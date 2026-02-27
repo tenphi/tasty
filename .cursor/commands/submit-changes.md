@@ -20,11 +20,15 @@ Short description of what changed.
 - Use `patch` for fixes and small changes, `minor` for new features or non-breaking API changes, `major` for breaking changes.
 - The description should be a concise user-facing summary (what changed, not how).
 
-## 2. Format code
+## 2. Typecheck
+
+Run `pnpm typecheck`. **Stop and report the error if it fails** — do not proceed to formatting or committing.
+
+## 3. Format code
 
 Run `pnpm format` to format code before committing.
 
-## 3. Commit
+## 4. Commit
 
 Use **Conventional Commits** format:
 
@@ -39,7 +43,7 @@ type(scope): short description
 - Before 1.0.0 release treat major changes as minor and minor as patches.
 - Do not include markdown files that are not in the repo yet and wasn't staged manually by the user.
 
-## 4. Push
+## 5. Push
 
 - **Never push to `main`**. Verify the current branch first.
 - If on `main`, stop and warn the user.

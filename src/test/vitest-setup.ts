@@ -39,7 +39,7 @@ expect.extend({
   },
 });
 
-const tastySerializer = {
+const tastySerializer: Parameters<typeof expect.addSnapshotSerializer>[0] = {
   test(val: unknown): val is ParentNode {
     return !!(
       val &&
@@ -48,9 +48,10 @@ const tastySerializer = {
     );
   },
 
-  print(val: ParentNode, serialize: (v: unknown) => string): string {
-    const markup = serialize(val);
-    const css = getCssTextForNode(val);
+  print(val: unknown, serialize: (v: unknown) => string): string {
+    const node = val as ParentNode;
+    const markup = serialize(node);
+    const css = getCssTextForNode(node);
 
     if (!css.trim()) {
       return markup;

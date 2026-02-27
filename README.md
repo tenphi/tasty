@@ -226,6 +226,31 @@ module.exports = {
 | `lh` | Line height | `1lh` | `var(--line-height)` |
 | `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
 
+## `tasty` vs `tastyStatic`
+
+Tasty ships two styling APIs with different trade-offs. Pick the one that fits your project:
+
+| | `tasty` (runtime) | `tastyStatic` (zero-runtime) |
+|---|---|---|
+| **Import** | `@tenphi/tasty` | `@tenphi/tasty/static` |
+| **Output** | React component | CSS class name (string) |
+| **CSS injection** | At runtime via `<style>` tags | At build time via Babel plugin |
+| **Runtime overhead** | Style generation + injection on mount | None — CSS is pre-extracted |
+| **Requires Babel plugin** | No | Yes (`@tenphi/tasty/babel-plugin`) |
+| **Component creation** | `tasty({ as, styles, ... })` | `tastyStatic({ ... })` returns a class |
+| **Extending components** | `tasty(BaseComponent, { styles })` | `tastyStatic(baseStyle, { ... })` |
+| **Global / selector styles** | `useGlobalStyles(selector, styles)` | `tastyStatic(selector, styles)` |
+| **Style props at runtime** | Yes — `styleProps`, `styles`, `mods` | No — all values must be static |
+| **Dynamic values** | Fully supported | Only via CSS custom properties |
+| **Sub-elements** | Built-in (`elements` + `<C.Title>`) | Manual (use `data-element` + CSS) |
+| **Variants** | Built-in (`variants` option) | Manual (create separate static styles) |
+| **Tokens** | `tokens` prop → inline CSS vars | `processTokens()` helper |
+| **Design tokens & units** | Full support (`#color`, `2x`, `1r`) | Full support (`#color`, `2x`, `1r`) |
+| **State mappings** | Full support (modifiers, media, etc.) | Full support (modifiers, media, etc.) |
+| **Recipes** | Supported via `configure()` | Supported via Babel plugin config |
+| **Framework** | React only | Framework-agnostic (requires Babel) |
+| **Best for** | Interactive React apps, design systems | Static sites, landing pages, SSG |
+
 ## Documentation
 
 - [Runtime API (tasty)](docs/tasty.md) — Full runtime styling documentation

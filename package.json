@@ -55,7 +55,7 @@
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm run build && changeset publish"
+    "release": "changeset publish"
   },
   "repository": {
     "type": "git",

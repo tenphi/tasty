@@ -1,5 +1,12 @@
 # @tenphi/tasty
 
+## 0.1.2
+
+### Patch Changes
+
+- Mark Node builtins (fs, path, crypto) as external to suppress build warnings
+- Deduplicate CI builds on push to main
+
 ## 0.1.1
 
 ### Patch Changes

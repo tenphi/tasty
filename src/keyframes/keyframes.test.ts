@@ -3,7 +3,7 @@
  */
 import { configure, resetConfig } from '../config';
 import { destroy } from '../injector';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import {
   extractAnimationNamesFromStyles,

@@ -1,7 +1,7 @@
 import { StyleParser } from '../parser/parser';
 import { okhslFunc } from '../plugins/okhsl-plugin';
 import { createStateParserContext, parseAdvancedState } from '../states';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import { cacheWrapper } from './cache-wrapper';
 import { camelToKebab } from './case-converter';
@@ -9,7 +9,11 @@ import { hslToRgb } from './hsl-to-rgb';
 import { okhslToRgb } from './okhsl-to-rgb';
 
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
-import type { AtRuleContext, ParsedAdvancedState } from '../states';
+import type {
+  AtRuleContext,
+  ParsedAdvancedState,
+  StateParserContext,
+} from '../states';
 
 export type StyleValue<T = string> = T | boolean | number | null | undefined;
 
@@ -34,9 +38,7 @@ export function normalizeColorTokenValue<T>(
   return value as T;
 }
 
-export type StyleValueStateMap<T = string> = {
-  [key: string]: StyleValue<T> | '@inherit';
-};
+export type StyleValueStateMap<T = string> = Record<string, StyleValue<T> | '@inherit'>;
 
 /**
  * Combined type for style values that can be either a direct value or a state map.
@@ -46,9 +48,7 @@ export type StylePropValue<T = string> = StyleValue<T> | StyleValueStateMap<T>;
 
 export type ComputeModel = string | number;
 
-export type CSSMap = { $?: string | string[] } & {
-  [key: string]: string | string[];
-};
+export type CSSMap = { $?: string | string[] } & Record<string, string | string[]>;
 
 export type StyleHandlerResult = CSSMap | CSSMap[] | void;
 
@@ -72,7 +72,7 @@ export type StyleHandlerDefinition =
 export interface StyleStateData {
   model?: ComputeModel;
   tokens?: string[];
-  value: StyleValue | StyleValueStateMap;
+  value: StyleValue | StyleValueStateMap | StyleStateData;
   /** The list of mods to apply */
   mods: string[];
   /** The list of **not** mods to apply (e.g. `:not(:hover)`) */
@@ -95,11 +95,11 @@ export interface ParsedColor {
 
 export type StyleStateDataList = StyleStateData[];
 
-export type StyleStateDataListMap = { [key: string]: StyleStateDataList };
+export type StyleStateDataListMap = Record<string, StyleStateDataList>;
 
-export type StyleMap = { [key: string]: StyleValue | StyleValueStateMap };
+export type StyleMap = Record<string, StyleValue | StyleValueStateMap>;
 
-export type StyleStateMap = { [key: string]: StyleStateData };
+export type StyleStateMap = Record<string, StyleStateData>;
 
 const devMode = process.env.NODE_ENV !== 'production';
 
@@ -203,10 +203,17 @@ export function getModSelector(modName: string): string {
   return MOD_NAME_CACHE.get(modName);
 }
 
-// Keep a single shared instance across the whole library so that the cache of
-// the new StyleParser keeps working and custom functions/units can be updated
-// at runtime.
-const __tastyParser = new StyleParser({ units: CUSTOM_UNITS });
+// Lazy-initialized to break the circular dependency:
+// parser.ts → classify.ts → utils/styles.ts → parser.ts
+let __tastyParser: StyleParser | null = null;
+
+function getOrCreateParser(): StyleParser {
+  if (!__tastyParser) {
+    __tastyParser = new StyleParser({ units: CUSTOM_UNITS });
+    __tastyParser.setFuncs(__tastyFuncs);
+  }
+  return __tastyParser;
+}
 
 // Registry for user-provided custom functions that the parser can call.
 // It is updated through the `customFunc` helper exported below.
@@ -216,15 +223,12 @@ const __tastyFuncs: Record<string, (groups: StyleDetails[]) => string> = {
   okhsl: okhslFunc,
 };
 
-// Eagerly register built-in functions on the parser.
-__tastyParser.setFuncs(__tastyFuncs);
-
 export function customFunc(
   name: string,
   fn: (groups: StyleDetails[]) => string,
 ) {
   __tastyFuncs[name] = fn;
-  __tastyParser.setFuncs(__tastyFuncs);
+  getOrCreateParser().setFuncs(__tastyFuncs);
 }
 
 /**
@@ -232,7 +236,7 @@ export function customFunc(
  * Used by configure() to apply parser configuration.
  */
 export function getGlobalParser(): StyleParser {
-  return __tastyParser;
+  return getOrCreateParser();
 }
 
 /**
@@ -290,7 +294,7 @@ export function setGlobalPredefinedTokens(
     ? { ...__globalPredefinedTokens, ...normalizedTokens }
     : normalizedTokens;
   // Clear parser cache since token values affect parsing
-  __tastyParser.clearCache();
+  getOrCreateParser().clearCache();
 }
 
 /**
@@ -309,7 +313,7 @@ export function getGlobalPredefinedTokens(): Record<string, string> | null {
 export function resetGlobalPredefinedTokens(): void {
   __globalPredefinedTokens = null;
   // Clear parser cache since token availability affects parsing
-  __tastyParser.clearCache();
+  getOrCreateParser().clearCache();
 }
 
 /**
@@ -330,7 +334,7 @@ export function parseStyle(value: StyleValue): ProcessedStyle {
     str = '';
   }
 
-  return __tastyParser.process(str);
+  return getOrCreateParser().process(str);
 }
 
 /**
@@ -352,15 +356,11 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   );
 
   let firstColor: string;
-  let shouldUseParser = false;
-
   if (isSimpleColor) {
     // For simple colors, use the value directly without parsing
     firstColor = val;
   } else {
-    // Complex value - might contain multiple tokens, fallback to full parser
-    shouldUseParser = true;
-    const processed = parseStyle(val as any);
+    const processed = parseStyle(val);
     const extractedColor = processed.groups.find((g) => g.colors.length)
       ?.colors[0];
 
@@ -409,7 +409,7 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   };
 }
 
-export function strToRgb(color, ignoreAlpha = false) {
+export function strToRgb(color, _ignoreAlpha = false) {
   if (!color) return undefined;
 
   if (color.startsWith('rgb')) return color;
@@ -514,15 +514,19 @@ export function extendStyles(defaultStyles, newStyles) {
  * @param [ignoreList] - A list of properties to ignore.
  */
 export function extractStyles(
-  props: { [key: string]: any },
+  props: Record<string, unknown>,
   styleList: readonly string[] = [],
   defaultStyles?: Styles,
-  propMap?: { [key: string]: string },
+  propMap?: Record<string, string>,
   ignoreList: readonly string[] = [],
 ): Styles {
   const styles: Styles = {
     ...defaultStyles,
-    ...(ignoreList.includes('styles') ? undefined : props.styles),
+    ...(ignoreList.includes('styles')
+      ? undefined
+      : props.styles && typeof props.styles === 'object'
+        ? (props.styles as Styles)
+        : undefined),
   };
 
   Object.keys(props).forEach((prop) => {
@@ -532,7 +536,7 @@ export function extractStyles(
     if (ignoreList && ignoreList.includes(prop)) {
       // do nothing
     } else if (styleList.includes(propName)) {
-      styles[propName] = value;
+      styles[propName] = value as Styles[keyof Styles];
     }
   }, {});
 
@@ -561,12 +565,15 @@ export const STATE_OPERATORS = {
 export const STATE_OPERATOR_LIST = ['!', '&', '|', '^'];
 
 /**
- *
+ * Convert state notation tokens to a compute model (string, or nested [op, lhs, rhs]).
  */
-function convertTokensToComputeUnits(tokens: any[]) {
+function convertTokensToComputeUnits(tokens: unknown[]): unknown {
   if (tokens.length === 1) {
     return tokens[0];
   }
+
+  const hasLength = (x: unknown): x is string | unknown[] =>
+    typeof x === 'string' || Array.isArray(x);
 
   STATE_OPERATOR_LIST.forEach((operator) => {
     let i;
@@ -575,19 +582,24 @@ function convertTokensToComputeUnits(tokens: any[]) {
       const token = tokens[i];
 
       if (token === '!') {
-        if (tokens[i + 1] && tokens[i + 1].length !== 1) {
-          tokens.splice(i, 2, ['!', tokens[i + 1]]);
+        const next = tokens[i + 1];
+        if (next !== undefined && hasLength(next) && next.length !== 1) {
+          tokens.splice(i, 2, ['!', next]);
         } else {
           tokens.splice(i, 1);
         }
       } else {
+        const prev = tokens[i - 1];
+        const next = tokens[i + 1];
         if (
-          tokens[i - 1] &&
-          tokens[i + 1] &&
-          tokens[i - 1].length !== 1 &&
-          tokens[i + 1].length !== 1
+          prev !== undefined &&
+          next !== undefined &&
+          hasLength(prev) &&
+          hasLength(next) &&
+          prev.length !== 1 &&
+          next.length !== 1
         ) {
-          tokens.splice(i - 1, 3, [token, tokens[i - 1], tokens[i + 1]]);
+          tokens.splice(i - 1, 3, [token, prev, next]);
         } else {
           tokens.splice(i, 1);
         }
@@ -606,8 +618,7 @@ function replaceCommasOutsideParens(str: string): string {
   let result = '';
   let depth = 0;
 
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
+  for (const char of str) {
 
     if (char === '(') {
       depth++;
@@ -629,7 +640,10 @@ function replaceCommasOutsideParens(str: string): string {
 /**
  * Parse state notation and return tokens, modifiers and compute model.
  */
-function parseStateNotationInner(notation: string, value: any): StyleStateData {
+function parseStateNotationInner(
+  notation: string,
+  value: StyleValue | StyleValueStateMap | StyleStateData,
+): StyleStateData {
   const tokens = replaceCommasOutsideParens(notation).match(STATES_REGEXP);
 
   if (!tokens || !tokens.length) {
@@ -652,10 +666,10 @@ function parseStateNotationInner(notation: string, value: any): StyleStateData {
 
   const mods: string[] = [];
 
-  let operations: any[][] = [[]];
+  const operations: unknown[][] = [[]];
   let list = operations[0];
   let position = 0;
-  let operation: any[];
+  let operation: unknown[];
 
   tokens.forEach((token) => {
     switch (token) {
@@ -666,7 +680,9 @@ function parseStateNotationInner(notation: string, value: any): StyleStateData {
         break;
       case ')':
         position--;
-        operations[position].push(convertTokensToComputeUnits(list));
+        operations[position].push(
+          convertTokensToComputeUnits(list as unknown[]),
+        );
         list = operations[position];
         break;
       default:
@@ -681,7 +697,9 @@ function parseStateNotationInner(notation: string, value: any): StyleStateData {
 
   while (position) {
     position--;
-    operations[position].push(convertTokensToComputeUnits(list));
+    operations[position].push(
+      convertTokensToComputeUnits(list as unknown[]),
+    );
     list = operations[position];
   }
 
@@ -689,7 +707,9 @@ function parseStateNotationInner(notation: string, value: any): StyleStateData {
     tokens,
     mods,
     notMods: [],
-    model: convertTokensToComputeUnits(operations[0]),
+    model: convertTokensToComputeUnits(
+      operations[0] as unknown[],
+    ) as ComputeModel | undefined,
     value,
   };
 }
@@ -818,7 +838,7 @@ function buildRootSelector(condition: string, isNegated: boolean): string {
  */
 export function styleStateMapToStyleStateDataList(
   styleStateMap: StyleStateMap | StyleValue | StyleValueStateMap,
-  parserContext?: import('../states').StateParserContext,
+  parserContext?: StateParserContext,
 ): { states: StyleStateDataList; mods: string[]; hasAdvancedStates: boolean } {
   if (typeof styleStateMap !== 'object' || !styleStateMap) {
     return {
@@ -952,7 +972,7 @@ export const COMPUTE_FUNC_MAP = {
  */
 export function computeState(
   computeModel: ComputeModel,
-  valueMap: (number | boolean)[] | { [key: string]: boolean } | Function,
+  valueMap: (number | boolean)[] | Record<string, boolean> | ((...args: unknown[]) => unknown),
 ) {
   if (!computeModel) return true;
 
@@ -1003,13 +1023,12 @@ export function computeState(
 
 const _innerCache = new WeakMap();
 
-export function stringifyStyles(styles: any): string {
+export function stringifyStyles(styles: unknown): string {
   if (styles == null || typeof styles !== 'object') return '';
   const keys = Object.keys(styles).sort();
   const parts: string[] = [];
-  for (let i = 0; i < keys.length; i++) {
-    const k = keys[i],
-      v = styles[k];
+  for (const k of keys) {
+    const v = styles[k];
     if (v === undefined || typeof v === 'function' || typeof v === 'symbol')
       continue;
 
@@ -1026,8 +1045,7 @@ export function stringifyStyles(styles: any): string {
       if (sv === undefined) {
         const innerKeys = Object.keys(v).sort();
         const innerParts: string[] = [];
-        for (let j = 0; j < innerKeys.length; j++) {
-          const ik = innerKeys[j];
+        for (const ik of innerKeys) {
           const ivs = JSON.stringify(v[ik]);
           if (ivs !== undefined)
             innerParts.push(JSON.stringify(ik) + ':' + ivs);

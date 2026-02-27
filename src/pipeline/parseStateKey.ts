@@ -6,18 +6,21 @@
  */
 
 import { Lru } from '../parser/lru';
+import type {
+  StateParserContext} from '../states';
 import {
   expandDimensionShorthands,
   expandTastyUnits,
   findTopLevelComma,
-  resolvePredefinedState,
-  StateParserContext,
+  resolvePredefinedState
 } from '../states';
 import { camelToKebab } from '../utils/case-converter';
 
+import type {
+  ConditionNode,
+  NumericBound} from './conditions';
 import {
   and,
-  ConditionNode,
   createContainerDimensionCondition,
   createContainerRawCondition,
   createContainerStyleCondition,
@@ -31,7 +34,6 @@ import {
   createStartingCondition,
   createSupportsCondition,
   not,
-  NumericBound,
   or,
   trueCondition,
 } from './conditions';
@@ -137,8 +139,7 @@ function replaceCommasOutsideParens(str: string): string {
   let result = '';
   let depth = 0;
 
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
+  for (const char of str) {
     if (char === '(') {
       depth++;
       result += char;

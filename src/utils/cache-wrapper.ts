@@ -1,30 +1,30 @@
 /**
  * Create a function that caches the result up to the limit.
  */
-export function cacheWrapper<
-  T extends (firstArg: any, secondArg?: string) => any,
->(handler: T, limit = 1000): T {
-  let cache: { string?: ReturnType<T> } = {};
+export function cacheWrapper<A, B, R>(
+  handler: (firstArg: A, secondArg?: B) => R,
+  limit = 1000,
+): (firstArg: A, secondArg?: B) => R {
+  const cache = new Map<string, R>();
   let count = 0;
 
-  return ((firstArg: any, secondArg?: string) => {
+  return (firstArg: A, secondArg?: B) => {
     const key =
       typeof firstArg === 'string' && secondArg == null
         ? firstArg
         : JSON.stringify([firstArg, secondArg]);
 
-    if (!cache[key]) {
+    let result = cache.get(key);
+    if (result === undefined) {
       if (count > limit) {
-        cache = {};
+        cache.clear();
         count = 0;
       }
-
       count++;
-
-      cache[key] =
+      result =
         secondArg == null ? handler(firstArg) : handler(firstArg, secondArg);
+      cache.set(key, result);
     }
-
-    return cache[key];
-  }) as T;
+    return result;
+  };
 }

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { SheetManager } from './sheet-manager';
-import { StyleInjectorConfig, StyleRule } from './types';
+import type { StyleInjectorConfig, StyleRule } from './types';
 
 // Helper function to create StyleRule from CSS for testing
 function createStyleRule(selector: string, declarations: string): StyleRule {
@@ -240,7 +240,7 @@ describe('SheetManager', () => {
         'rule1',
         document,
       );
-      const rule2 = sheetManager.insertRule(
+      const _rule2 = sheetManager.insertRule(
         registry,
         [createStyleRule('.rule2', 'color: blue;')],
         'rule2',
@@ -564,7 +564,7 @@ describe('SheetManager', () => {
   describe('bulk cleanup scheduling', () => {
     it('should use requestIdleCallback when idleCleanup is enabled', () => {
       // Mock requestIdleCallback
-      const mockRequestIdleCallback = vi.fn((callback) => {
+      const mockRequestIdleCallback = vi.fn((_callback) => {
         return 123; // mock handle - don't execute callback immediately
       });
       const mockCancelIdleCallback = vi.fn();

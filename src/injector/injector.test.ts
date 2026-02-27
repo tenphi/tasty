@@ -1,12 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { createElement } from 'react';
-
-import { StyleResult } from '../pipeline';
+import type { StyleResult } from '../pipeline';
 
 import { StyleInjector } from './injector';
-import { StyleInjectorConfig } from './types';
+import type { StyleInjectorConfig } from './types';
 
 // Helper function to convert CSS string to StyleResult array for testing
 function cssToStyleResults(css: string, className = 'test'): StyleResult[] {

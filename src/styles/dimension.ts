@@ -1,3 +1,4 @@
+import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
 const DEFAULT_MIN_SIZE = 'var(--gap)';
@@ -74,11 +75,11 @@ export function dimensionStyle(name: 'width' | 'height') {
 
       const processed = parseStyle(val);
       const { mods, values } =
-        processed.groups[0] ?? ({ mods: [], values: [] } as any);
+        processed.groups[0] ?? makeEmptyDetails();
 
       let flag = false;
 
-      for (let mod of mods) {
+      for (const mod of mods) {
         switch (mod) {
           case 'min':
             styles[minStyle] = values[0] || DEFAULT_MIN_SIZE;

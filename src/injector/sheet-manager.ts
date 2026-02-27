@@ -1,8 +1,6 @@
-import { Lru } from '../parser/lru';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
-import { camelToKebab } from '../utils/case-converter';
 
-import {
+import type {
   CacheMetrics,
   KeyframesInfo,
   KeyframesSteps,
@@ -15,7 +13,11 @@ import {
   StyleRule,
 } from './types';
 
-import type { StyleHandler } from '../utils/styles';
+import type {
+  CSSMap,
+  StyleHandler,
+  StyleValueStateMap,
+} from '../utils/styles';
 
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
@@ -350,7 +352,7 @@ export class SheetManager {
           insertedRuleTexts.push(fullRule);
           try {
             registry.ruleTextSet.add(fullRule);
-          } catch (_) {
+          } catch {
             // noop: defensive in case ruleTextSet is unavailable
           }
         }
@@ -495,7 +497,7 @@ export class SheetManager {
           ki.ruleIndex = Math.max(0, ki.ruleIndex - deleteCount);
         }
       }
-    } catch (_) {
+    } catch {
       // Defensive: do not let index adjustments crash cleanup
     }
   }
@@ -594,7 +596,7 @@ export class SheetManager {
           for (const text of texts) {
             registry.ruleTextSet.delete(text);
           }
-        } catch (_) {
+        } catch {
           // noop
         }
       }
@@ -608,7 +610,7 @@ export class SheetManager {
    */
   private findAvailableSheet(
     registry: RootRegistry,
-    root: Document | ShadowRoot,
+    _root: Document | ShadowRoot,
   ): SheetInfo | null {
     const maxRules = this.config.maxRulesPerSheet;
 
@@ -715,7 +717,7 @@ export class SheetManager {
     // Group by sheet for efficient deletion
     const rulesBySheet = new Map<
       number,
-      Array<{ className: string; ruleInfo: RuleInfo }>
+      { className: string; ruleInfo: RuleInfo }[]
     >();
 
     // Calculate CSS size before deletion and group rules
@@ -739,7 +741,7 @@ export class SheetManager {
     }
 
     // Delete rules from each sheet (in reverse order to preserve indices)
-    for (const [sheetIndex, rulesInSheet] of rulesBySheet) {
+    for (const [_sheetIndex, rulesInSheet] of rulesBySheet) {
       // Sort by rule index in descending order for safe deletion
       rulesInSheet.sort((a, b) => b.ruleInfo.ruleIndex - a.ruleInfo.ruleIndex);
 
@@ -902,7 +904,7 @@ export class SheetManager {
       }
 
       // Treat value as a style map and process via tasty style handlers
-      const styleMap = (value || {}) as Record<string, any>;
+      const styleMap = (value || {}) as StyleValueStateMap;
 
       // Build a deterministic handler queue based on present style keys
       const styleNames = Object.keys(styleMap).sort();
@@ -926,26 +928,26 @@ export class SheetManager {
 
       // Accumulate declarations (ordered). We intentionally ignore `$` selector fan-out
       // and any responsive/state bindings for keyframes.
-      const declarationPairs: Array<{ prop: string; value: string }> = [];
+      const declarationPairs: { prop: string; value: string }[] = [];
 
       handlerQueue.forEach((handler) => {
         const lookup = handler.__lookupStyles;
-        const filteredMap = lookup.reduce(
+        const filteredMap = lookup.reduce<StyleValueStateMap>(
           (acc, name) => {
             const v = styleMap[name];
             if (v !== undefined) acc[name] = v;
             return acc;
           },
-          {} as Record<string, any>,
+          {},
         );
 
-        const result = handler(filteredMap as any);
+        const result = handler(filteredMap);
         if (!result) return;
 
         const results = Array.isArray(result) ? result : [result];
         results.forEach((cssMap) => {
           if (!cssMap || typeof cssMap !== 'object') return;
-          const { $, ...props } = cssMap as Record<string, any>;
+          const { $: _$, ...props } = cssMap as CSSMap;
 
           Object.entries(props).forEach(([prop, val]) => {
             if (val == null || val === '') return;
@@ -1195,7 +1197,7 @@ export class SheetManager {
    */
   injectRawCSS(css: string, root: Document | ShadowRoot): RawCSSResult {
     if (!css.trim()) {
-      return { dispose: () => {} };
+      return { dispose: () => { /* noop */ } };
     }
 
     const styleElement = this.getOrCreateRawStyleElement(root);

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { configure, resetConfig } from '../config';
-import { StyleResult } from '../pipeline';
+import type { StyleResult } from '../pipeline';
 import {
   getGlobalPredefinedTokens,
   resetGlobalPredefinedTokens,

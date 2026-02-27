@@ -1,4 +1,4 @@
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import { mergeStyles } from './merge-styles';
 

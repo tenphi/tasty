@@ -6,6 +6,7 @@ import {
   parseStyle,
   strToRgb,
 } from '../utils/styles';
+import type { StyleValue } from '../utils/styles';
 
 const CACHE = {};
 
@@ -140,7 +141,7 @@ export function createStyle(
         };
       }
 
-      const processed = parseStyle(styleValue as any);
+      const processed = parseStyle(styleValue as StyleValue);
       return { [finalCssStyle]: processed.output };
     };
 

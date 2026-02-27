@@ -7,7 +7,7 @@ import {
   hasGlobalRecipes,
   resetConfig,
 } from '../config';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import { resolveRecipes } from './resolve-recipes';
 

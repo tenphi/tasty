@@ -1,7 +1,8 @@
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 
-import { createStaticStyle, isStaticStyle, StaticStyle } from './types';
+import type { StaticStyle } from './types';
+import { createStaticStyle, isStaticStyle } from './types';
 
 /**
  * Generate styles and return a StaticStyle object.

@@ -6,8 +6,8 @@
  */
 
 import { getGlobalKeyframes, hasGlobalKeyframes } from '../config';
-import { KeyframesSteps } from '../injector/types';
-import { Styles } from '../styles/types';
+import type { KeyframesSteps } from '../injector/types';
+import type { Styles } from '../styles/types';
 
 // ============================================================================
 // Constants

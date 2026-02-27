@@ -1,3 +1,4 @@
+import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
 interface ScrollbarStyleProps {
@@ -19,7 +20,7 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
   const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
   const { mods, colors, values } =
-    processed.groups[0] ?? ({ mods: [], colors: [], values: [] } as any);
+    processed.groups[0] ?? makeEmptyDetails();
   const style = {};
 
   // Default colors for scrollbar

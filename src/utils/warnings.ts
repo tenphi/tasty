@@ -1,11 +1,12 @@
+/* eslint-disable no-console */
 const PREFIX = 'Tasty';
 
-export function warn(...args) {
+export function warn(...args: unknown[]) {
   console.warn(`${PREFIX}:`, ...args);
 }
 
 export function deprecationWarning(
-  condition: any,
+  condition: unknown,
   {
     property,
     name,
@@ -40,6 +41,8 @@ export function deprecationWarning(
         : betterAlternative
     }`,
   );
-  reason && warn(`Reason: ${typeof reason === 'function' ? reason() : reason}`);
+  if (reason) {
+    warn(`Reason: ${typeof reason === 'function' ? reason() : reason}`);
+  }
   console.groupEnd();
 }

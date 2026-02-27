@@ -1,7 +1,7 @@
 import { okhslFunc } from '../plugins/okhsl-plugin';
 
 import { StyleParser } from './parser';
-import { StyleDetails } from './types';
+import type { StyleDetails } from './types';
 
 const parser = new StyleParser({
   funcs: {
@@ -553,7 +553,7 @@ describe('StyleProcessor', () => {
   });
 
   test('skips invalid functions while parsing (for example missing closing parenthesis)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
     const expr =
       'blur(10px) drop-shadow(0 0 1px rgb(var(--dark-color-rgb) / 20%)';
@@ -1220,7 +1220,7 @@ describe('#current color token', () => {
   });
 
   test('warning is logged when defining token with bare #current value', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
     setGlobalPredefinedTokens({
       '#my-color': '#current',
@@ -1238,7 +1238,7 @@ describe('#current color token', () => {
   });
 
   test('#current with opacity is allowed in predefined tokens', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
     setGlobalPredefinedTokens({
       '#my-color': '#current.5',
@@ -1261,7 +1261,7 @@ describe('#current color token', () => {
   });
 
   test('#current-theme is allowed (not confused with #current)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
     setGlobalPredefinedTokens({
       '#current-theme': '#purple',

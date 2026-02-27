@@ -1,8 +1,9 @@
 import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectGlobal } from '../injector';
-import { renderStyles, StyleResult } from '../pipeline';
-import { Styles } from '../styles/types';
+import type { StyleResult } from '../pipeline';
+import { renderStyles } from '../pipeline';
+import type { Styles } from '../styles/types';
 import { resolveRecipes } from '../utils/resolve-recipes';
 
 /**

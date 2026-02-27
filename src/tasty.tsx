@@ -1,20 +1,21 @@
-import {
+import type {
   AllHTMLAttributes,
   ComponentType,
-  createElement,
-  forwardRef,
   ForwardRefExoticComponent,
   JSX,
   PropsWithoutRef,
-  RefAttributes,
+  RefAttributes} from 'react';
+import {
+  createElement,
+  forwardRef,
   useMemo,
 } from 'react';
 import { isValidElementType } from 'react-is';
 
 import { useStyles } from './hooks/useStyles';
 import { BASE_STYLES } from './styles/list';
-import { Styles, StylesInterface } from './styles/types';
-import {
+import type { Styles, StylesInterface } from './styles/types';
+import type {
   AllBaseProps,
   BaseProps,
   BaseStyleProps,
@@ -61,9 +62,6 @@ function handleIsProperties(props: Record<string, unknown>) {
     }
   }
 }
-
-// Basic props accepted by our base element
-type BaseElementProps = { as?: string } & Record<string, unknown>;
 
 /**
  * Creates a sub-element component for compound component patterns.
@@ -164,9 +162,9 @@ export type PropsWithStyles = {
 
 export type VariantMap = Record<string, Styles>;
 
-export type WithVariant<V extends VariantMap> = {
+export interface WithVariant<V extends VariantMap> {
   variant?: keyof V;
-};
+}
 
 // ============================================================================
 // Sub-element types for compound components
@@ -199,6 +197,7 @@ export type ElementsDefinition = Record<
 /**
  * Resolves the tag from a SubElementDefinition
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ResolveElementTag<T extends SubElementDefinition<any>> = T extends string
   ? T
   : T extends { as?: infer Tag }
@@ -246,7 +245,7 @@ type SubElementComponents<E extends ElementsDefinition> = {
 type TastyBaseProps<
   K extends StyleList,
   V extends VariantMap,
-  E extends ElementsDefinition = {},
+  E extends ElementsDefinition = Record<string, never>,
 > = {
   /** Default styles of the element. */
   styles?: Styles;
@@ -264,10 +263,11 @@ type TastyBaseProps<
 export type TastyProps<
   K extends StyleList,
   V extends VariantMap,
-  E extends ElementsDefinition = {},
+  E extends ElementsDefinition = Record<string, never>,
   DefaultProps = Props,
 > = TastyBaseProps<K, V, E> & {
   /** The tag name of the element or a React component. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: string | ComponentType<any>;
 } & Partial<Omit<DefaultProps, 'as' | 'styles' | 'styleProps' | 'tokens'>>;
 
@@ -282,15 +282,13 @@ export type TastyProps<
 export type TastyElementOptions<
   K extends StyleList,
   V extends VariantMap,
-  E extends ElementsDefinition = {},
+  E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
 > = TastyBaseProps<K, V, E> & {
   /** The tag name of the element or a React component. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: Tag | ComponentType<any>;
-} & {
-  /** Allow additional props without polluting style type checking */
-  [key: string]: unknown;
-};
+} & Record<string, unknown>;
 
 export type AllBasePropsWithMods<K extends StyleList> = AllBaseProps & {
   [key in K[number]]?:
@@ -356,7 +354,7 @@ type TastyComponentPropsWithDefaults<
 export function tasty<
   K extends StyleList,
   V extends VariantMap,
-  E extends ElementsDefinition = {},
+  E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
 >(
   options: TastyElementOptions<K, V, E, Tag>,
@@ -370,14 +368,16 @@ export function tasty<
   DefaultProps extends Partial<Props> = Partial<Props>,
 >(
   Component: ComponentType<Props>,
-  options?: TastyProps<never, never, {}, Props>,
+  options?: TastyProps<never, never, Record<string, never>, Props>,
 ): ComponentType<TastyComponentPropsWithDefaults<Props, DefaultProps>>;
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Implementation
 export function tasty<
   K extends StyleList,
   V extends VariantMap,
-  C = Record<string, unknown>,
+   
+  _C = Record<string, unknown>,
 >(Component: any, options?: any) {
   if (isValidElementType(Component)) {
     return tastyWrap(Component as ComponentType<any>, options);
@@ -393,13 +393,13 @@ function tastyWrap<
   Component: ComponentType<P>,
   options?: TastyProps<never, never, P>,
 ): ComponentType<TastyComponentPropsWithDefaults<P, DefaultProps>> {
-  let {
+  const {
     as: extendTag,
     element: extendElement,
     ...defaultProps
   } = (options ?? {}) as TastyProps<never, never, P>;
 
-  let propsWithStyles = ['styles'].concat(
+  const propsWithStyles = ['styles'].concat(
     Object.keys(defaultProps).filter((prop) => prop.endsWith('Styles')),
   );
 
@@ -451,7 +451,7 @@ function tastyElement<
   V extends VariantMap,
   E extends ElementsDefinition,
 >(tastyOptions: TastyProps<K, V, E>) {
-  let {
+  const {
     as: originalAs = 'div',
     element: defaultElement,
     styles: defaultStyles,
@@ -480,7 +480,7 @@ function tastyElement<
     }
   }
 
-  let {
+  const {
     qa: defaultQa,
     qaVal: defaultQaVal,
     ...otherDefaultProps
@@ -490,9 +490,9 @@ function tastyElement<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
   >((allProps, ref) => {
-    let {
+    const {
       as,
-      styles,
+      styles: rawStyles,
       variant,
       mods,
       element,
@@ -508,6 +508,8 @@ function tastyElement<
         tokens?: Tokens;
         style?: Record<string, unknown>;
       };
+
+    let styles = rawStyles;
 
     // Optimize propStyles extraction - avoid creating empty objects
     let propStyles: Styles | null = null;

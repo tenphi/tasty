@@ -1,12 +1,12 @@
 import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { keyframes } from '../injector';
-import { KeyframesResult, KeyframesSteps } from '../injector/types';
+import type { KeyframesResult, KeyframesSteps } from '../injector/types';
 
-type UseKeyframesOptions = {
+interface UseKeyframesOptions {
   name?: string;
   root?: Document | ShadowRoot;
-};
+}
 
 /**
  * Hook to inject CSS @keyframes and return the generated animation name.

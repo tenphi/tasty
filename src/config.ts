@@ -200,11 +200,7 @@ export interface TastyConfig {
    * });
    * ```
    */
-  tokens?: {
-    [key: `$${string}`]: string | number | boolean;
-  } & {
-    [key: `#${string}`]: string | number | boolean;
-  };
+  tokens?: Record<`$${string}`, string | number | boolean> & Record<`#${string}`, string | number | boolean>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys). They may contain base styles,
@@ -364,10 +360,17 @@ export const INTERNAL_TOKENS: Record<string, string> = {
 // Global injector instance key
 const GLOBAL_INJECTOR_KEY = '__TASTY_GLOBAL_INJECTOR__';
 
+interface TastyGlobalStorage {
+  [GLOBAL_INJECTOR_KEY]?: StyleInjector;
+}
+
 declare global {
   interface Window {
-    [GLOBAL_INJECTOR_KEY]?: import('./injector/injector').StyleInjector;
+    [GLOBAL_INJECTOR_KEY]?: StyleInjector;
   }
+
+   
+  var __TASTY_GLOBAL_INJECTOR__: StyleInjector | undefined;
 }
 
 /**
@@ -381,7 +384,7 @@ export function isTestEnvironment(): boolean {
 
   // Check for test runner globals (safely)
   if (typeof global !== 'undefined') {
-    const g = global as any;
+    const g = global as unknown as Record<string, unknown>;
     if (g.vi || g.jest || g.expect || g.describe || g.it) {
       return true;
     }
@@ -397,7 +400,7 @@ export function isTestEnvironment(): boolean {
 
   // Check for other test runners
   if (typeof globalThis !== 'undefined') {
-    const gt = globalThis as any;
+    const gt = globalThis as unknown as Record<string, unknown>;
     if (gt.vitest || gt.mocha) {
       return true;
     }
@@ -782,7 +785,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalRecipes(mergedRecipes);
   }
 
-  // Create config without states, parser options, plugins, keyframes, properties, handlers, tokens, and recipes (handled separately)
+   
   const {
     states: _states,
     parserCacheSize: _parserCacheSize,
@@ -796,6 +799,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     recipes: _recipes,
     ...injectorConfig
   } = config;
+   
 
   const fullConfig: TastyConfig = {
     ...createDefaultConfig(),
@@ -807,7 +811,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   currentConfig = fullConfig;
 
   // Create/replace the global injector
-  const storage = typeof window !== 'undefined' ? window : (globalThis as any);
+  const storage: TastyGlobalStorage =
+    typeof window !== 'undefined' ? window : globalThis;
   storage[GLOBAL_INJECTOR_KEY] = new StyleInjector(fullConfig);
 }
 
@@ -826,8 +831,9 @@ export function getConfig(): TastyConfig {
  * Get the global injector instance.
  * Auto-configures with defaults if not already configured.
  */
-export function getGlobalInjector(): import('./injector/injector').StyleInjector {
-  const storage = typeof window !== 'undefined' ? window : (globalThis as any);
+export function getGlobalInjector(): StyleInjector {
+  const storage: TastyGlobalStorage =
+    typeof window !== 'undefined' ? window : globalThis;
 
   if (!storage[GLOBAL_INJECTOR_KEY]) {
     configure();
@@ -851,7 +857,8 @@ export function resetConfig(): void {
   clearPipelineCache();
   emittedWarnings.clear();
 
-  const storage = typeof window !== 'undefined' ? window : (globalThis as any);
+  const storage: TastyGlobalStorage =
+    typeof window !== 'undefined' ? window : globalThis;
   delete storage[GLOBAL_INJECTOR_KEY];
 }
 

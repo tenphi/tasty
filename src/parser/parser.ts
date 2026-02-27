@@ -1,16 +1,17 @@
 import { classify } from './classify';
 import { Lru } from './lru';
 import { scan } from './tokenizer';
+import type {
+  ParserOptions,
+  ProcessedStyle,
+  StyleDetails,
+  StyleDetailsPart} from './types';
 import {
   Bucket,
   finalizeGroup,
   finalizePart,
   makeEmptyDetails,
-  makeEmptyPart,
-  ParserOptions,
-  ProcessedStyle,
-  StyleDetails,
-  StyleDetailsPart,
+  makeEmptyPart
 } from './types';
 
 export class StyleParser {
@@ -101,7 +102,7 @@ export class StyleParser {
       currentPart = makeEmptyPart();
     };
 
-    scan(stripped, (tok, isComma, isSlash, prevChar) => {
+    scan(stripped, (tok, isComma, isSlash, _prevChar) => {
       if (tok) {
         // Accumulate raw token into currentGroup.input
         if (currentGroup.input) {

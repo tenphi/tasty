@@ -1,4 +1,4 @@
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 /**
  * Static style definition returned by tastyStatic().

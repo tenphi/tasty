@@ -236,7 +236,7 @@ export type ChunkName = (typeof CHUNK_NAMES)[keyof typeof CHUNK_NAMES];
  * Pre-computed map for O(1) style-to-chunk lookup.
  * Built once at module load time.
  */
-export const STYLE_TO_CHUNK: Map<string, ChunkName> = new Map();
+export const STYLE_TO_CHUNK = new Map<string, ChunkName>();
 
 // Populate the lookup map
 function populateStyleToChunkMap() {
@@ -285,7 +285,7 @@ const CHUNK_ORDER: readonly string[] = [
 /**
  * Map from chunk name to its priority index for sorting.
  */
-const CHUNK_PRIORITY: Map<string, number> = new Map(
+const _CHUNK_PRIORITY = new Map<string, number>(
   CHUNK_ORDER.map((name, index) => [name, index]),
 );
 

@@ -3,23 +3,26 @@
  * Eliminates CSS string parsing for better performance
  */
 
-import { StyleResult } from '../pipeline';
+import type { StyleResult } from '../pipeline';
 import {
   colorInitialValueToRgb,
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
 import { isDevEnv } from '../utils/is-dev-env';
+import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
 import { SheetManager } from './sheet-manager';
-import {
+import type {
+  CacheMetrics,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
   PropertyDefinition,
   RawCSSResult,
+  RootRegistry,
   StyleInjectorConfig,
   StyleRule,
 } from './types';
@@ -36,6 +39,11 @@ export class StyleInjector {
   private config: StyleInjectorConfig;
   private cleanupScheduled = false;
   private globalRuleCounter = 0;
+
+  /** @internal — exposed for debug utilities only */
+  get _sheetManager(): SheetManager {
+    return this.sheetManager;
+  }
 
   constructor(config: StyleInjectorConfig = {}) {
     this.config = config;
@@ -95,7 +103,7 @@ export class StyleInjector {
     if (rules.length === 0) {
       return {
         className: '',
-        dispose: () => {},
+        dispose: () => { /* noop */ },
       };
     }
 
@@ -208,7 +216,7 @@ export class StyleInjector {
 
       return {
         className,
-        dispose: () => {},
+        dispose: () => { /* noop */ },
       };
     }
 
@@ -252,7 +260,7 @@ export class StyleInjector {
     const registry = this.sheetManager.getRegistry(root);
 
     if (!rules || rules.length === 0) {
-      return { dispose: () => {} };
+      return { dispose: () => { /* noop */ } };
     }
 
     // Use a non-tasty identifier to avoid any collisions with .t{number} classes
@@ -300,7 +308,7 @@ export class StyleInjector {
   /**
    * Dispose of a className
    */
-  private dispose(className: string, registry: any): void {
+  private dispose(className: string, registry: RootRegistry): void {
     const currentRefCount = registry.refCounts.get(className);
     // Guard against stale double-dispose or mismatched lifecycle
     if (currentRefCount == null || currentRefCount <= 0) {
@@ -385,7 +393,7 @@ export class StyleInjector {
   /**
    * Get cache performance metrics
    */
-  getMetrics(options?: { root?: Document | ShadowRoot }): any {
+  getMetrics(options?: { root?: Document | ShadowRoot }): CacheMetrics | null {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     return this.sheetManager.getMetrics(registry);
@@ -486,7 +494,7 @@ export class StyleInjector {
         initialValueStr = String(definition.initialValue);
       } else {
         // Process via tasty parser to resolve custom units/functions
-        initialValueStr = parseStyle(definition.initialValue as any).output;
+        initialValueStr = parseStyle(definition.initialValue as StyleValue).output;
       }
       parts.push(`initial-value: ${initialValueStr};`);
     }
@@ -574,7 +582,7 @@ export class StyleInjector {
     if (Object.keys(steps).length === 0) {
       return {
         toString: () => '',
-        dispose: () => {},
+        dispose: () => { /* noop */ },
       };
     }
 
@@ -624,7 +632,7 @@ export class StyleInjector {
     if (!info) {
       return {
         toString: () => '',
-        dispose: () => {},
+        dispose: () => { /* noop */ },
       };
     }
 
@@ -650,7 +658,7 @@ export class StyleInjector {
   /**
    * Dispose keyframes
    */
-  private disposeKeyframes(contentHash: string, registry: any): void {
+  private disposeKeyframes(contentHash: string, registry: RootRegistry): void {
     const entry = registry.keyframesCache.get(contentHash);
     if (!entry) return;
 

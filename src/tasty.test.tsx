@@ -1,14 +1,36 @@
 import { cleanup, getByTestId, render } from '@testing-library/react';
-import { act } from 'react';
-
-import { Button } from '../components/actions';
-import { Block } from '../components/Block';
-import { Space } from '../components/layout/Space';
+import { act, forwardRef } from 'react';
 
 import { configure, resetConfig } from './config';
 import { useGlobalStyles } from './hooks';
 import { CONTAINER_STYLES } from './styles/list';
 import { tasty } from './tasty';
+
+const BaseButton = tasty({ as: 'button' });
+
+const Button = forwardRef<HTMLButtonElement, Record<string, any>>(
+  function Button({ type, ...props }, ref) {
+    return <BaseButton ref={ref} data-type={type} {...props} />;
+  },
+) as typeof BaseButton;
+
+const Block = tasty({ as: 'div' });
+
+const Space = tasty({
+  as: 'div',
+  styles: {
+    display: 'flex',
+    gap: true,
+    flow: {
+      '': 'row',
+      vertical: 'column',
+    },
+    placeItems: {
+      '': 'center stretch',
+      vertical: 'stretch',
+    },
+  },
+});
 
 describe('tasty() API', () => {
   it('should handle color fallback syntax', () => {
@@ -764,7 +786,7 @@ describe('tokens prop', () => {
   it('should warn on object token values', () => {
     const consoleWarnSpy = vi
       .spyOn(console, 'warn')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { /* noop */ });
 
     const Element = tasty({});
 
@@ -905,7 +927,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalButtonStyles />
         <button data-variant="primary">Primary Button</button>
@@ -943,7 +965,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalInteractiveStyles />
         <div className="interactive-element">Interactive Element</div>
@@ -986,7 +1008,7 @@ describe('useGlobalStyles() hook', () => {
 
     // Verify styles are injected when component is mounted
     let styleElements = document.head.querySelectorAll('[data-tasty]');
-    let styleContent = Array.from(styleElements)
+    const styleContent = Array.from(styleElements)
       .map((el) => el.textContent)
       .join('');
     expect(styleContent).toContain('.temporary-element');
@@ -998,9 +1020,6 @@ describe('useGlobalStyles() hook', () => {
 
     // Verify styles are cleaned up
     styleElements = document.head.querySelectorAll('[data-tasty]');
-    styleContent = Array.from(styleElements)
-      .map((el) => el.textContent)
-      .join('');
 
     // Either the style element is removed or the content no longer contains our selector
     const finalStyleCount = styleElements.length;
@@ -1064,7 +1083,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalCardStyles />
         <div className="global-card">
@@ -1106,7 +1125,7 @@ describe('useGlobalStyles() hook', () => {
       },
     });
 
-    const { container } = render(
+    render(
       <Card>
         <div data-element="Actions">
           <button>Action 1</button>
@@ -1192,7 +1211,7 @@ describe('useGlobalStyles() hook', () => {
   it('should warn when selector affix targets outside root scope', () => {
     const consoleWarnSpy = vi
       .spyOn(console, 'warn')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { /* noop */ });
 
     const Component = tasty({
       styles: {
@@ -1237,7 +1256,7 @@ describe('useGlobalStyles() hook', () => {
   it('should not warn when combinator has proper spaces in selector affix ($)', () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { /* noop */ });
 
     const Component = tasty({
       styles: {
@@ -1286,7 +1305,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalHeadingStyles />
         <GlobalParagraphStyles />
@@ -1332,7 +1351,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalWithPseudoStyles />
         <div className="pseudo-test" tabIndex={0}>
@@ -1365,7 +1384,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalAttributeSelectorStyles />
         <div data-testid="global-attr">Element with attribute selector</div>
@@ -1402,7 +1421,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container } = render(
+    render(
       <div>
         <GlobalComplexStyles />
         <GlobalDescendantStyles />
@@ -1453,7 +1472,7 @@ describe('useGlobalStyles() hook', () => {
       return null;
     }
 
-    const { container, rerender } = render(
+    const { rerender } = render(
       <div>
         <DynamicGlobalStyles1 />
         <div className="dynamic-selector">Dynamic content</div>

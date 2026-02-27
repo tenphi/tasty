@@ -1,6 +1,6 @@
-import { AllHTMLAttributes, ComponentType, CSSProperties } from 'react';
+import type { AllHTMLAttributes, ComponentType, CSSProperties } from 'react';
 
-import {
+import type {
   BASE_STYLES,
   BLOCK_INNER_STYLES,
   BLOCK_OUTER_STYLES,
@@ -14,7 +14,7 @@ import {
   POSITION_STYLES,
   TEXT_STYLES,
 } from './styles/list';
-import { Styles } from './styles/types';
+import type { Styles } from './styles/types';
 
 export interface GlobalStyledProps {
   breakpoints?: number[];
@@ -34,7 +34,7 @@ export interface GlobalStyledProps {
  * }
  * ```
  */
-
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TastyThemeNames {}
 
 type ThemeNameKey = Extract<keyof TastyThemeNames, string>;
@@ -52,9 +52,7 @@ export type ModValue = boolean | string | number | undefined | null;
  *   selected?: boolean;
  * }>;
  */
-export type Mods<T extends Record<string, ModValue> = {}> = T & {
-  [key: string]: ModValue;
-};
+export type Mods<T extends Record<string, ModValue> = Record<string, ModValue>> = T & Record<string, ModValue>;
 
 /**
  * Token value: string or number (processed), boolean for special handling, undefined/null (skipped).
@@ -69,9 +67,7 @@ export type TokenValue = string | number | boolean | undefined | null;
  * - `$name` keys become `--name` CSS properties
  * - `#name` keys become `--name-color` and `--name-color-rgb` CSS properties
  */
-export type Tokens = {
-  [key: `$${string}` | `#${string}`]: TokenValue;
-};
+export type Tokens = Record<`$${string}` | `#${string}`, TokenValue>;
 
 type Caps =
   | 'A'
@@ -104,6 +100,7 @@ type Caps =
 export interface BasePropsWithoutChildren<K extends TagName = TagName>
   extends Pick<AllHTMLAttributes<HTMLElement>, 'className' | 'role' | 'id'> {
   /** The HTML tag or React component to render as */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: K | ComponentType<any>;
   /** QA ID for e2e testing. An alias for `data-qa` attribute. */
   qa?: string;
@@ -130,7 +127,7 @@ export interface BasePropsWithoutChildren<K extends TagName = TagName>
   /** The CSS style map */
   style?:
     | CSSProperties
-    | (CSSProperties & { [key: string]: string | number | null | undefined });
+    | (CSSProperties & Record<string, string | number | null | undefined>);
   /** User-defined theme for the element. Mapped to `data-theme` attribute. Augment `TastyThemeNames` to register project-specific themes for autocomplete. */
   theme?: ThemeName | (string & {});
   /** CSS custom property tokens rendered as inline styles */
@@ -189,16 +186,15 @@ export type ContainerStyleProps = Pick<
 export type OuterStyleProps = Pick<Styles, (typeof OUTER_STYLES)[number]>;
 export type InnerStyleProps = Pick<Styles, (typeof INNER_STYLES)[number]>;
 
-export type ShortGridStyles = {
+export interface ShortGridStyles {
   template?: Styles['gridTemplate'];
   columns?: Styles['gridColumns'];
   rows?: Styles['gridRows'];
   areas?: Styles['gridAreas'];
-};
-
-export interface Props {
-  [key: string]: any;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Props = Record<string, any>;
 
 export type TagName = keyof HTMLElementTagNameMap;
 

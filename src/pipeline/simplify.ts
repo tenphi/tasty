@@ -12,18 +12,15 @@
 
 import { Lru } from '../parser/lru';
 
-import {
-  and,
+import type {
   ConditionNode,
   ContainerCondition,
-  falseCondition,
-  getConditionUniqueId,
   MediaCondition,
   ModifierCondition,
-  not,
-  NumericBound,
-  or,
-  StateCondition,
+  NumericBound} from './conditions';
+import {
+  falseCondition,
+  getConditionUniqueId,
   trueCondition,
 } from './conditions';
 
@@ -589,7 +586,7 @@ function hasAttributeConflict(terms: ConditionNode[]): boolean {
   }
 
   // Check each attribute for conflicts
-  for (const [attr, group] of modifiersByAttr) {
+  for (const [_attr, group] of modifiersByAttr) {
     // Multiple different values for same attribute in positive → conflict
     const positiveValues = group.positive
       .filter((m) => m.value !== undefined)
@@ -864,7 +861,7 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
   const mergedTerms: ConditionNode[] = [];
 
   // Merge media conditions
-  for (const [dim, group] of mediaByDim) {
+  for (const [_dim, group] of mediaByDim) {
     if (group.conditions.length > 1) {
       const merged = mergeMediaRanges(group.conditions);
       if (merged) {

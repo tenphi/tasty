@@ -20,11 +20,10 @@ import { BASE_TOKENS } from './base';
 import { COLOR_TOKENS } from './colors';
 import { LAYOUT_TOKENS } from './layout';
 import { SHADOW_TOKENS } from './shadows';
-import { SIZE_NAME_TO_KEY, SIZE_TOKENS, SIZES } from './sizes';
+import { SIZE_TOKENS } from './sizes';
 import { SPACE_TOKENS } from './spacing';
 
 import type { Styles } from '../styles/types';
-import type { SizeKey, SizeName } from './sizes';
 
 /**
  * All design tokens combined into a single Styles object.

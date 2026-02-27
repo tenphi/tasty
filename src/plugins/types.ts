@@ -29,9 +29,7 @@ export interface TastyPlugin {
    */
   handlers?: Record<string, StyleHandlerDefinition>;
   /** Predefined tokens replaced during style parsing (`$name` or `#name`) */
-  tokens?: {
-    [key: `$${string}` | `#${string}`]: string | number;
-  };
+  tokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys).

@@ -6,11 +6,12 @@
  * ensuring exactly one condition matches at any given time.
  */
 
-import { StyleValue } from '../utils/styles';
+import type { StyleValue } from '../utils/styles';
 
+import type {
+  ConditionNode} from './conditions';
 import {
   and,
-  ConditionNode,
   isCompoundCondition,
   not,
   trueCondition,

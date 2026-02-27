@@ -8,7 +8,7 @@ import {
 } from '../chunks';
 import { getGlobalKeyframes, hasGlobalKeyframes } from '../config';
 import { allocateClassName, inject, keyframes, property } from '../injector';
-import { KeyframesSteps, PropertyDefinition } from '../injector/types';
+import type { KeyframesSteps } from '../injector/types';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -17,9 +17,9 @@ import {
   mergeKeyframes,
   replaceAnimationNames,
 } from '../keyframes';
-import { RenderResult } from '../pipeline';
+import type { RenderResult } from '../pipeline';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import { stringifyStyles } from '../utils/styles';
 

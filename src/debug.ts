@@ -1,10 +1,18 @@
+/* eslint-disable no-console */
 /**
  * Debug utilities for inspecting tasty-generated CSS at runtime
  */
 
 import { CHUNK_NAMES } from './chunks/definitions';
 import { getCssTextForNode, injector } from './injector';
+import type { CleanupStats } from './injector/types';
 import { isDevEnv } from './utils/is-dev-env';
+
+declare global {
+  interface Window {
+    tastyDebug?: typeof tastyDebug;
+  }
+}
 
 // Type definitions for the new API
 type CSSTarget =
@@ -44,12 +52,12 @@ interface CacheMetrics {
   totalInsertions: number;
   totalUnused: number;
   stylesCleanedUp: number;
-  cleanupHistory: Array<{
+  cleanupHistory: {
     timestamp: number;
     classesDeleted: number;
     cssSize: number;
     rulesDeleted: number;
-  }>;
+  }[];
   startTime: number;
 
   // Calculated metrics
@@ -67,7 +75,7 @@ interface CacheStatus {
 
 interface Definitions {
   properties: string[]; // defined via @property
-  keyframes: Array<{ name: string; refCount: number }>;
+  keyframes: { name: string; refCount: number }[];
 }
 
 interface SummaryOptions {
@@ -121,7 +129,7 @@ interface Summary {
   // Metrics & definitions
   metrics: CacheMetrics | null;
   definedProperties: string[];
-  definedKeyframes: Array<{ name: string; refCount: number }>;
+  definedKeyframes: { name: string; refCount: number }[];
   propertyCount: number;
   keyframeCount: number;
 
@@ -201,7 +209,7 @@ function prettifyCSS(css: string): string {
 
     // Current line with proper indentation
     const indent = ' '.repeat(indentLevel * indentSize);
-    let result = indent + trimmed;
+    const result = indent + trimmed;
 
     // Handle opening braces - increase indent for next line
     if (trimmed.endsWith('{')) {
@@ -269,11 +277,11 @@ function findAllStyledClasses(
 
 function extractCSSRules(
   css: string,
-): Array<{ selector: string; declarations: string }> {
-  const rules: Array<{ selector: string; declarations: string }> = [];
+): { selector: string; declarations: string }[] {
+  const rules: { selector: string; declarations: string }[] = [];
 
   // Remove comments
-  let cleanCSS = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const cleanCSS = css.replace(/\/\*[\s\S]*?\*\//g, '');
 
   let i = 0;
   while (i < cleanCSS.length) {
@@ -383,7 +391,7 @@ function getPageCSS(options?: {
             const rules = Array.from(sheet.cssRules);
             cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
           }
-        } catch (e) {
+        } catch {
           // Cross-origin sheet or other access error
           if (includeCrossOrigin) {
             cssChunks.push(
@@ -393,7 +401,7 @@ function getPageCSS(options?: {
         }
       }
     }
-  } catch (e) {
+  } catch {
     // Fallback error handling
   }
 
@@ -410,7 +418,8 @@ function getPageStats(options?: {
   skippedStylesheets: number;
 } {
   const root = options?.root || document;
-  const includeCrossOrigin = options?.includeCrossOrigin ?? false;
+   
+  const _includeCrossOrigin = options?.includeCrossOrigin ?? false;
 
   let cssSize = 0;
   let ruleCount = 0;
@@ -432,12 +441,12 @@ function getPageStats(options?: {
               0,
             );
           }
-        } catch (e) {
+        } catch {
           skippedStylesheets++;
         }
       }
     }
-  } catch (e) {
+  } catch {
     // Fallback error handling
   }
 
@@ -483,7 +492,7 @@ function getChunkForClassName(
   className: string,
   root: Document | ShadowRoot = document,
 ): { chunkName: string | null; cacheKey: string | null } {
-  const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+  const registry = injector.instance._sheetManager?.getRegistry(
     root,
   );
   if (!registry) {
@@ -515,7 +524,7 @@ function getChunkBreakdown(root: Document | ShadowRoot = document): {
   >;
   totalChunkTypes: number;
 } {
-  const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+  const registry = injector.instance._sheetManager?.getRegistry(
     root,
   );
 
@@ -581,9 +590,7 @@ export const tastyDebug = {
         css = injector.instance.getCssTextForClasses(activeClasses, { root });
       } else if (target === 'unused') {
         // Get unused classes (refCount = 0) from the registry
-        const registry = (injector.instance as any)[
-          'sheetManager'
-        ]?.getRegistry(root);
+        const registry = injector.instance._sheetManager?.getRegistry(root);
         const unusedClasses: string[] = registry
           ? Array.from(
               registry.refCounts.entries() as IterableIterator<
@@ -681,9 +688,10 @@ export const tastyDebug = {
   }): CacheStatus {
     const { root = document } = opts || {};
     const activeClasses = findAllTastyClasses(root);
-    const allClasses = findAllStyledClasses(root);
+     
+    const _allClasses = findAllStyledClasses(root);
     // Get unused classes (refCount = 0) from the registry
-    const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+    const registry = injector.instance._sheetManager?.getRegistry(
       root,
     );
     const unusedClasses: string[] = registry
@@ -810,7 +818,7 @@ export const tastyDebug = {
     opts?: { root?: Document | ShadowRoot },
   ): { css: string; ruleCount: number; size: number } {
     const { root = document } = opts || {};
-    const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+    const registry = injector.instance._sheetManager?.getRegistry(
       root,
     );
 
@@ -895,7 +903,7 @@ export const tastyDebug = {
     // Get properties from injector if available, otherwise scan CSS
     let properties: string[] = [];
     try {
-      const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+      const registry = injector.instance._sheetManager?.getRegistry(
         root,
       );
       if (registry?.injectedProperties) {
@@ -916,9 +924,9 @@ export const tastyDebug = {
     }
 
     // Get keyframes
-    let keyframes: Array<{ name: string; refCount: number }> = [];
+    let keyframes: { name: string; refCount: number }[] = [];
     try {
-      const registry = (injector.instance as any)['sheetManager']?.getRegistry(
+      const registry = injector.instance._sheetManager?.getRegistry(
         root,
       );
       if (registry) {
@@ -989,7 +997,9 @@ export const tastyDebug = {
       averageClassesPerCleanup: 0,
       averageCssPerCleanup: 0,
       averageRulesPerCleanup: 0,
-      lastCleanup: undefined as any,
+      lastCleanup: undefined as
+        | (CleanupStats & { date: string })
+        | undefined,
     };
 
     if (cleanupSummary.totalCleanups > 0) {
@@ -1255,9 +1265,9 @@ export const tastyDebug = {
   install(): void {
     if (
       typeof window !== 'undefined' &&
-      (window as any).tastyDebug !== tastyDebug
+      window.tastyDebug !== tastyDebug
     ) {
-      (window as any).tastyDebug = tastyDebug;
+      window.tastyDebug = tastyDebug;
       console.log(
         '🎨 tastyDebug installed on window. Run tastyDebug.help() for quick start guide.',
       );
@@ -1306,7 +1316,8 @@ export const tastyDebug = {
 
       // Show stats and CSS for each sub-element
       subElements.forEach((element) => {
-        const elementSelector = `[data-element="${element}"]`;
+         
+        const _elementSelector = `[data-element="${element}"]`;
         const elementRegex = new RegExp(
           `[^}]*\\[data-element="${element.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\][^{]*\\{[^}]*\\}`,
           'gm',

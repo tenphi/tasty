@@ -13,7 +13,7 @@ import {
   extractLocalPredefinedStates,
   extractPredefinedStateRefs,
 } from '../states';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 /**
  * Recursively serialize a value with sorted keys for stable output.

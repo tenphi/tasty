@@ -2,7 +2,7 @@ import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectRawCSS } from '../injector';
 
-type UseRawCSSOptions = { root?: Document | ShadowRoot };
+interface UseRawCSSOptions { root?: Document | ShadowRoot }
 
 /**
  * Hook to inject raw CSS text directly without parsing.

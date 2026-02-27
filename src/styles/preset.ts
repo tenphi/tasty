@@ -1,6 +1,7 @@
+import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
-import { Styles } from './types';
+import type { Styles } from './types';
 
 /**
  * Convert a value to CSS, handling numbers as pixels for numeric properties
@@ -125,10 +126,10 @@ export function presetStyle({
 
   // Handle preset if defined
   if (hasPreset) {
-    let presetValue = preset === true ? '' : String(preset);
+    const presetValue = preset === true ? '' : String(preset);
 
     const processed = parseStyle(presetValue);
-    let { mods } = processed.groups[0] ?? ({ mods: [] } as any);
+    let { mods } = processed.groups[0] ?? makeEmptyDetails();
 
     const isStrong = mods.includes('strong');
     const isItalic = mods.includes('italic');

@@ -21,7 +21,8 @@ interface GroupData {
  * Process a single group and return gradient strings for its directions.
  */
 function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
-  let { values, mods, colors } = group;
+  let { values } = group;
+  const { mods, colors } = group;
 
   let directions = filterMods(
     mods,

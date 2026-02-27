@@ -5,9 +5,10 @@
  * to only include relevant keys before passing to renderStyles.
  */
 
-import { RenderResult, renderStyles } from '../pipeline';
+import type { RenderResult} from '../pipeline';
+import { renderStyles } from '../pipeline';
 import { extractLocalPredefinedStates } from '../states';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import { CHUNK_NAMES } from './definitions';
 

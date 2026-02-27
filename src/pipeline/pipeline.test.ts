@@ -4,8 +4,6 @@
  * Tests for the new style rendering pipeline.
  */
 
-import { createStateParserContext } from '../states';
-
 import {
   and,
   createMediaDimensionCondition,
@@ -1189,7 +1187,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip invalid standalone + selector', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Item: {
@@ -1209,7 +1207,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip invalid standalone ~ selector', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Item: {
@@ -1228,7 +1226,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip +Element pattern (targets outside root)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Next: {
@@ -1247,7 +1245,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip ~Element pattern (targets outside root)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Other: {
@@ -1266,7 +1264,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip consecutive combinators', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Item: {
@@ -1591,7 +1589,7 @@ describe('Sub-element selector affix ($) tests', () => {
 
   describe('Invalid pattern validation', () => {
     it('should warn and skip numeric-only patterns', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Label: {
@@ -1610,7 +1608,7 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip patterns starting with numbers', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
       const styles = {
         Label: {
@@ -1728,8 +1726,8 @@ describe('@supports queries snapshot tests', () => {
     // But the key is: NO overlapping, and exactly 2 DISTINCT rules (by selector/at-rule)
 
     // Verify we have distinct rules with no overlap
-    const atRules = result.map((r) => r.atRules?.[0] || 'none');
-    const selectors = result.map((r) => r.selector);
+    const _atRules = result.map((r) => r.atRules?.[0] || 'none');
+    const _selectors = result.map((r) => r.selector);
 
     // Should have 3 rules (2 for default covering !A and A&!B, 1 for A&B)
     expect(result.length).toBe(3);

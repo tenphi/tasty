@@ -6,7 +6,7 @@
  */
 
 import { hasStylesGenerated } from '../config';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 
 /**

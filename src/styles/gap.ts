@@ -1,3 +1,4 @@
+import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
 export function gapStyle({
@@ -32,7 +33,7 @@ export function gapStyle({
   }
 
   const processed = parseStyle(gap);
-  const { values } = processed.groups[0] ?? ({ values: [] } as any);
+  const { values } = processed.groups[0] ?? makeEmptyDetails();
 
   gap = values.join(' ');
 

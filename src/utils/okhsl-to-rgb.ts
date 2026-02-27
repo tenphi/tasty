@@ -99,9 +99,9 @@ const computeMaxSaturationOKLC = (a: number, b: number): number => {
   const km = dotYZ(OKLab_to_LMS_M[1], tmp3);
   const ks = dotYZ(OKLab_to_LMS_M[2], tmp3);
 
-  let l_ = 1.0 + sat * kl;
-  let m_ = 1.0 + sat * km;
-  let s_ = 1.0 + sat * ks;
+  const l_ = 1.0 + sat * kl;
+  const m_ = 1.0 + sat * km;
+  const s_ = 1.0 + sat * ks;
 
   const l = l_ ** 3;
   const m = m_ ** 3;
@@ -272,7 +272,7 @@ const OKHSLToOKLab = (hsl: Vec3): Vec3 => {
   const s = hsl[1];
   const l = hsl[2];
 
-  let L = toeInv(l);
+  const L = toeInv(l);
   let a = 0;
   let b = 0;
 

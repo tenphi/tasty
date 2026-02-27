@@ -34,7 +34,7 @@ describe('Style Handlers Configuration', () => {
     });
 
     it('should normalize multi lookup style tuple', () => {
-      const handler = ({ display, flow, gap }) =>
+      const handler = ({ display: _display, flow: _flow, gap }) =>
         gap ? { gap: gap } : undefined;
       const normalized = normalizeHandlerDefinition('customGap', [
         ['display', 'flow', 'gap'],
@@ -97,7 +97,7 @@ describe('Style Handlers Configuration', () => {
   describe('registerHandler', () => {
     it('should replace existing handlers for lookup styles', () => {
       // Get the original handler count
-      const originalHandlers = STYLE_HANDLER_MAP['fill']?.length || 0;
+      const _originalHandlers = STYLE_HANDLER_MAP['fill']?.length || 0;
 
       // Create a custom handler
       const customFill = ({ fill }) =>
@@ -234,7 +234,7 @@ describe('Style Handlers Configuration', () => {
   describe('resetHandlers', () => {
     it('should restore STYLE_HANDLER_MAP to initial state', () => {
       // Get original fill handler
-      const originalFillHandler = STYLE_HANDLER_MAP['fill']?.[0];
+      const _originalFillHandler = STYLE_HANDLER_MAP['fill']?.[0];
 
       // Register a custom handler
       const customFill = ({ fill }) =>

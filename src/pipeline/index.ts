@@ -15,41 +15,49 @@
  */
 
 import { Lru } from '../parser/lru';
+import type {
+  StateParserContext} from '../states';
 import {
   createStateParserContext,
-  extractLocalPredefinedStates,
-  StateParserContext,
+  extractLocalPredefinedStates
 } from '../states';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
-import { Styles } from '../styles/types';
-import { stringifyStyles, StyleHandler, StyleValue } from '../utils/styles';
+import type { Styles } from '../styles/types';
+import type {
+  StyleHandler,
+  StyleMap,
+  StyleValue,
+  StyleValueStateMap,
+} from '../utils/styles';
+import { stringifyStyles } from '../utils/styles';
 
+import type {
+  ConditionNode} from './conditions';
 import {
   and,
-  ConditionNode,
-  getConditionUniqueId,
   or,
-  StateCondition,
   trueCondition,
 } from './conditions';
+import type {
+  ExclusiveStyleEntry} from './exclusive';
 import {
   buildExclusiveConditions,
-  ExclusiveStyleEntry,
   expandExclusiveOrs,
   expandOrConditions,
   isValueMapping,
   parseStyleEntries,
 } from './exclusive';
+import type {
+  CSSRule,
+  SelectorVariant} from './materialize';
 import {
   buildAtRulesFromVariant,
   conditionToCSS,
-  CSSRule,
   modifierToCSS,
   pseudoToCSS,
-  rootConditionsToCSS,
-  SelectorVariant,
+  rootConditionsToCSS
 } from './materialize';
-import { parseStateKey, ParseStateKeyOptions } from './parseStateKey';
+import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
 // ============================================================================
@@ -78,15 +86,6 @@ export interface RenderResult {
 export interface PipelineResult {
   rules: CSSRule[];
   className?: string;
-}
-
-interface HandlerStateGroup {
-  handler: StyleHandler;
-  lookupStyles: string[];
-  stateSnapshots: Array<{
-    condition: ConditionNode;
-    values: Record<string, StyleValue>;
-  }>;
 }
 
 interface ComputedRule {
@@ -139,7 +138,7 @@ export function renderStylesPipeline(
       rules: rules.map((r) => ({
         ...r,
         needsClassName: true,
-      })) as any,
+      })),
     };
   }
 
@@ -228,7 +227,7 @@ function processStyles(
     if (!suffixes) continue; // Invalid selector, skip
 
     // Remove $ from nested styles
-    const { $: _omit, ...cleanedStyles } = nestedStyles;
+    const { $: _$, ...cleanedStyles } = nestedStyles;
 
     // Extract local predefined states scoped to this sub-element
     const subLocalStates = extractLocalPredefinedStates(cleanedStyles);
@@ -312,7 +311,7 @@ function processStyles(
     const computedRules: ComputedRule[] = [];
 
     for (const snapshot of stateSnapshots) {
-      const result = handler(snapshot.values as any);
+      const result = handler(snapshot.values as StyleValueStateMap);
       if (!result) continue;
 
       // Handler may return single or array
@@ -613,7 +612,7 @@ function validatePattern(pattern: string): AffixResult {
  */
 function processSinglePattern(pattern: string, key: string): string {
   // Strip leading & if present (implicit root reference, kept for compat)
-  let normalized = pattern.replace(/^&/, '').trim();
+  const normalized = pattern.replace(/^&/, '').trim();
 
   if (!normalized) {
     return ` [data-element="${key}"]`;
@@ -891,9 +890,8 @@ function normalizeSelectorSuffix(suffix: string): string {
 function buildHandlerQueue(
   styleKeys: string[],
   styles: Styles,
-): Array<{ handler: StyleHandler; styleMap: Record<string, any> }> {
-  const queue: Array<{ handler: StyleHandler; styleMap: Record<string, any> }> =
-    [];
+): { handler: StyleHandler; styleMap: StyleMap }[] {
+  const queue: { handler: StyleHandler; styleMap: StyleMap }[] = [];
   const seenHandlers = new Set<StyleHandler>();
 
   for (const styleName of styleKeys) {
@@ -908,11 +906,12 @@ function buildHandlerQueue(
       seenHandlers.add(handler);
 
       const lookupStyles = handler.__lookupStyles;
-      const styleMap: Record<string, any> = {};
+      const styleMap: StyleMap = {};
 
       for (const name of lookupStyles) {
-        if (styles[name] !== undefined) {
-          styleMap[name] = styles[name];
+        const val = styles[name];
+        if (val !== undefined) {
+          styleMap[name] = val as StyleValue | StyleValueStateMap;
         }
       }
 
@@ -929,7 +928,7 @@ function buildHandlerQueue(
 function computeStateCombinations(
   exclusiveByStyle: Map<string, ExclusiveStyleEntry[]>,
   lookupStyles: string[],
-): Array<{ condition: ConditionNode; values: Record<string, StyleValue> }> {
+): { condition: ConditionNode; values: Record<string, StyleValue> }[] {
   // Get entries for each style
   const entriesPerStyle = lookupStyles.map(
     (style) => exclusiveByStyle.get(style) || [],
@@ -939,10 +938,10 @@ function computeStateCombinations(
   const combinations = cartesianProduct(entriesPerStyle);
 
   // Build snapshots, simplifying and filtering impossible combinations
-  const snapshots: Array<{
+  const snapshots: {
     condition: ConditionNode;
     values: Record<string, StyleValue>;
-  }> = [];
+  }[] = [];
 
   for (const combo of combinations) {
     // Combine all exclusive conditions with AND
@@ -1204,7 +1203,7 @@ export function renderStyles(
           ? [rule.selector]
           : [''];
 
-      let finalSelector = selectorParts
+      const finalSelector = selectorParts
         .map((part) => {
           let sel = part
             ? `${classNameOrSelector}${part}`

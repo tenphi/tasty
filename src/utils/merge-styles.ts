@@ -1,5 +1,5 @@
 import { isSelector } from '../pipeline';
-import { Styles, StylesWithoutSelectors } from '../styles/types';
+import type { Styles, StylesWithoutSelectors } from '../styles/types';
 
 import { isDevEnv } from './is-dev-env';
 

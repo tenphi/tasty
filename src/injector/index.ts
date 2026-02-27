@@ -4,13 +4,14 @@ import {
   isTestEnvironment,
   markStylesGenerated,
 } from '../config';
-import { StyleResult } from '../pipeline';
+import type { StyleResult } from '../pipeline';
 
 import { StyleInjector } from './injector';
-import {
-  DisposeFunction,
+import type {
   GlobalInjectResult,
   InjectResult,
+  KeyframesResult,
+  KeyframesSteps,
   StyleInjectorConfig,
 } from './types';
 
@@ -84,9 +85,9 @@ export function getRawCSSText(options?: {
  * Inject keyframes and return object with toString() and dispose()
  */
 export function keyframes(
-  steps: import('./types').KeyframesSteps,
+  steps: KeyframesSteps,
   nameOrOptions?: string | { root?: Document | ShadowRoot; name?: string },
-): import('./types').KeyframesResult {
+): KeyframesResult {
   return getGlobalInjector().keyframes(steps, nameOrOptions);
 }
 
@@ -188,7 +189,7 @@ export function getCssTextForNode(
   const elements = (node as ParentNode).querySelectorAll
     ? (node as ParentNode).querySelectorAll('[class]')
     : ([] as unknown as NodeListOf<Element>);
-  elements && elements.forEach(readClasses);
+  if (elements) elements.forEach(readClasses);
 
   return getGlobalInjector().getCssTextForClasses(classSet, options);
 }

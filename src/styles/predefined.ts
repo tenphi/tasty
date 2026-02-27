@@ -1,5 +1,5 @@
 import { isDevEnv } from '../utils/is-dev-env';
-import {
+import type {
   RawStyleHandler,
   StyleHandler,
   StyleHandlerDefinition,
@@ -32,7 +32,8 @@ import { widthStyle } from './width';
 
 const devMode = isDevEnv();
 
-const numberConverter = (val) => {
+ 
+const _numberConverter = (val) => {
   if (typeof val === 'number') {
     return `${val}px`;
   }
@@ -180,7 +181,7 @@ export function predefine() {
     fadeStyle,
     insetStyle,
   ]
-    // @ts-ignore
+    // @ts-expect-error handler type varies across built-in style handlers
     .forEach((handler) => defineCustomStyle(handler));
 
   // Capture initial state after all built-in handlers are registered

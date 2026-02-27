@@ -17,7 +17,7 @@
 
 import { getGlobalRecipes } from '../config';
 import { isSelector } from '../pipeline';
-import { RecipeStyles, Styles } from '../styles/types';
+import type { RecipeStyles, Styles } from '../styles/types';
 
 import { isDevEnv } from './is-dev-env';
 import { mergeStyles } from './merge-styles';
@@ -113,6 +113,7 @@ function resolveRecipesForLevel(
   // Separate selector keys (sub-elements) from flat style properties.
   // mergeStyles handles selectors with its own semantics (e.g. false = delete),
   // but at this level we only want recipe merging on flat properties.
+   
   const { recipe: _recipe, ...allRest } = styles;
   const flatStyles: Record<string, unknown> = {};
   const selectorStyles: Record<string, unknown> = {};
@@ -176,13 +177,14 @@ export function resolveRecipes(styles: Styles): Styles {
   if (!recipes) return styles;
 
   let changed = false;
-  let result: Record<string, unknown> = {};
 
   // Resolve top-level recipe
   const topResolved = resolveRecipesForLevel(
     styles as Record<string, unknown>,
     recipes,
   );
+
+  let result: Record<string, unknown>;
 
   if (topResolved) {
     changed = true;

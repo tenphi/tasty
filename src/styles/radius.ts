@@ -1,3 +1,4 @@
+import { makeEmptyDetails } from '../parser/types';
 import { DIRECTIONS, parseStyle } from '../utils/styles';
 
 const PROP = 'var(--radius)';
@@ -13,8 +14,10 @@ export function radiusStyle({ radius }) {
   if (radius === true) radius = '1r';
 
   const processed = parseStyle(radius);
-  let { mods, values } =
-    processed.groups[0] ?? ({ mods: [], values: [] } as any);
+  const { mods } =
+    processed.groups[0] ?? makeEmptyDetails();
+  let { values } =
+    processed.groups[0] ?? makeEmptyDetails();
 
   if (mods.includes('round')) {
     values = ['9999rem'];

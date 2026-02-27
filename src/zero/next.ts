@@ -26,6 +26,7 @@ interface WebpackConfigContext {
   dir: string;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- webpack config types are complex */
 interface NextConfig {
   webpack?: (config: any, context: WebpackConfigContext) => any;
   [key: string]: unknown;

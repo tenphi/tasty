@@ -1,7 +1,7 @@
-import { CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
-import { KeyframesSteps, PropertyDefinition } from '../injector/types';
-import { StyleValue, StyleValueStateMap } from '../utils/styles';
+import type { KeyframesSteps, PropertyDefinition } from '../injector/types';
+import type { StyleValue, StyleValueStateMap } from '../utils/styles';
 
 /**
  * Extensible interface for named color tokens.
@@ -18,7 +18,7 @@ import { StyleValue, StyleValueStateMap } from '../utils/styles';
  * }
  * ```
  */
-
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TastyNamedColors {}
 
 type NamedColorKey = Extract<keyof TastyNamedColors, string>;
@@ -38,7 +38,7 @@ type NamedColor = [NamedColorKey] extends [never] ? string : NamedColorKey;
  * }
  * ```
  */
-
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TastyPresetNames {}
 
 type PresetNameKey = Extract<keyof TastyPresetNames, string>;
@@ -540,11 +540,8 @@ export type StylesWithoutSelectors = {
  * CSS custom properties (`$name`), and color tokens (`#name`).
  * Unlike StylesIndexSignature, does NOT allow sub-element selectors (recipes are flat).
  */
-export interface RecipeIndexSignature {
-  [key: string]:
-    | StyleValue<string | number | boolean | undefined>
-    | StyleValueStateMap<string | number | boolean | undefined>;
-}
+export type RecipeIndexSignature = Record<string, | StyleValue<string | number | boolean | undefined>
+    | StyleValueStateMap<string | number | boolean | undefined>>;
 
 /**
  * Style type for recipe definitions.

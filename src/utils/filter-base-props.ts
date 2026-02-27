@@ -44,11 +44,11 @@ interface PropsFilterOptions {
  * @param opts - Props to override.
  */
 export function filterBaseProps(
-  props,
+  props: Record<string, unknown>,
   opts: PropsFilterOptions = {},
-): Record<string, any> {
-  let { propNames, eventProps } = opts;
-  let filteredProps = {};
+): Record<string, unknown> {
+  const { propNames, eventProps } = opts;
+  const filteredProps: Record<string, unknown> = {};
 
   for (const prop in props) {
     if (

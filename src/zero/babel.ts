@@ -21,17 +21,16 @@ import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 
 import { configure } from '../config';
-import { RecipeStyles, Styles } from '../styles/types';
+import type { RecipeStyles, Styles } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
-import { StyleHandlerDefinition } from '../utils/styles';
+import type { StyleHandlerDefinition } from '../utils/styles';
 
 import { CSSWriter } from './css-writer';
 import {
   extractKeyframesFromStyles,
   extractStylesForSelector,
   extractStylesWithChunks,
-  KeyframesExtractionResult,
 } from './extractor';
 
 import type { NodePath, PluginPass } from '@babel/core';
@@ -114,9 +113,7 @@ export interface TastyZeroConfig {
    * Use `$name` for custom properties and `#name` for color tokens.
    * @example { $spacing: '2x', '#accent': '#purple' }
    */
-  tokens?: {
-    [key: `$${string}` | `#${string}`]: string | number;
-  };
+  tokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys).
@@ -142,12 +139,10 @@ export interface TastyZeroBabelOptions {
  * Registry to track StaticStyle objects by their variable names.
  * Used to resolve base styles when extending.
  */
-interface StaticStyleRegistry {
-  [variableName: string]: {
+type StaticStyleRegistry = Record<string, {
     styles: Styles;
     className: string;
-  };
-}
+  }>;
 
 interface PluginState extends PluginPass {
   staticStyleRegistry: StaticStyleRegistry;

@@ -136,7 +136,7 @@ describe('okhslPlugin', () => {
 
       it('returns fallback for missing values', () => {
         // Silence expected warning
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
 
         // Directly test okhslFunc with empty groups
         const result = okhslFunc([]);

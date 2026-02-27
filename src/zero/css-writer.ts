@@ -12,7 +12,7 @@ interface CSSBlock {
 }
 
 export class CSSWriter {
-  private cssBlocks: Map<string, CSSBlock> = new Map();
+  private cssBlocks = new Map<string, CSSBlock>();
   private outputPath: string;
   private devMode: boolean;
 

@@ -9,7 +9,8 @@ import {
   VALUE_KEYWORDS,
 } from './const';
 import { StyleParser } from './parser';
-import { Bucket, ParserOptions, ProcessedStyle } from './types';
+import type { ParserOptions, ProcessedStyle } from './types';
+import { Bucket } from './types';
 
 /**
  * Re-parses a value through the parser until it stabilizes (no changes)

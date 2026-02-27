@@ -9,8 +9,8 @@
  * - `#name` for color properties → `--name-color` (auto-sets syntax: '<color>')
  */
 
-import { PropertyDefinition } from '../injector/types';
-import { Styles } from '../styles/types';
+import type { PropertyDefinition } from '../injector/types';
+import type { Styles } from '../styles/types';
 import { getRgbValuesFromRgbaString, strToRgb } from '../utils/styles';
 
 // ============================================================================

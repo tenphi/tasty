@@ -5,7 +5,7 @@ import {
   generateChunkCacheKey,
   renderStylesForChunk,
 } from '../chunks';
-import { KeyframesSteps } from '../injector/types';
+import type { KeyframesSteps } from '../injector/types';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -13,8 +13,9 @@ import {
   hasLocalKeyframes,
   mergeKeyframes,
 } from '../keyframes';
-import { renderStyles, StyleResult } from '../pipeline';
-import { Styles } from '../styles/types';
+import type { StyleResult } from '../pipeline';
+import { renderStyles } from '../pipeline';
+import type { Styles } from '../styles/types';
 
 export interface ExtractedChunk {
   className: string;

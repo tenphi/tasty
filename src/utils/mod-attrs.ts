@@ -1,7 +1,7 @@
 /**
  * Generate data DOM attributes from modifier map.
  */
-import { AllBaseProps } from '../types';
+import type { AllBaseProps } from '../types';
 
 import { cacheWrapper } from './cache-wrapper';
 import { camelToKebab } from './case-converter';

@@ -319,8 +319,8 @@ export function isCompoundCondition(
 export function modifierUniqueId(
   attribute: string,
   value?: string,
-  operator: string = '=',
-  negated: boolean = false,
+  operator = '=',
+  negated = false,
 ): string {
   const base = value
     ? `mod:${attribute}${operator}${value}`
@@ -333,7 +333,7 @@ export function modifierUniqueId(
  */
 export function pseudoUniqueId(
   pseudo: string,
-  negated: boolean = false,
+  negated = false,
 ): string {
   const base = `pseudo:${pseudo}`;
   return negated ? `!${base}` : base;
@@ -352,7 +352,7 @@ export function mediaUniqueId(
     featureValue?: string;
     mediaType?: string;
   },
-  negated: boolean = false,
+  negated = false,
 ): string {
   let base: string;
 
@@ -392,7 +392,7 @@ export function containerUniqueId(
     propertyValue?: string;
     rawCondition?: string;
   },
-  negated: boolean = false,
+  negated = false,
 ): string {
   let base: string;
   const name = props.containerName || '_';
@@ -424,7 +424,7 @@ export function containerUniqueId(
  */
 export function rootUniqueId(
   selector: string,
-  negated: boolean = false,
+  negated = false,
 ): string {
   const base = `root:${selector}`;
   return negated ? `!${base}` : base;
@@ -435,7 +435,7 @@ export function rootUniqueId(
  */
 export function ownUniqueId(
   innerUniqueId: string,
-  negated: boolean = false,
+  negated = false,
 ): string {
   const base = `own:${innerUniqueId}`;
   return negated ? `!${base}` : base;
@@ -444,7 +444,7 @@ export function ownUniqueId(
 /**
  * Generate a normalized unique ID for a starting condition
  */
-export function startingUniqueId(negated: boolean = false): string {
+export function startingUniqueId(negated = false): string {
   return negated ? '!starting' : 'starting';
 }
 
@@ -454,7 +454,7 @@ export function startingUniqueId(negated: boolean = false): string {
 export function supportsUniqueId(
   subtype: 'feature' | 'selector',
   condition: string,
-  negated: boolean = false,
+  negated = false,
 ): string {
   const base = `supports:${subtype}:${condition}`;
   return negated ? `!${base}` : base;
@@ -471,7 +471,7 @@ export function createModifierCondition(
   attribute: string,
   value?: string,
   operator: '=' | '^=' | '$=' | '*=' = '=',
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): ModifierCondition {
   return {
@@ -491,7 +491,7 @@ export function createModifierCondition(
  */
 export function createPseudoCondition(
   pseudo: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): PseudoCondition {
   return {
@@ -511,7 +511,7 @@ export function createMediaDimensionCondition(
   dimension: 'width' | 'height' | 'inline-size' | 'block-size',
   lowerBound?: NumericBound,
   upperBound?: NumericBound,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): MediaCondition {
   return {
@@ -537,7 +537,7 @@ export function createMediaDimensionCondition(
 export function createMediaFeatureCondition(
   feature: string,
   featureValue?: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): MediaCondition {
   return {
@@ -557,7 +557,7 @@ export function createMediaFeatureCondition(
  */
 export function createMediaTypeCondition(
   mediaType: 'print' | 'screen' | 'all' | 'speech',
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): MediaCondition {
   return {
@@ -579,7 +579,7 @@ export function createContainerDimensionCondition(
   lowerBound?: NumericBound,
   upperBound?: NumericBound,
   containerName?: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): ContainerCondition {
   return {
@@ -607,7 +607,7 @@ export function createContainerStyleCondition(
   property: string,
   propertyValue?: string,
   containerName?: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): ContainerCondition {
   return {
@@ -636,7 +636,7 @@ export function createContainerStyleCondition(
 export function createContainerRawCondition(
   rawCondition: string,
   containerName?: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): ContainerCondition {
   return {
@@ -661,7 +661,7 @@ export function createContainerRawCondition(
  */
 export function createRootCondition(
   selector: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): RootCondition {
   return {
@@ -679,7 +679,7 @@ export function createRootCondition(
  */
 export function createOwnCondition(
   innerCondition: ConditionNode,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): OwnCondition {
   const innerUniqueId = getConditionUniqueId(innerCondition);
@@ -697,7 +697,7 @@ export function createOwnCondition(
  * Create a starting condition
  */
 export function createStartingCondition(
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): StartingCondition {
   return {
@@ -718,7 +718,7 @@ export function createStartingCondition(
 export function createSupportsCondition(
   subtype: 'feature' | 'selector',
   condition: string,
-  negated: boolean = false,
+  negated = false,
   raw?: string,
 ): SupportsCondition {
   return {

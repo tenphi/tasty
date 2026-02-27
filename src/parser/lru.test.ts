@@ -2,7 +2,7 @@ import { Lru } from './lru';
 
 describe('Lru', () => {
   it('should call onEvict callback when items are evicted', () => {
-    const evictedItems: Array<{ key: string; value: string }> = [];
+    const evictedItems: { key: string; value: string }[] = [];
     const onEvict = (key: string, value: string) => {
       evictedItems.push({ key, value });
     };
@@ -30,7 +30,7 @@ describe('Lru', () => {
   });
 
   it('should allow setting onEvict callback after construction', () => {
-    const evictedItems: Array<{ key: string; value: string }> = [];
+    const evictedItems: { key: string; value: string }[] = [];
     const lru = new Lru<string, string>(2);
 
     // Set callback later

@@ -1,3 +1,5 @@
+import type { StyleResult } from '../pipeline';
+
 export interface InjectResult {
   className: string;
   dispose: () => void;
@@ -108,7 +110,7 @@ export interface RootRegistry {
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline
-export type StyleRule = import('../pipeline').StyleResult;
+export type StyleRule = StyleResult;
 
 export interface KeyframesInfo {
   name: string;

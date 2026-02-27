@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { clearPipelineCache } from '../pipeline';
-import { Styles } from '../styles/types';
+import type { Styles } from '../styles/types';
 
 import { categorizeStyleKeys } from './definitions';
 import { renderStylesForChunk } from './renderChunk';

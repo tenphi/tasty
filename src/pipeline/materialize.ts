@@ -7,7 +7,7 @@
 
 import { Lru } from '../parser/lru';
 
-import {
+import type {
   ConditionNode,
   ContainerCondition,
   MediaCondition,
@@ -15,10 +15,8 @@ import {
   OwnCondition,
   PseudoCondition,
   RootCondition,
-  StartingCondition,
   StateCondition,
-  SupportsCondition,
-} from './conditions';
+  SupportsCondition} from './conditions';
 
 // ============================================================================
 // Types
@@ -1333,7 +1331,7 @@ function isOwnConditionsSuperset(
 function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
   // First pass: exact deduplication
   const seen = new Set<string>();
-  let result: SelectorVariant[] = [];
+  const result: SelectorVariant[] = [];
 
   for (const v of variants) {
     const key = getVariantKey(v);
@@ -1485,7 +1483,7 @@ function getConditionKey(node: ConditionNode): string {
 function buildCSSSelectorFromVariant(
   className: string,
   variant: SelectorVariant,
-  selectorSuffix: string = '',
+  selectorSuffix = '',
 ): string {
   // Start with base class (doubled for specificity)
   let selector = `.${className}.${className}`;
@@ -1603,7 +1601,7 @@ function getAtRulesKey(variant: SelectorVariant): string {
  * Returns an array of CSSRules because OR conditions may require multiple rules
  * (when different branches have different at-rules)
  */
-function materializeRule(
+function _materializeRule(
   condition: ConditionNode,
   declarations: Record<string, string>,
   selectorSuffix: string,

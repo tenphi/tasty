@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 // Convert complex js object to dot notation js object
 // url: https://github.com/vardars/dotize
@@ -18,9 +19,9 @@ export const dotize = {
   },
 
   getPathType: function (arrPath) {
-    let arrPathTypes = [];
-    for (let path in arrPath) {
-      let pathVal = arrPath[path];
+    const arrPathTypes = [];
+    for (const path in arrPath) {
+      const pathVal = arrPath[path];
       if (!pathVal) arrPathTypes.push(dotize.valTypes.none);
       else if (dotize.isNumber(pathVal))
         arrPathTypes.push(dotize.valTypes.array);
@@ -38,7 +39,7 @@ export const dotize = {
   },
 
   isEmptyObj: function (obj) {
-    for (let prop in obj) {
+    for (const prop in obj) {
       if (Object.hasOwnProperty.call(obj, prop)) return false;
     }
 
@@ -99,9 +100,9 @@ export const dotize = {
     }
 
     return (function recurse(o, p, isRoot) {
-      let isArrayItem = Array.isArray(o);
-      for (let f in o) {
-        let currentProp = o[f];
+      const isArrayItem = Array.isArray(o);
+      for (const f in o) {
+        const currentProp = o[f];
         if (
           currentProp &&
           typeof currentProp === 'object' &&
@@ -134,7 +135,7 @@ export const dotize = {
 
   backward: function (obj, prefix) {
     let newObj = {};
-    let arStartRegex = /\[(\d+)\]/g;
+    const arStartRegex = /\[(\d+)\]/g;
 
     // primitives
     if (dotize.isNotObject(obj) && dotize.isNotArray(obj)) {
@@ -146,10 +147,10 @@ export const dotize = {
     }
 
     for (let tProp in obj) {
-      let tPropVal = obj[tProp];
+      const tPropVal = obj[tProp];
 
       if (prefix) {
-        let prefixRegex = new RegExp('^' + prefix);
+        const prefixRegex = new RegExp('^' + prefix);
         tProp = tProp.replace(prefixRegex, '');
       }
 
@@ -157,8 +158,8 @@ export const dotize = {
 
       if (dotize.startsWith(tProp, '.')) tProp = tProp.replace(/^\./, '');
 
-      var arrPath = tProp.split('.');
-      var arrPathTypes = dotize.getPathType(arrPath);
+      const arrPath = tProp.split('.');
+      const arrPathTypes = dotize.getPathType(arrPath);
 
       // has array on root
       if (
@@ -171,14 +172,14 @@ export const dotize = {
 
       (function recurse(rPropVal, rObj, rPropValPrev, rObjPrev) {
         let currentPath = arrPath.shift();
-        let currentPathType = arrPathTypes.shift();
+        const currentPathType = arrPathTypes.shift();
 
         if (typeof currentPath == 'undefined' || currentPath == '') {
           newObj = rPropVal;
           return;
         }
 
-        let isArray = currentPathType == dotize.valTypes.array;
+        const isArray = currentPathType == dotize.valTypes.array;
 
         if (dotize.isNumber(currentPath)) currentPath = parseInt(currentPath);
 

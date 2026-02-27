@@ -1,0 +1,126 @@
+{
+  "name": "@tenphi/tasty",
+  "version": "0.1.0",
+  "description": "A design-system-integrated styling system and DSL for concise, state-aware UI styling",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./static": {
+      "import": {
+        "types": "./dist/static/index.d.ts",
+        "default": "./dist/static/index.js"
+      }
+    },
+    "./babel-plugin": {
+      "import": {
+        "types": "./dist/zero/babel.d.ts",
+        "default": "./dist/zero/babel.js"
+      }
+    },
+    "./zero": {
+      "import": {
+        "types": "./dist/zero/index.d.ts",
+        "default": "./dist/zero/index.js"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/zero/next.d.ts",
+        "default": "./dist/zero/next.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "prepublishOnly": "pnpm run build",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm run build && changeset publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tenphi/tasty.git"
+  },
+  "keywords": [
+    "css-in-js",
+    "styling",
+    "design-system",
+    "react",
+    "state-aware",
+    "zero-runtime",
+    "babel-plugin",
+    "typescript",
+    "dsl"
+  ],
+  "author": "Andrey Yamanov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tenphi/tasty/issues"
+  },
+  "homepage": "https://github.com/tenphi/tasty#readme",
+  "peerDependencies": {
+    "@babel/core": "^7.24.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@babel/core": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@babel/helper-plugin-utils": "^7.24.0",
+    "@babel/types": "^7.24.0",
+    "csstype": "^3.1.0",
+    "react-is": "^18.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
+    "@eslint/js": "^10.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/babel__core": "^7.20.5",
+    "@types/babel__helper-plugin-utils": "^7.10.3",
+    "@types/node": "^25.3.2",
+    "@types/react": "^19.0.0",
+    "@vitest/runner": "^4.0.18",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
+    "react": "^19.0.0",
+    "tsdown": "^0.20.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.0",
+    "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "packageManager": "pnpm@10.29.3"
+}

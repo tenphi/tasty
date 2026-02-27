@@ -395,7 +395,7 @@ function wrapHandler<T extends { __lookupStyles: string[] }>(handler: T): T {
  *
  * @example
  * ```ts
- * import { styleHandlers, configure } from '@cube-dev/ui-kit';
+ * import { styleHandlers, configure } from '@tenphi/tasty';
  *
  * configure({
  *   handlers: {

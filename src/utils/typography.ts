@@ -1,4 +1,4 @@
-import { TYPOGRAPHY_PRESETS, TypographyPreset } from '../../tokens/typography';
+import { TYPOGRAPHY_PRESETS, TypographyPreset } from '../tokens/typography';
 
 import type { Styles } from '../styles/types';
 

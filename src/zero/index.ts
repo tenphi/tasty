@@ -1,11 +1,11 @@
 /**
  * Zero-runtime module for programmatic use.
  *
- * For the Babel plugin, import from '@cube-dev/ui-kit/tasty/zero/babel'
+ * For the Babel plugin, import from '@tenphi/tasty/babel-plugin'
  *
  * @example
  * ```typescript
- * import { extractStylesWithChunks, CSSWriter } from '@cube-dev/ui-kit/tasty/zero';
+ * import { extractStylesWithChunks, CSSWriter } from '@tenphi/tasty/zero';
  *
  * const chunks = extractStylesWithChunks({ fill: '#blue', padding: '2x' });
  * const writer = new CSSWriter('output.css');

@@ -5,8 +5,8 @@
  *
  * @example
  * ```ts
- * import { configure } from '@cube-dev/ui-kit';
- * import { okhslPlugin } from '@cube-dev/ui-kit/tasty/plugins';
+ * import { configure } from '@tenphi/tasty';
+ * import { okhslPlugin } from '@tenphi/tasty';
  *
  * configure({
  *   plugins: [okhslPlugin()],

@@ -1,4 +1,3 @@
-import { AriaLabelingProps } from '@react-types/shared';
 import { AllHTMLAttributes, ComponentType, CSSProperties } from 'react';
 
 import {
@@ -27,7 +26,7 @@ export interface GlobalStyledProps {
  *
  * @example
  * ```typescript
- * declare module '@cube-dev/ui-kit' {
+ * declare module '@tenphi/tasty' {
  *   interface TastyThemeNames {
  *     danger: true;
  *     success: true;
@@ -139,8 +138,7 @@ export interface BasePropsWithoutChildren<K extends TagName = TagName>
 }
 
 export interface BaseProps<K extends TagName = TagName>
-  extends AriaLabelingProps,
-    BasePropsWithoutChildren<K>,
+  extends BasePropsWithoutChildren<K>,
     Pick<AllHTMLAttributes<HTMLElementTagNameMap[K]>, 'children'> {}
 
 export interface AllBaseProps<K extends TagName = TagName>
@@ -214,7 +212,7 @@ export type TagName = keyof HTMLElementTagNameMap;
  *
  * @example
  * ```typescript
- * import type { TastyExtensionConfig } from '@cube-dev/ui-kit';
+ * import type { TastyExtensionConfig } from '@tenphi/tasty';
  *
  * const config: TastyExtensionConfig = {
  *   tokens: ['#primary', '#danger', '$spacing'],

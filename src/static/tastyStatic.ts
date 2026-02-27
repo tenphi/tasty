@@ -70,7 +70,7 @@ export function tastyStatic(
       console.warn(
         `[tasty] tastyStatic('${stylesOrBaseOrSelector}', styles) was called at runtime. ` +
           'This indicates the Babel plugin is not configured. ' +
-          'Add @cube-dev/ui-kit/tasty/zero/babel to your Babel config.',
+          'Add @tenphi/tasty/babel-plugin to your Babel config.',
       );
     }
     return; // void
@@ -82,7 +82,7 @@ export function tastyStatic(
       console.warn(
         '[tasty] tastyStatic(base, styles) was called at runtime. ' +
           'This indicates the Babel plugin is not configured. ' +
-          'Add @cube-dev/ui-kit/tasty/zero/babel to your Babel config.',
+          'Add @tenphi/tasty/babel-plugin to your Babel config.',
       );
     }
     // Merge styles for dev mode preview (won't have real classNames)
@@ -98,7 +98,7 @@ export function tastyStatic(
     console.warn(
       '[tasty] tastyStatic(styles) was called at runtime. ' +
         'This indicates the Babel plugin is not configured. ' +
-        'Add @cube-dev/ui-kit/tasty/zero/babel to your Babel config.',
+        'Add @tenphi/tasty/babel-plugin to your Babel config.',
     );
   }
 

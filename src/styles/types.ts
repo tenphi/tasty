@@ -10,7 +10,7 @@ import { StyleValue, StyleValueStateMap } from '../utils/styles';
  *
  * @example
  * ```typescript
- * declare module '@cube-dev/ui-kit' {
+ * declare module '@tenphi/tasty' {
  *   interface TastyNamedColors {
  *     primary: true;
  *     danger: true;
@@ -30,7 +30,7 @@ type NamedColor = [NamedColorKey] extends [never] ? string : NamedColorKey;
  *
  * @example
  * ```typescript
- * declare module '@cube-dev/ui-kit' {
+ * declare module '@tenphi/tasty' {
  *   interface TastyPresetNames {
  *     h1: true;
  *     t3: true;

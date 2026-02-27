@@ -1,0 +1,111 @@
+---
+description: Tasty project structure, purpose, commands, and conventions
+alwaysApply: true
+---
+
+# Tasty — Design-System-Integrated Styling System
+
+Package: `@tenphi/tasty` — a styling system and DSL for concise, state-aware UI styling with design system integration.
+
+## Key Features
+
+- Declarative, state-aware CSS-in-JS styling
+- Design token integration (colors, units, typography)
+- Sub-element styling via data attributes
+- Advanced state mapping (media, container, root, supports queries)
+- Zero-runtime mode via Babel plugin
+- Plugin system (OKHSL color support, etc.)
+- React hooks for programmatic style injection
+
+## Project Structure
+
+```
+src/
+  index.ts              # Main entry point (runtime exports)
+  tasty.tsx              # Core tasty() factory
+  config.ts             # Configuration system
+  types.ts              # Core TypeScript types
+  debug.ts              # Debug utilities
+  static/               # tastyStatic() — build-time styles
+    index.ts
+    tastyStatic.ts
+    types.ts
+  zero/                 # Zero-runtime extraction & Babel plugin
+    index.ts            # Programmatic API
+    babel.ts            # Babel plugin
+    next.ts             # Next.js wrapper
+    extractor.ts        # Style extraction
+    css-writer.ts       # CSS file writer
+  hooks/                # React hooks (useStyles, useGlobalStyles, etc.)
+  injector/             # Runtime style injection
+  pipeline/             # Style rendering pipeline
+  parser/               # Style value parser & tokenizer
+  styles/               # Style handlers & definitions
+  chunks/               # Style chunking system
+  states/               # Predefined states
+  plugins/              # Plugin system (okhsl, etc.)
+  keyframes/            # Keyframes support
+  properties/           # CSS @property support
+  utils/                # Shared utilities
+```
+
+## Entry Points
+
+| Sub-path                | Description                        | Platform |
+|-------------------------|------------------------------------|----------|
+| `@tenphi/tasty`         | Runtime style engine               | Browser  |
+| `@tenphi/tasty/static`  | Build-time static style generation | Browser  |
+| `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime | Node     |
+| `@tenphi/tasty/zero`    | Programmatic extraction API        | Node     |
+| `@tenphi/tasty/next`    | Next.js integration wrapper        | Node     |
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm build` | Build via tsdown (ESM, browser + node targets) |
+| `pnpm test` | Run tests once (vitest) |
+| `pnpm test:watch` | Tests in watch mode |
+| `pnpm test:coverage` | Tests with coverage |
+| `pnpm typecheck` | Type-check without emitting |
+| `pnpm lint` | Lint source files |
+| `pnpm lint:fix` | Lint and auto-fix |
+| `pnpm format` | Format code with Prettier |
+| `pnpm format:check` | Check formatting |
+| `pnpm changeset` | Create a changeset |
+| `pnpm release` | Build and publish |
+
+## Stack
+
+- **Build**: tsdown (ESM, unbundled, dts + sourcemaps, browser + node targets)
+- **Test**: Vitest 4 with globals enabled, jsdom environment
+- **Lint**: ESLint 10 + typescript-eslint + prettier
+- **Format**: Prettier (single quotes, semicolons, trailing commas, 80 cols)
+- **Versioning**: Changesets
+- **Node**: >=20, **Package manager**: pnpm 10
+
+## CI/CD & Release
+
+- **CI**: Runs lint, format check, typecheck, build, and tests on push to `main` and PRs.
+- **Release**: On push to `main`, `changesets/action` either creates a version PR or publishes to npm.
+- **Snapshot**: Comment `/snapshot` on a PR to publish a `0.0.0-snapshot.<sha>` release.
+- **npm trusted publishing**: Uses OIDC provenance via the `release` GitHub environment.
+- **RELEASE_TOKEN secret**: A fine-grained GitHub PAT for Git pushes and PR creation.
+
+## Code Conventions
+
+- TypeScript strict mode, `consistent-type-imports` enforced
+- Test files use `*.test.ts` / `*.test.tsx` suffix, co-located in `src/`
+- Unused vars prefixed with `_` are allowed
+- JSX uses `react-jsx` transform
+- Functional API pattern: `tasty()` factory with hooks and configuration
+
+## Core API Surface
+
+- `tasty(options)` — create styled component
+- `tasty(BaseComponent, options)` — extend existing component
+- `configure(opts)` — set global configuration
+- `useStyles(styles)` — generate className from styles
+- `useGlobalStyles(selector, styles)` — inject global styles
+- `useRawCSS(css)` — inject raw CSS
+- `tastyStatic(styles)` — build-time style generation (zero-runtime)

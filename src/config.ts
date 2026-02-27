@@ -92,7 +92,7 @@ export interface TastyConfig {
    * Plugins are processed in order, with later plugins overriding earlier ones.
    * @example
    * ```ts
-   * import { okhslPlugin } from '@cube-dev/ui-kit/tasty/plugins';
+   * import { okhslPlugin } from '@tenphi/tasty';
    *
    * configure({
    *   plugins: [okhslPlugin()],
@@ -148,7 +148,7 @@ export interface TastyConfig {
    * Handlers replace built-in handlers for the same style name.
    * @example
    * ```ts
-   * import { styleHandlers } from '@cube-dev/ui-kit';
+   * import { styleHandlers } from '@tenphi/tasty';
    *
    * configure({
    *   handlers: {
@@ -636,7 +636,7 @@ export function isConfigLocked(): boolean {
  *
  * @example
  * ```ts
- * import { configure } from '@cube-dev/ui-kit';
+ * import { configure } from '@tenphi/tasty';
  *
  * // Configure before app renders
  * configure({

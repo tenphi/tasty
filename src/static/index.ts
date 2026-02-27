@@ -3,7 +3,7 @@
  *
  * Usage:
  * ```typescript
- * import { tastyStatic } from '@cube-dev/ui-kit/tasty/static';
+ * import { tastyStatic } from '@tenphi/tasty/static';
  *
  * // Returns StaticStyle object (className + styles + toString)
  * const button = tastyStatic({
@@ -28,7 +28,7 @@
  * ```javascript
  * // babel.config.js
  * plugins: [
- *   ['@cube-dev/ui-kit/tasty/zero/babel', { output: 'public/tasty.css' }]
+ *   ['@tenphi/tasty/babel-plugin', { output: 'public/tasty.css' }]
  * ]
  * ```
  */

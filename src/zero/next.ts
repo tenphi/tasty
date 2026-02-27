@@ -6,7 +6,7 @@
  * @example
  * ```javascript
  * // next.config.js
- * const { withTastyZero } = require('@cube-dev/ui-kit/tasty/zero/next');
+ * const { withTastyZero } = require('@tenphi/tasty/next');
  *
  * module.exports = withTastyZero({
  *   output: 'public/tasty.css',
@@ -54,7 +54,7 @@ export interface TastyZeroNextOptions {
  * @example
  * ```javascript
  * // next.config.js
- * const { withTastyZero } = require('@cube-dev/ui-kit/tasty/zero/next');
+ * const { withTastyZero } = require('@tenphi/tasty/next');
  *
  * module.exports = withTastyZero()({
  *   reactStrictMode: true,

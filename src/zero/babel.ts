@@ -11,7 +11,7 @@
  * // babel.config.js
  * module.exports = {
  *   plugins: [
- *     ['@cube-dev/ui-kit/tasty/zero/babel', { output: 'public/tasty.css' }]
+ *     ['@tenphi/tasty/babel-plugin', { output: 'public/tasty.css' }]
  *   ]
  * };
  * ```
@@ -76,12 +76,12 @@ export interface TastyZeroConfig {
    * Plugins are processed in order, with later plugins overriding earlier ones.
    * @example
    * ```ts
-   * import { okhslPlugin } from '@cube-dev/ui-kit/tasty/plugins';
+   * import { okhslPlugin } from '@tenphi/tasty';
    *
    * // babel.config.js
    * module.exports = {
    *   plugins: [
-   *     ['@cube-dev/ui-kit/tasty/zero/babel', {
+   *     ['@tenphi/tasty/babel-plugin', {
    *       config: { plugins: [okhslPlugin()] }
    *     }]
    *   ]
@@ -155,6 +155,7 @@ interface PluginState extends PluginPass {
   sourceFile?: string;
 }
 
+// @ts-expect-error PluginState vs PluginPass type mismatch in @babel/helper-plugin-utils
 export default declare<TastyZeroBabelOptions>((api, options) => {
   api.assertVersion(7);
 
@@ -190,7 +191,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
         const source = path.node.source.value;
 
         if (
-          source === '@cube-dev/ui-kit/tasty/static' ||
+          source === '@tenphi/tasty/static' ||
           source.endsWith('/tasty/static')
         ) {
           path.remove();

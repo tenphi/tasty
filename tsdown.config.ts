@@ -12,6 +12,7 @@ export default defineConfig({
   outDir: 'dist',
   unbundle: true,
   dts: true,
+  external: ['fs', 'path', 'crypto'],
   platform: 'browser',
   target: 'es2022',
   sourcemap: true,

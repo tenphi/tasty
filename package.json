@@ -33,6 +33,12 @@
         "types": "./dist/zero/next.d.ts",
         "default": "./dist/zero/next.js"
       }
+    },
+    "./parser": {
+      "import": {
+        "types": "./dist/parser/index.d.ts",
+        "default": "./dist/parser/index.js"
+      }
     }
   },
   "files": [

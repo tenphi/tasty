@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.1.3
+
+### Patch Changes
+
+- [`d95087e`](https://github.com/tenphi/tasty/commit/d95087ea4c631abec255c1268daa3055da3e0e5f) Thanks [@tenphi](https://github.com/tenphi)! - Export `StyleParser`, types, and `Bucket` enum via new `@tenphi/tasty/parser` sub-path for use by external tooling (e.g., ESLint plugin).
+
 ## 0.1.2
 
 ### Patch Changes

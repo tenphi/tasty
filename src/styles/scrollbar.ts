@@ -19,8 +19,7 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
   // Support true as alias for thin
   const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
-  const { mods, colors, values } =
-    processed.groups[0] ?? makeEmptyDetails();
+  const { mods, colors, values } = processed.groups[0] ?? makeEmptyDetails();
   const style = {};
 
   // Default colors for scrollbar

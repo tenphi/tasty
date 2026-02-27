@@ -8,14 +8,8 @@
 
 import type { StyleValue } from '../utils/styles';
 
-import type {
-  ConditionNode} from './conditions';
-import {
-  and,
-  isCompoundCondition,
-  not,
-  trueCondition,
-} from './conditions';
+import type { ConditionNode } from './conditions';
+import { and, isCompoundCondition, not, trueCondition } from './conditions';
 import { simplifyCondition } from './simplify';
 
 // ============================================================================

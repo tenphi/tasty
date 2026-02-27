@@ -52,7 +52,9 @@ export type ModValue = boolean | string | number | undefined | null;
  *   selected?: boolean;
  * }>;
  */
-export type Mods<T extends Record<string, ModValue> = Record<string, ModValue>> = T & Record<string, ModValue>;
+export type Mods<
+  T extends Record<string, ModValue> = Record<string, ModValue>,
+> = T & Record<string, ModValue>;
 
 /**
  * Token value: string or number (processed), boolean for special handling, undefined/null (skipped).
@@ -97,8 +99,9 @@ type Caps =
   | 'Y'
   | 'Z';
 
-export interface BasePropsWithoutChildren<K extends TagName = TagName>
-  extends Pick<AllHTMLAttributes<HTMLElement>, 'className' | 'role' | 'id'> {
+export interface BasePropsWithoutChildren<
+  K extends TagName = TagName,
+> extends Pick<AllHTMLAttributes<HTMLElement>, 'className' | 'role' | 'id'> {
   /** The HTML tag or React component to render as */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: K | ComponentType<any>;
@@ -135,11 +138,13 @@ export interface BasePropsWithoutChildren<K extends TagName = TagName>
 }
 
 export interface BaseProps<K extends TagName = TagName>
-  extends BasePropsWithoutChildren<K>,
+  extends
+    BasePropsWithoutChildren<K>,
     Pick<AllHTMLAttributes<HTMLElementTagNameMap[K]>, 'children'> {}
 
 export interface AllBaseProps<K extends TagName = TagName>
-  extends BaseProps<K>,
+  extends
+    BaseProps<K>,
     Omit<
       AllHTMLAttributes<HTMLElementTagNameMap[K]>,
       | 'style'

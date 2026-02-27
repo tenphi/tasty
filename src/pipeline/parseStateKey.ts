@@ -6,19 +6,16 @@
  */
 
 import { Lru } from '../parser/lru';
-import type {
-  StateParserContext} from '../states';
+import type { StateParserContext } from '../states';
 import {
   expandDimensionShorthands,
   expandTastyUnits,
   findTopLevelComma,
-  resolvePredefinedState
+  resolvePredefinedState,
 } from '../states';
 import { camelToKebab } from '../utils/case-converter';
 
-import type {
-  ConditionNode,
-  NumericBound} from './conditions';
+import type { ConditionNode, NumericBound } from './conditions';
 import {
   and,
   createContainerDimensionCondition,

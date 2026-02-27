@@ -9,7 +9,9 @@ describe('useGlobalStyles', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* noop */
+    });
   });
 
   afterEach(() => {

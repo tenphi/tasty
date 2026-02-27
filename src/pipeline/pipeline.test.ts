@@ -1187,7 +1187,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip invalid standalone + selector', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Item: {
@@ -1207,7 +1209,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip invalid standalone ~ selector', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Item: {
@@ -1226,7 +1230,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip +Element pattern (targets outside root)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Next: {
@@ -1245,7 +1251,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip ~Element pattern (targets outside root)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Other: {
@@ -1264,7 +1272,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip consecutive combinators', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Item: {
@@ -1589,7 +1599,9 @@ describe('Sub-element selector affix ($) tests', () => {
 
   describe('Invalid pattern validation', () => {
     it('should warn and skip numeric-only patterns', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Label: {
@@ -1608,7 +1620,9 @@ describe('Sub-element selector affix ($) tests', () => {
     });
 
     it('should warn and skip patterns starting with numbers', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* noop */ });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
 
       const styles = {
         Label: {

@@ -5,7 +5,7 @@
  * to only include relevant keys before passing to renderStyles.
  */
 
-import type { RenderResult} from '../pipeline';
+import type { RenderResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
 import { extractLocalPredefinedStates } from '../states';
 import type { Styles } from '../styles/types';

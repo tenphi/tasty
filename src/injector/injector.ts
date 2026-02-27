@@ -103,7 +103,9 @@ export class StyleInjector {
     if (rules.length === 0) {
       return {
         className: '',
-        dispose: () => { /* noop */ },
+        dispose: () => {
+          /* noop */
+        },
       };
     }
 
@@ -216,7 +218,9 @@ export class StyleInjector {
 
       return {
         className,
-        dispose: () => { /* noop */ },
+        dispose: () => {
+          /* noop */
+        },
       };
     }
 
@@ -260,7 +264,11 @@ export class StyleInjector {
     const registry = this.sheetManager.getRegistry(root);
 
     if (!rules || rules.length === 0) {
-      return { dispose: () => { /* noop */ } };
+      return {
+        dispose: () => {
+          /* noop */
+        },
+      };
     }
 
     // Use a non-tasty identifier to avoid any collisions with .t{number} classes
@@ -494,7 +502,9 @@ export class StyleInjector {
         initialValueStr = String(definition.initialValue);
       } else {
         // Process via tasty parser to resolve custom units/functions
-        initialValueStr = parseStyle(definition.initialValue as StyleValue).output;
+        initialValueStr = parseStyle(
+          definition.initialValue as StyleValue,
+        ).output;
       }
       parts.push(`initial-value: ${initialValueStr};`);
     }
@@ -582,7 +592,9 @@ export class StyleInjector {
     if (Object.keys(steps).length === 0) {
       return {
         toString: () => '',
-        dispose: () => { /* noop */ },
+        dispose: () => {
+          /* noop */
+        },
       };
     }
 
@@ -632,7 +644,9 @@ export class StyleInjector {
     if (!info) {
       return {
         toString: () => '',
-        dispose: () => { /* noop */ },
+        dispose: () => {
+          /* noop */
+        },
       };
     }
 

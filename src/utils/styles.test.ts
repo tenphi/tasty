@@ -171,7 +171,7 @@ describe('strToRgb', () => {
     // Extract RGB values and verify they're in the purple range
     const match = result?.match(/rgb\((\d+) (\d+) (\d+)\)/);
     expect(match).toBeTruthy();
-     
+
     const [, _r, g, b] = match!;
     // Purple should have significant blue, lower red, and low green
     expect(parseInt(b)).toBeGreaterThan(parseInt(g));

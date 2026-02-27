@@ -5,13 +5,14 @@ import type {
   ParserOptions,
   ProcessedStyle,
   StyleDetails,
-  StyleDetailsPart} from './types';
+  StyleDetailsPart,
+} from './types';
 import {
   Bucket,
   finalizeGroup,
   finalizePart,
   makeEmptyDetails,
-  makeEmptyPart
+  makeEmptyPart,
 } from './types';
 
 export class StyleParser {

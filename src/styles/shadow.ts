@@ -3,8 +3,7 @@ import { parseStyle } from '../utils/styles';
 
 function toBoxShadow(shadow) {
   const processed = parseStyle(shadow);
-  const { values, mods, colors } =
-    processed.groups[0] ?? makeEmptyDetails();
+  const { values, mods, colors } = processed.groups[0] ?? makeEmptyDetails();
   const mod = mods[0] || '';
   const shadowColor = (colors && colors[0]) ?? '';
 

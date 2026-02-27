@@ -5,8 +5,7 @@
 
 import { resetStylesGenerated } from '../config';
 
-import type {
-  StateParserContext} from './index';
+import type { StateParserContext } from './index';
 import {
   clearGlobalPredefinedStates,
   createStateParserContext,
@@ -19,7 +18,7 @@ import {
   isPredefinedStateRef,
   normalizeStateKey,
   parseAdvancedState,
-  setGlobalPredefinedStates
+  setGlobalPredefinedStates,
 } from './index';
 
 describe('Advanced State Mapping', () => {

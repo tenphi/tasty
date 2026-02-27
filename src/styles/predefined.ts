@@ -32,7 +32,6 @@ import { widthStyle } from './width';
 
 const devMode = isDevEnv();
 
- 
 const _numberConverter = (val) => {
   if (typeof val === 'number') {
     return `${val}px`;

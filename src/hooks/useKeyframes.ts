@@ -96,7 +96,7 @@ export function useKeyframes(
       return steps;
     },
 
-    isFactory ? deps ?? [] : [stepsOrFactory],
+    isFactory ? (deps ?? []) : [stepsOrFactory],
   );
 
   // Store keyframes results for cleanup - we need to track both the render-time

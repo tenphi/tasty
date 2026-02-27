@@ -38,7 +38,10 @@ export function normalizeColorTokenValue<T>(
   return value as T;
 }
 
-export type StyleValueStateMap<T = string> = Record<string, StyleValue<T> | '@inherit'>;
+export type StyleValueStateMap<T = string> = Record<
+  string,
+  StyleValue<T> | '@inherit'
+>;
 
 /**
  * Combined type for style values that can be either a direct value or a state map.
@@ -48,7 +51,10 @@ export type StylePropValue<T = string> = StyleValue<T> | StyleValueStateMap<T>;
 
 export type ComputeModel = string | number;
 
-export type CSSMap = { $?: string | string[] } & Record<string, string | string[]>;
+export type CSSMap = { $?: string | string[] } & Record<
+  string,
+  string | string[]
+>;
 
 export type StyleHandlerResult = CSSMap | CSSMap[] | void;
 
@@ -619,7 +625,6 @@ function replaceCommasOutsideParens(str: string): string {
   let depth = 0;
 
   for (const char of str) {
-
     if (char === '(') {
       depth++;
       result += char;
@@ -697,9 +702,7 @@ function parseStateNotationInner(
 
   while (position) {
     position--;
-    operations[position].push(
-      convertTokensToComputeUnits(list as unknown[]),
-    );
+    operations[position].push(convertTokensToComputeUnits(list as unknown[]));
     list = operations[position];
   }
 
@@ -707,9 +710,9 @@ function parseStateNotationInner(
     tokens,
     mods,
     notMods: [],
-    model: convertTokensToComputeUnits(
-      operations[0] as unknown[],
-    ) as ComputeModel | undefined,
+    model: convertTokensToComputeUnits(operations[0] as unknown[]) as
+      | ComputeModel
+      | undefined,
     value,
   };
 }
@@ -972,7 +975,10 @@ export const COMPUTE_FUNC_MAP = {
  */
 export function computeState(
   computeModel: ComputeModel,
-  valueMap: (number | boolean)[] | Record<string, boolean> | ((...args: unknown[]) => unknown),
+  valueMap:
+    | (number | boolean)[]
+    | Record<string, boolean>
+    | ((...args: unknown[]) => unknown),
 ) {
   if (!computeModel) return true;
 

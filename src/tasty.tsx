@@ -4,12 +4,9 @@ import type {
   ForwardRefExoticComponent,
   JSX,
   PropsWithoutRef,
-  RefAttributes} from 'react';
-import {
-  createElement,
-  forwardRef,
-  useMemo,
+  RefAttributes,
 } from 'react';
+import { createElement, forwardRef, useMemo } from 'react';
 import { isValidElementType } from 'react-is';
 
 import { useStyles } from './hooks/useStyles';
@@ -376,7 +373,6 @@ export function tasty<
 export function tasty<
   K extends StyleList,
   V extends VariantMap,
-   
   _C = Record<string, unknown>,
 >(Component: any, options?: any) {
   if (isValidElementType(Component)) {
@@ -537,8 +533,8 @@ function tastyElement<
 
     // Determine base styles: use variant styles if available, otherwise default styles
     const baseStyles = variantStylesMap
-      ? variantStylesMap[(variant as string) || 'default'] ??
-        variantStylesMap['default']
+      ? (variantStylesMap[(variant as string) || 'default'] ??
+        variantStylesMap['default'])
       : defaultStyles;
 
     // Merge base styles with instance styles and prop styles

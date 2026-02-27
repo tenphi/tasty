@@ -2,7 +2,9 @@ import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectRawCSS } from '../injector';
 
-interface UseRawCSSOptions { root?: Document | ShadowRoot }
+interface UseRawCSSOptions {
+  root?: Document | ShadowRoot;
+}
 
 /**
  * Hook to inject raw CSS text directly without parsing.
@@ -80,7 +82,7 @@ export function useRawCSS(
     () =>
       isFactory ? (cssOrFactory as () => string)() : (cssOrFactory as string),
 
-    isFactory ? deps ?? [] : [cssOrFactory],
+    isFactory ? (deps ?? []) : [cssOrFactory],
   );
 
   const disposeRef = useRef<(() => void) | null>(null);

@@ -200,7 +200,8 @@ export interface TastyConfig {
    * });
    * ```
    */
-  tokens?: Record<`$${string}`, string | number | boolean> & Record<`#${string}`, string | number | boolean>;
+  tokens?: Record<`$${string}`, string | number | boolean> &
+    Record<`#${string}`, string | number | boolean>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys). They may contain base styles,
@@ -369,7 +370,6 @@ declare global {
     [GLOBAL_INJECTOR_KEY]?: StyleInjector;
   }
 
-   
   var __TASTY_GLOBAL_INJECTOR__: StyleInjector | undefined;
 }
 
@@ -785,7 +785,6 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalRecipes(mergedRecipes);
   }
 
-   
   const {
     states: _states,
     parserCacheSize: _parserCacheSize,
@@ -799,7 +798,6 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     recipes: _recipes,
     ...injectorConfig
   } = config;
-   
 
   const fullConfig: TastyConfig = {
     ...createDefaultConfig(),

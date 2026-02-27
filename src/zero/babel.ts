@@ -139,10 +139,13 @@ export interface TastyZeroBabelOptions {
  * Registry to track StaticStyle objects by their variable names.
  * Used to resolve base styles when extending.
  */
-type StaticStyleRegistry = Record<string, {
+type StaticStyleRegistry = Record<
+  string,
+  {
     styles: Styles;
     className: string;
-  }>;
+  }
+>;
 
 interface PluginState extends PluginPass {
   staticStyleRegistry: StaticStyleRegistry;

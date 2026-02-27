@@ -331,10 +331,7 @@ export function modifierUniqueId(
 /**
  * Generate a normalized unique ID for a pseudo condition
  */
-export function pseudoUniqueId(
-  pseudo: string,
-  negated = false,
-): string {
+export function pseudoUniqueId(pseudo: string, negated = false): string {
   const base = `pseudo:${pseudo}`;
   return negated ? `!${base}` : base;
 }
@@ -422,10 +419,7 @@ export function containerUniqueId(
 /**
  * Generate a normalized unique ID for a root condition
  */
-export function rootUniqueId(
-  selector: string,
-  negated = false,
-): string {
+export function rootUniqueId(selector: string, negated = false): string {
   const base = `root:${selector}`;
   return negated ? `!${base}` : base;
 }
@@ -433,10 +427,7 @@ export function rootUniqueId(
 /**
  * Generate a normalized unique ID for an own condition
  */
-export function ownUniqueId(
-  innerUniqueId: string,
-  negated = false,
-): string {
+export function ownUniqueId(innerUniqueId: string, negated = false): string {
   const base = `own:${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }

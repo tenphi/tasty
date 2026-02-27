@@ -113,7 +113,7 @@ function resolveRecipesForLevel(
   // Separate selector keys (sub-elements) from flat style properties.
   // mergeStyles handles selectors with its own semantics (e.g. false = delete),
   // but at this level we only want recipe merging on flat properties.
-   
+
   const { recipe: _recipe, ...allRest } = styles;
   const flatStyles: Record<string, unknown> = {};
   const selectorStyles: Record<string, unknown> = {};

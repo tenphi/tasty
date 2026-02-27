@@ -16,7 +16,8 @@ import type {
   PseudoCondition,
   RootCondition,
   StateCondition,
-  SupportsCondition} from './conditions';
+  SupportsCondition,
+} from './conditions';
 
 // ============================================================================
 // Types

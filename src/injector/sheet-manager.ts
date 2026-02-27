@@ -13,11 +13,7 @@ import type {
   StyleRule,
 } from './types';
 
-import type {
-  CSSMap,
-  StyleHandler,
-  StyleValueStateMap,
-} from '../utils/styles';
+import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
@@ -932,14 +928,11 @@ export class SheetManager {
 
       handlerQueue.forEach((handler) => {
         const lookup = handler.__lookupStyles;
-        const filteredMap = lookup.reduce<StyleValueStateMap>(
-          (acc, name) => {
-            const v = styleMap[name];
-            if (v !== undefined) acc[name] = v;
-            return acc;
-          },
-          {},
-        );
+        const filteredMap = lookup.reduce<StyleValueStateMap>((acc, name) => {
+          const v = styleMap[name];
+          if (v !== undefined) acc[name] = v;
+          return acc;
+        }, {});
 
         const result = handler(filteredMap);
         if (!result) return;
@@ -1197,7 +1190,11 @@ export class SheetManager {
    */
   injectRawCSS(css: string, root: Document | ShadowRoot): RawCSSResult {
     if (!css.trim()) {
-      return { dispose: () => { /* noop */ } };
+      return {
+        dispose: () => {
+          /* noop */
+        },
+      };
     }
 
     const styleElement = this.getOrCreateRawStyleElement(root);

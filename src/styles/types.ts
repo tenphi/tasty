@@ -48,24 +48,23 @@ type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type OpaquePercentage = '' | `.${Digit}` | `.${Digit}${Digit}` | '.100';
 export type NoType = false | null | undefined;
 
-export interface StylesInterface
-  extends Omit<
-    CSSProperties,
-    | 'color'
-    | 'fill'
-    | 'font'
-    | 'outline'
-    | 'type'
-    | 'gap'
-    | 'padding'
-    | 'margin'
-    | 'width'
-    | 'height'
-    | 'border'
-    | 'transition'
-    | 'placeContent'
-    | 'placeItems'
-  > {
+export interface StylesInterface extends Omit<
+  CSSProperties,
+  | 'color'
+  | 'fill'
+  | 'font'
+  | 'outline'
+  | 'type'
+  | 'gap'
+  | 'padding'
+  | 'margin'
+  | 'width'
+  | 'height'
+  | 'border'
+  | 'transition'
+  | 'placeContent'
+  | 'placeItems'
+> {
   /**
    * @deprecated Use `flow` style instead.
    */
@@ -540,8 +539,11 @@ export type StylesWithoutSelectors = {
  * CSS custom properties (`$name`), and color tokens (`#name`).
  * Unlike StylesIndexSignature, does NOT allow sub-element selectors (recipes are flat).
  */
-export type RecipeIndexSignature = Record<string, | StyleValue<string | number | boolean | undefined>
-    | StyleValueStateMap<string | number | boolean | undefined>>;
+export type RecipeIndexSignature = Record<
+  string,
+  | StyleValue<string | number | boolean | undefined>
+  | StyleValueStateMap<string | number | boolean | undefined>
+>;
 
 /**
  * Style type for recipe definitions.

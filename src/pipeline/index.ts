@@ -15,11 +15,10 @@
  */
 
 import { Lru } from '../parser/lru';
-import type {
-  StateParserContext} from '../states';
+import type { StateParserContext } from '../states';
 import {
   createStateParserContext,
-  extractLocalPredefinedStates
+  extractLocalPredefinedStates,
 } from '../states';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { Styles } from '../styles/types';
@@ -31,15 +30,9 @@ import type {
 } from '../utils/styles';
 import { stringifyStyles } from '../utils/styles';
 
-import type {
-  ConditionNode} from './conditions';
-import {
-  and,
-  or,
-  trueCondition,
-} from './conditions';
-import type {
-  ExclusiveStyleEntry} from './exclusive';
+import type { ConditionNode } from './conditions';
+import { and, or, trueCondition } from './conditions';
+import type { ExclusiveStyleEntry } from './exclusive';
 import {
   buildExclusiveConditions,
   expandExclusiveOrs,
@@ -47,15 +40,13 @@ import {
   isValueMapping,
   parseStyleEntries,
 } from './exclusive';
-import type {
-  CSSRule,
-  SelectorVariant} from './materialize';
+import type { CSSRule, SelectorVariant } from './materialize';
 import {
   buildAtRulesFromVariant,
   conditionToCSS,
   modifierToCSS,
   pseudoToCSS,
-  rootConditionsToCSS
+  rootConditionsToCSS,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';

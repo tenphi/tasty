@@ -450,7 +450,9 @@ describe('Value Mods', () => {
       it('should warn when combinator lacks spaces in :has()', () => {
         const consoleErrorSpy = vi
           .spyOn(console, 'error')
-          .mockImplementation(() => { /* noop */ });
+          .mockImplementation(() => {
+            /* noop */
+          });
 
         // Test various invalid patterns
         getModSelector(':has(Body>Row)');
@@ -481,7 +483,9 @@ describe('Value Mods', () => {
       it('should not warn when combinator has proper spaces in :has()', () => {
         const consoleErrorSpy = vi
           .spyOn(console, 'error')
-          .mockImplementation(() => { /* noop */ });
+          .mockImplementation(() => {
+            /* noop */
+          });
 
         getModSelector(':has(Body > Row)');
         getModSelector(':has(Header + Content)');

@@ -14,10 +14,8 @@ export function radiusStyle({ radius }) {
   if (radius === true) radius = '1r';
 
   const processed = parseStyle(radius);
-  const { mods } =
-    processed.groups[0] ?? makeEmptyDetails();
-  let { values } =
-    processed.groups[0] ?? makeEmptyDetails();
+  const { mods } = processed.groups[0] ?? makeEmptyDetails();
+  let { values } = processed.groups[0] ?? makeEmptyDetails();
 
   if (mods.includes('round')) {
     values = ['9999rem'];

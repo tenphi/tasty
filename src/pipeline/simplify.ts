@@ -17,7 +17,8 @@ import type {
   ContainerCondition,
   MediaCondition,
   ModifierCondition,
-  NumericBound} from './conditions';
+  NumericBound,
+} from './conditions';
 import {
   falseCondition,
   getConditionUniqueId,

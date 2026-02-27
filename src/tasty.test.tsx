@@ -784,9 +784,9 @@ describe('tokens prop', () => {
   });
 
   it('should warn on object token values', () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => { /* noop */ });
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* noop */
+    });
 
     const Element = tasty({});
 
@@ -1209,9 +1209,9 @@ describe('useGlobalStyles() hook', () => {
   });
 
   it('should warn when selector affix targets outside root scope', () => {
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => { /* noop */ });
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* noop */
+    });
 
     const Component = tasty({
       styles: {
@@ -1256,7 +1256,9 @@ describe('useGlobalStyles() hook', () => {
   it('should not warn when combinator has proper spaces in selector affix ($)', () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
-      .mockImplementation(() => { /* noop */ });
+      .mockImplementation(() => {
+        /* noop */
+      });
 
     const Component = tasty({
       styles: {

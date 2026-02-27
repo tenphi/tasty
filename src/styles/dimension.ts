@@ -74,8 +74,7 @@ export function dimensionStyle(name: 'width' | 'height') {
       val = String(val);
 
       const processed = parseStyle(val);
-      const { mods, values } =
-        processed.groups[0] ?? makeEmptyDetails();
+      const { mods, values } = processed.groups[0] ?? makeEmptyDetails();
 
       let flag = false;
 

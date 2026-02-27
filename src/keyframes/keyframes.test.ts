@@ -268,9 +268,8 @@ describe('Global Keyframes Configuration', () => {
   });
 
   it('should store global keyframes via configure', async () => {
-    const { hasGlobalKeyframes, getGlobalKeyframes } = await import(
-      '../config'
-    );
+    const { hasGlobalKeyframes, getGlobalKeyframes } =
+      await import('../config');
 
     configure({
       forceTextInjection: true,
@@ -286,9 +285,8 @@ describe('Global Keyframes Configuration', () => {
   });
 
   it('should return false when no keyframes configured', async () => {
-    const { hasGlobalKeyframes, getGlobalKeyframes } = await import(
-      '../config'
-    );
+    const { hasGlobalKeyframes, getGlobalKeyframes } =
+      await import('../config');
 
     configure({
       forceTextInjection: true,

@@ -232,6 +232,7 @@ Tasty ships two styling APIs with different trade-offs. Pick the one that fits y
 
 | | `tasty` (runtime) | `tastyStatic` (zero-runtime) |
 |---|---|---|
+| **Framework** | React only | Framework-agnostic (requires Babel) |
 | **Import** | `@tenphi/tasty` | `@tenphi/tasty/static` |
 | **Output** | React component | CSS class name (string) |
 | **CSS injection** | At runtime via `<style>` tags | At build time via Babel plugin |
@@ -248,7 +249,6 @@ Tasty ships two styling APIs with different trade-offs. Pick the one that fits y
 | **Design tokens & units** | Full support (`#color`, `2x`, `1r`) | Full support (`#color`, `2x`, `1r`) |
 | **State mappings** | Full support (modifiers, media, etc.) | Full support (modifiers, media, etc.) |
 | **Recipes** | Supported via `configure()` | Supported via Babel plugin config |
-| **Framework** | React only | Framework-agnostic (requires Babel) |
 | **Best for** | Interactive React apps, design systems | Static sites, landing pages, SSG |
 
 ## Documentation

@@ -74,24 +74,24 @@ const Button = tasty({
     padding: '1.5x 3x',
     fill: {
       '': '#primary',
-      'hovered': '#primary-hover',
-      'pressed': '#primary-pressed',
-      'disabled': '#surface',
+      ':hover': '#primary-hover',
+      ':active': '#primary-pressed',
+      '[disabled]': '#surface',
     },
     color: {
       '': '#on-primary',
-      'disabled': '#text.40',
+      '[disabled]': '#text.40',
     },
     cursor: {
       '': 'pointer',
-      'disabled': 'not-allowed',
+      '[disabled]': 'not-allowed',
     },
     transition: 'theme',
   },
 });
 ```
 
-State keys map to `data-*` attributes, pseudo-classes, media queries, container queries, root states — whatever you need. Tasty compiles them into exclusive selectors automatically.
+State keys support pseudo-classes first (`:hover`, `:active`), then modifiers (`theme=danger`), attributes (`[disabled]`), media/container queries, root states, and more. Tasty compiles them into exclusive selectors automatically.
 
 ### Extend any component
 
@@ -102,7 +102,7 @@ const DangerButton = tasty(Button, {
   styles: {
     fill: {
       '': '#danger',
-      'hovered': '#danger-hover',
+      ':hover': '#danger-hover',
     },
   },
 });
@@ -207,13 +207,15 @@ Every style property accepts a state mapping object. Keys can be combined with b
 
 | State type | Syntax | CSS output |
 |------------|--------|------------|
-| Data attribute (boolean) | `hovered` | `[data-hovered]` |
-| Data attribute (value) | `theme=dark` | `[data-theme="dark"]` |
+| Data attribute (boolean modifier) | `disabled` | `[data-disabled]` |
+| Data attribute (value modifier) | `theme=danger` | `[data-theme="danger"]` |
 | Pseudo-class | `:hover` | `:hover` |
+| Attribute selector | `[role="tab"]` | `[role="tab"]` |
+| Class selector (supported) | `.is-active` | `.is-active` |
 | Media query | `@media(w < 768px)` | `@media (width < 768px)` |
 | Container query | `@(panel, w >= 300px)` | `@container panel (width >= 300px)` |
 | Root state | `@root(theme=dark)` | `:root[data-theme="dark"]` |
-| Parent state | `@parent(hovered)` | `:is([data-hovered] *)` |
+| Parent state | `@parent(theme=danger)` | `:is([data-theme="danger"] *)` |
 | Feature query | `@supports(display: grid)` | `@supports (display: grid)` |
 | Entry animation | `@starting` | `@starting-style` |
 
@@ -222,8 +224,8 @@ Combine with `&` (AND), `|` (OR), `!` (NOT):
 ```tsx
 fill: {
   '': '#surface',
-  '@dark & !disabled': '#dark-surface',
-  '@parent(hovered) | @parent(focused)': '#highlight',
+  'theme=danger & :hover': '#danger-hover',
+  '[aria-selected="true"]': '#accent-subtle',
 }
 ```
 
@@ -249,9 +251,11 @@ const Card = tasty({
 
 Sub-elements use `data-element` attributes — no extra class names, no naming conventions.
 
-By default, sub-elements participate in the same state context as the root component. That means `hovered`, `disabled`, `@dark`, and other state mappings are evaluated as part of one unified block, which keeps styling logic predictable across the whole markup tree.
+By default, sub-elements participate in the same state context as the root component. That means mappings like `:hover`, `theme=danger`, `[role="button"]`, and other keys are evaluated as one unified block, which keeps styling logic predictable across the whole markup tree.
 
 Use `@own(...)` when a sub-element should react to its own state instead of the root state context.
+
+Class selectors are also supported, but modifiers/pseudo-classes are usually the better default in design-system code.
 
 Use the sub-element selector `$` when you need precise descendant targeting to avoid leakage in deeply nested component trees.
 

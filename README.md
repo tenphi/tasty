@@ -249,6 +249,12 @@ const Card = tasty({
 
 Sub-elements use `data-element` attributes — no extra class names, no naming conventions.
 
+By default, sub-elements participate in the same state context as the root component. That means `hovered`, `disabled`, `@dark`, and other state mappings are evaluated as part of one unified block, which keeps styling logic predictable across the whole markup tree.
+
+Use `@own(...)` when a sub-element should react to its own state instead of the root state context.
+
+Use the sub-element selector `$` when you need precise descendant targeting to avoid leakage in deeply nested component trees.
+
 ### Variants
 
 Variants are designed to keep single-component CSS lean. Instead of generating dozens of static button classes up front, define all versions once and let runtime usage decide what CSS is actually emitted.

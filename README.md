@@ -302,14 +302,24 @@ Use `|` to post-apply recipes after local styles when you need recipe states/sty
 
 Modern CSS features are natively supported:
 
+Color tokens are automatically registered as typed properties (`<color>`), so token-based transitions work without extra setup.
+
 ```tsx
 const Pulse = tasty({
   styles: {
+    '@properties': {
+      '$pulse-scale': {
+        syntax: '<number>',
+        inherits: false,
+        initialValue: 1,
+      },
+    },
     animation: 'pulse 2s infinite',
+    transform: 'scale($pulse-scale)',
     '@keyframes': {
       pulse: {
-        '0%, 100%': { transform: 'scale(1)' },
-        '50%': { transform: 'scale(1.05)' },
+        '0%, 100%': { '$pulse-scale': 1 },
+        '50%': { '$pulse-scale': 1.05 },
       },
     },
   },

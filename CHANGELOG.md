@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.2.0
+
+### Minor Changes
+
+- [#3](https://github.com/tenphi/tasty/pull/3) [`a49afea`](https://github.com/tenphi/tasty/commit/a49afea07306630ab213fe5d1b3c599b8f607f6c) Thanks [@tenphi](https://github.com/tenphi)! - Add @parent() state for styling based on parent element state (e.g. @parent(hovered), @parent(theme=dark >) for direct parent).
+
 ## 0.1.3
 
 ### Patch Changes

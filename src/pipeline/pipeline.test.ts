@@ -294,6 +294,21 @@ describe('parseStateKey()', () => {
     }
   });
 
+  it('should parse @parent OR @parent as OR condition', () => {
+    const result = parseStateKey('@parent(hovered) | @parent(focused)');
+    expect(result.kind).toBe('compound');
+    if (result.kind === 'compound') {
+      expect(result.operator).toBe('OR');
+      expect(result.children.length).toBe(2);
+      for (const child of result.children) {
+        expect(child.kind).toBe('state');
+        if (child.kind === 'state') {
+          expect(child.type).toBe('parent');
+        }
+      }
+    }
+  });
+
   it('should parse @own state', () => {
     const result = parseStateKey('@own(hovered)', { isSubElement: true });
     expect(result.kind).toBe('state');

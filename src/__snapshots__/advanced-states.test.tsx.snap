@@ -100,6 +100,11 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should handle mu
 .t0.t0:not([data-focused] *), .t0.t0:not([data-hovered] *):is([data-focused] *) { background-color: var(--white-color); }"
 `;
 
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (OR) 1`] = `
+".t0.t0:is([data-hovered] *), .t0.t0:not([data-hovered] *):is([data-focused] *) { background-color: var(--blue-color); }
+.t0.t0:not([data-hovered] *):not([data-focused] *) { background-color: var(--white-color); }"
+`;
+
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `
 ".t0.t0[data-disabled]:is([data-hovered] *) { background-color: var(--gray-05-color); }
 .t0.t0:not([data-disabled]):is([data-hovered] *) { background-color: var(--blue-color); }

@@ -1,20 +1,26 @@
 name: Release
 
 on:
+  pull_request:
   push:
     branches: [main]
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
 
 jobs:
-  release:
+  snapshot:
+    name: Build & snapshot release
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     environment: release
-    permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
 
     steps:
       - name: Checkout
@@ -39,6 +45,66 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Set snapshot version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          SNAPSHOT_VERSION="0.0.0-snapshot.${SHORT_SHA}"
+          pnpm pkg set version="${SNAPSHOT_VERSION}"
+          echo "version=${SNAPSHOT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Clear .npmrc auth token (use OIDC instead)
+        run: npm config delete //registry.npmjs.org/:_authToken || true
+
+      - name: Publish snapshot
+        run: npm publish --tag pr_${{ github.event.number }} --access public --provenance
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const setMessage = (await import('${{ github.workspace }}/scripts/ci/set-message.mjs')).default;
+
+            await setMessage({
+              header: '## 📦 Snapshot release',
+              body: `Published [\`${{ steps.version.outputs.version }}\`](https://www.npmjs.com/package/@tenphi/tasty/v/${{ steps.version.outputs.version }}).\n\n\`\`\`\npnpm add @tenphi/tasty@${{ steps.version.outputs.version }}\n\`\`\``,
+              github,
+              repo: context.repo,
+              prNumber: ${{ github.event.number }},
+            });
+
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Clear .npmrc auth token (use OIDC instead)
+        run: npm config delete //registry.npmjs.org/:_authToken || true
+
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
@@ -47,7 +113,7 @@ jobs:
           title: 'chore: version packages'
           commit: 'chore: version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
       - name: Create GitHub Release

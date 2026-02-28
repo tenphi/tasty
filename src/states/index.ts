@@ -17,6 +17,7 @@ export interface ParsedAdvancedState {
     | 'media'
     | 'container'
     | 'root'
+    | 'parent'
     | 'own'
     | 'starting'
     | 'predefined'
@@ -62,6 +63,7 @@ const BUILTIN_STATES = new Set([
 const RESERVED_PREFIXES = [
   '@media',
   '@root',
+  '@parent',
   '@own',
   '@(',
   '@starting',
@@ -126,11 +128,12 @@ export function setGlobalPredefinedStates(
     }
 
     // Check for reserved prefixes (but only exact matches, not user-defined states like @mobile)
-    // Reserved prefixes are: @media, @root, @own, @(
+    // Reserved prefixes are: @media, @root, @parent, @own, @(
     // A user state like @mobile should NOT be blocked
     const isReservedPrefix =
       name === '@media' ||
       name === '@root' ||
+      name === '@parent' ||
       name === '@own' ||
       name.startsWith('@(');
 
@@ -220,7 +223,7 @@ export function isPredefinedStateRef(stateKey: string): boolean {
   // Check if it's NOT a built-in prefix
   for (const prefix of RESERVED_PREFIXES) {
     if (stateKey === prefix || stateKey.startsWith(prefix)) {
-      // Check if it's exactly @media, @root, @own, or starts with @( or @media(
+      // Check if it's exactly @media, @root, @parent, @own, or starts with @( or @media(
       if (
         stateKey === '@media' ||
         stateKey.startsWith('@media(') ||
@@ -229,6 +232,8 @@ export function isPredefinedStateRef(stateKey: string): boolean {
         return false;
       }
       if (stateKey === '@root' || stateKey.startsWith('@root(')) return false;
+      if (stateKey === '@parent' || stateKey.startsWith('@parent('))
+        return false;
       if (stateKey === '@own' || stateKey.startsWith('@own(')) return false;
       if (stateKey.startsWith('@(')) return false;
     }
@@ -269,6 +274,7 @@ export function extractLocalPredefinedStates(
       if (
         key === '@media' ||
         key === '@root' ||
+        key === '@parent' ||
         key === '@own' ||
         key.startsWith('@(')
       ) {
@@ -512,6 +518,34 @@ export function parseAdvancedState(
     };
   }
 
+  // Check for @parent(...) - parent element state
+  if (stateKey.startsWith('@parent(')) {
+    const endParen = findMatchingParen(stateKey, 7);
+    if (endParen === -1) {
+      warnOnce(
+        `unclosed-parent:${stateKey}`,
+        `[Tasty] Unclosed parent state '${stateKey}'. Missing closing parenthesis.`,
+      );
+      return { type: 'modifier', condition: stateKey, raw };
+    }
+
+    const condition = stateKey.slice(8, endParen);
+
+    if (!condition.trim()) {
+      warnOnce(
+        `empty-parent:${stateKey}`,
+        `[Tasty] Empty parent state condition '${stateKey}'.`,
+      );
+      return { type: 'modifier', condition: stateKey, raw };
+    }
+
+    return {
+      type: 'parent',
+      condition,
+      raw,
+    };
+  }
+
   // Check for @own(...) - sub-element own state
   if (stateKey.startsWith('@own(')) {
     const endParen = findMatchingParen(stateKey, 4);
@@ -741,6 +775,7 @@ export function detectAdvancedStateType(
   if (key === '@starting') return 'starting';
   if (key.startsWith('@media')) return 'media';
   if (key.startsWith('@root(')) return 'root';
+  if (key.startsWith('@parent(')) return 'parent';
   if (key.startsWith('@own(')) return 'own';
   if (key.startsWith('@(')) return 'container';
   if (isPredefinedStateRef(key)) return 'predefined';

@@ -211,6 +211,104 @@ describe('parseStateKey()', () => {
     }
   });
 
+  it('should parse @parent state with boolean modifier', () => {
+    const result = parseStateKey('@parent(hovered)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect((result as any).selector).toBe('[data-hovered]');
+      expect((result as any).direct).toBe(false);
+    }
+  });
+
+  it('should parse @parent state with value modifier', () => {
+    const result = parseStateKey('@parent(theme=dark)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect((result as any).selector).toBe('[data-theme="dark"]');
+      expect((result as any).direct).toBe(false);
+    }
+  });
+
+  it('should parse @parent state with direct parent syntax', () => {
+    const result = parseStateKey('@parent(hovered >)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect((result as any).selector).toBe('[data-hovered]');
+      expect((result as any).direct).toBe(true);
+    }
+  });
+
+  it('should parse @parent state with class selector', () => {
+    const result = parseStateKey('@parent(.my-class)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect((result as any).selector).toBe('.my-class');
+      expect((result as any).direct).toBe(false);
+    }
+  });
+
+  it('should parse @parent state with attribute selector', () => {
+    const result = parseStateKey('@parent([aria-expanded="true"])');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect((result as any).selector).toBe('[aria-expanded="true"]');
+    }
+  });
+
+  it('should parse negated @parent state', () => {
+    const result = parseStateKey('!@parent(hovered)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      expect(result.negated).toBe(true);
+      expect((result as any).selector).toBe('[data-hovered]');
+    }
+  });
+
+  it('should parse @parent AND @parent as independent conditions', () => {
+    const result = parseStateKey('@parent(hovered) & @parent(focused)');
+    expect(result.kind).toBe('compound');
+    if (result.kind === 'compound') {
+      expect(result.operator).toBe('AND');
+      expect(result.children.length).toBe(2);
+      for (const child of result.children) {
+        expect(child.kind).toBe('state');
+        if (child.kind === 'state') {
+          expect(child.type).toBe('parent');
+        }
+      }
+    }
+  });
+
+  it('should parse @parent combined with modifier', () => {
+    const result = parseStateKey('@parent(hovered) & disabled');
+    expect(result.kind).toBe('compound');
+    if (result.kind === 'compound') {
+      expect(result.operator).toBe('AND');
+      expect(result.children.length).toBe(2);
+    }
+  });
+
+  it('should parse @parent OR @parent as OR condition', () => {
+    const result = parseStateKey('@parent(hovered) | @parent(focused)');
+    expect(result.kind).toBe('compound');
+    if (result.kind === 'compound') {
+      expect(result.operator).toBe('OR');
+      expect(result.children.length).toBe(2);
+      for (const child of result.children) {
+        expect(child.kind).toBe('state');
+        if (child.kind === 'state') {
+          expect(child.type).toBe('parent');
+        }
+      }
+    }
+  });
+
   it('should parse @own state', () => {
     const result = parseStateKey('@own(hovered)', { isSubElement: true });
     expect(result.kind).toBe('state');
@@ -504,6 +602,49 @@ describe('conditionToCSS()', () => {
       selector: '[data-theme="dark"]',
       negated: false,
     });
+  });
+
+  it('should set parentConditions for @parent', () => {
+    const result = parseStateKey('@parent(hovered)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].parentConditions).toHaveLength(1);
+    expect(css.variants[0].parentConditions[0]).toEqual({
+      selector: '[data-hovered]',
+      direct: false,
+      negated: false,
+    });
+  });
+
+  it('should set parentConditions with direct flag', () => {
+    const result = parseStateKey('@parent(hovered >)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].parentConditions).toHaveLength(1);
+    expect(css.variants[0].parentConditions[0]).toEqual({
+      selector: '[data-hovered]',
+      direct: true,
+      negated: false,
+    });
+  });
+
+  it('should set negated parentConditions for !@parent', () => {
+    const result = parseStateKey('!@parent(hovered)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].parentConditions).toHaveLength(1);
+    expect(css.variants[0].parentConditions[0]).toEqual({
+      selector: '[data-hovered]',
+      direct: false,
+      negated: true,
+    });
+  });
+
+  it('should set independent parentConditions for AND', () => {
+    const result = parseStateKey('@parent(hovered) & @parent(focused)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].parentConditions).toHaveLength(2);
   });
 
   it('should convert @supports feature query', () => {

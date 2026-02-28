@@ -181,6 +181,32 @@ describe('Advanced State Mapping', () => {
       });
     });
 
+    describe('Parent States', () => {
+      it('should parse @parent(hovered)', () => {
+        const result = parseAdvancedState('@parent(hovered)', defaultCtx);
+        expect(result.type).toBe('parent');
+        expect(result.condition).toBe('hovered');
+      });
+
+      it('should parse @parent(theme=dark)', () => {
+        const result = parseAdvancedState('@parent(theme=dark)', defaultCtx);
+        expect(result.type).toBe('parent');
+        expect(result.condition).toBe('theme=dark');
+      });
+
+      it('should parse @parent(.my-class)', () => {
+        const result = parseAdvancedState('@parent(.my-class)', defaultCtx);
+        expect(result.type).toBe('parent');
+        expect(result.condition).toBe('.my-class');
+      });
+
+      it('should parse @parent(hovered >) with direct parent syntax', () => {
+        const result = parseAdvancedState('@parent(hovered >)', defaultCtx);
+        expect(result.type).toBe('parent');
+        expect(result.condition).toBe('hovered >');
+      });
+    });
+
     describe('Sub-Element Own States', () => {
       it('should parse @own(hovered) in sub-element context', () => {
         const subElementCtx: StateParserContext = {
@@ -355,6 +381,7 @@ describe('Advanced State Mapping', () => {
         expect(isPredefinedStateRef('@starting')).toBe(false);
         expect(isPredefinedStateRef('@media(w < 920px)')).toBe(false);
         expect(isPredefinedStateRef('@root(dark)')).toBe(false);
+        expect(isPredefinedStateRef('@parent(hovered)')).toBe(false);
         expect(isPredefinedStateRef('@own(hovered)')).toBe(false);
         expect(isPredefinedStateRef('@(w < 600px)')).toBe(false);
       });

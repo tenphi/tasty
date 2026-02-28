@@ -26,6 +26,7 @@ import {
   createMediaTypeCondition,
   createModifierCondition,
   createOwnCondition,
+  createParentCondition,
   createPseudoCondition,
   createRootCondition,
   createStartingCondition,
@@ -65,7 +66,7 @@ const parseCache = new Lru<string, ConditionNode>(5000);
  * We use a pattern that allows one level of nesting: [^()]*(?:\([^)]*\))?[^)]*
  */
 const STATE_TOKEN_PATTERN =
-  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^)]*\))?[^)]*\))|(@root\([^)]+\))|(@own\([^)]+\))|(@\([^()]*(?:\([^)]*\))?[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
+  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^)]*\))?[^)]*\))|(@root\([^)]+\))|(@parent\([^)]+\))|(@own\([^)]+\))|(@\([^()]*(?:\([^)]*\))?[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
 
 // ============================================================================
 // Token Types
@@ -296,6 +297,11 @@ class Parser {
       return this.parseRootState(value);
     }
 
+    // @parent(...) - parent element state
+    if (value.startsWith('@parent(')) {
+      return this.parseParentState(value);
+    }
+
     // @own(...) - own state (sub-element)
     if (value.startsWith('@own(')) {
       return this.parseOwnState(value);
@@ -513,6 +519,34 @@ class Parser {
     // Build selector from condition
     const selector = buildRootSelector(content);
     return createRootCondition(selector, false, raw);
+  }
+
+  /**
+   * Parse @parent(...) state
+   *
+   * Syntax:
+   *   @parent(hovered)      → :is([data-hovered] *)
+   *   @parent(theme=dark)   → :is([data-theme="dark"] *)
+   *   @parent(hovered >)    → :is([data-hovered] > *)  (direct parent)
+   *   @parent(.my-class)    → :is(.my-class *)
+   */
+  private parseParentState(raw: string): ConditionNode {
+    const content = raw.slice(8, -1); // Remove '@parent(' and ')'
+    if (!content.trim()) {
+      return trueCondition();
+    }
+
+    let condition = content.trim();
+    let direct = false;
+
+    // Detect trailing > for direct parent mode
+    if (condition.endsWith('>')) {
+      direct = true;
+      condition = condition.slice(0, -1).trim();
+    }
+
+    const selector = buildRootSelector(condition);
+    return createParentCondition(selector, direct, false, raw);
   }
 
   /**

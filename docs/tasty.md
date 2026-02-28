@@ -429,8 +429,49 @@ color: '(#primary, #secondary)',  // Fallback syntax
 | `@(...)` | Container queries | `@(panel, w >= 300px)` |
 | `@supports` | Feature/selector support | `@supports(display: grid)` |
 | `@root` | Root element states | `@root(theme=dark)` |
+| `@parent` | Parent/ancestor element states | `@parent(hovered)` |
 | `@own` | Sub-element's own state | `@own(hovered)` |
 | `@starting` | Entry animation | `@starting` |
+
+#### `@parent(...)` — Parent Element States
+
+Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks.
+
+```jsx
+const Highlight = tasty({
+  styles: {
+    fill: {
+      '': '#white',
+      '@parent(hovered)': '#gray.05',         // Any ancestor has [data-hovered]
+      '@parent(theme=dark >)': '#dark-02',     // Direct parent has [data-theme="dark"]
+    },
+  },
+});
+```
+
+| Syntax | CSS Output |
+|--------|------------|
+| `@parent(hovered)` | `:is([data-hovered] *)` |
+| `!@parent(hovered)` | `:not([data-hovered] *)` |
+| `@parent(hovered >)` | `:is([data-hovered] > *)` (direct parent) |
+| `@parent(.active)` | `:is(.active *)` |
+| `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
+
+For sub-elements, the parent check applies to the root element's ancestors:
+
+```jsx
+const Card = tasty({
+  styles: {
+    Label: {
+      color: {
+        '': '#text',
+        '@parent(hovered)': '#primary',
+      },
+    },
+  },
+});
+// → .t0.t0:is([data-hovered] *) [data-element="Label"]
+```
 
 ---
 

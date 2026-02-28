@@ -13,6 +13,7 @@ import type {
   MediaCondition,
   ModifierCondition,
   OwnCondition,
+  ParentCondition,
   PseudoCondition,
   RootCondition,
   StateCondition,
@@ -120,6 +121,18 @@ export interface ParsedRootCondition {
 }
 
 /**
+ * Parsed parent condition for structured analysis
+ */
+export interface ParsedParentCondition {
+  /** The selector part (e.g., '[data-hovered]') */
+  selector: string;
+  /** Whether this targets a direct parent (> combinator) */
+  direct: boolean;
+  /** Whether this is negated (:not([sel] *)) */
+  negated: boolean;
+}
+
+/**
  * A single selector variant (one term in a DNF expression)
  */
 export interface SelectorVariant {
@@ -143,6 +156,9 @@ export interface SelectorVariant {
 
   /** Structured root conditions */
   rootConditions: ParsedRootCondition[];
+
+  /** Structured parent conditions */
+  parentConditions: ParsedParentCondition[];
 
   /** Whether to wrap in @starting-style */
   startingStyle: boolean;
@@ -223,6 +239,7 @@ function emptyVariant(): SelectorVariant {
     containerConditions: [],
     supportsConditions: [],
     rootConditions: [],
+    parentConditions: [],
     startingStyle: false,
   };
 }
@@ -303,6 +320,10 @@ function stateToCSS(state: StateCondition): CSSComponents {
 
         case 'root':
           variant.rootConditions.push(rootToParsed(state));
+          break;
+
+        case 'parent':
+          variant.parentConditions.push(parentToParsed(state));
           break;
 
         case 'own':
@@ -576,6 +597,31 @@ export function rootConditionsToCSS(
 }
 
 /**
+ * Convert parent condition to parsed structure
+ */
+function parentToParsed(state: ParentCondition): ParsedParentCondition {
+  return {
+    selector: state.selector,
+    direct: state.direct,
+    negated: state.negated ?? false,
+  };
+}
+
+/**
+ * Convert parsed parent condition to CSS selector fragment (for final output)
+ *
+ * Positive: :is([selector] *) or :is([selector] > *)
+ * Negative: :not([selector] *) or :not([selector] > *)
+ */
+export function parentToCSS(parent: ParsedParentCondition): string {
+  const combinator = parent.direct ? ' > *' : ' *';
+  if (parent.negated) {
+    return `:not(${parent.selector}${combinator})`;
+  }
+  return `:is(${parent.selector}${combinator})`;
+}
+
+/**
  * Convert own condition to parsed structures for sub-element
  */
 function ownToParsed(
@@ -688,6 +734,32 @@ function dedupeRootConditions(
 }
 
 /**
+ * Get unique key for a parent condition
+ */
+function getParentKey(parent: ParsedParentCondition): string {
+  const base = `${parent.direct ? '>' : ''}${parent.selector}`;
+  return parent.negated ? `!${base}` : base;
+}
+
+/**
+ * Deduplicate parent conditions
+ */
+function dedupeParentConditions(
+  conditions: ParsedParentCondition[],
+): ParsedParentCondition[] {
+  const seen = new Set<string>();
+  const result: ParsedParentCondition[] = [];
+  for (const c of conditions) {
+    const key = getParentKey(c);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(c);
+    }
+  }
+  return result;
+}
+
+/**
  * Deduplicate own conditions (modifiers or pseudos)
  */
 function dedupeOwnConditions(
@@ -762,6 +834,23 @@ function hasRootContradiction(conditions: ParsedRootCondition[]): boolean {
 }
 
 /**
+ * Check for parent condition contradiction: same selector+direct with opposite negation
+ */
+function hasParentContradiction(conditions: ParsedParentCondition[]): boolean {
+  const byKey = new Map<string, boolean>();
+
+  for (const parent of conditions) {
+    const baseKey = `${parent.direct ? '>' : ''}${parent.selector}`;
+    const existing = byKey.get(baseKey);
+    if (existing !== undefined && existing !== !parent.negated) {
+      return true;
+    }
+    byKey.set(baseKey, !parent.negated);
+  }
+  return false;
+}
+
+/**
  * Check for own condition contradiction
  */
 function hasOwnConditionContradiction(
@@ -825,6 +914,15 @@ function mergeVariants(
     return null; // Impossible variant
   }
 
+  // Merge parent conditions and check for contradictions
+  const mergedParents = dedupeParentConditions([
+    ...a.parentConditions,
+    ...b.parentConditions,
+  ]);
+  if (hasParentContradiction(mergedParents)) {
+    return null; // Impossible variant
+  }
+
   // Merge own conditions and check for contradictions
   const mergedOwn = dedupeOwnConditions([
     ...a.ownConditions,
@@ -860,6 +958,7 @@ function mergeVariants(
     containerConditions: mergedContainers,
     supportsConditions: mergedSupports,
     rootConditions: mergedRoots,
+    parentConditions: mergedParents,
     startingStyle: a.startingStyle || b.startingStyle,
   };
 }
@@ -1127,6 +1226,7 @@ function getVariantKey(v: SelectorVariant): string {
     .sort()
     .join('|');
   const rootKey = v.rootConditions.map(getRootKey).sort().join('|');
+  const parentKey = v.parentConditions.map(getParentKey).sort().join('|');
   return [
     modifierKey,
     pseudoKey,
@@ -1135,6 +1235,7 @@ function getVariantKey(v: SelectorVariant): string {
     containerKey,
     supportsKey,
     rootKey,
+    parentKey,
     v.startingStyle ? '1' : '0',
   ].join('###');
 }
@@ -1183,6 +1284,10 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
   // Check if a.ownConditions is superset of b.ownConditions
   if (!isOwnConditionsSuperset(a.ownConditions, b.ownConditions)) return false;
 
+  // Check if a.parentConditions is superset of b.parentConditions
+  if (!isParentConditionsSuperset(a.parentConditions, b.parentConditions))
+    return false;
+
   // A is a superset if it has all of B's items (possibly more)
   // and at least one category has strictly more items
   const aTotal =
@@ -1192,6 +1297,7 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
     a.modifierConditions.length +
     a.pseudoConditions.length +
     a.rootConditions.length +
+    a.parentConditions.length +
     a.ownConditions.length;
   const bTotal =
     b.mediaConditions.length +
@@ -1200,6 +1306,7 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
     b.modifierConditions.length +
     b.pseudoConditions.length +
     b.rootConditions.length +
+    b.parentConditions.length +
     b.ownConditions.length;
 
   return aTotal > bTotal;
@@ -1299,6 +1406,20 @@ function isRootConditionsSuperset(
 }
 
 /**
+ * Check if parent conditions A is a superset of B
+ */
+function isParentConditionsSuperset(
+  a: ParsedParentCondition[],
+  b: ParsedParentCondition[],
+): boolean {
+  const aKeys = new Set(a.map(getParentKey));
+  for (const c of b) {
+    if (!aKeys.has(getParentKey(c))) return false;
+  }
+  return true;
+}
+
+/**
  * Check if own conditions A is a superset of B
  */
 function isOwnConditionsSuperset(
@@ -1352,7 +1473,8 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
       a.mediaConditions.length +
       a.containerConditions.length +
       a.supportsConditions.length +
-      a.rootConditions.length;
+      a.rootConditions.length +
+      a.parentConditions.length;
     const bCount =
       b.modifierConditions.length +
       b.pseudoConditions.length +
@@ -1360,7 +1482,8 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
       b.mediaConditions.length +
       b.containerConditions.length +
       b.supportsConditions.length +
-      b.rootConditions.length;
+      b.rootConditions.length +
+      b.parentConditions.length;
     return aCount - bCount;
   });
 
@@ -1497,6 +1620,11 @@ function buildCSSSelectorFromVariant(
   // Add pseudo selectors
   for (const pseudo of variant.pseudoConditions) {
     selector += pseudoToCSS(pseudo);
+  }
+
+  // Add parent selectors (before sub-element suffix)
+  for (const parent of variant.parentConditions) {
+    selector += parentToCSS(parent);
   }
 
   // Add selector suffix (e.g., ' [data-element="Label"]')

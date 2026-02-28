@@ -75,6 +75,55 @@ exports[`Advanced State Mapping - CSS Output > @media query states > should hand
 }"
 `;
 
+exports[`Advanced State Mapping - CSS Output > @parent states > should generate CSS with :is() for parent states 1`] = `
+".t0.t0:is([data-hovered] *) { background-color: var(--gray-05-color); }
+.t0.t0:not([data-hovered] *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `
+".t0.t0:is([aria-expanded="true"] *) { background-color: var(--blue-color); }
+.t0.t0:not([aria-expanded="true"] *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle class-based parent state 1`] = `
+".t0.t0:is(.active *) { background-color: var(--blue-color); }
+.t0.t0:not(.active *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle direct parent syntax 1`] = `
+".t0.t0:is([data-hovered] > *) { background-color: var(--gray-05-color); }
+.t0.t0:not([data-hovered] > *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (AND) 1`] = `
+".t0.t0:is([data-focused] *):is([data-hovered] *) { background-color: var(--blue-color); }
+.t0.t0:not([data-focused] *), .t0.t0:not([data-hovered] *):is([data-focused] *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `
+".t0.t0[data-disabled]:is([data-hovered] *) { background-color: var(--gray-05-color); }
+.t0.t0:not([data-disabled]):is([data-hovered] *) { background-color: var(--blue-color); }
+.t0.t0[data-disabled]:not([data-hovered] *) { background-color: var(--gray-03-color); }
+.t0.t0:not([data-disabled]):not([data-hovered] *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with root 1`] = `
+".t0.t0:is([data-hovered] *) { background-color: var(--gray-05-color); }
+:root[data-theme="dark"] .t0.t0:not([data-hovered] *) { background-color: var(--dark-02-color); }
+:root:not([data-theme="dark"]) .t0.t0:not([data-hovered] *) { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent on sub-element 1`] = `
+".t0.t0 { background-color: var(--white-color); }
+.t1.t1:is([data-hovered] *) [data-element="Label"] { background-color: var(--blue-color); }
+.t1.t1:not([data-hovered] *) [data-element="Label"] { background-color: var(--gray-02-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle value modifier parent state 1`] = `
+".t0.t0:is([data-theme="dark"] *) { background-color: var(--dark-02-color); }
+.t0.t0:not([data-theme="dark"] *) { background-color: var(--white-color); }"
+`;
+
 exports[`Advanced State Mapping - CSS Output > @root states > should generate CSS with :root prefix for root states 1`] = `
 ":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
 :root:not([data-theme="dark"]) .t0.t0 { background-color: var(--white-color); }"

@@ -45,6 +45,7 @@ import {
   buildAtRulesFromVariant,
   conditionToCSS,
   modifierToCSS,
+  parentToCSS,
   pseudoToCSS,
   rootConditionsToCSS,
 } from './materialize';
@@ -1028,6 +1029,11 @@ function buildSelectorFromVariant(
   // Add pseudo selectors
   for (const pseudo of variant.pseudoConditions) {
     selector += pseudoToCSS(pseudo);
+  }
+
+  // Add parent selectors (before sub-element suffix)
+  for (const parent of variant.parentConditions) {
+    selector += parentToCSS(parent);
   }
 
   selector += selectorSuffix;

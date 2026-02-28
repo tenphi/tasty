@@ -199,6 +199,140 @@ describe('Advanced State Mapping - CSS Output', () => {
     });
   });
 
+  describe('@parent states', () => {
+    it('should generate CSS with :is() for parent states', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(hovered)': '#gray-05',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle direct parent syntax', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(hovered >)': '#gray-05',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle value modifier parent state', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(theme=dark)': '#dark-02',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle class-based parent state', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(.active)': '#blue',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle multiple parent conditions (AND)', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(hovered) & @parent(focused)': '#blue',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle parent combined with modifier', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            disabled: '#gray-03',
+            '@parent(hovered)': '#blue',
+            '@parent(hovered) & disabled': '#gray-05',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle parent combined with root', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@root(theme=dark)': '#dark-02',
+            '@parent(hovered)': '#gray-05',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle parent on sub-element', () => {
+      const Element = tasty({
+        styles: {
+          fill: '#white',
+          Label: {
+            fill: {
+              '': '#gray-02',
+              '@parent(hovered)': '#blue',
+            },
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle attribute-based parent state', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent([aria-expanded="true"])': '#blue',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+  });
+
   // Note: @starting-style CSS is not supported by jsdom
   describe('@starting style states', () => {
     it('should generate CSS with @starting-style wrapper (jsdom limitation)', () => {

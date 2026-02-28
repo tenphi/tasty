@@ -96,6 +96,15 @@ export interface RootCondition extends BaseStateCondition {
 }
 
 /**
+ * Parent state condition: @parent(hovered), @parent(theme=dark >)
+ */
+export interface ParentCondition extends BaseStateCondition {
+  type: 'parent';
+  selector: string; // e.g., '[data-hovered]'
+  direct: boolean; // true for @parent(... >) — direct parent only
+}
+
+/**
  * Own state condition: @own(hovered)
  */
 export interface OwnCondition extends BaseStateCondition {
@@ -129,6 +138,7 @@ export type StateCondition =
   | MediaCondition
   | ContainerCondition
   | RootCondition
+  | ParentCondition
   | OwnCondition
   | StartingCondition
   | SupportsCondition;
@@ -425,6 +435,18 @@ export function rootUniqueId(selector: string, negated = false): string {
 }
 
 /**
+ * Generate a normalized unique ID for a parent condition
+ */
+export function parentUniqueId(
+  selector: string,
+  direct: boolean,
+  negated = false,
+): string {
+  const base = `parent:${direct ? '>' : ''}${selector}`;
+  return negated ? `!${base}` : base;
+}
+
+/**
  * Generate a normalized unique ID for an own condition
  */
 export function ownUniqueId(innerUniqueId: string, negated = false): string {
@@ -662,6 +684,26 @@ export function createRootCondition(
     raw: raw || `@root(${selector})`,
     uniqueId: rootUniqueId(selector, negated),
     selector,
+  };
+}
+
+/**
+ * Create a parent condition
+ */
+export function createParentCondition(
+  selector: string,
+  direct: boolean,
+  negated = false,
+  raw?: string,
+): ParentCondition {
+  return {
+    kind: 'state',
+    type: 'parent',
+    negated,
+    raw: raw || `@parent(${selector}${direct ? ' >' : ''})`,
+    uniqueId: parentUniqueId(selector, direct, negated),
+    selector,
+    direct,
   };
 }
 

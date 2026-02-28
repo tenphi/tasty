@@ -5,7 +5,8 @@
 <h1 align="center">Tasty</h1>
 
 <p align="center">
-  A design-system-integrated styling system and DSL for concise, state-aware UI styling
+  <strong>The styling engine built for design systems.</strong><br>
+  Deterministic CSS generation. State-aware DSL. Zero specificity conflicts. Ever.
 </p>
 
 <p align="center">
@@ -16,21 +17,21 @@
 
 ---
 
-Tasty is a powerful CSS-in-JS styling system for React that combines declarative state-aware styling with design system integration. It provides a concise DSL for creating maintainable, themeable components with built-in support for responsive design, dark mode, container queries, and more.
+Most CSS-in-JS libraries generate CSS. Tasty generates **mutually exclusive CSS** — for any combination of states, exactly one rule matches per property. No cascade conflicts, no specificity wars, no `!important` hacks. Components compose and extend without breaking each other. That's the foundation everything else is built on.
 
-## Features
+On top of that foundation, Tasty gives you a concise, CSS-like DSL with design tokens, custom units, responsive states, container queries, dark mode, sub-element styling, and zero-runtime extraction — all in one coherent system that scales from a single component to an enterprise design system.
 
-- **Declarative state-aware styling** — style objects with state keys (`hovered`, `disabled`, `@media`, `@root`, etc.)
-- **Design token integration** — color tokens (`#purple`), custom units (`2x`, `1r`), typography presets
-- **Sub-element styling** — style inner elements via capitalized keys with `data-element` attributes
-- **Advanced state mapping** — media queries, container queries, root states, supports queries with boolean logic
-- **Zero-runtime mode** — Babel plugin extracts CSS at build time for static sites
-- **Plugin system** — extensible with custom color functions (OKHSL, etc.)
-- **React hooks** — `useStyles`, `useGlobalStyles`, `useRawCSS` for programmatic style injection
-- **Style extension** — compose and extend styled components with proper merge semantics
-- **Recipes** — named style bundles for reusable patterns
-- **TypeScript-first** — full type definitions with module augmentation support
-- **Tree-shakeable ESM** — unbundled output with `sideEffects: false`
+## Why Tasty
+
+- **Deterministic at any scale** — Exclusive selector generation eliminates the entire class of cascade/specificity bugs. Every state combination resolves to exactly one CSS rule per property. Refactor freely.
+- **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days.
+- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts.
+- **Full modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, keyframes, boolean state logic with `&`, `|`, `!` operators. If CSS can do it, Tasty can express it — concisely.
+- **Runtime or zero-runtime — your call** — Use `tasty()` for dynamic React components with runtime injection, or `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction. Same DSL, same tokens, same output.
+- **Only generate what is used** — In runtime mode, Tasty injects CSS on demand for mounted components/variants, so your app avoids shipping style rules for UI states that are never rendered.
+- **Runtime performance that holds at scale** — The runtime path is used in enterprise-scale applications and tuned with multi-level caching, chunk-level style reuse, style garbage collection, and a dedicated injector.
+- **Composable by design** — Extend any component's styles with proper merge semantics. State maps can be extended, replaced, or inherited per-property. Variants, recipes, and sub-elements compose without collision.
+- **TypeScript-first** — Full type definitions, module augmentation for custom properties, and autocomplete for tokens, presets, and themes.
 
 ## Installation
 
@@ -38,17 +39,9 @@ Tasty is a powerful CSS-in-JS styling system for React that combines declarative
 pnpm add @tenphi/tasty
 ```
 
-```bash
-npm install @tenphi/tasty
-```
-
-```bash
-yarn add @tenphi/tasty
-```
-
 ## Quick Start
 
-### Creating Styled Components
+### Create a styled component
 
 ```tsx
 import { tasty } from '@tenphi/tasty';
@@ -56,50 +49,68 @@ import { tasty } from '@tenphi/tasty';
 const Card = tasty({
   as: 'div',
   styles: {
+    display: 'flex',
+    flow: 'column',
     padding: '4x',
-    fill: '#white',
-    border: true,
-    radius: true,
+    gap: '2x',
+    fill: '#surface',
+    border: '#border bottom',
+    radius: '1r',
   },
 });
 
+// Just a React component
 <Card>Hello World</Card>
 ```
 
-### State-Based Styling
+Every value maps to CSS you'd recognize — but with tokens and units that keep your design system consistent by default.
+
+### Add state-driven styles
 
 ```tsx
-const InteractiveCard = tasty({
+const Button = tasty({
+  as: 'button',
   styles: {
+    padding: '1.5x 3x',
     fill: {
-      '': '#white',
-      'hovered': '#gray.05',
-      'pressed': '#gray.10',
-      '@media(w < 768px)': '#surface',
+      '': '#primary',
+      'hovered': '#primary-hover',
+      'pressed': '#primary-pressed',
+      'disabled': '#surface',
     },
-    padding: {
-      '': '4x',
-      '@media(w < 768px)': '2x',
+    color: {
+      '': '#on-primary',
+      'disabled': '#text.40',
     },
+    cursor: {
+      '': 'pointer',
+      'disabled': 'not-allowed',
+    },
+    transition: 'theme',
   },
 });
 ```
 
-### Extending Components
+State keys map to `data-*` attributes, pseudo-classes, media queries, container queries, root states — whatever you need. Tasty compiles them into exclusive selectors automatically.
+
+### Extend any component
 
 ```tsx
 import { Button } from 'my-ui-lib';
 
-const PrimaryButton = tasty(Button, {
+const DangerButton = tasty(Button, {
   styles: {
-    fill: '#purple',
-    color: '#white',
-    padding: '2x 4x',
+    fill: {
+      '': '#danger',
+      'hovered': '#danger-hover',
+    },
   },
 });
 ```
 
-### Configuration
+Child styles merge with parent styles intelligently — state maps can extend or replace parent states per-property.
+
+### Configure once, use everywhere
 
 ```tsx
 import { configure } from '@tenphi/tasty';
@@ -107,154 +118,326 @@ import { configure } from '@tenphi/tasty';
 configure({
   states: {
     '@mobile': '@media(w < 768px)',
-    '@dark': '@root(theme=dark)',
+    '@tablet': '@media(w < 1024px)',
+    '@dark': '@root(schema=dark) | @media(prefers-color-scheme: dark)',
   },
   recipes: {
-    card: {
-      padding: '4x',
-      fill: '#surface',
-      radius: '1r',
-      border: true,
+    card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
+  },
+});
+```
+
+Predefined states turn complex selector logic into single tokens. Use `@mobile` instead of writing media query expressions in every component.
+
+## How It Actually Works
+
+This is the core idea that makes everything else possible.
+
+Traditional CSS uses the cascade to resolve conflicts: when multiple selectors match, the one with the highest specificity wins, or — if specificity is equal — the last one in source order wins. This makes styles inherently fragile. Reordering imports, adding a new media query, or composing components from different libraries can silently break styling.
+
+Tasty takes a fundamentally different approach: **every state mapping compiles into selectors that are guaranteed to never overlap.**
+
+```tsx
+const Text = tasty({
+  styles: {
+    color: {
+      '': '#text',
+      '@dark': '#text-on-dark',
+    },
+    padding: {
+      '': '4x',
+      '@mobile': '2x',
     },
   },
 });
 ```
 
-## Entry Points
+If `@dark` expands to `@root(schema=dark) | @media(prefers-color-scheme: dark)`, Tasty generates:
 
-| Import | Description | Platform |
-|--------|-------------|----------|
-| `@tenphi/tasty` | Runtime style engine | Browser |
-| `@tenphi/tasty/static` | Build-time static style generation | Browser |
-| `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime | Node |
-| `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration wrapper | Node |
+```css
+/* Explicit dark mode */
+:root[data-schema="dark"] .t0.t0 {
+  color: var(--text-on-dark-color);
+}
 
-## Core Concepts
+/* OS dark preference, no explicit override */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-schema="dark"]) .t0.t0 {
+    color: var(--text-on-dark-color);
+  }
+}
 
-### Design Tokens
+/* Light mode — neither condition */
+@media (not (prefers-color-scheme: dark)) {
+  :root:not([data-schema="dark"]) .t0.t0 {
+    color: var(--text-color);
+  }
+}
+```
+
+Every rule is guarded by the negation of all higher-priority rules. No two rules can ever match simultaneously. No specificity arithmetic. No source-order dependence. Components compose and extend without ever colliding.
+
+## Capabilities
+
+### Design Tokens and Custom Units
+
+Tokens are first-class. Colors use `#name` syntax. Spacing, radius, and border width use multiplier units tied to CSS custom properties:
 
 ```tsx
-const TokenCard = tasty({
-  styles: {
-    fill: '#surface',        // Color token → var(--surface-color)
-    color: '#text',          // Color token
-    padding: '2x',           // Gap multiplier → calc(var(--gap) * 2)
-    radius: '1r',            // Border radius → var(--radius)
-    border: '1bw solid #border',
-  },
-});
+fill: '#surface',         // → var(--surface-color)
+color: '#text.80',        // → 80% opacity text token
+padding: '2x',            // → calc(var(--gap) * 2)
+radius: '1r',             // → var(--radius)
+border: '1bw solid #border',
+```
+
+| Unit | Maps to | Example |
+|------|---------|---------|
+| `x` | `--gap` multiplier | `2x` → `calc(var(--gap) * 2)` |
+| `r` | `--radius` multiplier | `1r` → `var(--radius)` |
+| `bw` | `--border-width` multiplier | `1bw` → `var(--border-width)` |
+| `ow` | `--outline-width` multiplier | `1ow` → `var(--outline-width)` |
+| `cr` | `--card-radius` multiplier | `1cr` → `var(--card-radius)` |
+
+Define your own units via `configure({ units: { ... } })`.
+
+### State System
+
+Every style property accepts a state mapping object. Keys can be combined with boolean logic:
+
+| State type | Syntax | CSS output |
+|------------|--------|------------|
+| Data attribute (boolean) | `hovered` | `[data-hovered]` |
+| Data attribute (value) | `theme=dark` | `[data-theme="dark"]` |
+| Pseudo-class | `:hover` | `:hover` |
+| Media query | `@media(w < 768px)` | `@media (width < 768px)` |
+| Container query | `@(panel, w >= 300px)` | `@container panel (width >= 300px)` |
+| Root state | `@root(theme=dark)` | `:root[data-theme="dark"]` |
+| Parent state | `@parent(hovered)` | `:is([data-hovered] *)` |
+| Feature query | `@supports(display: grid)` | `@supports (display: grid)` |
+| Entry animation | `@starting` | `@starting-style` |
+
+Combine with `&` (AND), `|` (OR), `!` (NOT):
+
+```tsx
+fill: {
+  '': '#surface',
+  '@dark & !disabled': '#dark-surface',
+  '@parent(hovered) | @parent(focused)': '#highlight',
+}
 ```
 
 ### Sub-Element Styling
+
+Style inner elements from the parent component definition. No extra components, no CSS leakage:
 
 ```tsx
 const Card = tasty({
   styles: {
     padding: '4x',
     Title: { preset: 'h3', color: '#primary' },
-    Content: { color: '#text' },
+    Content: { color: '#text', preset: 't2' },
   },
-  elements: {
-    Title: 'h2',
-    Content: 'div',
-  },
+  elements: { Title: 'h2', Content: 'div' },
 });
 
 <Card>
-  <Card.Title>Title</Card.Title>
-  <Card.Content>Content</Card.Content>
+  <Card.Title>Heading</Card.Title>
+  <Card.Content>Body text</Card.Content>
 </Card>
 ```
 
-### Hooks
+Sub-elements use `data-element` attributes — no extra class names, no naming conventions.
+
+### Variants
+
+Variants are designed to keep single-component CSS lean. Instead of generating dozens of static button classes up front, define all versions once and let runtime usage decide what CSS is actually emitted.
 
 ```tsx
-import { useStyles, useGlobalStyles } from '@tenphi/tasty';
+const Button = tasty({
+  styles: { padding: '2x 4x', radius: '1r' },
+  variants: {
+    default: { fill: '#primary', color: '#on-primary' },
+    danger: { fill: '#danger', color: '#on-danger' },
+    outline: { fill: 'transparent', border: '1bw solid #primary' },
+  },
+});
 
-function MyComponent() {
-  const { className } = useStyles({
-    padding: '2x',
-    fill: '#surface',
-  });
+<Button variant="danger">Delete</Button>
+```
 
-  useGlobalStyles('.card', {
-    border: '1bw solid #border',
-    radius: '1r',
-  });
+### Recipes
 
-  return <div className={className}>Styled</div>;
+Recipes are predefined style sets that work like composable styling classes for Tasty. They can be pre-applied or post-applied to current styles, which lets you add reusable state logic while still allowing local style overrides.
+
+```tsx
+configure({
+  recipes: {
+    card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
+    elevated: { shadow: '0 2x 4x #shadow' },
+  },
+});
+
+const ProfileCard = tasty({
+  styles: {
+    recipe: 'card elevated',
+    color: '#text',
+  },
+});
+```
+
+Use `|` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order.
+
+### Keyframes and `@property`
+
+Modern CSS features are natively supported:
+
+```tsx
+const Pulse = tasty({
+  styles: {
+    animation: 'pulse 2s infinite',
+    '@keyframes': {
+      pulse: {
+        '0%, 100%': { transform: 'scale(1)' },
+        '50%': { transform: 'scale(1.05)' },
+      },
+    },
+  },
+});
+```
+
+### React Hooks
+
+For cases where you don't need a full component:
+
+```tsx
+import { useStyles, useGlobalStyles, useRawCSS } from '@tenphi/tasty';
+
+function App() {
+  const { className } = useStyles({ padding: '2x', fill: '#surface' });
+  useGlobalStyles(':root', { '#primary': 'purple', '$gap': '8px' });
+  useRawCSS('body { margin: 0; }');
+
+  return <main className={className}>...</main>;
 }
 ```
 
 ### Zero-Runtime Mode
 
+Extract all CSS at build time. Zero JavaScript overhead in production:
+
 ```tsx
 import { tastyStatic } from '@tenphi/tasty/static';
 
-const button = tastyStatic({
-  display: 'inline-flex',
-  padding: '2x 4x',
-  fill: '#purple',
-  color: '#white',
+const card = tastyStatic({
+  padding: '4x',
+  fill: '#surface',
+  radius: '1r',
+  color: { '': '#text', '@dark': '#text-on-dark' },
 });
 
-<button className={button}>Click me</button>
+// card is a CSS class name string
+<div className={card}>Static styles, zero runtime</div>
 ```
 
 Configure the Babel plugin:
 
 ```js
-// babel.config.js
 module.exports = {
   plugins: [
-    ['@tenphi/tasty/babel-plugin', { output: 'public/tasty.css' }],
+    ['@tenphi/tasty/babel-plugin', {
+      output: 'public/tasty.css',
+      config: {
+        states: { '@dark': '@root(theme=dark)' },
+      },
+    }],
   ],
 };
 ```
 
-## Built-in Units
-
-| Unit | Description | Example | CSS Output |
-|------|-------------|---------|------------|
-| `x` | Gap multiplier | `2x` | `calc(var(--gap) * 2)` |
-| `r` | Border radius | `1r` | `var(--radius)` |
-| `cr` | Card border radius | `1cr` | `var(--card-radius)` |
-| `bw` | Border width | `2bw` | `calc(var(--border-width) * 2)` |
-| `ow` | Outline width | `1ow` | `var(--outline-width)` |
-| `fs` | Font size | `1fs` | `var(--font-size)` |
-| `lh` | Line height | `1lh` | `var(--line-height)` |
-| `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
-
-## `tasty` vs `tastyStatic`
-
-Tasty ships two styling APIs with different trade-offs. Pick the one that fits your project:
+### `tasty` vs `tastyStatic`
 
 | | `tasty` (runtime) | `tastyStatic` (zero-runtime) |
 |---|---|---|
-| **Framework** | React only | Framework-agnostic (requires Babel) |
-| **Import** | `@tenphi/tasty` | `@tenphi/tasty/static` |
-| **Output** | React component | CSS class name (string) |
-| **CSS injection** | At runtime via `<style>` tags | At build time via Babel plugin |
-| **Runtime overhead** | Style generation + injection on mount | None — CSS is pre-extracted |
-| **Requires Babel plugin** | No | Yes (`@tenphi/tasty/babel-plugin`) |
-| **Component creation** | `tasty({ as, styles, ... })` | `tastyStatic({ ... })` returns a class |
-| **Extending components** | `tasty(BaseComponent, { styles })` | `tastyStatic(baseStyle, { ... })` |
-| **Global / selector styles** | `useGlobalStyles(selector, styles)` | `tastyStatic(selector, styles)` |
-| **Style props at runtime** | Yes — `styleProps`, `styles`, `mods` | No — all values must be static |
-| **Dynamic values** | Fully supported | Only via CSS custom properties |
-| **Sub-elements** | Built-in (`elements` + `<C.Title>`) | Manual (use `data-element` + CSS) |
-| **Variants** | Built-in (`variants` option) | Manual (create separate static styles) |
-| **Tokens** | `tokens` prop → inline CSS vars | `processTokens()` helper |
-| **Design tokens & units** | Full support (`#color`, `2x`, `1r`) | Full support (`#color`, `2x`, `1r`) |
-| **State mappings** | Full support (modifiers, media, etc.) | Full support (modifiers, media, etc.) |
-| **Recipes** | Supported via `configure()` | Supported via Babel plugin config |
-| **Best for** | Interactive React apps, design systems | Static sites, landing pages, SSG |
+| **Output** | React component | CSS class name |
+| **CSS injection** | Runtime `<style>` tags | Build-time extraction |
+| **Runtime cost** | Style generation on mount | None |
+| **Generated CSS scope** | Only styles/variants used at runtime | All extracted static styles at build time |
+| **Dynamic values** | Fully supported | Via CSS custom properties |
+| **Sub-elements** | Built-in (`<C.Title>`) | Manual (`data-element`) |
+| **Variants** | Built-in (`variants` option) | Separate static styles |
+| **Framework** | React | Any (requires Babel) |
+| **Best for** | Interactive apps, design systems | Static sites, SSG, landing pages |
+
+Both share the same DSL, tokens, units, state mappings, and recipes.
+
+### Runtime Performance
+
+If you choose the runtime approach, performance is usually a non-issue in practice:
+
+- CSS is generated and injected only when styles are actually used.
+- Multi-level caching avoids repeated parsing and style recomputation.
+- Styles are split into reusable chunks and applied as multiple class names, so matching chunks can be reused across components instead of re-injected.
+- Style normalization guarantees equivalent style input resolves to the same chunks, improving deduplication hit rates.
+- A style garbage collector removes unused styles/chunks over time.
+- A dedicated style injector minimizes DOM/style-tag overhead.
+- This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
+
+## Entry Points
+
+| Import | Description | Platform |
+|--------|-------------|----------|
+| `@tenphi/tasty` | Runtime style engine | Browser |
+| `@tenphi/tasty/static` | Zero-runtime static styles | Browser |
+| `@tenphi/tasty/babel-plugin` | Babel plugin for CSS extraction | Node |
+| `@tenphi/tasty/zero` | Programmatic extraction API | Node |
+| `@tenphi/tasty/next` | Next.js integration | Node |
+
+## Ecosystem
+
+Tasty is the core of a production-ready styling platform. These companion tools complete the picture:
+
+### [ESLint Plugin](https://github.com/tenphi/eslint-plugin-tasty)
+
+`@tenphi/eslint-plugin-tasty` — 27 lint rules that validate style property names, value syntax, token existence, state keys, and enforce best practices. Catch typos and invalid styles at lint time, not at runtime.
+
+```bash
+pnpm add -D @tenphi/eslint-plugin-tasty
+```
+
+```js
+import tasty from '@tenphi/eslint-plugin-tasty';
+export default [tasty.configs.recommended];
+```
+
+### [Glaze](https://github.com/tenphi/glaze)
+
+`@tenphi/glaze` — OKHSL-based color theme generator with automatic WCAG contrast solving. Generate light, dark, and high-contrast palettes from a single hue, and export them directly as Tasty color tokens.
+
+```tsx
+import { glaze } from '@tenphi/glaze';
+
+const theme = glaze(280, 80);
+theme.colors({
+  surface: { lightness: 97 },
+  text: { base: 'surface', lightness: '-52', contrast: 'AAA' },
+});
+
+const tokens = theme.tasty(); // Ready-to-use Tasty tokens
+```
+
+### [VS Code Extension](https://github.com/tenphi/tasty-vscode-extension)
+
+Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Highlights color tokens, custom units, state keys, presets, and style properties inside `tasty()`, `tastyStatic()`, and related APIs.
+
+### [Cube UI Kit](https://github.com/cube-js/cube-ui-kit)
+
+Open-source React UI kit built on Tasty + React Aria. 100+ production components proving Tasty works at design-system scale. A reference implementation and a ready-to-use component library.
 
 ## Documentation
 
-- [Runtime API (tasty)](docs/tasty.md) — Full runtime styling documentation
-- [Zero Runtime (tastyStatic)](docs/tasty-static.md) — Build-time static styling documentation
+- **[Runtime API (tasty)](docs/tasty.md)** — Full runtime styling documentation: component creation, state mappings, sub-elements, variants, hooks, configuration, and style property reference
+- **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
 
 ## License
 

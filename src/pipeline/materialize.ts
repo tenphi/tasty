@@ -16,6 +16,7 @@ import type {
   StateCondition,
   SupportsCondition,
 } from './conditions';
+import { not } from './conditions';
 
 // ============================================================================
 // Types
@@ -573,37 +574,46 @@ function innerConditionToVariants(
   negated: boolean,
   target: 'rootConditions' | 'ownConditions',
 ): CSSComponents {
-  const innerCSS = conditionToCSS(innerCondition);
+  // Apply De Morgan when negated: !(A | B) = !A & !B
+  // This collapses OR branches into a single AND variant.
+  const effectiveCondition = negated ? not(innerCondition) : innerCondition;
+  const innerCSS = conditionToCSS(effectiveCondition);
 
   if (innerCSS.isImpossible || innerCSS.variants.length === 0) {
     return { variants: [], isImpossible: true };
   }
 
-  const variants: SelectorVariant[] = innerCSS.variants.map((innerVariant) => {
+  const variants: SelectorVariant[] = [];
+
+  for (const innerVariant of innerCSS.variants) {
     const v = emptyVariant();
 
     for (const mod of innerVariant.modifierConditions) {
-      v[target].push({
-        ...mod,
-        negated: negated ? !mod.negated : mod.negated,
-      });
+      v[target].push(mod);
     }
     for (const pseudo of innerVariant.pseudoConditions) {
-      v[target].push({
-        ...pseudo,
-        negated: negated ? !pseudo.negated : pseudo.negated,
-      });
+      v[target].push(pseudo);
     }
 
-    return v;
-  });
+    // Skip empty variants (e.g. from TRUE inner conditions)
+    if (v[target].length > 0) {
+      variants.push(v);
+    }
+  }
+
+  if (variants.length === 0) {
+    return { variants: [emptyVariant()], isImpossible: false };
+  }
 
   return { variants, isImpossible: false };
 }
 
 /**
  * Convert a @parent() inner condition into SelectorVariants with ParentGroups.
- * Each inner OR branch becomes a separate variant, each containing one ParentGroup.
+ *
+ * Positive: each inner OR branch becomes a separate variant with one :is() group.
+ * Negated: !(A | B) = !A & !B — all branches become :not() groups collected
+ * into a single variant so they produce :not([a] *):not([b] *) on one element.
  */
 function parentConditionToVariants(
   innerCondition: ConditionNode,
@@ -616,9 +626,38 @@ function parentConditionToVariants(
     return { variants: [], isImpossible: true };
   }
 
-  const variants: SelectorVariant[] = innerCSS.variants.map((innerVariant) => {
+  if (negated) {
+    // Collect all OR branches into one variant as separate :not() groups.
     const v = emptyVariant();
-    const group: ParentGroup = { conditions: [], direct, negated };
+
+    for (const innerVariant of innerCSS.variants) {
+      const group: ParentGroup = { conditions: [], direct, negated: true };
+
+      for (const mod of innerVariant.modifierConditions) {
+        group.conditions.push(mod);
+      }
+      for (const pseudo of innerVariant.pseudoConditions) {
+        group.conditions.push(pseudo);
+      }
+
+      if (group.conditions.length > 0) {
+        v.parentGroups.push(group);
+      }
+    }
+
+    if (v.parentGroups.length === 0) {
+      return { variants: [emptyVariant()], isImpossible: false };
+    }
+
+    return { variants: [v], isImpossible: false };
+  }
+
+  // Positive: each OR branch is a separate variant
+  const variants: SelectorVariant[] = [];
+
+  for (const innerVariant of innerCSS.variants) {
+    const v = emptyVariant();
+    const group: ParentGroup = { conditions: [], direct, negated: false };
 
     for (const mod of innerVariant.modifierConditions) {
       group.conditions.push(mod);
@@ -627,9 +666,15 @@ function parentConditionToVariants(
       group.conditions.push(pseudo);
     }
 
-    v.parentGroups.push(group);
-    return v;
-  });
+    if (group.conditions.length > 0) {
+      v.parentGroups.push(group);
+      variants.push(v);
+    }
+  }
+
+  if (variants.length === 0) {
+    return { variants: [emptyVariant()], isImpossible: false };
+  }
 
   return { variants, isImpossible: false };
 }
@@ -701,42 +746,6 @@ function getSelectorConditionKey(cond: ParsedSelectorCondition): string {
   return 'attribute' in cond
     ? `mod:${getModifierKey(cond)}`
     : `pseudo:${getPseudoKey(cond)}`;
-}
-
-/**
- * Deduplicate modifier conditions
- */
-function dedupeModifierConditions(
-  conditions: ParsedModifierCondition[],
-): ParsedModifierCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedModifierCondition[] = [];
-  for (const c of conditions) {
-    const key = getModifierKey(c);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
-    }
-  }
-  return result;
-}
-
-/**
- * Deduplicate pseudo conditions
- */
-function dedupePseudoConditions(
-  conditions: ParsedPseudoCondition[],
-): ParsedPseudoCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedPseudoCondition[] = [];
-  for (const c of conditions) {
-    const key = getPseudoKey(c);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
-    }
-  }
-  return result;
 }
 
 /**
@@ -861,6 +870,25 @@ function hasSelectorConditionContradiction(
 }
 
 /**
+ * Check for parent group contradiction: same target (direct + conditions)
+ * with opposite negation. E.g. :not([data-hovered] *) and :is([data-hovered] *)
+ * in the same variant is impossible.
+ */
+function hasParentGroupContradiction(groups: ParentGroup[]): boolean {
+  const byBaseKey = new Map<string, boolean>();
+
+  for (const g of groups) {
+    const baseKey = `${g.direct ? '>' : ''}(${g.conditions.map(getSelectorConditionKey).sort().join(',')})`;
+    const existing = byBaseKey.get(baseKey);
+    if (existing !== undefined && existing !== !g.negated) {
+      return true;
+    }
+    byBaseKey.set(baseKey, !g.negated);
+  }
+  return false;
+}
+
+/**
  * Merge two selector variants (AND operation)
  * Deduplicates conditions and checks for contradictions
  */
@@ -886,26 +914,29 @@ function mergeVariants(
     return null; // Impossible variant
   }
 
-  // Merge modifier conditions and check for contradictions
-  const mergedModifiers = dedupeModifierConditions([
+  // Merge modifier and pseudo conditions together, check for contradictions
+  const mergedSelectorConditions = dedupeSelectorConditions([
     ...a.modifierConditions,
     ...b.modifierConditions,
-  ]);
-  if (hasModifierContradiction(mergedModifiers)) {
-    return null; // Impossible variant
-  }
-
-  // Merge pseudo conditions and check for contradictions
-  const mergedPseudos = dedupePseudoConditions([
     ...a.pseudoConditions,
     ...b.pseudoConditions,
   ]);
-  if (hasPseudoContradiction(mergedPseudos)) {
+  if (hasSelectorConditionContradiction(mergedSelectorConditions)) {
     return null; // Impossible variant
   }
 
+  const mergedModifiers = mergedSelectorConditions.filter(
+    (c): c is ParsedModifierCondition => 'attribute' in c,
+  );
+  const mergedPseudos = mergedSelectorConditions.filter(
+    (c): c is ParsedPseudoCondition => !('attribute' in c),
+  );
+
   // Concatenate parent groups (each group is an independent :is() wrapper)
   const mergedParentGroups = [...a.parentGroups, ...b.parentGroups];
+  if (hasParentGroupContradiction(mergedParentGroups)) {
+    return null; // Impossible variant
+  }
 
   // Merge own conditions and check for contradictions
   const mergedOwn = dedupeSelectorConditions([
@@ -1626,10 +1657,3 @@ export function buildAtRulesFromVariant(variant: SelectorVariant): string[] {
   return atRules;
 }
 
-/**
- * Get a string key for a variant's at-rules (for grouping)
- */
-function getAtRulesKey(variant: SelectorVariant): string {
-  const atRules = buildAtRulesFromVariant(variant);
-  return atRules.sort().join('|||');
-}

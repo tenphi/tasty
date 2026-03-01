@@ -82,7 +82,7 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should generate 
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `
 ".t0.t0:is([data-hovered] *), .t0.t0:is([data-focused] *) { background-color: var(--blue-color); }
-.t0.t0:not([data-hovered] *), .t0.t0:not([data-focused] *) { background-color: var(--white-color); }"
+.t0.t0:not([data-hovered] *):not([data-focused] *) { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `
@@ -107,12 +107,12 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should handle mu
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (OR) 1`] = `
 ".t0.t0:is([data-hovered] *), .t0.t0:not([data-hovered] *):is([data-focused] *) { background-color: var(--blue-color); }
-.t0.t0:not([data-hovered] *):not([data-focused] *), .t0.t0:not([data-hovered] *):is([data-hovered] *) { background-color: var(--white-color); }"
+.t0.t0:not([data-hovered] *):not([data-focused] *) { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `
 ".t0.t0[data-disabled]:is([data-hovered] *) { background-color: var(--gray-05-color); }
-.t0.t0:not([data-disabled]):is([data-hovered] *), .t0.t0:not([data-hovered] *):is([data-hovered] *) { background-color: var(--blue-color); }
+.t0.t0:not([data-disabled]):is([data-hovered] *) { background-color: var(--blue-color); }
 .t0.t0[data-disabled]:not([data-hovered] *) { background-color: var(--gray-03-color); }
 .t0.t0:not([data-disabled]):not([data-hovered] *) { background-color: var(--white-color); }"
 `;
@@ -142,8 +142,7 @@ exports[`Advanced State Mapping - CSS Output > @root states > should generate CS
 exports[`Advanced State Mapping - CSS Output > @root states > should handle OR inside single @root() 1`] = `
 ":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
 :root[data-mode="compact"] .t0.t0 { background-color: var(--dark-02-color); }
-:root:not([data-theme="dark"]) .t0.t0 { background-color: var(--white-color); }
-:root:not([data-mode="compact"]) .t0.t0 { background-color: var(--white-color); }"
+:root:not([data-theme="dark"]):not([data-mode="compact"]) .t0.t0 { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @root states > should handle attribute-based root states 1`] = `

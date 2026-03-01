@@ -7,7 +7,7 @@
  * Resolution order per level (top-level and each sub-element independently):
  * base_recipe_1 base_recipe_2 → component styles → post_recipe_1 post_recipe_2
  *
- * The `|` separator splits base recipes (before component styles)
+ * The `/` separator splits base recipes (before component styles)
  * from post recipes (after component styles). All merges use mergeStyles
  * semantics: primitives and state maps with '' key fully replace;
  * state maps without '' key extend the existing value.
@@ -32,10 +32,11 @@ interface ParsedRecipeGroups {
 /**
  * Parse a recipe string into base and post recipe name groups.
  *
- * Syntax: `'base1 base2 | post1 post2'`
+ * Syntax: `'base1 base2 / post1 post2'`
  * - Names are space-separated within each group
- * - `|` separates base (before component) from post (after component) groups
- * - `|` is optional; if absent, all names are base
+ * - `/` separates base (before component) from post (after component) groups
+ * - `/` is optional; if absent, all names are base
+ * - `none` as the sole base value means "no base recipes"
  *
  * Returns `{ base: null, post: null }` if the string is empty or invalid.
  */
@@ -46,18 +47,19 @@ function parseRecipeNames(value: unknown): ParsedRecipeGroups {
   const trimmed = value.trim();
   if (trimmed === '') return empty;
 
-  const pipeIndex = trimmed.indexOf('|');
+  const slashIndex = trimmed.indexOf('/');
 
-  if (pipeIndex === -1) {
+  if (slashIndex === -1) {
+    if (trimmed === 'none') return empty;
     const names = splitNames(trimmed);
     return { base: names, post: null };
   }
 
-  const basePart = trimmed.slice(0, pipeIndex);
-  const postPart = trimmed.slice(pipeIndex + 1);
+  const basePart = trimmed.slice(0, slashIndex);
+  const postPart = trimmed.slice(slashIndex + 1);
 
   return {
-    base: splitNames(basePart),
+    base: basePart.trim() === 'none' ? null : splitNames(basePart),
     post: splitNames(postPart),
   };
 }

@@ -208,7 +208,8 @@ export interface TastyConfig {
    * tokens (`$name`/`#name` definitions), local states, `@keyframes`, and `@properties`.
    *
    * Components reference recipes via: `recipe: 'name1 name2'` in their styles.
-   * Use `|` to separate base recipes from post recipes: `recipe: 'base1 base2 | post1'`.
+   * Use `/` to separate base recipes from post recipes: `recipe: 'base1 base2 / post1'`.
+   * Use `none` to skip base recipes: `recipe: 'none / post1'`.
    * Resolution order: `base_recipes → component styles → post_recipes`.
    *
    * Recipes cannot reference other recipes.
@@ -595,6 +596,16 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
   // Dev-mode validation
   if (devMode) {
     for (const [name, recipeStyles] of Object.entries(recipes)) {
+      if (name === 'none') {
+        warnOnce(
+          'recipe-reserved-none',
+          `[Tasty] Recipe name "none" is reserved. ` +
+            `It is used as a keyword meaning "no base recipes" ` +
+            `(e.g. recipe: 'none / post-recipe'). ` +
+            `Choose a different name for your recipe.`,
+        );
+      }
+
       for (const key of Object.keys(recipeStyles)) {
         if (isSelector(key)) {
           warnOnce(

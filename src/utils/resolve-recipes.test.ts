@@ -345,7 +345,7 @@ describe('resolveRecipes', () => {
   // Post-merge recipe resolution
   // ============================================================================
 
-  describe('post-merge recipes (| separator)', () => {
+  describe('post-merge recipes (/ separator)', () => {
     beforeEach(() => {
       configure({
         recipes: {
@@ -368,7 +368,7 @@ describe('resolveRecipes', () => {
 
     it('post recipe state map extends component primitive', () => {
       const styles: Styles = {
-        recipe: 'reset input | input-autofill',
+        recipe: 'reset input / input-autofill',
         preset: 't3',
       };
       const result = resolveRecipes(styles);
@@ -391,7 +391,7 @@ describe('resolveRecipes', () => {
 
     it('post recipe state map extends component state map', () => {
       const styles: Styles = {
-        recipe: 'reset input | input-autofill',
+        recipe: 'reset input / input-autofill',
         preset: {
           '': 't3',
           ':hover': 't2',
@@ -416,7 +416,7 @@ describe('resolveRecipes', () => {
       });
     });
 
-    it('base-only (no |) still works', () => {
+    it('base-only (no /) still works', () => {
       const styles: Styles = { recipe: 'reset card', color: '#text' };
       const result = resolveRecipes(styles);
 
@@ -428,9 +428,9 @@ describe('resolveRecipes', () => {
       });
     });
 
-    it('post-only (| post-recipe) works', () => {
+    it('post-only (/ post-recipe) works', () => {
       const styles: Styles = {
-        recipe: '| input-autofill',
+        recipe: '/ input-autofill',
         preset: 't3',
       };
       const result = resolveRecipes(styles);
@@ -449,7 +449,7 @@ describe('resolveRecipes', () => {
 
     it('multiple post recipes', () => {
       const styles: Styles = {
-        recipe: 'reset | card elevated',
+        recipe: 'reset / card elevated',
         padding: '2x',
       };
       const result = resolveRecipes(styles);
@@ -464,7 +464,7 @@ describe('resolveRecipes', () => {
 
     it('post recipe adds new keys without affecting existing ones', () => {
       const styles: Styles = {
-        recipe: 'reset | elevated',
+        recipe: 'reset / elevated',
         padding: '2x',
       };
       const result = resolveRecipes(styles);
@@ -474,6 +474,47 @@ describe('resolveRecipes', () => {
         padding: '2x',
         shadow: '2x 2x 4x #shadow',
       });
+    });
+
+    it('none with post recipe applies only post-recipe', () => {
+      const styles: Styles = {
+        recipe: 'none / input-autofill',
+        preset: 't3',
+      };
+      const result = resolveRecipes(styles);
+
+      expect(result).toEqual({
+        preset: {
+          '': 't3',
+          ':-webkit-autofill': 'inherit',
+        },
+        '-webkit-text-fill-color': {
+          '': 'currentColor',
+          ':-webkit-autofill': '#primary',
+        },
+      });
+    });
+
+    it('none without slash means no recipes at all', () => {
+      const styles: Styles = { recipe: 'none', padding: '2x' };
+      const result = resolveRecipes(styles);
+
+      expect(result).toEqual({ padding: '2x' });
+      expect(result.recipe).toBeUndefined();
+    });
+
+    it('none is not looked up as a recipe name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation();
+
+      const styles: Styles = { recipe: 'none / elevated' };
+      const result = resolveRecipes(styles);
+
+      expect(result).toEqual({
+        shadow: '2x 2x 4x #shadow',
+      });
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

@@ -28,6 +28,8 @@ export type {
   SubElementDefinition,
   ElementsDefinition,
   SubElementProps,
+  WithVariant,
+  VariantMap,
 } from './tasty';
 export type {
   AllBaseProps,

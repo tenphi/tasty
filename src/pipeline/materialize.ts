@@ -309,35 +309,34 @@ function stateToCSS(state: StateCondition): CSSComponents {
         'ownConditions',
       );
 
-    default: {
-      const variant: SelectorVariant = emptyVariant();
+    case 'modifier': {
+      const v = emptyVariant();
+      v.modifierConditions.push(modifierToParsed(state));
+      return { variants: [v], isImpossible: false };
+    }
 
-      switch (state.type) {
-        case 'modifier':
-          variant.modifierConditions.push(modifierToParsed(state));
-          break;
+    case 'pseudo': {
+      const v = emptyVariant();
+      v.pseudoConditions.push(pseudoToParsed(state));
+      return { variants: [v], isImpossible: false };
+    }
 
-        case 'pseudo':
-          variant.pseudoConditions.push(pseudoToParsed(state));
-          break;
+    case 'container': {
+      const v = emptyVariant();
+      v.containerConditions.push(containerToParsed(state));
+      return { variants: [v], isImpossible: false };
+    }
 
-        case 'container':
-          variant.containerConditions.push(containerToParsed(state));
-          break;
+    case 'supports': {
+      const v = emptyVariant();
+      v.supportsConditions.push(supportsToParsed(state));
+      return { variants: [v], isImpossible: false };
+    }
 
-        case 'supports':
-          variant.supportsConditions.push(supportsToParsed(state));
-          break;
-
-        case 'starting':
-          variant.startingStyle = !state.negated;
-          break;
-      }
-
-      return {
-        variants: [variant],
-        isImpossible: false,
-      };
+    case 'starting': {
+      const v = emptyVariant();
+      v.startingStyle = !state.negated;
+      return { variants: [v], isImpossible: false };
     }
   }
 }
@@ -565,6 +564,15 @@ function supportsToParsed(state: SupportsCondition): ParsedSupportsCondition {
 }
 
 /**
+ * Collect all modifier and pseudo conditions from a variant as a flat array.
+ */
+function collectSelectorConditions(
+  variant: SelectorVariant,
+): ParsedSelectorCondition[] {
+  return [...variant.modifierConditions, ...variant.pseudoConditions];
+}
+
+/**
  * Convert an inner condition tree into SelectorVariants.
  * Each inner OR branch becomes a separate variant, preserving disjunction.
  * Shared by @root() and @own().
@@ -574,8 +582,13 @@ function innerConditionToVariants(
   negated: boolean,
   target: 'rootConditions' | 'ownConditions',
 ): CSSComponents {
-  // Apply De Morgan when negated: !(A | B) = !A & !B
-  // This collapses OR branches into a single AND variant.
+  // For @root/@own, negation is applied upfront via De Morgan: !(A | B) = !A & !B.
+  // This is safe because the negated conditions are appended directly to the same
+  // selector (e.g. :root:not([a]):not([b])), so collapsing OR branches is correct.
+  //
+  // @parent uses a different strategy (parentConditionToVariants) because each OR
+  // branch must become its own :not(... *) wrapper — the * combinator scopes to a
+  // specific ancestor, so branches cannot be merged into one selector.
   const effectiveCondition = negated ? not(innerCondition) : innerCondition;
   const innerCSS = conditionToCSS(effectiveCondition);
 
@@ -586,17 +599,11 @@ function innerConditionToVariants(
   const variants: SelectorVariant[] = [];
 
   for (const innerVariant of innerCSS.variants) {
-    const v = emptyVariant();
+    const conditions = collectSelectorConditions(innerVariant);
 
-    for (const mod of innerVariant.modifierConditions) {
-      v[target].push(mod);
-    }
-    for (const pseudo of innerVariant.pseudoConditions) {
-      v[target].push(pseudo);
-    }
-
-    // Skip empty variants (e.g. from TRUE inner conditions)
-    if (v[target].length > 0) {
+    if (conditions.length > 0) {
+      const v = emptyVariant();
+      v[target].push(...conditions);
       variants.push(v);
     }
   }
@@ -631,17 +638,10 @@ function parentConditionToVariants(
     const v = emptyVariant();
 
     for (const innerVariant of innerCSS.variants) {
-      const group: ParentGroup = { conditions: [], direct, negated: true };
+      const conditions = collectSelectorConditions(innerVariant);
 
-      for (const mod of innerVariant.modifierConditions) {
-        group.conditions.push(mod);
-      }
-      for (const pseudo of innerVariant.pseudoConditions) {
-        group.conditions.push(pseudo);
-      }
-
-      if (group.conditions.length > 0) {
-        v.parentGroups.push(group);
+      if (conditions.length > 0) {
+        v.parentGroups.push({ conditions, direct, negated: true });
       }
     }
 
@@ -656,18 +656,11 @@ function parentConditionToVariants(
   const variants: SelectorVariant[] = [];
 
   for (const innerVariant of innerCSS.variants) {
-    const v = emptyVariant();
-    const group: ParentGroup = { conditions: [], direct, negated: false };
+    const conditions = collectSelectorConditions(innerVariant);
 
-    for (const mod of innerVariant.modifierConditions) {
-      group.conditions.push(mod);
-    }
-    for (const pseudo of innerVariant.pseudoConditions) {
-      group.conditions.push(pseudo);
-    }
-
-    if (group.conditions.length > 0) {
-      v.parentGroups.push(group);
+    if (conditions.length > 0) {
+      const v = emptyVariant();
+      v.parentGroups.push({ conditions, direct, negated: false });
       variants.push(v);
     }
   }
@@ -769,21 +762,22 @@ function dedupeSelectorConditions(
   // Pass 2: remove negated value modifiers subsumed by other modifiers.
   // :not([data-attr]) subsumes :not([data-attr="value"])
   // [data-attr="X"] implies :not([data-attr="Y"]) is redundant
-  // Note: contradictions (e.g. [data-x="a"] & [data-x="b"]) are detected
-  // separately; this pass only removes safe redundancies.
+  // This implication only holds for exact-match (=) operators; substring
+  // operators (^=, $=, *=) don't imply exclusivity between values.
   const negatedBooleanAttrs = new Set<string>();
-  const positiveValuesByAttr = new Map<string, Set<string>>();
+  const positiveExactValuesByAttr = new Map<string, Set<string>>();
 
   for (const c of result) {
     if (!('attribute' in c)) continue;
     if (c.negated && c.value === undefined) {
       negatedBooleanAttrs.add(c.attribute);
     }
-    if (!c.negated && c.value !== undefined) {
-      let values = positiveValuesByAttr.get(c.attribute);
+    const op = c.operator ?? '=';
+    if (!c.negated && c.value !== undefined && op === '=') {
+      let values = positiveExactValuesByAttr.get(c.attribute);
       if (!values) {
         values = new Set();
-        positiveValuesByAttr.set(c.attribute, values);
+        positiveExactValuesByAttr.set(c.attribute, values);
       }
       values.add(c.value);
     }
@@ -796,8 +790,9 @@ function dedupeSelectorConditions(
     if (negatedBooleanAttrs.has(c.attribute)) {
       return false;
     }
-    const positiveValues = positiveValuesByAttr.get(c.attribute);
-    // Only remove if there's exactly one positive value and it differs
+    const op = c.operator ?? '=';
+    if (op !== '=') return true;
+    const positiveValues = positiveExactValuesByAttr.get(c.attribute);
     if (
       positiveValues !== undefined &&
       positiveValues.size === 1 &&
@@ -914,23 +909,20 @@ function mergeVariants(
     return null; // Impossible variant
   }
 
-  // Merge modifier and pseudo conditions together, check for contradictions
-  const mergedSelectorConditions = dedupeSelectorConditions([
+  // Merge modifier and pseudo conditions separately, then cross-check
+  const mergedModifiers = dedupeSelectorConditions([
     ...a.modifierConditions,
     ...b.modifierConditions,
+  ]) as ParsedModifierCondition[];
+  const mergedPseudos = dedupeSelectorConditions([
     ...a.pseudoConditions,
     ...b.pseudoConditions,
-  ]);
-  if (hasSelectorConditionContradiction(mergedSelectorConditions)) {
+  ]) as ParsedPseudoCondition[];
+  if (
+    hasSelectorConditionContradiction([...mergedModifiers, ...mergedPseudos])
+  ) {
     return null; // Impossible variant
   }
-
-  const mergedModifiers = mergedSelectorConditions.filter(
-    (c): c is ParsedModifierCondition => 'attribute' in c,
-  );
-  const mergedPseudos = mergedSelectorConditions.filter(
-    (c): c is ParsedPseudoCondition => !('attribute' in c),
-  );
 
   // Concatenate parent groups (each group is an independent :is() wrapper)
   const mergedParentGroups = [...a.parentGroups, ...b.parentGroups];
@@ -1237,13 +1229,7 @@ function getVariantKey(v: SelectorVariant): string {
     .map(getSelectorConditionKey)
     .sort()
     .join('|');
-  const parentKey = v.parentGroups
-    .map(
-      (g) =>
-        `${g.direct ? '>' : ''}(${g.conditions.map(getSelectorConditionKey).sort().join(',')})`,
-    )
-    .sort()
-    .join('|');
+  const parentKey = v.parentGroups.map(getParentGroupKey).sort().join('|');
   return [
     modifierKey,
     pseudoKey,
@@ -1656,4 +1642,3 @@ export function buildAtRulesFromVariant(variant: SelectorVariant): string[] {
 
   return atRules;
 }
-

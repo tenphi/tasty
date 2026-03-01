@@ -446,7 +446,7 @@ color: '(#primary, #secondary)',  // Fallback syntax
 
 #### `@parent(...)` — Parent Element States
 
-Style based on ancestor element attributes. Uses `:is([selector] *)` / `:is(:not([selector]) *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`) is supported inside `@parent()`.
+Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`) is supported inside `@parent()`.
 
 ```jsx
 const Highlight = tasty({

@@ -39,11 +39,7 @@ export * from '../styles/list';
 
 // Pipeline
 export { renderStyles, isSelector, parseStateKey } from '../pipeline';
-export type {
-  StyleResult,
-  RenderResult,
-  ConditionNode,
-} from '../pipeline';
+export type { StyleResult, RenderResult, ConditionNode } from '../pipeline';
 export type { ParseStateKeyOptions } from '../pipeline/parseStateKey';
 
 // Parser

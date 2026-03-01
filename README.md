@@ -296,7 +296,7 @@ const ProfileCard = tasty({
 });
 ```
 
-Use `|` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order.
+Use `/` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order. Use `none` to skip base recipes: `recipe: 'none / disabled'`.
 
 ### Keyframes and `@property`
 

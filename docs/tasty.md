@@ -259,15 +259,26 @@ const ElevatedCard = tasty({
 });
 ```
 
-**Post-merge recipes (`|` separator):**
+**Post-merge recipes (`/` separator):**
 
-Recipes listed after `|` are applied *after* component styles using `mergeStyles`:
+Recipes listed after `/` are applied *after* component styles using `mergeStyles`:
 
 ```jsx
 const Input = tasty({
   styles: {
-    recipe: 'reset input | input-autofill',
+    recipe: 'reset input / input-autofill',
     preset: 't3',
+  },
+});
+```
+
+Use `none` to skip base recipes and apply only post recipes:
+
+```jsx
+const Custom = tasty({
+  styles: {
+    recipe: 'none / disabled',
+    padding: '2x',
   },
 });
 ```

@@ -478,13 +478,15 @@ export interface StylesInterface extends Omit<
   /**
    * Apply one or more predefined style recipes by name.
    * Recipes are defined globally via `configure({ recipes: { ... } })`.
-   * Multiple recipes are space-separated. Use `|` to separate base recipes
+   * Multiple recipes are space-separated. Use `/` to separate base recipes
    * (applied before component styles) from post recipes (applied after, via mergeStyles).
+   * Use `none` to explicitly skip base recipes.
    *
    * Examples:
    * - `recipe: 'card'` // Apply the 'card' recipe
    * - `recipe: 'card elevated'` // Apply 'card' then 'elevated', then component styles
-   * - `recipe: 'reset input | input-autofill'` // Base recipes, then post recipe
+   * - `recipe: 'reset input / input-autofill'` // Base recipes, then post recipe
+   * - `recipe: 'none / disabled'` // No base recipes, only post recipe
    * - `recipe: ''` // Clear recipes from base styles when extending
    */
   recipe?: string;

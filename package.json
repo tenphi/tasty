@@ -34,10 +34,10 @@
         "default": "./dist/zero/next.js"
       }
     },
-    "./parser": {
+    "./core": {
       "import": {
-        "types": "./dist/parser/index.d.ts",
-        "default": "./dist/parser/index.js"
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
       }
     }
   },

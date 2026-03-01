@@ -7,7 +7,7 @@ export default defineConfig({
     'zero/index': 'src/zero/index.ts',
     'zero/babel': 'src/zero/babel.ts',
     'zero/next': 'src/zero/next.ts',
-    'parser/index': 'src/parser/index.ts',
+    'core/index': 'src/core/index.ts',
   },
   format: 'esm',
   outDir: 'dist',

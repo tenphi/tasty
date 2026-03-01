@@ -1,4 +1,6 @@
-import type { AllHTMLAttributes, ComponentType, CSSProperties } from 'react';
+import type { AllHTMLAttributes, ComponentType } from 'react';
+
+import type { CSSProperties } from './utils/css-types';
 
 import type {
   BASE_STYLES,

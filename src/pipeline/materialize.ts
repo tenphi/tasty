@@ -12,10 +12,7 @@ import type {
   ContainerCondition,
   MediaCondition,
   ModifierCondition,
-  OwnCondition,
-  ParentCondition,
   PseudoCondition,
-  RootCondition,
   StateCondition,
   SupportsCondition,
 } from './conditions';
@@ -110,27 +107,10 @@ export interface ParsedPseudoCondition {
   negated: boolean;
 }
 
-/**
- * Parsed root condition for structured analysis
- */
-export interface ParsedRootCondition {
-  /** The selector part (e.g., '[data-theme="dark"]') */
-  selector: string;
-  /** Whether this is negated (:root:not(...)) */
-  negated: boolean;
-}
-
-/**
- * Parsed parent condition for structured analysis
- */
-export interface ParsedParentCondition {
-  /** The selector part (e.g., '[data-hovered]') */
-  selector: string;
-  /** Whether this targets a direct parent (> combinator) */
-  direct: boolean;
-  /** Whether this is negated (:not([sel] *)) */
-  negated: boolean;
-}
+/** Modifier or pseudo condition (shared across own/root/parent) */
+type ParsedSelectorCondition =
+  | ParsedModifierCondition
+  | ParsedPseudoCondition;
 
 /**
  * A single selector variant (one term in a DNF expression)
@@ -143,7 +123,7 @@ export interface SelectorVariant {
   pseudoConditions: ParsedPseudoCondition[];
 
   /** Structured own conditions (for sub-element states) */
-  ownConditions: (ParsedModifierCondition | ParsedPseudoCondition)[];
+  ownConditions: ParsedSelectorCondition[];
 
   /** Parsed media conditions for structured combination */
   mediaConditions: ParsedMediaCondition[];
@@ -154,11 +134,14 @@ export interface SelectorVariant {
   /** Parsed supports conditions for @supports at-rules */
   supportsConditions: ParsedSupportsCondition[];
 
-  /** Structured root conditions */
-  rootConditions: ParsedRootCondition[];
+  /** Root conditions (modifier/pseudo applied to :root) */
+  rootConditions: ParsedSelectorCondition[];
 
-  /** Structured parent conditions */
-  parentConditions: ParsedParentCondition[];
+  /** Parent conditions (modifier/pseudo applied to ancestor) */
+  parentConditions: ParsedSelectorCondition[];
+
+  /** Whether @parent uses direct child combinator (>) */
+  parentDirect: boolean;
 
   /** Whether to wrap in @starting-style */
   startingStyle: boolean;
@@ -240,6 +223,7 @@ function emptyVariant(): SelectorVariant {
     supportsConditions: [],
     rootConditions: [],
     parentConditions: [],
+    parentDirect: false,
     startingStyle: false,
   };
 }
@@ -319,15 +303,31 @@ function stateToCSS(state: StateCondition): CSSComponents {
           break;
 
         case 'root':
-          variant.rootConditions.push(rootToParsed(state));
+          variant.rootConditions.push(
+            ...extractInnerConditions(
+              state.innerCondition,
+              state.negated ?? false,
+            ),
+          );
           break;
 
         case 'parent':
-          variant.parentConditions.push(parentToParsed(state));
+          variant.parentConditions.push(
+            ...extractInnerConditions(
+              state.innerCondition,
+              state.negated ?? false,
+            ),
+          );
+          variant.parentDirect = state.direct;
           break;
 
         case 'own':
-          variant.ownConditions.push(...ownToParsed(state));
+          variant.ownConditions.push(
+            ...extractInnerConditions(
+              state.innerCondition,
+              state.negated ?? false,
+            ),
+          );
           break;
 
         case 'starting':
@@ -566,93 +566,79 @@ function supportsToParsed(state: SupportsCondition): ParsedSupportsCondition {
 }
 
 /**
- * Convert root condition to parsed structure
+ * Extract modifier/pseudo conditions from an inner condition tree.
+ * Shared by @own(), @root(), and @parent().
  */
-function rootToParsed(state: RootCondition): ParsedRootCondition {
-  return {
-    selector: state.selector,
-    negated: state.negated ?? false,
-  };
+function extractInnerConditions(
+  innerCondition: ConditionNode,
+  negated: boolean,
+): ParsedSelectorCondition[] {
+  const innerCSS = conditionToCSS(innerCondition);
+
+  if (innerCSS.isImpossible || innerCSS.variants.length === 0) {
+    return [];
+  }
+
+  const result: ParsedSelectorCondition[] = [];
+  for (const variant of innerCSS.variants) {
+    for (const mod of variant.modifierConditions) {
+      result.push({
+        ...mod,
+        negated: negated ? !mod.negated : mod.negated,
+      });
+    }
+    for (const pseudo of variant.pseudoConditions) {
+      result.push({
+        ...pseudo,
+        negated: negated ? !pseudo.negated : pseudo.negated,
+      });
+    }
+  }
+  return result;
 }
 
 /**
  * Convert parsed root conditions to CSS selector prefix (for final output)
  */
 export function rootConditionsToCSS(
-  roots: ParsedRootCondition[],
+  roots: ParsedSelectorCondition[],
 ): string | undefined {
   if (roots.length === 0) return undefined;
 
-  // Combine all root conditions into a single :root prefix
-  // e.g., :root[data-theme="dark"]:not([data-mode="light"])
   let prefix = ':root';
-  for (const root of roots) {
-    if (root.negated) {
-      prefix += `:not(${root.selector})`;
-    } else {
-      prefix += root.selector;
-    }
+  for (const cond of roots) {
+    prefix += selectorConditionToCSS(cond);
   }
   return prefix;
 }
 
 /**
- * Convert parent condition to parsed structure
+ * Convert parsed parent conditions to CSS selector fragment (for final output)
  */
-function parentToParsed(state: ParentCondition): ParsedParentCondition {
-  return {
-    selector: state.selector,
-    direct: state.direct,
-    negated: state.negated ?? false,
-  };
+export function parentConditionsToCSS(
+  parents: ParsedSelectorCondition[],
+  direct: boolean,
+): string {
+  if (parents.length === 0) return '';
+
+  const combinator = direct ? ' > *' : ' *';
+
+  let selectorParts = '';
+  for (const cond of parents) {
+    selectorParts += selectorConditionToCSS(cond);
+  }
+
+  return `:is(${selectorParts}${combinator})`;
 }
 
 /**
- * Convert parsed parent condition to CSS selector fragment (for final output)
- *
- * Positive: :is([selector] *) or :is([selector] > *)
- * Negative: :not([selector] *) or :not([selector] > *)
+ * Convert a modifier or pseudo condition to a CSS selector fragment
  */
-export function parentToCSS(parent: ParsedParentCondition): string {
-  const combinator = parent.direct ? ' > *' : ' *';
-  if (parent.negated) {
-    return `:not(${parent.selector}${combinator})`;
+export function selectorConditionToCSS(cond: ParsedSelectorCondition): string {
+  if ('attribute' in cond) {
+    return modifierToCSS(cond);
   }
-  return `:is(${parent.selector}${combinator})`;
-}
-
-/**
- * Convert own condition to parsed structures for sub-element
- */
-function ownToParsed(
-  state: OwnCondition,
-): (ParsedModifierCondition | ParsedPseudoCondition)[] {
-  const innerCSS = conditionToCSS(state.innerCondition);
-
-  if (innerCSS.isImpossible || innerCSS.variants.length === 0) {
-    return [];
-  }
-
-  // Collect all modifier/pseudo conditions from all variants
-  const allConditions: (ParsedModifierCondition | ParsedPseudoCondition)[] = [];
-  for (const variant of innerCSS.variants) {
-    for (const mod of variant.modifierConditions) {
-      // Apply outer negation
-      allConditions.push({
-        ...mod,
-        negated: state.negated ? !mod.negated : mod.negated,
-      });
-    }
-    for (const pseudo of variant.pseudoConditions) {
-      // Apply outer negation
-      allConditions.push({
-        ...pseudo,
-        negated: state.negated ? !pseudo.negated : pseudo.negated,
-      });
-    }
-  }
-
-  return allConditions;
+  return pseudoToCSS(cond);
 }
 
 /**
@@ -673,10 +659,12 @@ function getPseudoKey(pseudo: ParsedPseudoCondition): string {
 }
 
 /**
- * Get unique key for a root condition
+ * Get unique key for any selector condition (modifier or pseudo)
  */
-function getRootKey(root: ParsedRootCondition): string {
-  return root.negated ? `!${root.selector}` : root.selector;
+function getSelectorConditionKey(cond: ParsedSelectorCondition): string {
+  return 'attribute' in cond
+    ? `mod:${getModifierKey(cond)}`
+    : `pseudo:${getPseudoKey(cond)}`;
 }
 
 /**
@@ -716,67 +704,53 @@ function dedupePseudoConditions(
 }
 
 /**
- * Deduplicate root conditions
+ * Deduplicate selector conditions (modifiers or pseudos).
+ * Shared by root, parent, and own conditions.
  */
-function dedupeRootConditions(
-  conditions: ParsedRootCondition[],
-): ParsedRootCondition[] {
+function dedupeSelectorConditions(
+  conditions: ParsedSelectorCondition[],
+): ParsedSelectorCondition[] {
+  // Pass 1: exact-key dedup
   const seen = new Set<string>();
-  const result: ParsedRootCondition[] = [];
+  let result: ParsedSelectorCondition[] = [];
   for (const c of conditions) {
-    const key = getRootKey(c);
+    const key = getSelectorConditionKey(c);
     if (!seen.has(key)) {
       seen.add(key);
       result.push(c);
     }
   }
-  return result;
-}
 
-/**
- * Get unique key for a parent condition
- */
-function getParentKey(parent: ParsedParentCondition): string {
-  const base = `${parent.direct ? '>' : ''}${parent.selector}`;
-  return parent.negated ? `!${base}` : base;
-}
+  // Pass 2: remove negated modifiers subsumed by other modifiers
+  // :not([data-attr]) subsumes :not([data-attr="value"])
+  // [data-attr="X"] implies :not([data-attr="Y"]) is redundant
+  const negatedBooleanAttrs = new Set<string>();
+  const positiveValueByAttr = new Map<string, string>();
 
-/**
- * Deduplicate parent conditions
- */
-function dedupeParentConditions(
-  conditions: ParsedParentCondition[],
-): ParsedParentCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedParentCondition[] = [];
-  for (const c of conditions) {
-    const key = getParentKey(c);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
+  for (const c of result) {
+    if (!('attribute' in c)) continue;
+    if (c.negated && c.value === undefined) {
+      negatedBooleanAttrs.add(c.attribute);
+    }
+    if (!c.negated && c.value !== undefined) {
+      positiveValueByAttr.set(c.attribute, c.value);
     }
   }
-  return result;
-}
 
-/**
- * Deduplicate own conditions (modifiers or pseudos)
- */
-function dedupeOwnConditions(
-  conditions: (ParsedModifierCondition | ParsedPseudoCondition)[],
-): (ParsedModifierCondition | ParsedPseudoCondition)[] {
-  const seen = new Set<string>();
-  const result: (ParsedModifierCondition | ParsedPseudoCondition)[] = [];
-  for (const c of conditions) {
-    const key =
-      'attribute' in c
-        ? `mod:${getModifierKey(c)}`
-        : `pseudo:${getPseudoKey(c)}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
+  result = result.filter((c) => {
+    if (!('attribute' in c) || !c.negated || c.value === undefined) {
+      return true;
     }
-  }
+    if (negatedBooleanAttrs.has(c.attribute)) {
+      return false;
+    }
+    const positiveValue = positiveValueByAttr.get(c.attribute);
+    if (positiveValue !== undefined && c.value !== positiveValue) {
+      return false;
+    }
+    return true;
+  });
+
   return result;
 }
 
@@ -818,43 +792,11 @@ function hasPseudoContradiction(conditions: ParsedPseudoCondition[]): boolean {
 }
 
 /**
- * Check for root condition contradiction: same selector with opposite negation
+ * Check for selector condition contradiction (modifier or pseudo with opposite negation).
+ * Shared by root, parent, and own conditions.
  */
-function hasRootContradiction(conditions: ParsedRootCondition[]): boolean {
-  const byKey = new Map<string, boolean>(); // selector -> isPositive
-
-  for (const root of conditions) {
-    const existing = byKey.get(root.selector);
-    if (existing !== undefined && existing !== !root.negated) {
-      return true; // Same selector with opposite negation
-    }
-    byKey.set(root.selector, !root.negated);
-  }
-  return false;
-}
-
-/**
- * Check for parent condition contradiction: same selector+direct with opposite negation
- */
-function hasParentContradiction(conditions: ParsedParentCondition[]): boolean {
-  const byKey = new Map<string, boolean>();
-
-  for (const parent of conditions) {
-    const baseKey = `${parent.direct ? '>' : ''}${parent.selector}`;
-    const existing = byKey.get(baseKey);
-    if (existing !== undefined && existing !== !parent.negated) {
-      return true;
-    }
-    byKey.set(baseKey, !parent.negated);
-  }
-  return false;
-}
-
-/**
- * Check for own condition contradiction
- */
-function hasOwnConditionContradiction(
-  conditions: (ParsedModifierCondition | ParsedPseudoCondition)[],
+function hasSelectorConditionContradiction(
+  conditions: ParsedSelectorCondition[],
 ): boolean {
   const modifiers: ParsedModifierCondition[] = [];
   const pseudos: ParsedPseudoCondition[] = [];
@@ -888,11 +830,11 @@ function mergeVariants(
   }
 
   // Merge root conditions and check for contradictions
-  const mergedRoots = dedupeRootConditions([
+  const mergedRoots = dedupeSelectorConditions([
     ...a.rootConditions,
     ...b.rootConditions,
   ]);
-  if (hasRootContradiction(mergedRoots)) {
+  if (hasSelectorConditionContradiction(mergedRoots)) {
     return null; // Impossible variant
   }
 
@@ -915,20 +857,20 @@ function mergeVariants(
   }
 
   // Merge parent conditions and check for contradictions
-  const mergedParents = dedupeParentConditions([
+  const mergedParents = dedupeSelectorConditions([
     ...a.parentConditions,
     ...b.parentConditions,
   ]);
-  if (hasParentContradiction(mergedParents)) {
+  if (hasSelectorConditionContradiction(mergedParents)) {
     return null; // Impossible variant
   }
 
   // Merge own conditions and check for contradictions
-  const mergedOwn = dedupeOwnConditions([
+  const mergedOwn = dedupeSelectorConditions([
     ...a.ownConditions,
     ...b.ownConditions,
   ]);
-  if (hasOwnConditionContradiction(mergedOwn)) {
+  if (hasSelectorConditionContradiction(mergedOwn)) {
     return null; // Impossible variant
   }
 
@@ -959,6 +901,7 @@ function mergeVariants(
     supportsConditions: mergedSupports,
     rootConditions: mergedRoots,
     parentConditions: mergedParents,
+    parentDirect: a.parentDirect || b.parentDirect,
     startingStyle: a.startingStyle || b.startingStyle,
   };
 }
@@ -1206,11 +1149,7 @@ function getVariantKey(v: SelectorVariant): string {
   const modifierKey = v.modifierConditions.map(getModifierKey).sort().join('|');
   const pseudoKey = v.pseudoConditions.map(getPseudoKey).sort().join('|');
   const ownKey = v.ownConditions
-    .map((c) =>
-      'attribute' in c
-        ? `mod:${getModifierKey(c)}`
-        : `pseudo:${getPseudoKey(c)}`,
-    )
+    .map(getSelectorConditionKey)
     .sort()
     .join('|');
   const containerKey = v.containerConditions
@@ -1225,8 +1164,14 @@ function getVariantKey(v: SelectorVariant): string {
     .map((c) => `${c.subtype}:${c.negated ? '!' : ''}${c.condition}`)
     .sort()
     .join('|');
-  const rootKey = v.rootConditions.map(getRootKey).sort().join('|');
-  const parentKey = v.parentConditions.map(getParentKey).sort().join('|');
+  const rootKey = v.rootConditions
+    .map(getSelectorConditionKey)
+    .sort()
+    .join('|');
+  const parentKey = v.parentConditions
+    .map(getSelectorConditionKey)
+    .sort()
+    .join('|');
   return [
     modifierKey,
     pseudoKey,
@@ -1256,7 +1201,7 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
   if (a.startingStyle !== b.startingStyle) return false;
 
   // Check if a.rootConditions is superset of b.rootConditions
-  if (!isRootConditionsSuperset(a.rootConditions, b.rootConditions))
+  if (!isSelectorConditionsSuperset(a.rootConditions, b.rootConditions))
     return false;
 
   // Check if a.mediaConditions is superset of b.mediaConditions
@@ -1282,10 +1227,11 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
     return false;
 
   // Check if a.ownConditions is superset of b.ownConditions
-  if (!isOwnConditionsSuperset(a.ownConditions, b.ownConditions)) return false;
+  if (!isSelectorConditionsSuperset(a.ownConditions, b.ownConditions))
+    return false;
 
   // Check if a.parentConditions is superset of b.parentConditions
-  if (!isParentConditionsSuperset(a.parentConditions, b.parentConditions))
+  if (!isSelectorConditionsSuperset(a.parentConditions, b.parentConditions))
     return false;
 
   // A is a superset if it has all of B's items (possibly more)
@@ -1392,53 +1338,16 @@ function isPseudoConditionsSuperset(
 }
 
 /**
- * Check if root conditions A is a superset of B
+ * Check if selector conditions A is a superset of B.
+ * Shared by root, parent, and own conditions.
  */
-function isRootConditionsSuperset(
-  a: ParsedRootCondition[],
-  b: ParsedRootCondition[],
+function isSelectorConditionsSuperset(
+  a: ParsedSelectorCondition[],
+  b: ParsedSelectorCondition[],
 ): boolean {
-  const aKeys = new Set(a.map(getRootKey));
+  const aKeys = new Set(a.map(getSelectorConditionKey));
   for (const c of b) {
-    if (!aKeys.has(getRootKey(c))) return false;
-  }
-  return true;
-}
-
-/**
- * Check if parent conditions A is a superset of B
- */
-function isParentConditionsSuperset(
-  a: ParsedParentCondition[],
-  b: ParsedParentCondition[],
-): boolean {
-  const aKeys = new Set(a.map(getParentKey));
-  for (const c of b) {
-    if (!aKeys.has(getParentKey(c))) return false;
-  }
-  return true;
-}
-
-/**
- * Check if own conditions A is a superset of B
- */
-function isOwnConditionsSuperset(
-  a: (ParsedModifierCondition | ParsedPseudoCondition)[],
-  b: (ParsedModifierCondition | ParsedPseudoCondition)[],
-): boolean {
-  const aKeys = new Set(
-    a.map((c) =>
-      'attribute' in c
-        ? `mod:${getModifierKey(c)}`
-        : `pseudo:${getPseudoKey(c)}`,
-    ),
-  );
-  for (const c of b) {
-    const key =
-      'attribute' in c
-        ? `mod:${getModifierKey(c)}`
-        : `pseudo:${getPseudoKey(c)}`;
-    if (!aKeys.has(key)) return false;
+    if (!aKeys.has(getSelectorConditionKey(c))) return false;
   }
   return true;
 }
@@ -1622,9 +1531,12 @@ function buildCSSSelectorFromVariant(
     selector += pseudoToCSS(pseudo);
   }
 
-  // Add parent selectors (before sub-element suffix)
-  for (const parent of variant.parentConditions) {
-    selector += parentToCSS(parent);
+  // Add parent selector (before sub-element suffix)
+  if (variant.parentConditions.length > 0) {
+    selector += parentConditionsToCSS(
+      variant.parentConditions,
+      variant.parentDirect,
+    );
   }
 
   // Add selector suffix (e.g., ' [data-element="Label"]')
@@ -1632,11 +1544,7 @@ function buildCSSSelectorFromVariant(
 
   // Add own selectors (after sub-element)
   for (const own of variant.ownConditions) {
-    if ('attribute' in own) {
-      selector += modifierToCSS(own);
-    } else {
-      selector += pseudoToCSS(own);
-    }
+    selector += selectorConditionToCSS(own);
   }
 
   // Add root prefix if present

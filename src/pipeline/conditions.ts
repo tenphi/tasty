@@ -92,7 +92,7 @@ export interface ContainerCondition extends BaseStateCondition {
  */
 export interface RootCondition extends BaseStateCondition {
   type: 'root';
-  selector: string; // e.g., '[data-theme="dark"]'
+  innerCondition: ConditionNode;
 }
 
 /**
@@ -100,7 +100,7 @@ export interface RootCondition extends BaseStateCondition {
  */
 export interface ParentCondition extends BaseStateCondition {
   type: 'parent';
-  selector: string; // e.g., '[data-hovered]'
+  innerCondition: ConditionNode;
   direct: boolean; // true for @parent(... >) — direct parent only
 }
 
@@ -429,8 +429,11 @@ export function containerUniqueId(
 /**
  * Generate a normalized unique ID for a root condition
  */
-export function rootUniqueId(selector: string, negated = false): string {
-  const base = `root:${selector}`;
+export function rootUniqueId(
+  innerUniqueId: string,
+  negated = false,
+): string {
+  const base = `root:${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }
 
@@ -438,11 +441,11 @@ export function rootUniqueId(selector: string, negated = false): string {
  * Generate a normalized unique ID for a parent condition
  */
 export function parentUniqueId(
-  selector: string,
+  innerUniqueId: string,
   direct: boolean,
   negated = false,
 ): string {
-  const base = `parent:${direct ? '>' : ''}${selector}`;
+  const base = `parent:${direct ? '>' : ''}${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }
 
@@ -673,17 +676,18 @@ export function createContainerRawCondition(
  * Create a root condition
  */
 export function createRootCondition(
-  selector: string,
+  innerCondition: ConditionNode,
   negated = false,
   raw?: string,
 ): RootCondition {
+  const innerUniqueId = getConditionUniqueId(innerCondition);
   return {
     kind: 'state',
     type: 'root',
     negated,
-    raw: raw || `@root(${selector})`,
-    uniqueId: rootUniqueId(selector, negated),
-    selector,
+    raw: raw || `@root(...)`,
+    uniqueId: rootUniqueId(innerUniqueId, negated),
+    innerCondition,
   };
 }
 
@@ -691,18 +695,19 @@ export function createRootCondition(
  * Create a parent condition
  */
 export function createParentCondition(
-  selector: string,
+  innerCondition: ConditionNode,
   direct: boolean,
   negated = false,
   raw?: string,
 ): ParentCondition {
+  const innerUniqueId = getConditionUniqueId(innerCondition);
   return {
     kind: 'state',
     type: 'parent',
     negated,
-    raw: raw || `@parent(${selector}${direct ? ' >' : ''})`,
-    uniqueId: parentUniqueId(selector, direct, negated),
-    selector,
+    raw: raw || `@parent(...)`,
+    uniqueId: parentUniqueId(innerUniqueId, direct, negated),
+    innerCondition,
     direct,
   };
 }

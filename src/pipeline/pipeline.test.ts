@@ -207,7 +207,11 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('root');
-      expect((result as any).selector).toBe('[data-theme="dark"]');
+      const inner = (result as any).innerCondition;
+      expect(inner.kind).toBe('state');
+      expect(inner.type).toBe('modifier');
+      expect(inner.attribute).toBe('data-theme');
+      expect(inner.value).toBe('dark');
     }
   });
 
@@ -216,7 +220,9 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
-      expect((result as any).selector).toBe('[data-hovered]');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('modifier');
+      expect(inner.attribute).toBe('data-hovered');
       expect((result as any).direct).toBe(false);
     }
   });
@@ -226,7 +232,10 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
-      expect((result as any).selector).toBe('[data-theme="dark"]');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('modifier');
+      expect(inner.attribute).toBe('data-theme');
+      expect(inner.value).toBe('dark');
       expect((result as any).direct).toBe(false);
     }
   });
@@ -236,7 +245,9 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
-      expect((result as any).selector).toBe('[data-hovered]');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('modifier');
+      expect(inner.attribute).toBe('data-hovered');
       expect((result as any).direct).toBe(true);
     }
   });
@@ -246,7 +257,9 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
-      expect((result as any).selector).toBe('.my-class');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('pseudo');
+      expect(inner.pseudo).toBe('.my-class');
       expect((result as any).direct).toBe(false);
     }
   });
@@ -256,7 +269,9 @@ describe('parseStateKey()', () => {
     expect(result.kind).toBe('state');
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
-      expect((result as any).selector).toBe('[aria-expanded="true"]');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('pseudo');
+      expect(inner.pseudo).toBe('[aria-expanded="true"]');
     }
   });
 
@@ -266,7 +281,9 @@ describe('parseStateKey()', () => {
     if (result.kind === 'state') {
       expect(result.type).toBe('parent');
       expect(result.negated).toBe(true);
-      expect((result as any).selector).toBe('[data-hovered]');
+      const inner = (result as any).innerCondition;
+      expect(inner.type).toBe('modifier');
+      expect(inner.attribute).toBe('data-hovered');
     }
   });
 
@@ -599,7 +616,9 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].rootConditions).toHaveLength(1);
     expect(css.variants[0].rootConditions[0]).toEqual({
-      selector: '[data-theme="dark"]',
+      attribute: 'data-theme',
+      value: 'dark',
+      operator: '=',
       negated: false,
     });
   });
@@ -610,10 +629,12 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentConditions).toHaveLength(1);
     expect(css.variants[0].parentConditions[0]).toEqual({
-      selector: '[data-hovered]',
-      direct: false,
+      attribute: 'data-hovered',
+      value: undefined,
+      operator: undefined,
       negated: false,
     });
+    expect(css.variants[0].parentDirect).toBe(false);
   });
 
   it('should set parentConditions with direct flag', () => {
@@ -622,10 +643,12 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentConditions).toHaveLength(1);
     expect(css.variants[0].parentConditions[0]).toEqual({
-      selector: '[data-hovered]',
-      direct: true,
+      attribute: 'data-hovered',
+      value: undefined,
+      operator: undefined,
       negated: false,
     });
+    expect(css.variants[0].parentDirect).toBe(true);
   });
 
   it('should set negated parentConditions for !@parent', () => {
@@ -634,8 +657,9 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentConditions).toHaveLength(1);
     expect(css.variants[0].parentConditions[0]).toEqual({
-      selector: '[data-hovered]',
-      direct: false,
+      attribute: 'data-hovered',
+      value: undefined,
+      operator: undefined,
       negated: true,
     });
   });
@@ -1001,6 +1025,69 @@ describe('Complex OR conditions with mixed types', () => {
         r.selector.includes(':root:not([data-prefers-schema="system"])'),
       ),
     ).toBe(true);
+  });
+
+  it('should not produce redundant :not() when boolean root subsumes valued root', () => {
+    clearPipelineCache();
+
+    // When we negate "@root(schema) | @root(schema=dark)", the default branch
+    // gets AND(!root(schema), !root(schema=dark)). The boolean negation
+    // :not([data-schema]) already implies :not([data-schema="dark"]), so the
+    // latter should be dropped.
+    const styles = {
+      color: {
+        '': 'red',
+        '@root(schema) | @root(schema=dark)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const defaultRules = result.filter((r) =>
+      r.declarations.includes('red'),
+    );
+
+    for (const rule of defaultRules) {
+      if (rule.selector.includes(':not([data-schema])')) {
+        expect(rule.selector).not.toContain(':not([data-schema="dark"])');
+      }
+    }
+  });
+
+  it('should support compound AND in @root()', () => {
+    clearPipelineCache();
+
+    const styles = {
+      color: {
+        '': 'red',
+        '@root(theme=dark & mode=compact)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+    const blueRule = result.find((r) => r.declarations.includes('blue'));
+    expect(blueRule).toBeDefined();
+    expect(blueRule!.selector).toContain(':root');
+    expect(blueRule!.selector).toContain('[data-theme="dark"]');
+    expect(blueRule!.selector).toContain('[data-mode="compact"]');
+  });
+
+  it('should support compound AND in @parent()', () => {
+    clearPipelineCache();
+
+    const styles = {
+      color: {
+        '': 'red',
+        '@parent(theme=dark & !disabled)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+    const blueRule = result.find((r) => r.declarations.includes('blue'));
+    expect(blueRule).toBeDefined();
+    expect(blueRule!.selector).toContain(':is(');
+    expect(blueRule!.selector).toContain('[data-theme="dark"]');
+    expect(blueRule!.selector).toContain(':not([data-disabled])');
   });
 });
 

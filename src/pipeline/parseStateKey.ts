@@ -516,9 +516,8 @@ class Parser {
       return trueCondition();
     }
 
-    // Build selector from condition
-    const selector = buildRootSelector(content);
-    return createRootCondition(selector, false, raw);
+    const innerCondition = parseStateKey(content, this.options);
+    return createRootCondition(innerCondition, false, raw);
   }
 
   /**
@@ -545,8 +544,8 @@ class Parser {
       condition = condition.slice(0, -1).trim();
     }
 
-    const selector = buildRootSelector(condition);
-    return createParentCondition(selector, direct, false, raw);
+    const innerCondition = parseStateKey(condition, this.options);
+    return createParentCondition(innerCondition, direct, false, raw);
   }
 
   /**
@@ -766,27 +765,6 @@ function parseNumericValue(value: string): number | null {
 /**
  * Build a root state selector from a condition string
  */
-function buildRootSelector(condition: string): string {
-  // Handle class selector: .className
-  if (condition.startsWith('.')) {
-    return condition;
-  }
-
-  // Handle attribute selector: [attr]
-  if (condition.startsWith('[')) {
-    return condition;
-  }
-
-  // Handle value mod: theme=dark
-  if (condition.includes('=')) {
-    const [key, value] = condition.split('=');
-    return `[data-${camelToKebab(key.trim())}="${value.trim()}"]`;
-  }
-
-  // Boolean mod: camelCase -> [data-camel-case]
-  return `[data-${camelToKebab(condition)}]`;
-}
-
 // ============================================================================
 // Main Export
 // ============================================================================

@@ -45,9 +45,10 @@ import {
   buildAtRulesFromVariant,
   conditionToCSS,
   modifierToCSS,
-  parentToCSS,
+  parentConditionsToCSS,
   pseudoToCSS,
   rootConditionsToCSS,
+  selectorConditionToCSS,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
@@ -1031,20 +1032,19 @@ function buildSelectorFromVariant(
     selector += pseudoToCSS(pseudo);
   }
 
-  // Add parent selectors (before sub-element suffix)
-  for (const parent of variant.parentConditions) {
-    selector += parentToCSS(parent);
+  // Add parent selector (before sub-element suffix)
+  if (variant.parentConditions.length > 0) {
+    selector += parentConditionsToCSS(
+      variant.parentConditions,
+      variant.parentDirect,
+    );
   }
 
   selector += selectorSuffix;
 
   // Add own selectors (after sub-element)
   for (const own of variant.ownConditions) {
-    if ('attribute' in own) {
-      selector += modifierToCSS(own);
-    } else {
-      selector += pseudoToCSS(own);
-    }
+    selector += selectorConditionToCSS(own);
   }
 
   return selector;
@@ -1070,7 +1070,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   // Helper to get root prefix key for grouping
   const getRootPrefixKey = (variant: SelectorVariant): string => {
     return variant.rootConditions
-      .map((r) => (r.negated ? `!${r.selector}` : r.selector))
+      .map((r) => selectorConditionToCSS(r))
       .sort()
       .join('|');
   };

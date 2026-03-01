@@ -119,7 +119,7 @@ configure({
   states: {
     '@mobile': '@media(w < 768px)',
     '@tablet': '@media(w < 1024px)',
-    '@dark': '@root(schema=dark) | @media(prefers-color-scheme: dark)',
+    '@dark': '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
   },
   recipes: {
     card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
@@ -152,26 +152,31 @@ const Text = tasty({
 });
 ```
 
-If `@dark` expands to `@root(schema=dark) | @media(prefers-color-scheme: dark)`, Tasty generates:
+If `@dark` expands to `@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))`, Tasty generates:
 
 ```css
-/* Explicit dark mode */
+/* Branch 1: Explicit dark schema */
 :root[data-schema="dark"] .t0.t0 {
   color: var(--text-on-dark-color);
 }
 
-/* OS dark preference, no explicit override */
+/* Branch 2: No schema attribute + OS prefers dark */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-schema="dark"]) .t0.t0 {
+  :root:not([data-schema]) .t0.t0 {
     color: var(--text-on-dark-color);
   }
 }
 
-/* Light mode — neither condition */
+/* Default: no schema + OS does not prefer dark */
 @media (not (prefers-color-scheme: dark)) {
   :root:not([data-schema="dark"]) .t0.t0 {
     color: var(--text-color);
   }
+}
+
+/* Default: schema is set but not dark (any OS preference) */
+:root:not([data-schema="dark"])[data-schema] .t0.t0 {
+  color: var(--text-color);
 }
 ```
 

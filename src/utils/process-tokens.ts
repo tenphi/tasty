@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react';
-
 import type { Tokens, TokenValue } from '../types';
+
+import type { CSSProperties } from './css-types';
 
 import { okhslToRgb } from './okhsl-to-rgb';
 import {

@@ -1,6 +1,5 @@
-import type { CSSProperties } from 'react';
-
 import type { KeyframesSteps, PropertyDefinition } from '../injector/types';
+import type { CSSProperties } from '../utils/css-types';
 import type { StyleValue, StyleValueStateMap } from '../utils/styles';
 
 /**

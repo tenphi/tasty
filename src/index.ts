@@ -1,3 +1,7 @@
+// Framework-agnostic core
+export * from './core';
+
+// React bindings
 export { tasty, Element } from './tasty';
 export {
   useStyles,
@@ -11,52 +15,11 @@ export type {
   UseStylesResult,
   UsePropertyOptions,
 } from './hooks';
-// Configuration API
-export {
-  configure,
-  getConfig,
-  isConfigLocked,
-  hasStylesGenerated,
-  resetConfig,
-  isTestEnvironment,
-  hasGlobalKeyframes,
-  getGlobalKeyframes,
-  hasGlobalRecipes,
-  getGlobalRecipes,
-} from './config';
-export type { TastyConfig } from './config';
 
-// Plugins
-export { okhslPlugin, okhslFunc } from './plugins';
-export type { TastyPlugin, TastyPluginFactory } from './plugins';
-
-// Chunk utilities for advanced use cases
-export { CHUNK_NAMES, STYLE_TO_CHUNK, categorizeStyleKeys } from './chunks';
-export type { ChunkName, ChunkInfo } from './chunks';
-// Advanced state mapping utilities
-export { getGlobalPredefinedStates, setGlobalPredefinedStates } from './states';
-export type {
-  StateParserContext,
-  ParsedAdvancedState,
-  AtRuleContext,
-} from './states';
-export * from './utils/filter-base-props';
-export * from './utils/colors';
-export * from './utils/styles';
-export * from './utils/mod-attrs';
-export { styleHandlers } from './styles';
-export { renderStyles, isSelector } from './pipeline';
-export type { StyleResult, RenderResult } from './pipeline';
-export * from './utils/dotize';
-export * from './styles/list';
-export * from './utils/merge-styles';
-export { resolveRecipes } from './utils/resolve-recipes';
-export * from './utils/warnings';
+// React-specific utilities
 export * from './utils/get-display-name';
-export * from './utils/process-tokens';
-export * from './utils/typography';
-export * from './injector';
-export * from './debug';
+
+// React-specific types
 export type {
   TastyProps,
   TastyElementOptions,
@@ -69,38 +32,5 @@ export type {
 export type {
   AllBaseProps,
   BaseProps,
-  BaseStyleProps,
-  DimensionStyleProps,
-  ColorStyleProps,
-  OuterStyleProps,
-  PositionStyleProps,
-  TextStyleProps,
-  BlockStyleProps,
-  BlockInnerStyleProps,
-  BlockOuterStyleProps,
-  ContainerStyleProps,
   BasePropsWithoutChildren,
-  Props,
-  FlowStyleProps,
-  ShortGridStyles,
-  GlobalStyledProps,
-  TagName,
-  Mods,
-  ModValue,
-  Tokens,
-  TokenValue,
-  TastyExtensionConfig,
-  TastyThemeNames,
 } from './types';
-export type {
-  StylesInterface,
-  Styles,
-  StylesWithoutSelectors,
-  RecipeStyles,
-  NoType,
-  Selector,
-  SuffixForSelector,
-  NotSelector,
-  TastyNamedColors,
-  TastyPresetNames,
-} from './styles/types';

@@ -39,10 +39,12 @@
         "types": "./dist/core/index.d.ts",
         "default": "./dist/core/index.js"
       }
-    }
+    },
+    "./tasty.config": "./tasty.config.ts"
   },
   "files": [
-    "dist"
+    "dist",
+    "tasty.config.ts"
   ],
   "sideEffects": false,
   "engines": {

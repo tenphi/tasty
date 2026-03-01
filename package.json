@@ -86,21 +86,26 @@
   "homepage": "https://github.com/tenphi/tasty#readme",
   "peerDependencies": {
     "@babel/core": "^7.24.0",
+    "@babel/helper-plugin-utils": "^7.24.0",
+    "@babel/types": "^7.24.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
-    "react": {
+    "@babel/core": {
       "optional": true
     },
-    "@babel/core": {
+    "@babel/helper-plugin-utils": {
+      "optional": true
+    },
+    "@babel/types": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },
   "dependencies": {
-    "@babel/helper-plugin-utils": "^7.24.0",
-    "@babel/types": "^7.24.0",
-    "csstype": "^3.1.0",
-    "react-is": "^18.3.1"
+    "csstype": "^3.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

@@ -7,8 +7,6 @@ import type {
   RefAttributes,
 } from 'react';
 import { createElement, forwardRef, useMemo } from 'react';
-import { isValidElementType } from 'react-is';
-
 import { useStyles } from './hooks/useStyles';
 import { BASE_STYLES } from './styles/list';
 import type { Styles, StylesInterface } from './styles/types';
@@ -21,6 +19,7 @@ import type {
   Tokens,
 } from './types';
 import { getDisplayName } from './utils/get-display-name';
+import { isValidElementType } from './utils/is-valid-element-type';
 import { mergeStyles } from './utils/merge-styles';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens, stringifyTokens } from './utils/process-tokens';

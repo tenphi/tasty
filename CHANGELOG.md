@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.5.1
+
+### Patch Changes
+
+- [`2fd0a9e`](https://github.com/tenphi/tasty/commit/2fd0a9e6a1d27815878ff3c114a7e0c682aaffcb) Thanks [@tenphi](https://github.com/tenphi)! - Add eslint config file for tasty validation.
+
 ## 0.5.0
 
 ### Minor Changes

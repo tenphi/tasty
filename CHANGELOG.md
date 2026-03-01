@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.3.0
+
+### Minor Changes
+
+- [#5](https://github.com/tenphi/tasty/pull/5) [`13ecc70`](https://github.com/tenphi/tasty/commit/13ecc70e7c434e009114668e095a652ad72fec8e) Thanks [@tenphi](https://github.com/tenphi)! - Change recipe syntax separator from `|` to `/` and add support for `none` value to disable base recipes.
+
 ## 0.2.0
 
 ### Minor Changes

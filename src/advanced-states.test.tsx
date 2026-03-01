@@ -233,7 +233,7 @@ describe('Advanced State Mapping - CSS Output', () => {
         styles: {
           fill: {
             '': '#white',
-            '@parent(hovered >)': '#gray-05',
+            '@parent(hovered, >)': '#gray-05',
           },
         },
       });

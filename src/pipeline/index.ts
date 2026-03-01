@@ -45,7 +45,7 @@ import {
   buildAtRulesFromVariant,
   conditionToCSS,
   modifierToCSS,
-  parentConditionsToCSS,
+  parentGroupsToCSS,
   pseudoToCSS,
   rootConditionsToCSS,
   selectorConditionToCSS,
@@ -1032,12 +1032,9 @@ function buildSelectorFromVariant(
     selector += pseudoToCSS(pseudo);
   }
 
-  // Add parent selector (before sub-element suffix)
-  if (variant.parentConditions.length > 0) {
-    selector += parentConditionsToCSS(
-      variant.parentConditions,
-      variant.parentDirect,
-    );
+  // Add parent selectors (before sub-element suffix)
+  if (variant.parentGroups.length > 0) {
+    selector += parentGroupsToCSS(variant.parentGroups);
   }
 
   selector += selectorSuffix;

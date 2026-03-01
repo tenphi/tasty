@@ -4,6 +4,11 @@
  * Tests for the new style rendering pipeline.
  */
 
+import type {
+  ConditionNode,
+  ParentCondition,
+  RootCondition,
+} from './conditions';
 import {
   and,
   createMediaDimensionCondition,
@@ -17,6 +22,20 @@ import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
 import { conditionToCSS } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
+
+function assertParentCondition(node: ConditionNode): ParentCondition {
+  if (node.kind !== 'state' || node.type !== 'parent') {
+    throw new Error(`Expected parent condition, got ${node.kind}`);
+  }
+  return node;
+}
+
+function assertRootCondition(node: ConditionNode): RootCondition {
+  if (node.kind !== 'state' || node.type !== 'root') {
+    throw new Error(`Expected root condition, got ${node.kind}`);
+  }
+  return node;
+}
 
 import { clearPipelineCache, renderStyles } from './index';
 
@@ -204,85 +223,73 @@ describe('parseStateKey()', () => {
 
   it('should parse @root state', () => {
     const result = parseStateKey('@root(theme=dark)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('root');
-      const inner = (result as any).innerCondition;
-      expect(inner.kind).toBe('state');
-      expect(inner.type).toBe('modifier');
+    const root = assertRootCondition(result);
+    const inner = root.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'modifier') {
       expect(inner.attribute).toBe('data-theme');
       expect(inner.value).toBe('dark');
     }
   });
 
   it('should parse @parent state with boolean modifier', () => {
-    const result = parseStateKey('@parent(hovered)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('modifier');
+    const parent = assertParentCondition(parseStateKey('@parent(hovered)'));
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'modifier') {
       expect(inner.attribute).toBe('data-hovered');
-      expect((result as any).direct).toBe(false);
     }
+    expect(parent.direct).toBe(false);
   });
 
   it('should parse @parent state with value modifier', () => {
-    const result = parseStateKey('@parent(theme=dark)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('modifier');
+    const parent = assertParentCondition(parseStateKey('@parent(theme=dark)'));
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'modifier') {
       expect(inner.attribute).toBe('data-theme');
       expect(inner.value).toBe('dark');
-      expect((result as any).direct).toBe(false);
     }
+    expect(parent.direct).toBe(false);
   });
 
   it('should parse @parent state with direct parent syntax', () => {
-    const result = parseStateKey('@parent(hovered >)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('modifier');
+    const parent = assertParentCondition(parseStateKey('@parent(hovered, >)'));
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'modifier') {
       expect(inner.attribute).toBe('data-hovered');
-      expect((result as any).direct).toBe(true);
     }
+    expect(parent.direct).toBe(true);
   });
 
   it('should parse @parent state with class selector', () => {
-    const result = parseStateKey('@parent(.my-class)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('pseudo');
+    const parent = assertParentCondition(parseStateKey('@parent(.my-class)'));
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'pseudo') {
       expect(inner.pseudo).toBe('.my-class');
-      expect((result as any).direct).toBe(false);
     }
+    expect(parent.direct).toBe(false);
   });
 
   it('should parse @parent state with attribute selector', () => {
-    const result = parseStateKey('@parent([aria-expanded="true"])');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('pseudo');
+    const parent = assertParentCondition(
+      parseStateKey('@parent([aria-expanded="true"])'),
+    );
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'pseudo') {
       expect(inner.pseudo).toBe('[aria-expanded="true"]');
     }
   });
 
   it('should parse negated @parent state', () => {
-    const result = parseStateKey('!@parent(hovered)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      expect(result.negated).toBe(true);
-      const inner = (result as any).innerCondition;
-      expect(inner.type).toBe('modifier');
+    const parent = assertParentCondition(parseStateKey('!@parent(hovered)'));
+    expect(parent.negated).toBe(true);
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('state');
+    if (inner.kind === 'state' && inner.type === 'modifier') {
       expect(inner.attribute).toBe('data-hovered');
     }
   });
@@ -327,24 +334,24 @@ describe('parseStateKey()', () => {
   });
 
   it('should parse @parent with OR inside as parent with inner OR', () => {
-    const result = parseStateKey('@parent(hovered | focused)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('parent');
-      const inner = (result as any).innerCondition;
-      expect(inner.kind).toBe('compound');
+    const parent = assertParentCondition(
+      parseStateKey('@parent(hovered | focused)'),
+    );
+    const inner = parent.innerCondition;
+    expect(inner.kind).toBe('compound');
+    if (inner.kind === 'compound') {
       expect(inner.operator).toBe('OR');
       expect(inner.children).toHaveLength(2);
     }
   });
 
   it('should parse @root with OR inside as root with inner OR', () => {
-    const result = parseStateKey('@root(theme=dark | mode=compact)');
-    expect(result.kind).toBe('state');
-    if (result.kind === 'state') {
-      expect(result.type).toBe('root');
-      const inner = (result as any).innerCondition;
-      expect(inner.kind).toBe('compound');
+    const root = assertRootCondition(
+      parseStateKey('@root(theme=dark | mode=compact)'),
+    );
+    const inner = root.innerCondition;
+    expect(inner.kind).toBe('compound');
+    if (inner.kind === 'compound') {
       expect(inner.operator).toBe('OR');
       expect(inner.children).toHaveLength(2);
     }
@@ -647,52 +654,56 @@ describe('conditionToCSS()', () => {
     });
   });
 
-  it('should set parentConditions for @parent', () => {
+  it('should set parentGroups for @parent', () => {
     const result = parseStateKey('@parent(hovered)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].parentConditions).toHaveLength(1);
-    expect(css.variants[0].parentConditions[0]).toEqual({
+    expect(css.variants[0].parentGroups).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].direct).toBe(false);
+    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[0].parentDirect).toBe(false);
   });
 
-  it('should set parentConditions with direct flag', () => {
-    const result = parseStateKey('@parent(hovered >)');
+  it('should set parentGroups with direct flag', () => {
+    const result = parseStateKey('@parent(hovered, >)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].parentConditions).toHaveLength(1);
-    expect(css.variants[0].parentConditions[0]).toEqual({
+    expect(css.variants[0].parentGroups).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].direct).toBe(true);
+    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[0].parentDirect).toBe(true);
   });
 
-  it('should set negated parentConditions for !@parent', () => {
+  it('should set negated parentGroups for !@parent', () => {
     const result = parseStateKey('!@parent(hovered)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].parentConditions).toHaveLength(1);
-    expect(css.variants[0].parentConditions[0]).toEqual({
+    expect(css.variants[0].parentGroups).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].negated).toBe(true);
+    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
-      negated: true,
+      negated: false,
     });
   });
 
-  it('should set independent parentConditions for AND', () => {
+  it('should set independent parentGroups for AND', () => {
     const result = parseStateKey('@parent(hovered) & @parent(focused)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].parentConditions).toHaveLength(2);
+    expect(css.variants[0].parentGroups).toHaveLength(2);
   });
 
   it('should produce two variants for @root with OR inside', () => {
@@ -722,23 +733,25 @@ describe('conditionToCSS()', () => {
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(2);
 
-    expect(css.variants[0].parentConditions).toHaveLength(1);
-    expect(css.variants[0].parentConditions[0]).toEqual({
+    expect(css.variants[0].parentGroups).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[0].parentDirect).toBe(false);
+    expect(css.variants[0].parentGroups[0].direct).toBe(false);
 
-    expect(css.variants[1].parentConditions).toHaveLength(1);
-    expect(css.variants[1].parentConditions[0]).toEqual({
+    expect(css.variants[1].parentGroups).toHaveLength(1);
+    expect(css.variants[1].parentGroups[0].conditions).toHaveLength(1);
+    expect(css.variants[1].parentGroups[0].conditions[0]).toEqual({
       attribute: 'data-focused',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[1].parentDirect).toBe(false);
+    expect(css.variants[1].parentGroups[0].direct).toBe(false);
   });
 
   it('should produce single variant for @root with AND inside', () => {

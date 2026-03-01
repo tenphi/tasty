@@ -96,12 +96,12 @@ export interface RootCondition extends BaseStateCondition {
 }
 
 /**
- * Parent state condition: @parent(hovered), @parent(theme=dark >)
+ * Parent state condition: @parent(hovered), @parent(theme=dark, >)
  */
 export interface ParentCondition extends BaseStateCondition {
   type: 'parent';
   innerCondition: ConditionNode;
-  direct: boolean; // true for @parent(... >) — direct parent only
+  direct: boolean; // true for @parent(..., >) — direct parent only
 }
 
 /**

@@ -526,7 +526,7 @@ class Parser {
    * Syntax:
    *   @parent(hovered)      → :is([data-hovered] *)
    *   @parent(theme=dark)   → :is([data-theme="dark"] *)
-   *   @parent(hovered >)    → :is([data-hovered] > *)  (direct parent)
+   *   @parent(hovered, >)   → :is([data-hovered] > *)  (direct parent)
    *   @parent(.my-class)    → :is(.my-class *)
    */
   private parseParentState(raw: string): ConditionNode {
@@ -538,10 +538,14 @@ class Parser {
     let condition = content.trim();
     let direct = false;
 
-    // Detect trailing > for direct parent mode
-    if (condition.endsWith('>')) {
-      direct = true;
-      condition = condition.slice(0, -1).trim();
+    // Detect ", >" suffix for direct parent mode
+    const lastCommaIdx = condition.lastIndexOf(',');
+    if (lastCommaIdx !== -1) {
+      const afterComma = condition.slice(lastCommaIdx + 1).trim();
+      if (afterComma === '>') {
+        direct = true;
+        condition = condition.slice(0, lastCommaIdx).trim();
+      }
     }
 
     const innerCondition = parseStateKey(condition, this.options);

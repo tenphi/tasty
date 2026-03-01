@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.4.2
+
+### Patch Changes
+
+- [`e6a6982`](https://github.com/tenphi/tasty/commit/e6a6982c1db6a75bfce0ca00f11452a25e7102e6) Thanks [@tenphi](https://github.com/tenphi)! - Drop `react-is` dependency by replacing `isValidElementType` with a lightweight internal utility. Move `@babel/helper-plugin-utils` and `@babel/types` from dependencies to optional peer dependencies since they are only needed for the Babel plugin entry point.
+
 ## 0.4.1
 
 ### Patch Changes

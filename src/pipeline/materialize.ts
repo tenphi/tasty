@@ -108,9 +108,7 @@ export interface ParsedPseudoCondition {
 }
 
 /** Modifier or pseudo condition (shared across own/root/parent) */
-type ParsedSelectorCondition =
-  | ParsedModifierCondition
-  | ParsedPseudoCondition;
+type ParsedSelectorCondition = ParsedModifierCondition | ParsedPseudoCondition;
 
 /**
  * A single selector variant (one term in a DNF expression)
@@ -1152,10 +1150,7 @@ function hasContainerStyleContradiction(
 function getVariantKey(v: SelectorVariant): string {
   const modifierKey = v.modifierConditions.map(getModifierKey).sort().join('|');
   const pseudoKey = v.pseudoConditions.map(getPseudoKey).sort().join('|');
-  const ownKey = v.ownConditions
-    .map(getSelectorConditionKey)
-    .sort()
-    .join('|');
+  const ownKey = v.ownConditions.map(getSelectorConditionKey).sort().join('|');
   const containerKey = v.containerConditions
     .map((c) => `${c.name ?? ''}:${c.negated ? '!' : ''}${c.condition}`)
     .sort()

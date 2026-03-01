@@ -429,10 +429,7 @@ export function containerUniqueId(
 /**
  * Generate a normalized unique ID for a root condition
  */
-export function rootUniqueId(
-  innerUniqueId: string,
-  negated = false,
-): string {
+export function rootUniqueId(innerUniqueId: string, negated = false): string {
   const base = `root:${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }

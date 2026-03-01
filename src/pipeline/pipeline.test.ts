@@ -1120,9 +1120,7 @@ describe('Complex OR conditions with mixed types', () => {
 
     const result = renderStyles(styles, '.test');
 
-    const defaultRules = result.filter((r) =>
-      r.declarations.includes('red'),
-    );
+    const defaultRules = result.filter((r) => r.declarations.includes('red'));
 
     for (const rule of defaultRules) {
       if (rule.selector.includes(':not([data-schema])')) {

@@ -200,10 +200,10 @@ describe('Advanced State Mapping', () => {
         expect(result.condition).toBe('.my-class');
       });
 
-      it('should parse @parent(hovered >) with direct parent syntax', () => {
-        const result = parseAdvancedState('@parent(hovered >)', defaultCtx);
+      it('should parse @parent(hovered, >) with direct parent syntax', () => {
+        const result = parseAdvancedState('@parent(hovered, >)', defaultCtx);
         expect(result.type).toBe('parent');
-        expect(result.condition).toBe('hovered >');
+        expect(result.condition).toBe('hovered, >');
       });
     });
 

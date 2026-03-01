@@ -516,9 +516,8 @@ class Parser {
       return trueCondition();
     }
 
-    // Build selector from condition
-    const selector = buildRootSelector(content);
-    return createRootCondition(selector, false, raw);
+    const innerCondition = parseStateKey(content, this.options);
+    return createRootCondition(innerCondition, false, raw);
   }
 
   /**
@@ -527,7 +526,7 @@ class Parser {
    * Syntax:
    *   @parent(hovered)      → :is([data-hovered] *)
    *   @parent(theme=dark)   → :is([data-theme="dark"] *)
-   *   @parent(hovered >)    → :is([data-hovered] > *)  (direct parent)
+   *   @parent(hovered, >)   → :is([data-hovered] > *)  (direct parent)
    *   @parent(.my-class)    → :is(.my-class *)
    */
   private parseParentState(raw: string): ConditionNode {
@@ -539,14 +538,18 @@ class Parser {
     let condition = content.trim();
     let direct = false;
 
-    // Detect trailing > for direct parent mode
-    if (condition.endsWith('>')) {
-      direct = true;
-      condition = condition.slice(0, -1).trim();
+    // Detect ", >" suffix for direct parent mode
+    const lastCommaIdx = condition.lastIndexOf(',');
+    if (lastCommaIdx !== -1) {
+      const afterComma = condition.slice(lastCommaIdx + 1).trim();
+      if (afterComma === '>') {
+        direct = true;
+        condition = condition.slice(0, lastCommaIdx).trim();
+      }
     }
 
-    const selector = buildRootSelector(condition);
-    return createParentCondition(selector, direct, false, raw);
+    const innerCondition = parseStateKey(condition, this.options);
+    return createParentCondition(innerCondition, direct, false, raw);
   }
 
   /**
@@ -761,30 +764,6 @@ function parseNumericValue(value: string): number | null {
     return parseFloat(match[1]);
   }
   return null;
-}
-
-/**
- * Build a root state selector from a condition string
- */
-function buildRootSelector(condition: string): string {
-  // Handle class selector: .className
-  if (condition.startsWith('.')) {
-    return condition;
-  }
-
-  // Handle attribute selector: [attr]
-  if (condition.startsWith('[')) {
-    return condition;
-  }
-
-  // Handle value mod: theme=dark
-  if (condition.includes('=')) {
-    const [key, value] = condition.split('=');
-    return `[data-${camelToKebab(key.trim())}="${value.trim()}"]`;
-  }
-
-  // Boolean mod: camelCase -> [data-camel-case]
-  return `[data-${camelToKebab(condition)}]`;
 }
 
 // ============================================================================

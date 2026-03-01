@@ -720,18 +720,15 @@ function hasContainerStyleConflict(terms: ConditionNode[]): boolean {
 function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
   // Build sets of positive container style properties with specific values
   const positiveContainerStyles = new Map<string, string | undefined>();
-  // key: "containerName:property", value: propertyValue (or undefined for existence)
 
   // Build sets of positive modifier attributes with specific values
   const positiveModifiers = new Map<string, string | undefined>();
-  // key: "attribute", value: value (or undefined for boolean)
 
   for (const term of terms) {
     if (term.kind !== 'state' || term.negated) continue;
 
     if (term.type === 'container' && term.subtype === 'style') {
       const key = `${term.containerName || '_'}:${term.property}`;
-      // Only track if we have a specific value (not just existence check)
       if (term.propertyValue !== undefined) {
         positiveContainerStyles.set(key, term.propertyValue);
       }
@@ -742,7 +739,6 @@ function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
     }
   }
 
-  // Filter out redundant negations
   return terms.filter((term) => {
     if (term.kind !== 'state' || !term.negated) return true;
 
@@ -752,19 +748,11 @@ function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
       const positiveValue = positiveContainerStyles.get(key);
 
       if (positiveValue !== undefined) {
-        // We have a positive style(--prop: X) for this property
-
         if (term.propertyValue === undefined) {
-          // Negating existence: not style(--prop)
-          // But we have style(--prop: X), which implies existence → contradiction
-          // This should have been caught by hasContainerStyleConflict
           return true;
         }
 
         if (term.propertyValue !== positiveValue) {
-          // Negating a different value: not style(--prop: Y)
-          // We have style(--prop: X), which implies not style(--prop: Y)
-          // → This negation is redundant!
           return false;
         }
       }
@@ -775,9 +763,7 @@ function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
       const positiveValue = positiveModifiers.get(term.attribute);
 
       if (positiveValue !== undefined && term.value !== undefined) {
-        // We have [attr="X"] and this is not [attr="Y"]
         if (term.value !== positiveValue) {
-          // [attr="X"] implies not [attr="Y"] → redundant
           return false;
         }
       }

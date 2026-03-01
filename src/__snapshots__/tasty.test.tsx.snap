@@ -59,7 +59,7 @@ exports[`tasty() API > should optimize attribute selectors 2`] = `
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
 ".t20.t20[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t20.t20[data-size="medium"]:not([data-selected]), .t20.t20[data-size="medium"]:not([data-size="large"]), .t20.t20:not([data-size="medium"])[data-selected]:not([data-size="large"]) { padding: 16px 0px 0px; }
+.t20.t20[data-size="medium"], .t20.t20:not([data-size="medium"])[data-selected]:not([data-size="large"]) { padding: 16px 0px 0px; }
 .t20.t20:not([data-size="medium"]):not([data-selected]) { padding: 8px 0px 0px; }"
 `;
 

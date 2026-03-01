@@ -80,6 +80,11 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should generate 
 .t0.t0:not([data-hovered] *) { background-color: var(--white-color); }"
 `;
 
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `
+".t0.t0:is([data-hovered] *), .t0.t0:is([data-focused] *) { background-color: var(--blue-color); }
+.t0.t0:not([data-hovered] *):not([data-focused] *) { background-color: var(--white-color); }"
+`;
+
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `
 ".t0.t0:is([aria-expanded="true"] *) { background-color: var(--blue-color); }
 .t0.t0:not([aria-expanded="true"] *) { background-color: var(--white-color); }"
@@ -132,6 +137,12 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should handle va
 exports[`Advanced State Mapping - CSS Output > @root states > should generate CSS with :root prefix for root states 1`] = `
 ":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
 :root:not([data-theme="dark"]) .t0.t0 { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @root states > should handle OR inside single @root() 1`] = `
+":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
+:root[data-mode="compact"] .t0.t0 { background-color: var(--dark-02-color); }
+:root:not([data-theme="dark"]):not([data-mode="compact"]) .t0.t0 { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @root states > should handle attribute-based root states 1`] = `
@@ -209,11 +220,8 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should gen
 "@media (prefers-color-scheme: dark) {
   :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
 }
-@media (prefers-color-scheme: no-preference) and (not (prefers-color-scheme: dark)) {
-  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
-}
 @media (prefers-color-scheme: no-preference) {
-  :root:not([data-prefers-schema="system"])[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
 }
 @media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
   .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
@@ -245,7 +253,7 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should han
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle cascading root states with specificity 1`] = `
 ":root[data-mode="compact"] .t0.t0 { background-color: var(--gray-02-color); }
 :root:not([data-mode="compact"])[data-theme="light"] .t0.t0 { background-color: var(--light-01-color); }
-:root:not([data-mode="compact"]):not([data-theme="light"])[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
+:root:not([data-mode="compact"])[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
 :root:not([data-mode="compact"]):not([data-theme="dark"]):not([data-theme="light"]) .t0.t0 { background-color: var(--white-color); }"
 `;
 
@@ -324,11 +332,8 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should sup
 "@media (prefers-color-scheme: dark) {
   :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
 }
-@media (prefers-color-scheme: no-preference) and (not (prefers-color-scheme: dark)) {
-  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
-}
 @media (prefers-color-scheme: no-preference) {
-  :root:not([data-prefers-schema="system"])[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
 }
 @media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
   .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }

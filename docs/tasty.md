@@ -446,7 +446,7 @@ color: '(#primary, #secondary)',  // Fallback syntax
 
 #### `@parent(...)` — Parent Element States
 
-Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks.
+Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`) is supported inside `@parent()`.
 
 ```jsx
 const Highlight = tasty({
@@ -454,7 +454,7 @@ const Highlight = tasty({
     fill: {
       '': '#white',
       '@parent(hovered)': '#gray.05',         // Any ancestor has [data-hovered]
-      '@parent(theme=dark >)': '#dark-02',     // Direct parent has [data-theme="dark"]
+      '@parent(theme=dark, >)': '#dark-02',   // Direct parent has [data-theme="dark"]
     },
   },
 });
@@ -464,9 +464,11 @@ const Highlight = tasty({
 |--------|------------|
 | `@parent(hovered)` | `:is([data-hovered] *)` |
 | `!@parent(hovered)` | `:not([data-hovered] *)` |
-| `@parent(hovered >)` | `:is([data-hovered] > *)` (direct parent) |
+| `@parent(hovered, >)` | `:is([data-hovered] > *)` (direct parent) |
 | `@parent(.active)` | `:is(.active *)` |
+| `@parent(hovered & focused)` | `:is([data-hovered][data-focused] *)` (same ancestor) |
 | `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
+| `@parent(hovered \| focused)` | `:is([data-hovered] *)`, `:is([data-focused] *)` (OR variants) |
 
 For sub-elements, the parent check applies to the root element's ancestors:
 

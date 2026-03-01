@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.4.1
+
+### Patch Changes
+
+- [`27bc1bf`](https://github.com/tenphi/tasty/commit/27bc1bfe81e8f93f10f9d3496fefab506b4e7fa8) Thanks [@tenphi](https://github.com/tenphi)! - Add missing exports.
+
 ## 0.4.0
 
 ### Minor Changes

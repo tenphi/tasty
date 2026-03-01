@@ -197,6 +197,20 @@ describe('Advanced State Mapping - CSS Output', () => {
       const { container } = render(<Element />);
       expect(container).toMatchTastySnapshot();
     });
+
+    it('should handle OR inside single @root()', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@root(theme=dark | mode=compact)': '#dark-02',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
   });
 
   describe('@parent states', () => {
@@ -276,6 +290,20 @@ describe('Advanced State Mapping - CSS Output', () => {
           fill: {
             '': '#white',
             '@parent(hovered) | @parent(focused)': '#blue',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should handle OR inside single @parent()', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@parent(hovered | focused)': '#blue',
           },
         },
       });

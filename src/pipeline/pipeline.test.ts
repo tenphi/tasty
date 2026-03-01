@@ -326,6 +326,30 @@ describe('parseStateKey()', () => {
     }
   });
 
+  it('should parse @parent with OR inside as parent with inner OR', () => {
+    const result = parseStateKey('@parent(hovered | focused)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('parent');
+      const inner = (result as any).innerCondition;
+      expect(inner.kind).toBe('compound');
+      expect(inner.operator).toBe('OR');
+      expect(inner.children).toHaveLength(2);
+    }
+  });
+
+  it('should parse @root with OR inside as root with inner OR', () => {
+    const result = parseStateKey('@root(theme=dark | mode=compact)');
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('root');
+      const inner = (result as any).innerCondition;
+      expect(inner.kind).toBe('compound');
+      expect(inner.operator).toBe('OR');
+      expect(inner.children).toHaveLength(2);
+    }
+  });
+
   it('should parse @own state', () => {
     const result = parseStateKey('@own(hovered)', { isSubElement: true });
     expect(result.kind).toBe('state');
@@ -669,6 +693,59 @@ describe('conditionToCSS()', () => {
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentConditions).toHaveLength(2);
+  });
+
+  it('should produce two variants for @root with OR inside', () => {
+    const result = parseStateKey('@root(theme=dark | mode=compact)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(2);
+
+    expect(css.variants[0].rootConditions).toHaveLength(1);
+    expect(css.variants[0].rootConditions[0]).toEqual({
+      attribute: 'data-theme',
+      value: 'dark',
+      operator: '=',
+      negated: false,
+    });
+
+    expect(css.variants[1].rootConditions).toHaveLength(1);
+    expect(css.variants[1].rootConditions[0]).toEqual({
+      attribute: 'data-mode',
+      value: 'compact',
+      operator: '=',
+      negated: false,
+    });
+  });
+
+  it('should produce two variants for @parent with OR inside', () => {
+    const result = parseStateKey('@parent(hovered | focused)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(2);
+
+    expect(css.variants[0].parentConditions).toHaveLength(1);
+    expect(css.variants[0].parentConditions[0]).toEqual({
+      attribute: 'data-hovered',
+      value: undefined,
+      operator: undefined,
+      negated: false,
+    });
+    expect(css.variants[0].parentDirect).toBe(false);
+
+    expect(css.variants[1].parentConditions).toHaveLength(1);
+    expect(css.variants[1].parentConditions[0]).toEqual({
+      attribute: 'data-focused',
+      value: undefined,
+      operator: undefined,
+      negated: false,
+    });
+    expect(css.variants[1].parentDirect).toBe(false);
+  });
+
+  it('should produce single variant for @root with AND inside', () => {
+    const result = parseStateKey('@root(theme=dark & mode=compact)');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].rootConditions).toHaveLength(2);
   });
 
   it('should convert @supports feature query', () => {
@@ -1088,6 +1165,44 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRule!.selector).toContain(':is(');
     expect(blueRule!.selector).toContain('[data-theme="dark"]');
     expect(blueRule!.selector).toContain(':not([data-disabled])');
+  });
+
+  it('should support OR inside @root()', () => {
+    clearPipelineCache();
+
+    const styles = {
+      color: {
+        '': 'red',
+        '@root(theme=dark | mode=compact)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+    const blueRules = result.filter((r) => r.declarations.includes('blue'));
+    expect(blueRules.length).toBeGreaterThanOrEqual(1);
+
+    const allSelectors = blueRules.map((r) => r.selector).join(', ');
+    expect(allSelectors).toContain(':root[data-theme="dark"]');
+    expect(allSelectors).toContain(':root[data-mode="compact"]');
+  });
+
+  it('should support OR inside @parent()', () => {
+    clearPipelineCache();
+
+    const styles = {
+      color: {
+        '': 'red',
+        '@parent(hovered | focused)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+    const blueRules = result.filter((r) => r.declarations.includes('blue'));
+    expect(blueRules.length).toBeGreaterThanOrEqual(1);
+
+    const allSelectors = blueRules.map((r) => r.selector).join(', ');
+    expect(allSelectors).toContain(':is([data-hovered]');
+    expect(allSelectors).toContain(':is([data-focused]');
   });
 });
 

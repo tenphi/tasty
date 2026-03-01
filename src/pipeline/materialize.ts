@@ -272,7 +272,6 @@ function conditionToCSSInner(node: ConditionNode): CSSComponents {
 function stateToCSS(state: StateCondition): CSSComponents {
   switch (state.type) {
     case 'media': {
-      // Media conditions can return multiple variants for negated ranges (OR branches)
       const mediaResults = mediaToParsed(state);
       const variants = mediaResults.map((mediaCond) => {
         const v = emptyVariant();
@@ -281,6 +280,28 @@ function stateToCSS(state: StateCondition): CSSComponents {
       });
       return { variants, isImpossible: false };
     }
+
+    case 'root':
+      return innerConditionToVariants(
+        state.innerCondition,
+        state.negated ?? false,
+        'rootConditions',
+      );
+
+    case 'parent':
+      return innerConditionToVariants(
+        state.innerCondition,
+        state.negated ?? false,
+        'parentConditions',
+        state.direct,
+      );
+
+    case 'own':
+      return innerConditionToVariants(
+        state.innerCondition,
+        state.negated ?? false,
+        'ownConditions',
+      );
 
     default: {
       const variant: SelectorVariant = emptyVariant();
@@ -300,34 +321,6 @@ function stateToCSS(state: StateCondition): CSSComponents {
 
         case 'supports':
           variant.supportsConditions.push(supportsToParsed(state));
-          break;
-
-        case 'root':
-          variant.rootConditions.push(
-            ...extractInnerConditions(
-              state.innerCondition,
-              state.negated ?? false,
-            ),
-          );
-          break;
-
-        case 'parent':
-          variant.parentConditions.push(
-            ...extractInnerConditions(
-              state.innerCondition,
-              state.negated ?? false,
-            ),
-          );
-          variant.parentDirect = state.direct;
-          break;
-
-        case 'own':
-          variant.ownConditions.push(
-            ...extractInnerConditions(
-              state.innerCondition,
-              state.negated ?? false,
-            ),
-          );
           break;
 
         case 'starting':
@@ -566,35 +559,46 @@ function supportsToParsed(state: SupportsCondition): ParsedSupportsCondition {
 }
 
 /**
- * Extract modifier/pseudo conditions from an inner condition tree.
- * Shared by @own(), @root(), and @parent().
+ * Convert an inner condition tree into SelectorVariants.
+ * Each inner OR branch becomes a separate variant, preserving disjunction.
+ * Shared by @root(), @parent(), and @own().
  */
-function extractInnerConditions(
+function innerConditionToVariants(
   innerCondition: ConditionNode,
   negated: boolean,
-): ParsedSelectorCondition[] {
+  target: 'rootConditions' | 'parentConditions' | 'ownConditions',
+  parentDirect?: boolean,
+): CSSComponents {
   const innerCSS = conditionToCSS(innerCondition);
 
   if (innerCSS.isImpossible || innerCSS.variants.length === 0) {
-    return [];
+    return { variants: [], isImpossible: true };
   }
 
-  const result: ParsedSelectorCondition[] = [];
-  for (const variant of innerCSS.variants) {
-    for (const mod of variant.modifierConditions) {
-      result.push({
+  const variants: SelectorVariant[] = innerCSS.variants.map((innerVariant) => {
+    const v = emptyVariant();
+
+    for (const mod of innerVariant.modifierConditions) {
+      v[target].push({
         ...mod,
         negated: negated ? !mod.negated : mod.negated,
       });
     }
-    for (const pseudo of variant.pseudoConditions) {
-      result.push({
+    for (const pseudo of innerVariant.pseudoConditions) {
+      v[target].push({
         ...pseudo,
         negated: negated ? !pseudo.negated : pseudo.negated,
       });
     }
-  }
-  return result;
+
+    if (parentDirect !== undefined) {
+      v.parentDirect = parentDirect;
+    }
+
+    return v;
+  });
+
+  return { variants, isImpossible: false };
 }
 
 /**
@@ -1182,6 +1186,7 @@ function getVariantKey(v: SelectorVariant): string {
     rootKey,
     parentKey,
     v.startingStyle ? '1' : '0',
+    v.parentDirect ? '1' : '0',
   ].join('###');
 }
 
@@ -1199,6 +1204,7 @@ function getVariantKey(v: SelectorVariant): string {
 function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
   // Must have same context
   if (a.startingStyle !== b.startingStyle) return false;
+  if (a.parentDirect !== b.parentDirect) return false;
 
   // Check if a.rootConditions is superset of b.rootConditions
   if (!isSelectorConditionsSuperset(a.rootConditions, b.rootConditions))

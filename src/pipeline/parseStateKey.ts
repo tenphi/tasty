@@ -762,9 +762,6 @@ function parseNumericValue(value: string): number | null {
   return null;
 }
 
-/**
- * Build a root state selector from a condition string
- */
 // ============================================================================
 // Main Export
 // ============================================================================

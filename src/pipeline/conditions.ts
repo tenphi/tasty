@@ -685,7 +685,7 @@ export function createRootCondition(
     kind: 'state',
     type: 'root',
     negated,
-    raw: raw || `@root(...)`,
+    raw: raw || `@root(${innerUniqueId})`,
     uniqueId: rootUniqueId(innerUniqueId, negated),
     innerCondition,
   };
@@ -705,7 +705,7 @@ export function createParentCondition(
     kind: 'state',
     type: 'parent',
     negated,
-    raw: raw || `@parent(...)`,
+    raw: raw || `@parent(${innerUniqueId})`,
     uniqueId: parentUniqueId(innerUniqueId, direct, negated),
     innerCondition,
     direct,

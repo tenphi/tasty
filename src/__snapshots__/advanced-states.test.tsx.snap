@@ -80,6 +80,11 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should generate 
 .t0.t0:is(:not([data-hovered]) *) { background-color: var(--white-color); }"
 `;
 
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `
+".t0.t0:is([data-hovered] *), .t0.t0:is([data-focused] *) { background-color: var(--blue-color); }
+.t0.t0:is(:not([data-hovered]) *), .t0.t0:is(:not([data-focused]) *) { background-color: var(--white-color); }"
+`;
+
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `
 ".t0.t0:is([aria-expanded="true"] *) { background-color: var(--blue-color); }
 .t0.t0:is(:not([aria-expanded="true"]) *) { background-color: var(--white-color); }"
@@ -132,6 +137,13 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should handle va
 exports[`Advanced State Mapping - CSS Output > @root states > should generate CSS with :root prefix for root states 1`] = `
 ":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
 :root:not([data-theme="dark"]) .t0.t0 { background-color: var(--white-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > @root states > should handle OR inside single @root() 1`] = `
+":root[data-theme="dark"] .t0.t0 { background-color: var(--dark-02-color); }
+:root[data-mode="compact"] .t0.t0 { background-color: var(--dark-02-color); }
+:root:not([data-theme="dark"]) .t0.t0 { background-color: var(--white-color); }
+:root:not([data-mode="compact"]) .t0.t0 { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @root states > should handle attribute-based root states 1`] = `

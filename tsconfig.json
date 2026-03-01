@@ -3,7 +3,7 @@
     "target": "ES2024",
     "module": "ES2022",
     "lib": ["ES2024", "DOM"],
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
     "moduleResolution": "bundler",
     "strict": true,
     "noImplicitAny": false,

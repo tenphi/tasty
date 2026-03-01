@@ -1,5 +1,5 @@
 ---
-'@tenphi/tasty': patch
+'@tenphi/tasty': minor
 ---
 
-Improve state resolution logic for better handling of root and parent conditions. The `@dark` state now correctly distinguishes between cases where the schema attribute is not set versus when it's explicitly set to a non-dark value, ensuring proper CSS generation for all scenarios.
+Parse `@root()`, `@parent()`, and `@own()` inner content as full condition expressions instead of raw CSS selectors. This enables boolean logic (`&`, `|`, `!`) inside these conditions, unifying their internal representation as modifier/pseudo conditions and removing duplicated code paths.

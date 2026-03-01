@@ -24,6 +24,7 @@ On top of that foundation, Tasty gives you a concise, CSS-like DSL with design t
 ## Why Tasty
 
 - **Deterministic at any scale** — Exclusive selector generation eliminates the entire class of cascade/specificity bugs. Every state combination resolves to exactly one CSS rule per property. Refactor freely.
+- **AI-friendly by design** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, understand, and refactor even advanced state bindings as confidently as a human — because there's no hidden cascade logic or implicit ordering to second-guess.
 - **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days.
 - **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts.
 - **Full modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, keyframes, boolean state logic with `&`, `|`, `!` operators. If CSS can do it, Tasty can express it — concisely.

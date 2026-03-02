@@ -2,7 +2,7 @@ import { parseStyle } from '../utils/styles';
 
 const SECOND_FILL_COLOR_PROPERTY = '--tasty-second-fill-color';
 
-const MAP = {
+const MAP: Record<string, string[]> = {
   fade: ['mask', 'mask-composite'],
   translate: ['transform', 'translate'],
   rotate: ['transform', 'rotate'],
@@ -71,9 +71,35 @@ const MAP = {
 export const DEFAULT_TIMING = 'var(--transition)';
 const DEFAULT_EASING = 'linear';
 
-function getTiming(name) {
+const EASING_KEYWORDS = new Set([
+  'ease',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'linear',
+  'step-start',
+  'step-end',
+]);
+
+function isEasing(token: string): boolean {
+  return (
+    EASING_KEYWORDS.has(token) ||
+    token.startsWith('cubic-bezier(') ||
+    token.startsWith('steps(') ||
+    token.startsWith('linear(')
+  );
+}
+
+function getTiming(name: string): string {
   return `var(--${name}-transition, var(--transition))`;
 }
+
+type TransitionEntry = [
+  name: string,
+  easing: string | undefined,
+  timing: string | undefined,
+  delay: string | undefined,
+];
 
 export function transitionStyle({ transition }) {
   if (!transition) return;
@@ -85,14 +111,14 @@ export function transitionStyle({ transition }) {
     if (idx < processed.groups.length - 1) tokens.push(',');
   });
 
-  if (!tokens) return;
+  if (tokens.length === 0) return;
 
   let tempTransition: string[] = [];
   const transitions: string[][] = [];
 
   tokens.forEach((token) => {
     if (token === ',') {
-      if (tempTransition) {
+      if (tempTransition.length) {
         transitions.push(tempTransition);
         tempTransition = [];
       }
@@ -101,22 +127,27 @@ export function transitionStyle({ transition }) {
     }
   });
 
-  if (tempTransition) {
+  if (tempTransition.length) {
     transitions.push(tempTransition);
   }
 
-  const map: {
-    name?: string;
-    easing?: string;
-    timing?: string;
-    delay?: string;
-  } = {};
+  const map: Record<string, TransitionEntry> = {};
 
   transitions.forEach((transition) => {
     const name = transition[0];
-    const timing = transition[1];
-    const easing = transition[2];
-    const delay = transition[3];
+
+    let timing: string | undefined;
+    let easing: string | undefined;
+    let delay: string | undefined;
+
+    if (transition[1] && isEasing(transition[1])) {
+      easing = transition[1];
+      delay = transition[2];
+    } else {
+      timing = transition[1];
+      easing = transition[2];
+      delay = transition[3];
+    }
 
     const styles = MAP[name] || [name];
 

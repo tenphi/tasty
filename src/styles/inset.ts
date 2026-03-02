@@ -1,4 +1,7 @@
+import type { StyleDetails } from '../parser/types';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
+
+type Direction = (typeof DIRECTIONS)[number];
 
 /**
  * Parse an inset value and return the first processed value
@@ -14,24 +17,53 @@ function parseInsetValue(value: string | number | boolean): string | null {
 }
 
 /**
- * Parse inset value with optional directions (like "1x top" or "2x left right")
+ * Extract values and directions from a single parsed group.
  */
-function parseDirectionalInset(value: string | number | boolean): {
+function extractGroupData(group: StyleDetails): {
   values: string[];
-  directions: string[];
+  directions: Direction[];
 } {
-  if (typeof value === 'number') {
-    return { values: [`${value}px`], directions: [] };
-  }
-  if (!value) return { values: [], directions: [] };
-  if (value === true) value = '0';
-
-  const { values = [], mods = [] } = parseStyle(value).groups[0] ?? {};
-
+  const { values = [], mods = [] } = group;
   return {
     values: values.length ? values : ['0'],
-    directions: filterMods(mods, DIRECTIONS),
+    directions: filterMods(mods, DIRECTIONS) as Direction[],
   };
+}
+
+/**
+ * Apply a single group's values and directions onto a direction map.
+ */
+function applyGroup(
+  dirs: Record<Direction, string>,
+  values: string[],
+  directions: Direction[],
+): void {
+  if (!values.length) return;
+
+  if (directions.length === 0) {
+    dirs.top = values[0];
+    dirs.right = values[1] || values[0];
+    dirs.bottom = values[2] || values[0];
+    dirs.left = values[3] || values[1] || values[0];
+  } else {
+    directions.forEach((dir, i) => {
+      dirs[dir] = values[i] ?? values[0];
+    });
+  }
+}
+
+/**
+ * Optimize inset output shorthand.
+ */
+function optimizeInset(dirs: Record<Direction, string>): { inset: string } {
+  const { top, right, bottom, left } = dirs;
+  if (top === right && right === bottom && bottom === left) {
+    return { inset: top };
+  }
+  if (top === bottom && left === right) {
+    return { inset: `${top} ${left}` };
+  }
+  return { inset: `${top} ${right} ${bottom} ${left}` };
 }
 
 /**
@@ -77,7 +109,6 @@ export function insetStyle({
   bottom?: string | number | boolean;
   left?: string | number | boolean;
 }) {
-  // If no props are defined, return empty object
   if (
     inset == null &&
     insetBlock == null &&
@@ -118,30 +149,29 @@ export function insetStyle({
     return result;
   }
 
-  // When inset, insetBlock, or insetInline is used, use the shorthand approach
-  // Initialize all directions to auto
-  let [topVal, rightVal, bottomVal, leftVal] = ['auto', 'auto', 'auto', 'auto'];
+  const dirs: Record<Direction, string> = {
+    top: 'auto',
+    right: 'auto',
+    bottom: 'auto',
+    left: 'auto',
+  };
 
   // Priority 1 (lowest): inset
   if (inset != null) {
-    const { values, directions } = parseDirectionalInset(inset);
+    if (typeof inset === 'number') {
+      const v = `${inset}px`;
+      dirs.top = dirs.right = dirs.bottom = dirs.left = v;
+    } else if (inset === true) {
+      inset = '0';
+    }
 
-    if (values.length) {
-      if (directions.length === 0) {
-        topVal = values[0];
-        rightVal = values[1] || values[0];
-        bottomVal = values[2] || values[0];
-        leftVal = values[3] || values[1] || values[0];
-      } else {
-        // Assign values to directions in the order they appear
-        // e.g., 'right 1x top 0' → right: 1x, top: 0
-        directions.forEach((dir, i) => {
-          const val = values[i] ?? values[0];
-          if (dir === 'top') topVal = val;
-          else if (dir === 'right') rightVal = val;
-          else if (dir === 'bottom') bottomVal = val;
-          else if (dir === 'left') leftVal = val;
-        });
+    if (typeof inset === 'string' && inset) {
+      const processed = parseStyle(inset);
+      const groups = processed.groups ?? [];
+
+      for (const group of groups) {
+        const { values, directions } = extractGroupData(group);
+        applyGroup(dirs, values, directions);
       }
     }
   }
@@ -149,40 +179,32 @@ export function insetStyle({
   // Priority 2 (medium): insetBlock/insetInline
   if (insetBlock != null) {
     const val = parseInsetValue(insetBlock);
-    if (val) topVal = bottomVal = val;
+    if (val) dirs.top = dirs.bottom = val;
   }
   if (insetInline != null) {
     const val = parseInsetValue(insetInline);
-    if (val) leftVal = rightVal = val;
+    if (val) dirs.left = dirs.right = val;
   }
 
   // Priority 3 (highest): individual directions
   if (top != null) {
     const val = parseInsetValue(top);
-    if (val) topVal = val;
+    if (val) dirs.top = val;
   }
   if (right != null) {
     const val = parseInsetValue(right);
-    if (val) rightVal = val;
+    if (val) dirs.right = val;
   }
   if (bottom != null) {
     const val = parseInsetValue(bottom);
-    if (val) bottomVal = val;
+    if (val) dirs.bottom = val;
   }
   if (left != null) {
     const val = parseInsetValue(left);
-    if (val) leftVal = val;
+    if (val) dirs.left = val;
   }
 
-  // Optimize output: 1 value if all same, 2 values if top==bottom && left==right
-  if (topVal === rightVal && rightVal === bottomVal && bottomVal === leftVal) {
-    return { inset: topVal };
-  }
-  if (topVal === bottomVal && leftVal === rightVal) {
-    return { inset: `${topVal} ${leftVal}` };
-  }
-
-  return { inset: `${topVal} ${rightVal} ${bottomVal} ${leftVal}` };
+  return optimizeInset(dirs);
 }
 
 insetStyle.__lookupStyles = [

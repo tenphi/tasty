@@ -278,4 +278,54 @@ describe('paddingStyle', () => {
       });
     });
   });
+
+  describe('multi-group (comma-separated)', () => {
+    it('base value with directional override', () => {
+      expect(paddingStyle({ padding: '1x, 2x top' })).toEqual({
+        padding: '16px 8px 8px 8px',
+      });
+    });
+
+    it('base value with multiple directional overrides', () => {
+      expect(paddingStyle({ padding: '1x, 2x top bottom' })).toEqual({
+        padding: '16px 8px',
+      });
+    });
+
+    it('directional groups without base', () => {
+      expect(
+        paddingStyle({ padding: '2x left right, 1x top bottom' }),
+      ).toEqual({
+        padding: '8px 16px',
+      });
+    });
+
+    it('later groups override earlier groups for same direction', () => {
+      expect(paddingStyle({ padding: '1x, 2x top, 3x top' })).toEqual({
+        padding: '24px 8px 8px 8px',
+      });
+    });
+
+    it('multi-group with paddingBlock override', () => {
+      expect(
+        paddingStyle({ padding: '1x, 2x left right', paddingBlock: '3x' }),
+      ).toEqual({
+        padding: '24px 16px',
+      });
+    });
+
+    it('multi-group with individual direction override', () => {
+      expect(
+        paddingStyle({ padding: '1x, 2x top', paddingTop: '4x' }),
+      ).toEqual({
+        padding: '32px 8px 8px 8px',
+      });
+    });
+
+    it('all sides same after multi-group resolves to single value', () => {
+      expect(paddingStyle({ padding: '1x, 1x top' })).toEqual({
+        padding: '8px',
+      });
+    });
+  });
 });

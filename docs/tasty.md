@@ -488,34 +488,9 @@ const Card = tasty({
 
 ---
 
-## Style Properties Reference
+## Style Properties
 
-### Layout Properties
-
-- `display` — Standard CSS display values. `hide: true` as shortcut for `display: none`
-- `flow` — Unified flex/grid direction control
-- `gap` — Element spacing across all layout types
-- `padding` / `margin` — Enhanced syntax with directional modifiers (`top`, `right`, `bottom`, `left`)
-- `width` / `height` — With min/max/fixed modifiers and intrinsic sizing
-
-### Visual Properties
-
-- `color` / `fill` — Color tokens with opacity, dual-fill support
-- `border` — Enhanced syntax with directional support
-- `radius` — Border radius with shape modifiers (`round`, `ellipse`, `leaf`)
-- `outline` — Focus outline with offset support
-- `image` — Background images
-
-### Typography Properties
-
-- `preset` — Semantic typography shortcuts (`h1`–`h6`, `t1`–`t4`, `p1`–`p4`, etc.)
-- `textOverflow` — Text truncation with ellipsis or multi-line clamping
-
-### Advanced Properties
-
-- `transition` — Semantic transition names (`fill`, `theme`, `border`, etc.)
-- `scrollbar` — Scrollbar styling (`thin`, `none`, `styled`, custom colors)
-- `fade` — Edge fading with gradient masks
+For a complete reference of all enhanced style properties — syntax, values, modifiers, and recommendations — see **[Style Properties Reference](styles.md)**.
 
 ---
 
@@ -686,14 +661,6 @@ function MyTabs({ styles, tabListStyles, prefixStyles }) {
 
 - Don't use `styles` prop directly on components
 - Don't use raw CSS values when tokens exist
-- Don't use CSS property names when Tasty alternatives exist (`fill` not `backgroundColor`)
+- Don't use CSS property names when Tasty alternatives exist — see [recommended props](styles.md#recommended-props)
 - Don't change `styles` prop at runtime (use modifiers or tokens instead)
 - Don't use `style` prop for custom styling (only for third-party library integration)
-
-| Native CSS | Tasty Alternative |
-|------------|-------------------|
-| `backgroundColor` | `fill` |
-| `borderColor/Width/Style` | `border` |
-| `borderRadius` | `radius` |
-| `maxWidth` | `width: "max 100%"` |
-| `minWidth` | `width: "min 200px"` |

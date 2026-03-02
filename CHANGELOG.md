@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.5.3
+
+### Patch Changes
+
+- [#16](https://github.com/tenphi/tasty/pull/16) [`caf461a`](https://github.com/tenphi/tasty/commit/caf461a8ada6f897ef3f8ebe35d1d1d2af516efb) Thanks [@tenphi](https://github.com/tenphi)! - Add top-level `types`, `main`, and `module` fields for compatibility with `moduleResolution: "node"`.
+
 ## 0.5.2
 
 ### Patch Changes

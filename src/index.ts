@@ -1,3 +1,10 @@
+import type { CSSProperties as ReactCSSProperties } from 'react';
+
+declare module './utils/css-types' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- augments CSSProperties with React's CSSProperties for compatibility
+  interface CSSProperties extends ReactCSSProperties {}
+}
+
 // Framework-agnostic core
 export * from './core';
 

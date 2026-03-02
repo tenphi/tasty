@@ -3,6 +3,9 @@
   "version": "0.5.2",
   "description": "A design-system-integrated styling system and DSL for concise, state-aware UI styling",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {

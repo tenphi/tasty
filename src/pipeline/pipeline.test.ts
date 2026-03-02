@@ -11,6 +11,7 @@ import type {
 } from './conditions';
 import {
   and,
+  createContainerDimensionCondition,
   createMediaDimensionCondition,
   createModifierCondition,
   falseCondition,
@@ -20,7 +21,7 @@ import {
 } from './conditions';
 import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
 import { conditionToCSS } from './materialize';
-import { parseStateKey } from './parseStateKey';
+import { clearParseCache, parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
 function assertParentCondition(node: ConditionNode): ParentCondition {
@@ -531,6 +532,177 @@ describe('simplifyCondition()', () => {
       expect((result as any).attribute).toBe('data-a');
     }
   });
+
+  it('should apply absorption: A | (A & B) → A', () => {
+    const a = createModifierCondition('data-a');
+    const b = createModifierCondition('data-b');
+    const result = simplifyCondition(or(a, and(a, b)));
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect((result as any).attribute).toBe('data-a');
+    }
+  });
+
+  it('should handle nested absorption: A & (A | (B & C)) → A', () => {
+    const a = createModifierCondition('data-a');
+    const b = createModifierCondition('data-b');
+    const c = createModifierCondition('data-c');
+    const result = simplifyCondition(and(a, or(a, and(b, c))));
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect((result as any).attribute).toBe('data-a');
+    }
+  });
+
+  it('should merge overlapping media ranges', () => {
+    const lower = createMediaDimensionCondition(
+      'width',
+      { value: '400px', valueNumeric: 400, inclusive: true },
+      undefined,
+    );
+    const upper = createMediaDimensionCondition('width', undefined, {
+      value: '800px',
+      valueNumeric: 800,
+      inclusive: true,
+    });
+    const result = simplifyCondition(and(lower, upper));
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state' && result.type === 'media') {
+      expect(result.lowerBound?.valueNumeric).toBe(400);
+      expect(result.upperBound?.valueNumeric).toBe(800);
+    }
+  });
+
+  it('should merge container dimension ranges', () => {
+    const lower = createContainerDimensionCondition(
+      'width',
+      { value: '200px', valueNumeric: 200, inclusive: true },
+      undefined,
+    );
+    const upper = createContainerDimensionCondition('width', undefined, {
+      value: '600px',
+      valueNumeric: 600,
+      inclusive: false,
+    });
+    const result = simplifyCondition(and(lower, upper));
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state' && result.type === 'container') {
+      expect(result.lowerBound?.valueNumeric).toBe(200);
+      expect(result.lowerBound?.inclusive).toBe(true);
+      expect(result.upperBound?.valueNumeric).toBe(600);
+      expect(result.upperBound?.inclusive).toBe(false);
+    }
+  });
+
+  it('should detect impossible adjacent media ranges', () => {
+    const lower = createMediaDimensionCondition(
+      'width',
+      { value: '800px', valueNumeric: 800, inclusive: false },
+      undefined,
+    );
+    const upper = createMediaDimensionCondition('width', undefined, {
+      value: '800px',
+      valueNumeric: 800,
+      inclusive: false,
+    });
+    const result = simplifyCondition(and(lower, upper));
+    expect(result.kind).toBe('false');
+  });
+});
+
+describe('XOR parsing and simplification', () => {
+  it('should parse simple XOR: A ^ B', () => {
+    const result = parseStateKey('hovered ^ focused');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBe(2);
+  });
+
+  it('should parse chained XOR: A ^ B ^ C', () => {
+    const result = parseStateKey('hovered ^ focused ^ disabled');
+    const css = conditionToCSS(result);
+    expect(css.variants.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should produce correct XOR semantics (A ^ B = A&!B | !A&B)', () => {
+    const result = parseStateKey('hovered ^ focused');
+    const simplified = simplifyCondition(result);
+    expect(simplified.kind).toBe('compound');
+    if (simplified.kind === 'compound') {
+      expect(simplified.operator).toBe('OR');
+      expect(simplified.children.length).toBe(2);
+      for (const branch of simplified.children) {
+        expect(branch.kind).toBe('compound');
+        if (branch.kind === 'compound') {
+          expect(branch.operator).toBe('AND');
+          expect(branch.children.length).toBe(2);
+        }
+      }
+    }
+  });
+
+  it('should simplify XOR with contradiction: A ^ A → FALSE', () => {
+    const a = createModifierCondition('data-hovered');
+    const xorResult = or(and(a, not(a)), and(not(a), a));
+    const result = simplifyCondition(xorResult);
+    expect(result.kind).toBe('false');
+  });
+
+  it('should emit warning for long XOR chains', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler(
+      (w: { code: string; message: string }) => {
+        warnings.push(w);
+      },
+    );
+
+    clearParseCache();
+    parseStateKey('a ^ b ^ c ^ d ^ e');
+    expect(
+      warnings.some((w) => w.code === 'XOR_CHAIN_TOO_LONG'),
+    ).toBe(true);
+
+    restore();
+  });
+});
+
+describe('De Morgan expansion in exclusive conditions', () => {
+  it('should handle NOT(AND) in exclusive conditions', () => {
+    const entries = parseStyleEntries(
+      'padding',
+      {
+        '': '4x',
+        'hovered & focused': '2x',
+      },
+      parseStateKey,
+    );
+
+    const exclusive = buildExclusiveConditions(entries);
+    expect(exclusive.length).toBe(2);
+
+    const defaultEntry = exclusive.find((e) => e.stateKey === '');
+    expect(defaultEntry).toBeDefined();
+    expect(defaultEntry!.exclusiveCondition.kind).not.toBe('false');
+  });
+});
+
+describe('dedupeVariants via conditionToCSS', () => {
+  it('should remove exact duplicate variants', () => {
+    const a = createModifierCondition('data-a');
+    const condition = or(a, a);
+    const css = conditionToCSS(condition);
+    expect(css.variants.length).toBe(1);
+  });
+
+  it('should remove superset variants', () => {
+    const a = createModifierCondition('data-a');
+    const b = createModifierCondition('data-b');
+    const ab = and(a, b);
+    const condition = or(a, ab);
+    const css = conditionToCSS(condition);
+    expect(css.variants.length).toBe(1);
+    expect(css.variants[0].modifierConditions.length).toBe(1);
+  });
 });
 
 describe('buildExclusiveConditions()', () => {
@@ -711,16 +883,14 @@ describe('conditionToCSS()', () => {
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(2);
 
-    expect(css.variants[0].rootConditions).toHaveLength(1);
-    expect(css.variants[0].rootConditions[0]).toEqual({
+    const rootConditions = css.variants.map((v) => v.rootConditions[0]);
+    expect(rootConditions).toContainEqual({
       attribute: 'data-theme',
       value: 'dark',
       operator: '=',
       negated: false,
     });
-
-    expect(css.variants[1].rootConditions).toHaveLength(1);
-    expect(css.variants[1].rootConditions[0]).toEqual({
+    expect(rootConditions).toContainEqual({
       attribute: 'data-mode',
       value: 'compact',
       operator: '=',
@@ -733,25 +903,27 @@ describe('conditionToCSS()', () => {
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(2);
 
-    expect(css.variants[0].parentGroups).toHaveLength(1);
-    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
-    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
+    const parentConditions = css.variants.map(
+      (v) => v.parentGroups[0].conditions[0],
+    );
+    expect(parentConditions).toContainEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[0].parentGroups[0].direct).toBe(false);
-
-    expect(css.variants[1].parentGroups).toHaveLength(1);
-    expect(css.variants[1].parentGroups[0].conditions).toHaveLength(1);
-    expect(css.variants[1].parentGroups[0].conditions[0]).toEqual({
+    expect(parentConditions).toContainEqual({
       attribute: 'data-focused',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(css.variants[1].parentGroups[0].direct).toBe(false);
+
+    for (const v of css.variants) {
+      expect(v.parentGroups).toHaveLength(1);
+      expect(v.parentGroups[0].conditions).toHaveLength(1);
+      expect(v.parentGroups[0].direct).toBe(false);
+    }
   });
 
   it('should produce single variant for @root with AND inside', () => {

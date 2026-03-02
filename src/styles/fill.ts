@@ -12,6 +12,18 @@ export function fillStyle({
   backgroundOrigin,
   backgroundClip,
   background,
+}: {
+  fill?: string;
+  backgroundColor?: string;
+  image?: string;
+  backgroundImage?: string;
+  backgroundPosition?: string;
+  backgroundSize?: string;
+  backgroundRepeat?: string;
+  backgroundAttachment?: string;
+  backgroundOrigin?: string;
+  backgroundClip?: string;
+  background?: string;
 }) {
   // If background is set, it overrides everything
   if (background) {
@@ -86,7 +98,7 @@ fillStyle.__lookupStyles = [
   'background',
 ];
 
-export function svgFillStyle({ svgFill }) {
+export function svgFillStyle({ svgFill }: { svgFill?: string }) {
   if (!svgFill) return;
 
   const processed = parseStyle(svgFill);

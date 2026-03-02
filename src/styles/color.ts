@@ -2,7 +2,7 @@ import { parseColor } from '../utils/styles';
 
 import { convertColorChainToRgbChain } from './createStyle';
 
-export function colorStyle({ color }) {
+export function colorStyle({ color }: { color?: string | boolean }) {
   if (!color) return;
 
   if (color === true) color = 'currentColor';

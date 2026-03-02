@@ -971,57 +971,47 @@ function mergeVariants(
 }
 
 /**
- * Deduplicate media conditions by their key (subtype + condition + negated)
+ * Generic deduplication by a key extraction function.
+ * Preserves insertion order, keeping the first occurrence of each key.
  */
+function dedupeByKey<T>(items: T[], getKey: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const key = getKey(item);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 function dedupeMediaConditions(
   conditions: ParsedMediaCondition[],
 ): ParsedMediaCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedMediaCondition[] = [];
-  for (const c of conditions) {
-    const key = `${c.subtype}|${c.condition}|${c.negated}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
-    }
-  }
-  return result;
+  return dedupeByKey(
+    conditions,
+    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
+  );
 }
 
-/**
- * Deduplicate container conditions by their key (name + condition + negated)
- */
 function dedupeContainerConditions(
   conditions: ParsedContainerCondition[],
 ): ParsedContainerCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedContainerCondition[] = [];
-  for (const c of conditions) {
-    const key = `${c.name ?? ''}|${c.condition}|${c.negated}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
-    }
-  }
-  return result;
+  return dedupeByKey(
+    conditions,
+    (c) => `${c.name ?? ''}|${c.condition}|${c.negated}`,
+  );
 }
 
-/**
- * Deduplicate supports conditions by their key (subtype + condition + negated)
- */
 function dedupeSupportsConditions(
   conditions: ParsedSupportsCondition[],
 ): ParsedSupportsCondition[] {
-  const seen = new Set<string>();
-  const result: ParsedSupportsCondition[] = [];
-  for (const c of conditions) {
-    const key = `${c.subtype}|${c.condition}|${c.negated}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(c);
-    }
-  }
-  return result;
+  return dedupeByKey(
+    conditions,
+    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
+  );
 }
 
 /**
@@ -1206,10 +1196,16 @@ function hasContainerStyleContradiction(
   return false;
 }
 
+const variantKeyCache = new WeakMap<SelectorVariant, string>();
+
 /**
- * Get a unique key for a variant (for deduplication)
+ * Get a unique key for a variant (for deduplication).
+ * Cached via WeakMap since variants are compared multiple times during
+ * deduplication and sorting.
  */
 function getVariantKey(v: SelectorVariant): string {
+  const cached = variantKeyCache.get(v);
+  if (cached !== undefined) return cached;
   const modifierKey = v.modifierConditions.map(getModifierKey).sort().join('|');
   const pseudoKey = v.pseudoConditions.map(getPseudoKey).sort().join('|');
   const ownKey = v.ownConditions.map(getSelectorConditionKey).sort().join('|');
@@ -1230,7 +1226,7 @@ function getVariantKey(v: SelectorVariant): string {
     .sort()
     .join('|');
   const parentKey = v.parentGroups.map(getParentGroupKey).sort().join('|');
-  return [
+  const key = [
     modifierKey,
     pseudoKey,
     ownKey,
@@ -1241,6 +1237,8 @@ function getVariantKey(v: SelectorVariant): string {
     parentKey,
     v.startingStyle ? '1' : '0',
   ].join('###');
+  variantKeyCache.set(v, key);
+  return key;
 }
 
 /**
@@ -1318,97 +1316,69 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
 }
 
 /**
- * Check if media conditions A is a superset of B
+ * Generic superset check: true if every item in B has a matching key in A.
  */
+function isConditionsSuperset<T>(
+  a: T[],
+  b: T[],
+  getKey: (item: T) => string,
+): boolean {
+  const aKeys = new Set(a.map(getKey));
+  return b.every((c) => aKeys.has(getKey(c)));
+}
+
 function isMediaConditionsSuperset(
   a: ParsedMediaCondition[],
   b: ParsedMediaCondition[],
 ): boolean {
-  const aKeys = new Set(
-    a.map((c) => `${c.subtype}|${c.condition}|${c.negated}`),
+  return isConditionsSuperset(
+    a,
+    b,
+    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
   );
-  for (const c of b) {
-    const key = `${c.subtype}|${c.condition}|${c.negated}`;
-    if (!aKeys.has(key)) return false;
-  }
-  return true;
 }
 
-/**
- * Check if container conditions A is a superset of B
- */
 function isContainerConditionsSuperset(
   a: ParsedContainerCondition[],
   b: ParsedContainerCondition[],
 ): boolean {
-  const aKeys = new Set(
-    a.map((c) => `${c.name ?? ''}|${c.condition}|${c.negated}`),
+  return isConditionsSuperset(
+    a,
+    b,
+    (c) => `${c.name ?? ''}|${c.condition}|${c.negated}`,
   );
-  for (const c of b) {
-    const key = `${c.name ?? ''}|${c.condition}|${c.negated}`;
-    if (!aKeys.has(key)) return false;
-  }
-  return true;
 }
 
-/**
- * Check if supports conditions A is a superset of B
- */
 function isSupportsConditionsSuperset(
   a: ParsedSupportsCondition[],
   b: ParsedSupportsCondition[],
 ): boolean {
-  const aKeys = new Set(
-    a.map((c) => `${c.subtype}|${c.condition}|${c.negated}`),
+  return isConditionsSuperset(
+    a,
+    b,
+    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
   );
-  for (const c of b) {
-    const key = `${c.subtype}|${c.condition}|${c.negated}`;
-    if (!aKeys.has(key)) return false;
-  }
-  return true;
 }
 
-/**
- * Check if modifier conditions A is a superset of B
- */
 function isModifierConditionsSuperset(
   a: ParsedModifierCondition[],
   b: ParsedModifierCondition[],
 ): boolean {
-  const aKeys = new Set(a.map(getModifierKey));
-  for (const c of b) {
-    if (!aKeys.has(getModifierKey(c))) return false;
-  }
-  return true;
+  return isConditionsSuperset(a, b, getModifierKey);
 }
 
-/**
- * Check if pseudo conditions A is a superset of B
- */
 function isPseudoConditionsSuperset(
   a: ParsedPseudoCondition[],
   b: ParsedPseudoCondition[],
 ): boolean {
-  const aKeys = new Set(a.map(getPseudoKey));
-  for (const c of b) {
-    if (!aKeys.has(getPseudoKey(c))) return false;
-  }
-  return true;
+  return isConditionsSuperset(a, b, getPseudoKey);
 }
 
-/**
- * Check if selector conditions A is a superset of B.
- * Shared by root and own conditions.
- */
 function isSelectorConditionsSuperset(
   a: ParsedSelectorCondition[],
   b: ParsedSelectorCondition[],
 ): boolean {
-  const aKeys = new Set(a.map(getSelectorConditionKey));
-  for (const c of b) {
-    if (!aKeys.has(getSelectorConditionKey(c))) return false;
-  }
-  return true;
+  return isConditionsSuperset(a, b, getSelectorConditionKey);
 }
 
 /**
@@ -1417,11 +1387,7 @@ function isSelectorConditionsSuperset(
  */
 function isParentGroupsSuperset(a: ParentGroup[], b: ParentGroup[]): boolean {
   if (a.length < b.length) return false;
-  const aKeys = new Set(a.map(getParentGroupKey));
-  for (const g of b) {
-    if (!aKeys.has(getParentGroupKey(g))) return false;
-  }
-  return true;
+  return isConditionsSuperset(a, b, getParentGroupKey);
 }
 
 function getParentGroupKey(g: ParentGroup): string {
@@ -1459,7 +1425,11 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
     v.supportsConditions.length +
     v.rootConditions.length +
     v.parentGroups.reduce((sum, g) => sum + g.conditions.length, 0);
-  result.sort((a, b) => variantConditionCount(a) - variantConditionCount(b));
+  result.sort((a, b) => {
+    const countDiff = variantConditionCount(a) - variantConditionCount(b);
+    if (countDiff !== 0) return countDiff;
+    return getVariantKey(a).localeCompare(getVariantKey(b));
+  });
 
   // Remove variants that are supersets of earlier (less restrictive) variants
   const filtered: SelectorVariant[] = [];

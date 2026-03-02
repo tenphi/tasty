@@ -1,4 +1,4 @@
-export function alignStyle({ align }) {
+export function alignStyle({ align }: { align?: string }) {
   if (typeof align !== 'string') return;
 
   if (!align) return;

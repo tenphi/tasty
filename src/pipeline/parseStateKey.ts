@@ -16,6 +16,7 @@ import {
 import { camelToKebab } from '../utils/case-converter';
 
 import type { ConditionNode, NumericBound } from './conditions';
+import { emitWarning } from './warnings';
 import {
   and,
   createContainerDimensionCondition,
@@ -35,6 +36,17 @@ import {
   or,
   trueCondition,
 } from './conditions';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum XOR operands before emitting a performance warning.
+ * A ^ B ^ C ^ D = 8 OR branches (2^(n-1)), so chains above 4
+ * risk exponential blowup in downstream processing.
+ */
+const MAX_XOR_CHAIN_LENGTH = 4;
 
 // ============================================================================
 // Types
@@ -229,10 +241,21 @@ class Parser {
 
   private parseXor(): ConditionNode {
     let left = this.parseUnary();
+    let operandCount = 1;
 
     while (this.current()?.type === 'XOR') {
       this.advance();
       const right = this.parseUnary();
+      operandCount++;
+
+      if (operandCount > MAX_XOR_CHAIN_LENGTH) {
+        emitWarning(
+          'XOR_CHAIN_TOO_LONG',
+          `XOR chain with ${operandCount} operands produces ${Math.pow(2, operandCount - 1)} OR branches. ` +
+            `Consider breaking into smaller expressions to avoid exponential growth.`,
+        );
+      }
+
       // XOR: (A & !B) | (!A & B)
       left = or(and(left, not(right)), and(not(left), right));
     }

@@ -1,5 +1,5 @@
 // Deprecated: left as an example
-export function boxShadowCombinator(styles) {
+export function boxShadowCombinator(styles: Record<string, unknown>) {
   const values = boxShadowCombinator.__lookupStyles.reduce(
     (list: string[], style) => {
       const value = styles[style];

@@ -52,6 +52,7 @@ import {
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
+import { emitWarning } from './warnings';
 
 // ============================================================================
 // Types (compatible with old renderStyles API)
@@ -92,6 +93,7 @@ interface ComputedRule {
 // ============================================================================
 
 const pipelineCache = new Lru<string, CSSRule[]>(5000);
+const transformPatternCache = new Lru<string, string>(1000);
 
 // ============================================================================
 // Main Pipeline Function
@@ -410,8 +412,8 @@ function getAllSelectors(key: string, styles?: Styles): string[] | null {
     if (affix !== undefined) {
       const result = processAffix(String(affix), key);
       if (!result.valid) {
-        console.warn(`[Tasty] ${result.reason}`);
-        return null; // Skip this sub-element entirely
+        emitWarning('INVALID_SELECTOR_AFFIX', result.reason);
+        return null;
       }
       return result.selectors;
     }
@@ -673,143 +675,125 @@ function processSinglePattern(pattern: string, key: string): string {
  * // → 'button.primary:hover'
  */
 function transformPattern(pattern: string): string {
-  let result = '';
+  const cached = transformPatternCache.get(pattern);
+  if (cached !== undefined) return cached;
+
+  const result = transformPatternInner(pattern);
+  transformPatternCache.set(pattern, result);
+  return result;
+}
+
+function transformPatternInner(pattern: string): string {
+  const parts: string[] = [];
   let i = 0;
+
+  const lastChar = (): string => {
+    if (parts.length === 0) return '';
+    const last = parts[parts.length - 1];
+    return last[last.length - 1] || '';
+  };
+
+  const ensureSpace = (): void => {
+    if (parts.length > 0 && lastChar() !== ' ') {
+      parts.push(' ');
+    }
+  };
 
   while (i < pattern.length) {
     const char = pattern[i];
 
-    // Skip whitespace
     if (/\s/.test(char)) {
       i++;
       continue;
     }
 
-    // Combinator: > + ~
     if (/[>+~]/.test(char)) {
-      // Add combinator with surrounding spaces
-      if (result && !result.endsWith(' ')) {
-        result += ' ';
-      }
-      result += char;
+      ensureSpace();
+      parts.push(char);
       i++;
       continue;
     }
 
-    // Uppercase element name
     if (/[A-Z]/.test(char)) {
-      // Read the full element name
-      let name = '';
+      const nameStart = i;
       while (i < pattern.length && /[a-zA-Z0-9]/.test(pattern[i])) {
-        name += pattern[i];
         i++;
       }
-      // Add with proper spacing
-      if (result && !result.endsWith(' ')) {
-        result += ' ';
-      }
-      result += `[data-element="${name}"]`;
+      ensureSpace();
+      parts.push(`[data-element="${pattern.slice(nameStart, i)}"]`);
       continue;
     }
 
-    // @ placeholder
     if (char === '@') {
-      if (result && !result.endsWith(' ')) {
-        result += ' ';
-      }
-      result += '@';
+      ensureSpace();
+      parts.push('@');
       i++;
-      // Don't add space after @ - let the next token attach if it's a class/pseudo
       continue;
     }
 
-    // Pseudo-element/class (::before, :hover)
     if (char === ':') {
-      // Don't add space before pseudo if attached to previous element
-      let pseudo = '';
+      const pseudoStart = i;
       while (
         i < pattern.length &&
         !/[\s>+~,@]/.test(pattern[i]) &&
         !/[A-Z]/.test(pattern[i])
       ) {
-        pseudo += pattern[i];
         i++;
       }
-      result += pseudo;
+      parts.push(pattern.slice(pseudoStart, i));
       continue;
     }
 
-    // Lowercase HTML tag name (a, div, button, my-component)
     if (/[a-z]/.test(char)) {
-      let tag = '';
+      const tagStart = i;
       while (i < pattern.length && /[a-z0-9-]/.test(pattern[i])) {
-        tag += pattern[i];
         i++;
       }
-      // Add with proper spacing
-      if (result && !result.endsWith(' ')) {
-        result += ' ';
-      }
-      result += tag;
+      ensureSpace();
+      parts.push(pattern.slice(tagStart, i));
       continue;
     }
 
-    // Class (.active, .myClass, .navItem)
     if (char === '.') {
-      // Keep attached if directly after ] (element), @ (placeholder), or alphanumeric (tag)
-      // Otherwise add space (standalone class selector)
-      const lastNonSpace = result.replace(/\s+$/, '').slice(-1);
+      const lc = lastChar();
       const attachToLast =
-        lastNonSpace === ']' ||
-        lastNonSpace === '@' ||
-        /[a-zA-Z0-9-]/.test(lastNonSpace);
-      if (result && !attachToLast && !result.endsWith(' ')) {
-        result += ' ';
+        lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
+      if (parts.length > 0 && !attachToLast && lc !== ' ') {
+        parts.push(' ');
       }
-      // Start with the dot
-      let cls = '.';
+      const clsStart = i;
       i++;
-      // Class names can contain uppercase letters (camelCase, BEM, etc.)
-      // Stop at: whitespace, combinators, comma, @, or new token starters (. : [)
       while (i < pattern.length && /[a-zA-Z0-9_-]/.test(pattern[i])) {
-        cls += pattern[i];
         i++;
       }
-      result += cls;
+      parts.push(pattern.slice(clsStart, i));
       continue;
     }
 
-    // Attribute selector [...]
     if (char === '[') {
-      // Keep attached if directly after ] (element), @ (placeholder), or alphanumeric (tag)
-      // Otherwise add space (standalone attribute selector)
-      const lastNonSpace = result.replace(/\s+$/, '').slice(-1);
+      const lc = lastChar();
       const attachToLast =
-        lastNonSpace === ']' ||
-        lastNonSpace === '@' ||
-        /[a-zA-Z0-9-]/.test(lastNonSpace);
-      if (result && !attachToLast && !result.endsWith(' ')) {
-        result += ' ';
+        lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
+      if (parts.length > 0 && !attachToLast && lc !== ' ') {
+        parts.push(' ');
       }
-      let attr = '';
+      const attrStart = i;
       let depth = 0;
       while (i < pattern.length) {
-        attr += pattern[i];
         if (pattern[i] === '[') depth++;
         if (pattern[i] === ']') depth--;
         i++;
         if (depth === 0) break;
       }
-      result += attr;
+      parts.push(pattern.slice(attrStart, i));
       continue;
     }
 
-    // Other characters - just append
-    result += char;
+    parts.push(char);
     i++;
   }
 
-  return result;
+  return parts.join('');
 }
 
 /**
@@ -1263,3 +1247,9 @@ export { simplifyCondition } from './simplify';
 export { buildExclusiveConditions } from './exclusive';
 export { conditionToCSS } from './materialize';
 export type { CSSRule } from './materialize';
+export { setWarningHandler, emitWarning } from './warnings';
+export type {
+  TastyWarning,
+  TastyWarningCode,
+  TastyWarningHandler,
+} from './warnings';

@@ -38,7 +38,7 @@ function processGroup(group: GroupData): {
   const { values, mods, colors } = group;
 
   const directions = filterMods(mods, DIRECTIONS) as Direction[];
-  const typeMods = filterMods(mods, BORDER_STYLES);
+  const typeMods = filterMods(mods, BORDER_STYLES as unknown as string[]);
 
   const width = values[0] || 'var(--border-width)';
   const style = typeMods[0] || 'solid';
@@ -70,7 +70,7 @@ function formatBorderValue(value: BorderValue): string {
  *
  * Later groups override earlier groups for conflicting directions.
  */
-export function borderStyle({ border }) {
+export function borderStyle({ border }: { border?: string | number | boolean }) {
   if (!border && border !== 0) return;
 
   if (border === true) border = '1bw';

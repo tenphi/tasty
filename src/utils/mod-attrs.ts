@@ -37,7 +37,7 @@ function modAttrs(map: AllBaseProps['mods']): Record<string, string> | null {
         }
 
         return attrs;
-      }, {})
+      }, {} as Record<string, string>)
     : null;
 }
 

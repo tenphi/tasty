@@ -254,31 +254,11 @@ function simplifyOr(children: ConditionNode[]): ConditionNode {
 // ============================================================================
 
 /**
- * Check if any term contradicts another (A & !A)
+ * Check if any pair of terms has complementary negation (A and !A).
+ * Used for both contradiction detection (in AND) and tautology detection (in OR),
+ * since the underlying check is identical: the context determines the semantics.
  */
-function hasContradiction(terms: ConditionNode[]): boolean {
-  const uniqueIds = new Set<string>();
-
-  for (const term of terms) {
-    if (term.kind !== 'state') continue;
-
-    const id = term.uniqueId;
-    // Check if negation exists
-    const negatedId = term.negated ? id.slice(1) : `!${id}`;
-
-    if (uniqueIds.has(negatedId)) {
-      return true;
-    }
-    uniqueIds.add(id);
-  }
-
-  return false;
-}
-
-/**
- * Check for tautologies (A | !A)
- */
-function hasTautology(terms: ConditionNode[]): boolean {
+function hasComplementaryPair(terms: ConditionNode[]): boolean {
   const uniqueIds = new Set<string>();
 
   for (const term of terms) {
@@ -295,6 +275,9 @@ function hasTautology(terms: ConditionNode[]): boolean {
 
   return false;
 }
+
+const hasContradiction = hasComplementaryPair;
+const hasTautology = hasComplementaryPair;
 
 // ============================================================================
 // Range Contradiction Detection
@@ -881,9 +864,13 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
   return result;
 }
 
-function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
-  if (conditions.length === 0) return null;
-
+/**
+ * Tighten bounds by picking the most restrictive lower and upper bounds
+ * from a set of conditions that have lowerBound/upperBound fields.
+ */
+function tightenBounds(
+  conditions: { lowerBound?: NumericBound; upperBound?: NumericBound }[],
+): { lowerBound?: NumericBound; upperBound?: NumericBound } {
   let lowerBound: NumericBound | undefined;
   let upperBound: NumericBound | undefined;
 
@@ -908,23 +895,14 @@ function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
     }
   }
 
-  const base = conditions[0];
+  return { lowerBound, upperBound };
+}
 
-  // Build a merged condition
-  const merged: MediaCondition = {
-    kind: 'state',
-    type: 'media',
-    subtype: 'dimension',
-    negated: false,
-    raw: buildMergedRaw(base.dimension || 'width', lowerBound, upperBound),
-    uniqueId: '', // Will be recalculated
-    dimension: base.dimension,
-    lowerBound,
-    upperBound,
-  };
-
-  // Recalculate uniqueId
-  const parts = ['media', 'dim', merged.dimension];
+function appendBoundsToUniqueId(
+  parts: (string | undefined)[],
+  lowerBound?: NumericBound,
+  upperBound?: NumericBound,
+): void {
   if (lowerBound) {
     parts.push(lowerBound.inclusive ? '>=' : '>');
     parts.push(lowerBound.value);
@@ -933,6 +911,28 @@ function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
     parts.push(upperBound.inclusive ? '<=' : '<');
     parts.push(upperBound.value);
   }
+}
+
+function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
+  if (conditions.length === 0) return null;
+
+  const { lowerBound, upperBound } = tightenBounds(conditions);
+  const base = conditions[0];
+
+  const merged: MediaCondition = {
+    kind: 'state',
+    type: 'media',
+    subtype: 'dimension',
+    negated: false,
+    raw: buildMergedRaw(base.dimension || 'width', lowerBound, upperBound),
+    uniqueId: '',
+    dimension: base.dimension,
+    lowerBound,
+    upperBound,
+  };
+
+  const parts: (string | undefined)[] = ['media', 'dim', merged.dimension];
+  appendBoundsToUniqueId(parts, lowerBound, upperBound);
   merged.uniqueId = parts.join(':');
 
   return merged;
@@ -943,30 +943,7 @@ function mergeContainerRanges(
 ): ContainerCondition | null {
   if (conditions.length === 0) return null;
 
-  let lowerBound: NumericBound | undefined;
-  let upperBound: NumericBound | undefined;
-
-  for (const cond of conditions) {
-    if (cond.lowerBound) {
-      if (
-        !lowerBound ||
-        (cond.lowerBound.valueNumeric ?? -Infinity) >
-          (lowerBound.valueNumeric ?? -Infinity)
-      ) {
-        lowerBound = cond.lowerBound;
-      }
-    }
-    if (cond.upperBound) {
-      if (
-        !upperBound ||
-        (cond.upperBound.valueNumeric ?? Infinity) <
-          (upperBound.valueNumeric ?? Infinity)
-      ) {
-        upperBound = cond.upperBound;
-      }
-    }
-  }
-
+  const { lowerBound, upperBound } = tightenBounds(conditions);
   const base = conditions[0];
 
   const merged: ContainerCondition = {
@@ -975,24 +952,21 @@ function mergeContainerRanges(
     subtype: 'dimension',
     negated: false,
     raw: buildMergedRaw(base.dimension || 'width', lowerBound, upperBound),
-    uniqueId: '', // Will be recalculated
+    uniqueId: '',
     containerName: base.containerName,
     dimension: base.dimension,
     lowerBound,
     upperBound,
   };
 
-  // Recalculate uniqueId
   const name = merged.containerName || '_';
-  const parts = ['container', 'dim', name, merged.dimension];
-  if (lowerBound) {
-    parts.push(lowerBound.inclusive ? '>=' : '>');
-    parts.push(lowerBound.value);
-  }
-  if (upperBound) {
-    parts.push(upperBound.inclusive ? '<=' : '<');
-    parts.push(upperBound.value);
-  }
+  const parts: (string | undefined)[] = [
+    'container',
+    'dim',
+    name,
+    merged.dimension,
+  ];
+  appendBoundsToUniqueId(parts, lowerBound, upperBound);
   merged.uniqueId = parts.join(':');
 
   return merged;
@@ -1034,10 +1008,16 @@ function sortTerms(terms: ConditionNode[]): ConditionNode[] {
 // ============================================================================
 
 /**
- * Apply absorption law for AND: A & (A | B) → A
+ * Apply the absorption law: removes compound terms that are absorbed by
+ * a simple term already present.
+ *
+ * For AND context: A & (A | B) → A  (absorbs OR compounds)
+ * For OR  context: A | (A & B) → A  (absorbs AND compounds)
  */
-function applyAbsorptionAnd(terms: ConditionNode[]): ConditionNode[] {
-  // Collect all unique IDs of simple terms
+function applyAbsorption(
+  terms: ConditionNode[],
+  absorbedOperator: 'OR' | 'AND',
+): ConditionNode[] {
   const simpleIds = new Set<string>();
   for (const term of terms) {
     if (term.kind !== 'compound') {
@@ -1045,13 +1025,11 @@ function applyAbsorptionAnd(terms: ConditionNode[]): ConditionNode[] {
     }
   }
 
-  // Filter out OR terms that are absorbed
   return terms.filter((term) => {
-    if (term.kind === 'compound' && term.operator === 'OR') {
-      // If any child of this OR is in simpleIds, absorb the whole OR
+    if (term.kind === 'compound' && term.operator === absorbedOperator) {
       for (const child of term.children) {
         if (simpleIds.has(getConditionUniqueId(child))) {
-          return false; // Absorb
+          return false;
         }
       }
     }
@@ -1059,28 +1037,10 @@ function applyAbsorptionAnd(terms: ConditionNode[]): ConditionNode[] {
   });
 }
 
-/**
- * Apply absorption law for OR: A | (A & B) → A
- */
-function applyAbsorptionOr(terms: ConditionNode[]): ConditionNode[] {
-  // Collect all unique IDs of simple terms
-  const simpleIds = new Set<string>();
-  for (const term of terms) {
-    if (term.kind !== 'compound') {
-      simpleIds.add(getConditionUniqueId(term));
-    }
-  }
+function applyAbsorptionAnd(terms: ConditionNode[]): ConditionNode[] {
+  return applyAbsorption(terms, 'OR');
+}
 
-  // Filter out AND terms that are absorbed
-  return terms.filter((term) => {
-    if (term.kind === 'compound' && term.operator === 'AND') {
-      // If any child of this AND is in simpleIds, absorb the whole AND
-      for (const child of term.children) {
-        if (simpleIds.has(getConditionUniqueId(child))) {
-          return false; // Absorb
-        }
-      }
-    }
-    return true;
-  });
+function applyAbsorptionOr(terms: ConditionNode[]): ConditionNode[] {
+  return applyAbsorption(terms, 'AND');
 }

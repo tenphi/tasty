@@ -20,7 +20,15 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
   const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
   const { mods, colors, values } = processed.groups[0] ?? makeEmptyDetails();
-  const style = {};
+  type NestedStyle = Record<string, string>;
+  type ScrollbarStyleMap = Record<string, string | NestedStyle>;
+  const style: ScrollbarStyleMap = {};
+
+  function getNested(key: string): NestedStyle {
+    const v = style[key];
+    if (v && typeof v === 'object') return v;
+    return {};
+  }
 
   // Default colors for scrollbar
   const defaultThumbColor = 'var(--scrollbar-thumb-color)';
@@ -63,7 +71,7 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
   // Custom size setup for WebKit
   if (sizeValue) {
     style['&::-webkit-scrollbar'] = {
-      ...(style['&::-webkit-scrollbar'] || {}),
+      ...getNested('&::-webkit-scrollbar'),
       width: sizeValue,
       height: sizeValue,
     };
@@ -81,23 +89,22 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
     style['scrollbar-color'] = `${thumbColor} ${trackColor}`;
 
     // WebKit - always set these for consistency
-    if (!style['&::-webkit-scrollbar']) {
-      style['&::-webkit-scrollbar'] = {};
-    }
-    style['&::-webkit-scrollbar']['background'] = trackColor;
+    const webkitScrollbar = getNested('&::-webkit-scrollbar');
+    webkitScrollbar['background'] = trackColor;
+    style['&::-webkit-scrollbar'] = webkitScrollbar;
 
     style['&::-webkit-scrollbar-track'] = {
-      ...(style['&::-webkit-scrollbar-track'] || {}),
+      ...getNested('&::-webkit-scrollbar-track'),
       background: trackColor,
     };
 
     style['&::-webkit-scrollbar-thumb'] = {
-      ...(style['&::-webkit-scrollbar-thumb'] || {}),
+      ...getNested('&::-webkit-scrollbar-thumb'),
       background: thumbColor,
     };
 
     style['&::-webkit-scrollbar-corner'] = {
-      ...(style['&::-webkit-scrollbar-corner'] || {}),
+      ...getNested('&::-webkit-scrollbar-corner'),
       background: cornerColor,
     };
   }
@@ -113,10 +120,9 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
     }
 
     // Ensure scrollbars appear in WebKit even with little content
-    if (!style['&::-webkit-scrollbar']) {
-      style['&::-webkit-scrollbar'] = {};
-    }
-    style['&::-webkit-scrollbar']['display'] = 'block';
+    const alwaysScrollbar = getNested('&::-webkit-scrollbar');
+    alwaysScrollbar['display'] = 'block';
+    style['&::-webkit-scrollbar'] = alwaysScrollbar;
   }
 
   // Enhanced 'styled' mode with better transitions and appearance
@@ -141,7 +147,7 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
       height: sizeValue,
       transition: baseTransition,
       background: defaultTrackColor,
-      ...(style['&::-webkit-scrollbar'] || {}),
+      ...getNested('&::-webkit-scrollbar'),
     };
 
     style['&::-webkit-scrollbar-thumb'] = {
@@ -149,19 +155,19 @@ export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
       'min-height': '24px',
       transition: baseTransition,
       background: defaultThumbColor,
-      ...(style['&::-webkit-scrollbar-thumb'] || {}),
+      ...getNested('&::-webkit-scrollbar-thumb'),
     };
 
     style['&::-webkit-scrollbar-track'] = {
       background: defaultTrackColor,
       transition: baseTransition,
-      ...(style['&::-webkit-scrollbar-track'] || {}),
+      ...getNested('&::-webkit-scrollbar-track'),
     };
 
     style['&::-webkit-scrollbar-corner'] = {
       background: defaultTrackColor,
       transition: baseTransition,
-      ...(style['&::-webkit-scrollbar-corner'] || {}),
+      ...getNested('&::-webkit-scrollbar-corner'),
     };
   }
 

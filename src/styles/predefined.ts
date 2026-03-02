@@ -32,21 +32,21 @@ import { widthStyle } from './width';
 
 const devMode = isDevEnv();
 
-const _numberConverter = (val) => {
+const _numberConverter = (val: string | number | boolean | undefined) => {
   if (typeof val === 'number') {
     return `${val}px`;
   }
 
   return val;
 };
-const columnsConverter = (val) => {
+const columnsConverter = (val: string | number | boolean | undefined) => {
   if (typeof val === 'number') {
     return 'minmax(1px, 1fr) '.repeat(val).trim();
   }
 
   return;
 };
-const rowsConverter = (val) => {
+const rowsConverter = (val: string | number | boolean | undefined) => {
   if (typeof val === 'number') {
     return 'auto '.repeat(val).trim();
   }
@@ -145,7 +145,7 @@ export function predefine() {
   defineStyleAlias('gridAreas', 'grid-template-areas');
   defineStyleAlias('gridColumns', 'grid-template-columns', columnsConverter);
   defineStyleAlias('gridRows', 'grid-template-rows', rowsConverter);
-  defineStyleAlias('gridTemplate', 'grid-template', (val) => {
+  defineStyleAlias('gridTemplate', 'grid-template', (val: string | boolean | number | undefined) => {
     if (typeof val !== 'string') return;
 
     return val

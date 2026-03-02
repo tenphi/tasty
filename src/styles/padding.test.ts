@@ -293,11 +293,11 @@ describe('paddingStyle', () => {
     });
 
     it('directional groups without base', () => {
-      expect(
-        paddingStyle({ padding: '2x left right, 1x top bottom' }),
-      ).toEqual({
-        padding: '8px 16px',
-      });
+      expect(paddingStyle({ padding: '2x left right, 1x top bottom' })).toEqual(
+        {
+          padding: '8px 16px',
+        },
+      );
     });
 
     it('later groups override earlier groups for same direction', () => {
@@ -315,11 +315,11 @@ describe('paddingStyle', () => {
     });
 
     it('multi-group with individual direction override', () => {
-      expect(
-        paddingStyle({ padding: '1x, 2x top', paddingTop: '4x' }),
-      ).toEqual({
-        padding: '32px 8px 8px 8px',
-      });
+      expect(paddingStyle({ padding: '1x, 2x top', paddingTop: '4x' })).toEqual(
+        {
+          padding: '32px 8px 8px 8px',
+        },
+      );
     });
 
     it('all sides same after multi-group resolves to single value', () => {

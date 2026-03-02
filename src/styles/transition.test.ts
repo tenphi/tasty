@@ -22,10 +22,9 @@ describe('transitionStyle', () => {
     it('handles semantic name with duration and easing', () => {
       const result = transitionStyle({ transition: 'fade 0.15s ease-in' });
       expect(result).toEqual({
-        transition: [
-          'mask 0.15s ease-in',
-          'mask-composite 0.15s ease-in',
-        ].join(', '),
+        transition: ['mask 0.15s ease-in', 'mask-composite 0.15s ease-in'].join(
+          ', ',
+        ),
       });
     });
 
@@ -66,8 +65,7 @@ describe('transitionStyle', () => {
     it('handles ease without duration', () => {
       const result = transitionStyle({ transition: 'color ease' });
       expect(result).toEqual({
-        transition:
-          'color var(--color-transition, var(--transition)) ease',
+        transition: 'color var(--color-transition, var(--transition)) ease',
       });
     });
 

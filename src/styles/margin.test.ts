@@ -321,11 +321,11 @@ describe('marginStyle', () => {
     });
 
     it('directional groups: auto left/right, value top/bottom', () => {
-      expect(
-        marginStyle({ margin: 'auto left right, 1x top bottom' }),
-      ).toEqual({
-        margin: '8px auto',
-      });
+      expect(marginStyle({ margin: 'auto left right, 1x top bottom' })).toEqual(
+        {
+          margin: '8px auto',
+        },
+      );
     });
 
     it('later groups override earlier groups for same direction', () => {
@@ -343,9 +343,7 @@ describe('marginStyle', () => {
     });
 
     it('multi-group with individual direction override', () => {
-      expect(
-        marginStyle({ margin: '1x, 2x top', marginTop: '4x' }),
-      ).toEqual({
+      expect(marginStyle({ margin: '1x, 2x top', marginTop: '4x' })).toEqual({
         margin: '32px 8px 8px 8px',
       });
     });

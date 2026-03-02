@@ -1,3 +1,9 @@
+import type { CSSProperties as ReactCSSProperties } from 'react';
+
+declare module './utils/css-types' {
+  interface CSSProperties extends ReactCSSProperties {}
+}
+
 // Framework-agnostic core
 export * from './core';
 

@@ -1,3 +1,3 @@
 import type { Properties } from 'csstype';
 
-export type CSSProperties = Properties<string | number>;
+export interface CSSProperties extends Properties<string | number> {}

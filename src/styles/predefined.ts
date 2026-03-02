@@ -145,14 +145,18 @@ export function predefine() {
   defineStyleAlias('gridAreas', 'grid-template-areas');
   defineStyleAlias('gridColumns', 'grid-template-columns', columnsConverter);
   defineStyleAlias('gridRows', 'grid-template-rows', rowsConverter);
-  defineStyleAlias('gridTemplate', 'grid-template', (val: string | boolean | number | undefined) => {
-    if (typeof val !== 'string') return;
+  defineStyleAlias(
+    'gridTemplate',
+    'grid-template',
+    (val: string | boolean | number | undefined) => {
+      if (typeof val !== 'string') return;
 
-    return val
-      .split('/')
-      .map((s, i) => (i ? columnsConverter : rowsConverter)(s))
-      .join('/');
-  });
+      return val
+        .split('/')
+        .map((s, i) => (i ? columnsConverter : rowsConverter)(s))
+        .join('/');
+    },
+  );
   // Note: outlineOffset is now handled by outlineStyle
 
   [

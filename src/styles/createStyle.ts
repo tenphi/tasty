@@ -6,7 +6,12 @@ import {
   parseStyle,
   strToRgb,
 } from '../utils/styles';
-import type { CSSMap, StyleHandler, StyleValue, StyleValueStateMap } from '../utils/styles';
+import type {
+  CSSMap,
+  StyleHandler,
+  StyleValue,
+  StyleValueStateMap,
+} from '../utils/styles';
 
 const CACHE: Record<string, StyleHandler> = {};
 

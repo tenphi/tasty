@@ -756,8 +756,7 @@ function transformPatternInner(pattern: string): string {
 
     if (char === '.') {
       const lc = lastChar();
-      const attachToLast =
-        lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
+      const attachToLast = lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
       if (parts.length > 0 && !attachToLast && lc !== ' ') {
         parts.push(' ');
       }
@@ -772,8 +771,7 @@ function transformPatternInner(pattern: string): string {
 
     if (char === '[') {
       const lc = lastChar();
-      const attachToLast =
-        lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
+      const attachToLast = lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
       if (parts.length > 0 && !attachToLast && lc !== ' ') {
         parts.push(' ');
       }

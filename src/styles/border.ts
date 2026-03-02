@@ -70,7 +70,11 @@ function formatBorderValue(value: BorderValue): string {
  *
  * Later groups override earlier groups for conflicting directions.
  */
-export function borderStyle({ border }: { border?: string | number | boolean }) {
+export function borderStyle({
+  border,
+}: {
+  border?: string | number | boolean;
+}) {
   if (!border && border !== 0) return;
 
   if (border === true) border = '1bw';

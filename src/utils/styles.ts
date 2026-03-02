@@ -415,7 +415,10 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   };
 }
 
-export function strToRgb(color: string, _ignoreAlpha = false): string | null | undefined {
+export function strToRgb(
+  color: string,
+  _ignoreAlpha = false,
+): string | null | undefined {
   if (!color) return undefined;
 
   if (color.startsWith('rgb')) return color;
@@ -468,14 +471,17 @@ export function hexToRgb(hex: string): string | null {
   const matched = hex
     .replace(
       /^#?([a-f\d])([a-f\d])([a-f\d])$/i,
-      (_m: string, r: string, g: string, b: string) => '#' + r + r + g + g + b + b,
+      (_m: string, r: string, g: string, b: string) =>
+        '#' + r + r + g + g + b + b,
     )
     .substring(1)
     .match(/.{2}/g);
 
   if (!matched) return null;
 
-  const rgba = matched.map((x: string, i: number) => parseInt(x, 16) * (i === 3 ? 1 / 255 : 1));
+  const rgba = matched.map(
+    (x: string, i: number) => parseInt(x, 16) * (i === 3 ? 1 / 255 : 1),
+  );
 
   if (rgba.some((v) => Number.isNaN(v))) {
     return null;
@@ -969,7 +975,10 @@ export function styleStateMapToStyleStateDataList(
   return { states: stateDataList, mods: allMods, hasAdvancedStates };
 }
 
-export const COMPUTE_FUNC_MAP: Record<string, (a: unknown, b?: unknown) => unknown> = {
+export const COMPUTE_FUNC_MAP: Record<
+  string,
+  (a: unknown, b?: unknown) => unknown
+> = {
   '!': (a: unknown) => !a,
   '^': (a: unknown, b?: unknown) => (a && !b) || (!a && b),
   '|': (a: unknown, b?: unknown) => a || b,

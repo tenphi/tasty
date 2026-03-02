@@ -1,7 +1,11 @@
 /**
  * @deprecated `styledScrollbar` is deprecated. Use `scrollbar` instead.
  */
-export function styledScrollbarStyle({ styledScrollbar: val }: { styledScrollbar?: string | boolean | null }) {
+export function styledScrollbarStyle({
+  styledScrollbar: val,
+}: {
+  styledScrollbar?: string | boolean | null;
+}) {
   if (val == null) return null;
 
   if (!val) {

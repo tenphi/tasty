@@ -4,7 +4,11 @@ import { DIRECTIONS, parseStyle } from '../utils/styles';
 const PROP = 'var(--radius)';
 const SHARP = 'var(--sharp-radius)';
 
-export function radiusStyle({ radius }: { radius?: string | number | boolean }) {
+export function radiusStyle({
+  radius,
+}: {
+  radius?: string | number | boolean;
+}) {
   if (typeof radius === 'number') {
     radius = `${radius}px`;
   }

@@ -658,9 +658,7 @@ describe('XOR parsing and simplification', () => {
 
     clearParseCache();
     parseStateKey('a ^ b ^ c ^ d ^ e');
-    expect(
-      warnings.some((w) => w.code === 'XOR_CHAIN_TOO_LONG'),
-    ).toBe(true);
+    expect(warnings.some((w) => w.code === 'XOR_CHAIN_TOO_LONG')).toBe(true);
 
     restore();
   });

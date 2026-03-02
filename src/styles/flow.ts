@@ -1,4 +1,10 @@
-export function flowStyle({ display = 'block', flow }: { display?: string; flow?: string }) {
+export function flowStyle({
+  display = 'block',
+  flow,
+}: {
+  display?: string;
+  flow?: string;
+}) {
   let style;
 
   if (display.includes('grid')) {

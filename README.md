@@ -462,6 +462,10 @@ const tokens = theme.tasty(); // Ready-to-use Tasty tokens
 
 Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Highlights color tokens, custom units, state keys, presets, and style properties inside `tasty()`, `tastyStatic()`, and related APIs.
 
+<p align="center">
+  <img src="assets/tasty-vscode-highlight.png" width="512" alt="Tasty VS Code syntax highlighting example">
+</p>
+
 ### [Cube UI Kit](https://github.com/cube-js/cube-ui-kit)
 
 Open-source React UI kit built on Tasty + React Aria. 100+ production components proving Tasty works at design-system scale. A reference implementation and a ready-to-use component library.

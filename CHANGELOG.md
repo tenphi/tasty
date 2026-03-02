@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.5.2
+
+### Patch Changes
+
+- [#14](https://github.com/tenphi/tasty/pull/14) [`d761080`](https://github.com/tenphi/tasty/commit/d7610807ac56b13052b92fc2f1fb427180d924a1) Thanks [@tenphi](https://github.com/tenphi)! - Extract style properties reference into dedicated docs/styles.md with comprehensive coverage of all custom-handled props, values, modifiers, and recommendations.
+
 ## 0.5.1
 
 ### Patch Changes

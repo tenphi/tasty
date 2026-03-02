@@ -17,9 +17,9 @@
 
 ---
 
-Most CSS-in-JS libraries generate CSS. Tasty generates **mutually exclusive CSS** — for any combination of states, exactly one rule matches per property. No cascade conflicts, no specificity wars, no `!important` hacks. Components compose and extend without breaking each other. That's the foundation everything else is built on.
+Most CSS-in-JS libraries emit rules that compete through cascade and specificity. Tasty emits **mutually exclusive CSS selectors** — for any component state combination, exactly one selector matches each property at a time. No cascade conflicts, no specificity wars, no `!important` escapes. Components compose and extend without breaking each other.
 
-On top of that foundation, Tasty gives you a concise, CSS-like DSL with design tokens, custom units, responsive states, container queries, dark mode, sub-element styling, and zero-runtime extraction — all in one coherent system that scales from a single component to an enterprise design system.
+That guarantee unlocks a concise, CSS-like DSL where design tokens, custom units, responsive states, container queries, sub-element styling, and theming all compose without surprises — one coherent system that scales from a single component to an enterprise design system.
 
 ## Why Tasty
 

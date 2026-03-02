@@ -419,11 +419,12 @@ If you choose the runtime approach, performance is usually a non-issue in practi
 
 | Import | Description | Platform |
 |--------|-------------|----------|
-| `@tenphi/tasty` | Runtime style engine | Browser |
-| `@tenphi/tasty/static` | Zero-runtime static styles | Browser |
-| `@tenphi/tasty/babel-plugin` | Babel plugin for CSS extraction | Node |
+| `@tenphi/tasty` | Runtime style engine (`tasty`, hooks, `configure`) | Browser |
+| `@tenphi/tasty/static` | Zero-runtime static styles (`tastyStatic`) | Browser |
+| `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
+| `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration | Node |
+| `@tenphi/tasty/next` | Next.js integration wrapper | Node |
 
 ## Ecosystem
 

@@ -462,7 +462,8 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ## Documentation
 
-- **[Runtime API (tasty)](docs/tasty.md)** — Full runtime styling documentation: component creation, state mappings, sub-elements, variants, hooks, configuration, and style property reference
+- **[Runtime API (tasty)](docs/tasty.md)** — Full runtime styling documentation: component creation, state mappings, sub-elements, variants, hooks, and configuration
+- **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 - **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring

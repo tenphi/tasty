@@ -306,4 +306,52 @@ describe('marginStyle', () => {
       });
     });
   });
+
+  describe('multi-group (comma-separated)', () => {
+    it('base value with directional override', () => {
+      expect(marginStyle({ margin: '1x, 2x top' })).toEqual({
+        margin: '16px 8px 8px 8px',
+      });
+    });
+
+    it('base value with multiple directional overrides', () => {
+      expect(marginStyle({ margin: '1x, 2x top bottom' })).toEqual({
+        margin: '16px 8px',
+      });
+    });
+
+    it('directional groups: auto left/right, value top/bottom', () => {
+      expect(marginStyle({ margin: 'auto left right, 1x top bottom' })).toEqual(
+        {
+          margin: '8px auto',
+        },
+      );
+    });
+
+    it('later groups override earlier groups for same direction', () => {
+      expect(marginStyle({ margin: '1x, 2x top, 3x top' })).toEqual({
+        margin: '24px 8px 8px 8px',
+      });
+    });
+
+    it('multi-group with marginBlock override', () => {
+      expect(
+        marginStyle({ margin: '1x, 2x left right', marginBlock: '3x' }),
+      ).toEqual({
+        margin: '24px 16px',
+      });
+    });
+
+    it('multi-group with individual direction override', () => {
+      expect(marginStyle({ margin: '1x, 2x top', marginTop: '4x' })).toEqual({
+        margin: '32px 8px 8px 8px',
+      });
+    });
+
+    it('all sides same after multi-group resolves to single value', () => {
+      expect(marginStyle({ margin: '1x, 1x top' })).toEqual({
+        margin: '8px',
+      });
+    });
+  });
 });

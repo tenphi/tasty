@@ -134,13 +134,13 @@ Predefined states turn complex selector logic into single tokens. Use `@mobile` 
 
 This is the core idea that makes everything else possible.
 
-Traditional CSS has two intertwined problems.
+Traditional CSS has two structural problems.
 
-First, the **cascade** resolves conflicts by specificity and source order: when multiple selectors match, the one with the highest specificity wins, or — if specificity is equal — the last one in source order wins. This makes styles inherently fragile. Reordering imports, adding a new media query, or composing components from different libraries can silently break styling.
+First, the **cascade** resolves conflicts by specificity and source order: when multiple selectors match, the one with the highest specificity wins, or — if specificity is equal — the last one in source order wins. That makes styles inherently fragile. Reordering imports, adding a media query, or composing components from different libraries can silently break styling.
 
-Second, **crafting selectors that faithfully express complex real-world states is fundamentally hard.** A single state like "dark mode" may depend on a root attribute, an OS preference, or a combination of both — each branch requiring its own selector, its own negation of every other branch, and correct nesting inside `@media` blocks. The example below shows the CSS you'd need to write by hand for just *one* property with *one* state. Scale that to dozens of properties, combine it with responsive breakpoints and container queries, and the selector logic becomes unmanageable.
+Second, **authoring selectors that capture real-world state logic is fundamentally hard.** A single state like "dark mode" may depend on a root attribute, an OS preference, or both — each branch needing its own selector, proper negation of competing branches, and correct `@media` nesting. The example below shows the CSS you'd write by hand for just *one* property with *one* state. Scale that across dozens of properties, then add breakpoints and container queries, and the selector logic quickly becomes unmanageable.
 
-Tasty solves both problems at once: **every state mapping compiles into selectors that are guaranteed to never overlap.**
+Tasty solves both problems at once: **every state mapping compiles into mutually exclusive selectors.**
 
 ```tsx
 const Text = tasty({
@@ -185,9 +185,9 @@ If `@dark` expands to `@root(schema=dark) | (!@root(schema) & @media(prefers-col
 }
 ```
 
-Every rule is guarded by the negation of all higher-priority rules. No two rules can ever match simultaneously. No specificity arithmetic. No source-order dependence. Components compose and extend without ever colliding.
+Every rule is guarded by the negation of higher-priority rules. No two rules can match at the same time. No specificity arithmetic. No source-order dependence. Components compose and extend without collisions.
 
-Because Tasty absorbs the selector complexity, CSS features that are too fragile to use in practice — nested container queries, multi-condition `@supports` gates, combined root-state and media branches — become trivially expressible. You stay in pure CSS instead of falling back to JavaScript workarounds, and the browser keeps full control over layout, painting, and transitions. Tasty doesn't limit CSS — it unleashes its full potential by removing the complexity that held developers back.
+By absorbing selector complexity, Tasty makes advanced CSS patterns practical again — nested container queries, multi-condition `@supports` gates, and combined root-state/media branches. You stay in pure CSS instead of relying on JavaScript workarounds, so the browser can optimize layout, painting, and transitions natively. Tasty doesn't limit CSS; it unlocks its full potential by removing the complexity that held teams back.
 
 ## Capabilities
 

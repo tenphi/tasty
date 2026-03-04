@@ -7,11 +7,7 @@
 
 import type { KeyframesSteps } from '../injector/types';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
-import type {
-  CSSMap,
-  StyleHandler,
-  StyleValueStateMap,
-} from '../utils/styles';
+import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
 /**
  * Convert keyframes steps to a CSS string.

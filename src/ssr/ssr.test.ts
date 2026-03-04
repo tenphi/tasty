@@ -68,9 +68,7 @@ describe('formatRules', () => {
       ],
       't3',
     );
-    expect(css).toBe(
-      '@media (max-width: 768px) { .t3.t3 { display: none } }',
-    );
+    expect(css).toBe('@media (max-width: 768px) { .t3.t3 { display: none } }');
   });
 
   it('handles rootPrefix', () => {
@@ -85,9 +83,7 @@ describe('formatRules', () => {
       ],
       't4',
     );
-    expect(css).toBe(
-      ':root[data-theme="dark"] .t4.t4 { color: white }',
-    );
+    expect(css).toBe(':root[data-theme="dark"] .t4.t4 { color: white }');
   });
 
   it('merges declarations for same selector', () => {
@@ -240,8 +236,14 @@ describe('ServerStyleCollector', () => {
   it('collects keyframes and properties', () => {
     const collector = new ServerStyleCollector();
 
-    collector.collectKeyframes('fadeIn', '@keyframes fadeIn { 0% { opacity: 0 } 100% { opacity: 1 } }');
-    collector.collectProperty('$rotation', '@property --rotation { syntax: "<angle>"; inherits: false; initial-value: 0deg; }');
+    collector.collectKeyframes(
+      'fadeIn',
+      '@keyframes fadeIn { 0% { opacity: 0 } 100% { opacity: 1 } }',
+    );
+    collector.collectProperty(
+      '$rotation',
+      '@property --rotation { syntax: "<angle>"; inherits: false; initial-value: 0deg; }',
+    );
 
     const css = collector.getCSS();
     expect(css).toContain('@keyframes fadeIn');
@@ -337,9 +339,8 @@ describe('ServerStyleCollector with pipeline', () => {
 
   it('produces valid CSS when fed pipeline output', async () => {
     const { renderStylesForChunk } = await import('../chunks');
-    const { generateChunkCacheKey, categorizeStyleKeys } = await import(
-      '../chunks'
-    );
+    const { generateChunkCacheKey, categorizeStyleKeys } =
+      await import('../chunks');
 
     const collector = new ServerStyleCollector();
     const styles = { display: 'flex', padding: '2x' } as any;
@@ -354,11 +355,7 @@ describe('ServerStyleCollector with pipeline', () => {
         collector.allocateClassName(cacheKey);
 
       if (isNewAllocation) {
-        const renderResult = renderStylesForChunk(
-          styles,
-          chunkName,
-          styleKeys,
-        );
+        const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
         if (renderResult.rules.length > 0) {
           collector.collectChunk(cacheKey, className, renderResult.rules);
         }
@@ -376,9 +373,8 @@ describe('ServerStyleCollector with pipeline', () => {
 
   it('deduplicates chunks with same styles', async () => {
     const { renderStylesForChunk } = await import('../chunks');
-    const { generateChunkCacheKey, categorizeStyleKeys } = await import(
-      '../chunks'
-    );
+    const { generateChunkCacheKey, categorizeStyleKeys } =
+      await import('../chunks');
 
     const collector = new ServerStyleCollector();
     const styles = { display: 'flex' } as any;
@@ -476,7 +472,13 @@ describe('hydrateTastyCache', () => {
     });
 
     const result = inject(
-      [{ selector: '', declarations: 'background: blue', needsClassName: true }],
+      [
+        {
+          selector: '',
+          declarations: 'background: blue',
+          needsClassName: true,
+        },
+      ],
       { cacheKey: 'APPEARANCE:fill=#blue' },
     );
 
@@ -518,7 +520,13 @@ describe('hydrateTastyCache', () => {
     // inject() with the same cacheKey hits the "already injected" path
     // (ruleIndex -2 is not a placeholder) — increments refCount, no CSS insertion
     const result = inject(
-      [{ selector: '', declarations: 'background: purple', needsClassName: true }],
+      [
+        {
+          selector: '',
+          declarations: 'background: purple',
+          needsClassName: true,
+        },
+      ],
       { cacheKey: 'APPEARANCE:fill=#purple' },
     );
     expect(result.className).toBe('t0');

@@ -6,10 +6,7 @@
  */
 
 import type { PropertyDefinition } from '../injector/types';
-import {
-  colorInitialValueToRgb,
-  getEffectiveDefinition,
-} from '../properties';
+import { colorInitialValueToRgb, getEffectiveDefinition } from '../properties';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
@@ -33,9 +30,7 @@ export function formatPropertyCSS(
 
   if (result.isColor) {
     const rgbCssName = `${result.cssName}-rgb`;
-    const rgbInitial = colorInitialValueToRgb(
-      result.definition.initialValue,
-    );
+    const rgbInitial = colorInitialValueToRgb(result.definition.initialValue);
     rules.push(
       buildPropertyRule(rgbCssName, {
         syntax: '<number>+',

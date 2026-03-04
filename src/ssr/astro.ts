@@ -66,8 +66,7 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     let cacheTag = '';
     if (transferCache) {
       const cacheState = collector.getCacheState();
-      const hasHydratableStyles =
-        Object.keys(cacheState.entries).length > 0;
+      const hasHydratableStyles = Object.keys(cacheState.entries).length > 0;
       if (hasHydratableStyles) {
         cacheTag = `<script data-tasty-cache type="application/json"${nonceAttr}>${JSON.stringify(cacheState)}</script>`;
       }

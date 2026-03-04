@@ -11,12 +11,7 @@
 
 /// <reference path="./next-navigation.d.ts" />
 
-import {
-  createElement,
-  Fragment,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createElement, Fragment, useState, type ReactNode } from 'react';
 import { useServerInsertedHTML } from 'next/navigation';
 
 import { getConfig } from '../config';

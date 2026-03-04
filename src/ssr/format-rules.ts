@@ -12,10 +12,7 @@ import type { StyleResult } from '../pipeline';
  * Resolve selectors for a rule, applying className-based specificity doubling
  * and rootPrefix handling. Mirrors the logic in StyleInjector.inject().
  */
-function resolveSelector(
-  rule: StyleResult,
-  className: string,
-): string {
+function resolveSelector(rule: StyleResult, className: string): string {
   let selector = rule.selector;
 
   if (rule.needsClassName) {
@@ -81,10 +78,7 @@ function groupRules(
  * Produces the same CSS text as SheetManager.insertRule() would insert
  * into the DOM, but as a plain string suitable for SSR output.
  */
-export function formatRules(
-  rules: StyleResult[],
-  className: string,
-): string {
+export function formatRules(rules: StyleResult[], className: string): string {
   if (rules.length === 0) return '';
 
   const resolvedRules = rules.map((rule) => ({

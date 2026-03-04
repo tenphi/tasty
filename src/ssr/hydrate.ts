@@ -49,10 +49,7 @@ export function hydrateTastyCache(state?: SSRCacheState): void {
   const injector = getGlobalInjector();
   const registry = injector._sheetManager.getRegistry(document);
 
-  registry.classCounter = Math.max(
-    registry.classCounter,
-    state.classCounter,
-  );
+  registry.classCounter = Math.max(registry.classCounter, state.classCounter);
 
   for (const [cacheKey, className] of Object.entries(state.entries)) {
     registry.cacheKeyToClassName.set(cacheKey, className);

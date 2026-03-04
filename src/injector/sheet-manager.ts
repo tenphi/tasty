@@ -887,9 +887,10 @@ export class SheetManager {
   }
 
   /**
-   * Convert keyframes steps to CSS string
+   * Convert keyframes steps to CSS string.
+   * Public so the SSR collector can format keyframes without DOM access.
    */
-  private stepsToCSS(steps: KeyframesSteps): string {
+  stepsToCSS(steps: KeyframesSteps): string {
     const rules: string[] = [];
 
     for (const [key, value] of Object.entries(steps)) {

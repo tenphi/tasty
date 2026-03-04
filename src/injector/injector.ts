@@ -314,6 +314,35 @@ export class StyleInjector {
   }
 
   /**
+   * Increment refCount for an already-injected cacheKey and return a dispose.
+   * Used by useStyles on cache hits (hydration or runtime reuse) where
+   * the pipeline was skipped but refCount tracking is still needed.
+   * Returns null if the cacheKey is not found.
+   */
+  trackRef(
+    cacheKey: string,
+    options?: { root?: Document | ShadowRoot },
+  ): InjectResult | null {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    if (!registry.cacheKeyToClassName.has(cacheKey)) return null;
+
+    const className = registry.cacheKeyToClassName.get(cacheKey)!;
+    const currentRefCount = registry.refCounts.get(className) || 0;
+    registry.refCounts.set(className, currentRefCount + 1);
+
+    if (registry.metrics) {
+      registry.metrics.hits++;
+    }
+
+    return {
+      className,
+      dispose: () => this.dispose(className, registry),
+    };
+  }
+
+  /**
    * Dispose of a className
    */
   private dispose(className: string, registry: RootRegistry): void {

@@ -43,13 +43,35 @@
         "default": "./dist/core/index.js"
       }
     },
+    "./ssr": {
+      "import": {
+        "types": "./dist/ssr/index.d.ts",
+        "default": "./dist/ssr/index.js"
+      }
+    },
+    "./ssr/next": {
+      "import": {
+        "types": "./dist/ssr/next.d.ts",
+        "default": "./dist/ssr/next.js"
+      }
+    },
+    "./ssr/astro": {
+      "import": {
+        "types": "./dist/ssr/astro.d.ts",
+        "default": "./dist/ssr/astro.js"
+      }
+    },
     "./tasty.config": "./tasty.config.ts"
   },
   "files": [
     "dist",
     "tasty.config.ts"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/ssr/index.js",
+    "./dist/ssr/next.js",
+    "./dist/ssr/astro.js"
+  ],
   "engines": {
     "node": ">=20"
   },

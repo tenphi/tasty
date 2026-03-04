@@ -1,4 +1,4 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
+import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import {
   categorizeStyleKeys,
@@ -19,6 +19,11 @@ import {
 } from '../keyframes';
 import type { RenderResult } from '../pipeline';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
+import type { ServerStyleCollector } from '../ssr/collector';
+import { TastySSRContext } from '../ssr/context';
+import { formatKeyframesCSS } from '../ssr/format-keyframes';
+import { formatPropertyCSS } from '../ssr/format-property';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import { stringifyStyles } from '../utils/styles';
@@ -64,6 +69,12 @@ interface ProcessedChunk {
 /**
  * Render, cache-key, and allocate a className for a single chunk.
  * Returns a ProcessedChunk, or null if the chunk produces no CSS rules.
+ *
+ * Always runs the pipeline and calls allocateClassName. The inject()
+ * call in useInsertionEffect handles all edge cases: placeholders from
+ * abandoned concurrent renders, hydration hits (ruleIndex -2), and
+ * runtime cache hits (already injected). The pipeline's own LRU cache
+ * makes repeated calls for identical styles cheap.
  */
 function processChunk(
   styles: Styles,
@@ -146,8 +157,67 @@ function getUsedKeyframes(
 }
 
 /**
+ * Resolve the SSR collector from React context or AsyncLocalStorage.
+ * Returns null on the client (no collector available).
+ */
+function resolveSSRCollector(
+  reactContext: ServerStyleCollector | null,
+): ServerStyleCollector | null {
+  if (reactContext) return reactContext;
+
+  const alsCollector = getRegisteredSSRCollector();
+  if (alsCollector) return alsCollector;
+
+  return null;
+}
+
+/**
+ * Process a chunk on the SSR path: allocate via collector, render, collect CSS.
+ * Returns null if the chunk produces no CSS rules.
+ */
+function processChunkSSR(
+  collector: ServerStyleCollector,
+  styles: Styles,
+  chunkName: string,
+  styleKeys: string[],
+): ProcessedChunk | null {
+  if (styleKeys.length === 0) return null;
+
+  const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
+  const { className, isNewAllocation } = collector.allocateClassName(cacheKey);
+
+  if (isNewAllocation) {
+    const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
+    if (renderResult.rules.length > 0) {
+      collector.collectChunk(cacheKey, className, renderResult.rules);
+      return {
+        name: chunkName,
+        styleKeys,
+        cacheKey,
+        renderResult,
+        className,
+      };
+    }
+    return null;
+  }
+
+  return {
+    name: chunkName,
+    styleKeys,
+    cacheKey,
+    renderResult: { rules: [] },
+    className,
+  };
+}
+
+/**
  * Hook to generate CSS classes from Tasty styles.
  * Handles style rendering, className allocation, and CSS injection.
+ *
+ * SSR-aware: when a ServerStyleCollector is available (via React context
+ * or AsyncLocalStorage), CSS is collected during the render phase instead
+ * of being injected into the DOM. useInsertionEffect does not run on the
+ * server, so the collector path is the only active path during SSR.
  *
  * Uses chunking to split styles into logical groups for better caching
  * and CSS reuse across components.
@@ -166,6 +236,9 @@ function getUsedKeyframes(
  * ```
  */
 export function useStyles(styles: UseStylesOptions): UseStylesResult {
+  const ssrContextValue = useContext(TastySSRContext);
+  const ssrCollector = resolveSSRCollector(ssrContextValue);
+
   // Array of dispose functions for each chunk
   const disposeRef = useRef<(() => void)[]>([]);
 
@@ -214,20 +287,57 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
       chunkMap = mergeChunksForStartingStyle(chunkMap);
     }
 
-    // Process each chunk: render → cache key → allocate className
     const chunks: ProcessedChunk[] = [];
 
-    for (const [chunkName, chunkStyleKeys] of chunkMap) {
-      const chunk = processChunk(currentStyles, chunkName, chunkStyleKeys);
-      if (chunk) {
-        chunks.push(chunk);
+    if (ssrCollector) {
+      // Ensure internal @property and :root token CSS is included
+      ssrCollector.collectInternals();
+
+      // SERVER PATH: allocate via collector, collect CSS
+      for (const [chunkName, chunkStyleKeys] of chunkMap) {
+        const chunk = processChunkSSR(
+          ssrCollector,
+          currentStyles,
+          chunkName,
+          chunkStyleKeys,
+        );
+        if (chunk) chunks.push(chunk);
+      }
+
+      // Collect keyframes on the server
+      const usedKeyframes = getUsedKeyframes(currentStyles);
+      if (usedKeyframes) {
+        for (const [name, steps] of Object.entries(usedKeyframes)) {
+          const css = formatKeyframesCSS(name, steps);
+          ssrCollector.collectKeyframes(name, css);
+        }
+      }
+
+      // Collect @property rules on the server
+      if (hasLocalProperties(currentStyles)) {
+        const localProperties = extractLocalProperties(currentStyles);
+        if (localProperties) {
+          for (const [token, definition] of Object.entries(localProperties)) {
+            const css = formatPropertyCSS(token, definition);
+            if (css) {
+              ssrCollector.collectProperty(token, css);
+            }
+          }
+        }
+      }
+    } else {
+      // CLIENT PATH: unchanged behavior
+      for (const [chunkName, chunkStyleKeys] of chunkMap) {
+        const chunk = processChunk(currentStyles, chunkName, chunkStyleKeys);
+        if (chunk) chunks.push(chunk);
       }
     }
 
     return chunks;
   }, [styleKey]);
 
-  // Inject styles in insertion effect (avoids render phase side effects)
+  // Inject styles in insertion effect (avoids render phase side effects).
+  // Does NOT run on the server — the SSR path above handles collection.
   useInsertionEffect(() => {
     // Cleanup all previous disposals
     disposeRef.current.forEach((dispose) => dispose?.());
@@ -266,14 +376,10 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
     }
 
     // Register local @properties if defined (no dispose needed - properties are permanent)
-    // Token formats: $name → --name, #name → --name-color (with auto syntax: '<color>')
-    // The injector.property() handles token parsing and auto-settings internally
-    // Note: Global properties are injected once when styles are first generated (see markStylesGenerated)
     if (currentStyles && hasLocalProperties(currentStyles)) {
       const localProperties = extractLocalProperties(currentStyles);
       if (localProperties) {
         for (const [token, definition] of Object.entries(localProperties)) {
-          // Pass the token directly - injector handles parsing
           property(token, definition);
         }
       }

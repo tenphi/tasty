@@ -26,6 +26,18 @@ export function allocateClassName(
 }
 
 /**
+ * Track a reference to an already-injected cacheKey (refCount + dispose).
+ * Used on cache hits (SSR hydration or runtime reuse) where the pipeline
+ * was skipped. Returns null if the cacheKey is not in the cache.
+ */
+export function trackRef(
+  cacheKey: string,
+  options?: { root?: Document | ShadowRoot },
+): InjectResult | null {
+  return getGlobalInjector().trackRef(cacheKey, options);
+}
+
+/**
  * Inject styles and return className with dispose function
  */
 export function inject(

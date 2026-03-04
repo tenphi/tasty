@@ -560,10 +560,7 @@ function hasGroupedValueConflict<T extends { negated: boolean }>(
   groupKey: (term: T) => string,
   getValue: (term: T) => string | undefined,
 ): boolean {
-  const groups = new Map<
-    string,
-    { positive: T[]; negated: T[] }
-  >();
+  const groups = new Map<string, { positive: T[]; negated: T[] }>();
 
   for (const term of terms) {
     const matched = match(term);
@@ -611,8 +608,7 @@ function hasGroupedValueConflict<T extends { negated: boolean }>(
 function hasAttributeConflict(terms: ConditionNode[]): boolean {
   return hasGroupedValueConflict<ModifierCondition>(
     terms,
-    (t) =>
-      t.kind === 'state' && t.type === 'modifier' ? t : null,
+    (t) => (t.kind === 'state' && t.type === 'modifier' ? t : null),
     (t) => t.attribute,
     (t) => t.value,
   );
@@ -858,9 +854,7 @@ function appendBoundsToUniqueId(
   }
 }
 
-function mergeDimensionRanges<
-  T extends MediaCondition | ContainerCondition,
->(
+function mergeDimensionRanges<T extends MediaCondition | ContainerCondition>(
   conditions: T[],
   idPrefix: string[],
 ): T | null {
@@ -921,9 +915,7 @@ function buildMergedRaw(
 // ============================================================================
 
 function sortTerms(terms: ConditionNode[]): ConditionNode[] {
-  const withIds = terms.map(
-    (t) => [getConditionUniqueId(t), t] as const,
-  );
+  const withIds = terms.map((t) => [getConditionUniqueId(t), t] as const);
   withIds.sort((a, b) => a[0].localeCompare(b[0]));
   return withIds.map(([, t]) => t);
 }

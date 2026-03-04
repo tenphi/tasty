@@ -899,7 +899,7 @@ function tightenBounds(
 }
 
 function appendBoundsToUniqueId(
-  parts: (string | undefined)[],
+  parts: string[],
   lowerBound?: NumericBound,
   upperBound?: NumericBound,
 ): void {
@@ -931,7 +931,8 @@ function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
     upperBound,
   };
 
-  const parts: (string | undefined)[] = ['media', 'dim', merged.dimension];
+  const dim = merged.dimension ?? 'width';
+  const parts: string[] = ['media', 'dim', dim];
   appendBoundsToUniqueId(parts, lowerBound, upperBound);
   merged.uniqueId = parts.join(':');
 
@@ -960,12 +961,8 @@ function mergeContainerRanges(
   };
 
   const name = merged.containerName || '_';
-  const parts: (string | undefined)[] = [
-    'container',
-    'dim',
-    name,
-    merged.dimension,
-  ];
+  const dim = merged.dimension ?? 'width';
+  const parts: string[] = ['container', 'dim', name, dim];
   appendBoundsToUniqueId(parts, lowerBound, upperBound);
   merged.uniqueId = parts.join(':');
 

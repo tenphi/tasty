@@ -1425,11 +1425,7 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
     v.supportsConditions.length +
     v.rootConditions.length +
     v.parentGroups.reduce((sum, g) => sum + g.conditions.length, 0);
-  result.sort((a, b) => {
-    const countDiff = variantConditionCount(a) - variantConditionCount(b);
-    if (countDiff !== 0) return countDiff;
-    return getVariantKey(a).localeCompare(getVariantKey(b));
-  });
+  result.sort((a, b) => variantConditionCount(a) - variantConditionCount(b));
 
   // Remove variants that are supersets of earlier (less restrictive) variants
   const filtered: SelectorVariant[] = [];

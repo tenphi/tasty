@@ -93,7 +93,6 @@ interface ComputedRule {
 // ============================================================================
 
 const pipelineCache = new Lru<string, CSSRule[]>(5000);
-const transformPatternCache = new Lru<string, string>(1000);
 
 // ============================================================================
 // Main Pipeline Function
@@ -675,29 +674,9 @@ function processSinglePattern(pattern: string, key: string): string {
  * // → 'button.primary:hover'
  */
 function transformPattern(pattern: string): string {
-  const cached = transformPatternCache.get(pattern);
-  if (cached !== undefined) return cached;
-
-  const result = transformPatternInner(pattern);
-  transformPatternCache.set(pattern, result);
-  return result;
-}
-
-function transformPatternInner(pattern: string): string {
-  const parts: string[] = [];
+  let result = '';
+  let lastCh = '';
   let i = 0;
-
-  const lastChar = (): string => {
-    if (parts.length === 0) return '';
-    const last = parts[parts.length - 1];
-    return last[last.length - 1] || '';
-  };
-
-  const ensureSpace = (): void => {
-    if (parts.length > 0 && lastChar() !== ' ') {
-      parts.push(' ');
-    }
-  };
 
   while (i < pattern.length) {
     const char = pattern[i];
@@ -708,8 +687,11 @@ function transformPatternInner(pattern: string): string {
     }
 
     if (/[>+~]/.test(char)) {
-      ensureSpace();
-      parts.push(char);
+      if (result && lastCh !== ' ') {
+        result += ' ';
+      }
+      result += char;
+      lastCh = char;
       i++;
       continue;
     }
@@ -719,14 +701,21 @@ function transformPatternInner(pattern: string): string {
       while (i < pattern.length && /[a-zA-Z0-9]/.test(pattern[i])) {
         i++;
       }
-      ensureSpace();
-      parts.push(`[data-element="${pattern.slice(nameStart, i)}"]`);
+      if (result && lastCh !== ' ') {
+        result += ' ';
+      }
+      const segment = `[data-element="${pattern.slice(nameStart, i)}"]`;
+      result += segment;
+      lastCh = ']';
       continue;
     }
 
     if (char === '@') {
-      ensureSpace();
-      parts.push('@');
+      if (result && lastCh !== ' ') {
+        result += ' ';
+      }
+      result += '@';
+      lastCh = '@';
       i++;
       continue;
     }
@@ -740,7 +729,9 @@ function transformPatternInner(pattern: string): string {
       ) {
         i++;
       }
-      parts.push(pattern.slice(pseudoStart, i));
+      const segment = pattern.slice(pseudoStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
@@ -749,31 +740,37 @@ function transformPatternInner(pattern: string): string {
       while (i < pattern.length && /[a-z0-9-]/.test(pattern[i])) {
         i++;
       }
-      ensureSpace();
-      parts.push(pattern.slice(tagStart, i));
+      if (result && lastCh !== ' ') {
+        result += ' ';
+      }
+      const segment = pattern.slice(tagStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
     if (char === '.') {
-      const lc = lastChar();
-      const attachToLast = lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
-      if (parts.length > 0 && !attachToLast && lc !== ' ') {
-        parts.push(' ');
+      const attachToLast =
+        lastCh === ']' || lastCh === '@' || /[a-zA-Z0-9-]/.test(lastCh);
+      if (result && !attachToLast && lastCh !== ' ') {
+        result += ' ';
       }
       const clsStart = i;
       i++;
       while (i < pattern.length && /[a-zA-Z0-9_-]/.test(pattern[i])) {
         i++;
       }
-      parts.push(pattern.slice(clsStart, i));
+      const segment = pattern.slice(clsStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
     if (char === '[') {
-      const lc = lastChar();
-      const attachToLast = lc === ']' || lc === '@' || /[a-zA-Z0-9-]/.test(lc);
-      if (parts.length > 0 && !attachToLast && lc !== ' ') {
-        parts.push(' ');
+      const attachToLast =
+        lastCh === ']' || lastCh === '@' || /[a-zA-Z0-9-]/.test(lastCh);
+      if (result && !attachToLast && lastCh !== ' ') {
+        result += ' ';
       }
       const attrStart = i;
       let depth = 0;
@@ -783,15 +780,17 @@ function transformPatternInner(pattern: string): string {
         i++;
         if (depth === 0) break;
       }
-      parts.push(pattern.slice(attrStart, i));
+      result += pattern.slice(attrStart, i);
+      lastCh = ']';
       continue;
     }
 
-    parts.push(char);
+    result += char;
+    lastCh = char;
     i++;
   }
 
-  return parts.join('');
+  return result;
 }
 
 /**

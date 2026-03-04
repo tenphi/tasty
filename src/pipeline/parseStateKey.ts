@@ -16,6 +16,7 @@ import {
 import { camelToKebab } from '../utils/case-converter';
 
 import type { ConditionNode, NumericBound } from './conditions';
+import { emitWarning } from './warnings';
 import {
   and,
   createContainerDimensionCondition,
@@ -35,6 +36,17 @@ import {
   or,
   trueCondition,
 } from './conditions';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum XOR operands before emitting a performance warning.
+ * A ^ B ^ C ^ D = 8 OR branches (2^(n-1)), so chains above 4
+ * risk exponential blowup in downstream processing.
+ */
+const MAX_XOR_CHAIN_LENGTH = 4;
 
 // ============================================================================
 // Types
@@ -229,10 +241,21 @@ class Parser {
 
   private parseXor(): ConditionNode {
     let left = this.parseUnary();
+    let operandCount = 1;
 
     while (this.current()?.type === 'XOR') {
       this.advance();
       const right = this.parseUnary();
+      operandCount++;
+
+      if (operandCount > MAX_XOR_CHAIN_LENGTH) {
+        emitWarning(
+          'XOR_CHAIN_TOO_LONG',
+          `XOR chain with ${operandCount} operands produces ${Math.pow(2, operandCount - 1)} OR branches. ` +
+            `Consider breaking into smaller expressions to avoid exponential growth.`,
+        );
+      }
+
       // XOR: (A & !B) | (!A & B)
       left = or(and(left, not(right)), and(not(left), right));
     }
@@ -510,14 +533,20 @@ class Parser {
   /**
    * Parse @root(...) state
    */
-  private parseRootState(raw: string): ConditionNode {
-    const content = raw.slice(6, -1); // Remove '@root(' and ')'
-    if (!content.trim()) {
-      return trueCondition();
-    }
+  private parseInnerCondition(
+    raw: string,
+    prefixLen: number,
+    wrap: (inner: ConditionNode) => ConditionNode,
+  ): ConditionNode {
+    const content = raw.slice(prefixLen, -1);
+    if (!content.trim()) return trueCondition();
+    return wrap(parseStateKey(content, this.options));
+  }
 
-    const innerCondition = parseStateKey(content, this.options);
-    return createRootCondition(innerCondition, false, raw);
+  private parseRootState(raw: string): ConditionNode {
+    return this.parseInnerCondition(raw, 6, (inner) =>
+      createRootCondition(inner, false, raw),
+    );
   }
 
   /**
@@ -530,7 +559,7 @@ class Parser {
    *   @parent(.my-class)    → :is(.my-class *)
    */
   private parseParentState(raw: string): ConditionNode {
-    const content = raw.slice(8, -1); // Remove '@parent(' and ')'
+    const content = raw.slice(8, -1);
     if (!content.trim()) {
       return trueCondition();
     }
@@ -538,7 +567,6 @@ class Parser {
     let condition = content.trim();
     let direct = false;
 
-    // Detect ", >" suffix for direct parent mode
     const lastCommaIdx = condition.lastIndexOf(',');
     if (lastCommaIdx !== -1) {
       const afterComma = condition.slice(lastCommaIdx + 1).trim();
@@ -575,18 +603,10 @@ class Parser {
     return createSupportsCondition('feature', content, false, raw);
   }
 
-  /**
-   * Parse @own(...) state
-   */
   private parseOwnState(raw: string): ConditionNode {
-    const content = raw.slice(5, -1); // Remove '@own(' and ')'
-    if (!content.trim()) {
-      return trueCondition();
-    }
-
-    // Parse the inner condition recursively
-    const innerCondition = parseStateKey(content, this.options);
-    return createOwnCondition(innerCondition, false, raw);
+    return this.parseInnerCondition(raw, 5, (inner) =>
+      createOwnCondition(inner, false, raw),
+    );
   }
 
   /**

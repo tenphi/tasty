@@ -101,7 +101,7 @@ type TransitionEntry = [
   delay: string | undefined,
 ];
 
-export function transitionStyle({ transition }) {
+export function transitionStyle({ transition }: { transition?: string }) {
   if (!transition) return;
 
   const processed = parseStyle(transition);

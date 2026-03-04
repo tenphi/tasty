@@ -52,6 +52,7 @@ import {
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
+import { emitWarning } from './warnings';
 
 // ============================================================================
 // Types (compatible with old renderStyles API)
@@ -410,8 +411,8 @@ function getAllSelectors(key: string, styles?: Styles): string[] | null {
     if (affix !== undefined) {
       const result = processAffix(String(affix), key);
       if (!result.valid) {
-        console.warn(`[Tasty] ${result.reason}`);
-        return null; // Skip this sub-element entirely
+        emitWarning('INVALID_SELECTOR_AFFIX', result.reason);
+        return null;
       }
       return result.selectors;
     }
@@ -674,138 +675,118 @@ function processSinglePattern(pattern: string, key: string): string {
  */
 function transformPattern(pattern: string): string {
   let result = '';
+  let lastCh = '';
   let i = 0;
 
   while (i < pattern.length) {
     const char = pattern[i];
 
-    // Skip whitespace
     if (/\s/.test(char)) {
       i++;
       continue;
     }
 
-    // Combinator: > + ~
     if (/[>+~]/.test(char)) {
-      // Add combinator with surrounding spaces
-      if (result && !result.endsWith(' ')) {
+      if (result && lastCh !== ' ') {
         result += ' ';
       }
       result += char;
+      lastCh = char;
       i++;
       continue;
     }
 
-    // Uppercase element name
     if (/[A-Z]/.test(char)) {
-      // Read the full element name
-      let name = '';
+      const nameStart = i;
       while (i < pattern.length && /[a-zA-Z0-9]/.test(pattern[i])) {
-        name += pattern[i];
         i++;
       }
-      // Add with proper spacing
-      if (result && !result.endsWith(' ')) {
+      if (result && lastCh !== ' ') {
         result += ' ';
       }
-      result += `[data-element="${name}"]`;
+      const segment = `[data-element="${pattern.slice(nameStart, i)}"]`;
+      result += segment;
+      lastCh = ']';
       continue;
     }
 
-    // @ placeholder
     if (char === '@') {
-      if (result && !result.endsWith(' ')) {
+      if (result && lastCh !== ' ') {
         result += ' ';
       }
       result += '@';
+      lastCh = '@';
       i++;
-      // Don't add space after @ - let the next token attach if it's a class/pseudo
       continue;
     }
 
-    // Pseudo-element/class (::before, :hover)
     if (char === ':') {
-      // Don't add space before pseudo if attached to previous element
-      let pseudo = '';
+      const pseudoStart = i;
       while (
         i < pattern.length &&
         !/[\s>+~,@]/.test(pattern[i]) &&
         !/[A-Z]/.test(pattern[i])
       ) {
-        pseudo += pattern[i];
         i++;
       }
-      result += pseudo;
+      const segment = pattern.slice(pseudoStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
-    // Lowercase HTML tag name (a, div, button, my-component)
     if (/[a-z]/.test(char)) {
-      let tag = '';
+      const tagStart = i;
       while (i < pattern.length && /[a-z0-9-]/.test(pattern[i])) {
-        tag += pattern[i];
         i++;
       }
-      // Add with proper spacing
-      if (result && !result.endsWith(' ')) {
+      if (result && lastCh !== ' ') {
         result += ' ';
       }
-      result += tag;
+      const segment = pattern.slice(tagStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
-    // Class (.active, .myClass, .navItem)
     if (char === '.') {
-      // Keep attached if directly after ] (element), @ (placeholder), or alphanumeric (tag)
-      // Otherwise add space (standalone class selector)
-      const lastNonSpace = result.replace(/\s+$/, '').slice(-1);
       const attachToLast =
-        lastNonSpace === ']' ||
-        lastNonSpace === '@' ||
-        /[a-zA-Z0-9-]/.test(lastNonSpace);
-      if (result && !attachToLast && !result.endsWith(' ')) {
+        lastCh === ']' || lastCh === '@' || /[a-zA-Z0-9-]/.test(lastCh);
+      if (result && !attachToLast && lastCh !== ' ') {
         result += ' ';
       }
-      // Start with the dot
-      let cls = '.';
+      const clsStart = i;
       i++;
-      // Class names can contain uppercase letters (camelCase, BEM, etc.)
-      // Stop at: whitespace, combinators, comma, @, or new token starters (. : [)
       while (i < pattern.length && /[a-zA-Z0-9_-]/.test(pattern[i])) {
-        cls += pattern[i];
         i++;
       }
-      result += cls;
+      const segment = pattern.slice(clsStart, i);
+      result += segment;
+      lastCh = segment[segment.length - 1] || lastCh;
       continue;
     }
 
-    // Attribute selector [...]
     if (char === '[') {
-      // Keep attached if directly after ] (element), @ (placeholder), or alphanumeric (tag)
-      // Otherwise add space (standalone attribute selector)
-      const lastNonSpace = result.replace(/\s+$/, '').slice(-1);
       const attachToLast =
-        lastNonSpace === ']' ||
-        lastNonSpace === '@' ||
-        /[a-zA-Z0-9-]/.test(lastNonSpace);
-      if (result && !attachToLast && !result.endsWith(' ')) {
+        lastCh === ']' || lastCh === '@' || /[a-zA-Z0-9-]/.test(lastCh);
+      if (result && !attachToLast && lastCh !== ' ') {
         result += ' ';
       }
-      let attr = '';
+      const attrStart = i;
       let depth = 0;
       while (i < pattern.length) {
-        attr += pattern[i];
         if (pattern[i] === '[') depth++;
         if (pattern[i] === ']') depth--;
         i++;
         if (depth === 0) break;
       }
-      result += attr;
+      result += pattern.slice(attrStart, i);
+      lastCh = ']';
       continue;
     }
 
-    // Other characters - just append
     result += char;
+    lastCh = char;
     i++;
   }
 
@@ -966,25 +947,44 @@ function computeStateCombinations(
 function cartesianProduct<T>(arrays: T[][]): T[][] {
   if (arrays.length === 0) return [[]];
 
-  // Filter out empty arrays
   const nonEmpty = arrays.filter((a) => a.length > 0);
   if (nonEmpty.length === 0) return [[]];
 
-  return nonEmpty.reduce<T[][]>(
-    (acc, arr) => acc.flatMap((combo) => arr.map((item) => [...combo, item])),
-    [[]],
-  );
+  let result: T[][] = [[]];
+  for (const arr of nonEmpty) {
+    const next: T[][] = [];
+    for (const combo of result) {
+      for (const item of arr) {
+        const newCombo = new Array<T>(combo.length + 1);
+        for (let i = 0; i < combo.length; i++) newCombo[i] = combo[i];
+        newCombo[combo.length] = item;
+        next.push(newCombo);
+      }
+    }
+    result = next;
+  }
+  return result;
+}
+
+const declStringCache = new WeakMap<Record<string, string>, string>();
+
+function stringifyDeclarations(decl: Record<string, string>): string {
+  let cached = declStringCache.get(decl);
+  if (cached === undefined) {
+    cached = JSON.stringify(decl);
+    declStringCache.set(decl, cached);
+  }
+  return cached;
 }
 
 /**
  * Merge rules with identical CSS output
  */
 function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
-  // Group by selectorSuffix + declarations
   const groups = new Map<string, ComputedRule[]>();
 
   for (const rule of rules) {
-    const key = `${rule.selectorSuffix}|${JSON.stringify(rule.declarations)}`;
+    const key = `${rule.selectorSuffix}|${stringifyDeclarations(rule.declarations)}`;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -1263,3 +1263,9 @@ export { simplifyCondition } from './simplify';
 export { buildExclusiveConditions } from './exclusive';
 export { conditionToCSS } from './materialize';
 export type { CSSRule } from './materialize';
+export { setWarningHandler, emitWarning } from './warnings';
+export type {
+  TastyWarning,
+  TastyWarningCode,
+  TastyWarningHandler,
+} from './warnings';

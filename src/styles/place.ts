@@ -1,4 +1,4 @@
-export function placeStyle({ place }) {
+export function placeStyle({ place }: { place?: string }) {
   if (typeof place !== 'string') return;
 
   if (!place) return;

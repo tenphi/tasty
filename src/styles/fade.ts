@@ -56,7 +56,7 @@ function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
   );
 }
 
-export function fadeStyle({ fade }) {
+export function fadeStyle({ fade }: { fade?: string }) {
   if (!fade) return;
 
   const processed = parseStyle(fade);

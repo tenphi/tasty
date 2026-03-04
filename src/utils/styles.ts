@@ -138,7 +138,7 @@ export const CUSTOM_UNITS = {
   x: '8px',
   fs: 'var(--font-size)',
   lh: 'var(--line-height)',
-  sf: function sf(num) {
+  sf: function sf(num: number) {
     return `minmax(0, ${num}fr)`;
   },
 };
@@ -415,7 +415,10 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   };
 }
 
-export function strToRgb(color, _ignoreAlpha = false) {
+export function strToRgb(
+  color: string,
+  _ignoreAlpha = false,
+): string | null | undefined {
   if (!color) return undefined;
 
   if (color.startsWith('rgb')) return color;
@@ -464,15 +467,21 @@ export function getRgbValuesFromRgbaString(str: string): number[] {
   });
 }
 
-export function hexToRgb(hex) {
-  const rgba = hex
+export function hexToRgb(hex: string): string | null {
+  const matched = hex
     .replace(
       /^#?([a-f\d])([a-f\d])([a-f\d])$/i,
-      (m, r, g, b) => '#' + r + r + g + g + b + b,
+      (_m: string, r: string, g: string, b: string) =>
+        '#' + r + r + g + g + b + b,
     )
     .substring(1)
-    .match(/.{2}/g)
-    .map((x, i) => parseInt(x, 16) * (i === 3 ? 1 / 255 : 1));
+    .match(/.{2}/g);
+
+  if (!matched) return null;
+
+  const rgba = matched.map(
+    (x: string, i: number) => parseInt(x, 16) * (i === 3 ? 1 / 255 : 1),
+  );
 
   if (rgba.some((v) => Number.isNaN(v))) {
     return null;
@@ -485,12 +494,15 @@ export function hexToRgb(hex) {
   return null;
 }
 
-export function filterMods(mods, allowedMods) {
+export function filterMods(mods: string[], allowedMods: string[]): string[] {
   return mods.filter((mod) => allowedMods.includes(mod));
 }
 
-export function extendStyles(defaultStyles, newStyles) {
-  let styles = {};
+export function extendStyles(
+  defaultStyles?: Record<string, unknown> | null,
+  newStyles?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  let styles: Record<string, unknown> = {};
 
   if (!defaultStyles) {
     if (!newStyles) {
@@ -963,11 +975,14 @@ export function styleStateMapToStyleStateDataList(
   return { states: stateDataList, mods: allMods, hasAdvancedStates };
 }
 
-export const COMPUTE_FUNC_MAP = {
-  '!': (a) => !a, // NOT - boolean negation
-  '^': (a, b) => (a && !b) || (!a && b), // XOR - true when exactly one is true
-  '|': (a, b) => a || b, // OR - logical OR
-  '&': (a, b) => a && b, // AND - logical AND
+export const COMPUTE_FUNC_MAP: Record<
+  string,
+  (a: unknown, b?: unknown) => unknown
+> = {
+  '!': (a: unknown) => !a,
+  '^': (a: unknown, b?: unknown) => (a && !b) || (!a && b),
+  '|': (a: unknown, b?: unknown) => a || b,
+  '&': (a: unknown, b?: unknown) => a && b,
 };
 
 /**
@@ -982,11 +997,13 @@ export function computeState(
 ) {
   if (!computeModel) return true;
 
+  const map = valueMap as Record<string | number, unknown>;
+
   if (!Array.isArray(computeModel)) {
     if (typeof valueMap === 'function') {
       return !!valueMap(computeModel);
     } else {
-      return !!valueMap[computeModel];
+      return !!map[computeModel];
     }
   }
 
@@ -1000,28 +1017,28 @@ export function computeState(
     // return false;
   }
 
-  let a = computeModel[1];
+  let a: unknown = computeModel[1];
 
   if (typeof a === 'object') {
-    a = !!computeState(a, valueMap);
+    a = !!computeState(a as unknown as ComputeModel, valueMap);
   } else if (typeof valueMap === 'function') {
     a = !!valueMap(a);
   } else {
-    a = !!valueMap[a];
+    a = !!map[a as string | number];
   }
 
   if (computeModel.length === 2) {
     return func(a);
   }
 
-  let b = computeModel[2];
+  let b: unknown = computeModel[2];
 
   if (typeof b === 'object') {
-    b = !!computeState(b, valueMap);
+    b = !!computeState(b as unknown as ComputeModel, valueMap);
   } else if (typeof valueMap === 'function') {
     b = !!valueMap(b);
   } else {
-    b = !!valueMap[b];
+    b = !!map[b as string | number];
   }
 
   return !!func(a, b);
@@ -1031,10 +1048,11 @@ const _innerCache = new WeakMap();
 
 export function stringifyStyles(styles: unknown): string {
   if (styles == null || typeof styles !== 'object') return '';
-  const keys = Object.keys(styles).sort();
+  const obj = styles as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
   const parts: string[] = [];
   for (const k of keys) {
-    const v = styles[k];
+    const v = obj[k];
     if (v === undefined || typeof v === 'function' || typeof v === 'symbol')
       continue;
 
@@ -1049,10 +1067,11 @@ export function stringifyStyles(styles: unknown): string {
     if (needsInnerSort) {
       sv = _innerCache.get(v);
       if (sv === undefined) {
-        const innerKeys = Object.keys(v).sort();
+        const innerObj = v as Record<string, unknown>;
+        const innerKeys = Object.keys(innerObj).sort();
         const innerParts: string[] = [];
         for (const ik of innerKeys) {
-          const ivs = JSON.stringify(v[ik]);
+          const ivs = JSON.stringify(innerObj[ik]);
           if (ivs !== undefined)
             innerParts.push(JSON.stringify(ik) + ':' + ivs);
         }

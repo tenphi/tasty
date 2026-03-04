@@ -1290,7 +1290,7 @@ export const tastyDebug = {
       ...new Set(
         subElementMatches
           .map((match) => match.match(/\[data-element="([^"]+)"\]/)?.[1])
-          .filter(Boolean),
+          .filter((v): v is string => !!v),
       ),
     ];
 

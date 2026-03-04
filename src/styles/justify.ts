@@ -1,4 +1,4 @@
-export function justifyStyle({ justify }) {
+export function justifyStyle({ justify }: { justify?: string }) {
   if (typeof justify !== 'string') return;
 
   if (!justify) return;

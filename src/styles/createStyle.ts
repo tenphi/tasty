@@ -6,9 +6,14 @@ import {
   parseStyle,
   strToRgb,
 } from '../utils/styles';
-import type { StyleValue } from '../utils/styles';
+import type {
+  CSSMap,
+  StyleHandler,
+  StyleValue,
+  StyleValueStateMap,
+} from '../utils/styles';
 
-const CACHE = {};
+const CACHE: Record<string, StyleHandler> = {};
 
 /**
  * Convert color fallback chain to RGB fallback chain.
@@ -63,7 +68,7 @@ export function createStyle(
   const key = `${styleName}.${cssStyle ?? ''}`;
 
   if (!CACHE[key]) {
-    const styleHandler = (styleMap) => {
+    const styleHandler = (styleMap: StyleValueStateMap): CSSMap | void => {
       let styleValue = styleMap[styleName];
 
       if (styleValue == null || styleValue === false) return;
@@ -93,7 +98,7 @@ export function createStyle(
 
       // convert non-string values
       if (converter && typeof styleValue !== 'string') {
-        styleValue = converter(styleValue);
+        styleValue = converter(styleValue as string | number | true);
 
         if (!styleValue) return;
       }
@@ -105,9 +110,9 @@ export function createStyle(
       ) {
         styleValue = styleValue.trim();
 
-        const rgba = strToRgb(styleValue);
+        const rgba = strToRgb(styleValue as string);
 
-        const { color, name } = parseColor(styleValue);
+        const { color, name } = parseColor(styleValue as string);
 
         if (name && rgba) {
           return {
@@ -137,7 +142,7 @@ export function createStyle(
         }
 
         return {
-          [finalCssStyle]: color,
+          [finalCssStyle]: color ?? '',
         };
       }
 

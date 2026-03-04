@@ -1,7 +1,7 @@
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
-function toBoxShadow(shadow) {
+function toBoxShadow(shadow: string): string {
   const processed = parseStyle(shadow);
   const { values, mods, colors } = processed.groups[0] ?? makeEmptyDetails();
   const mod = mods[0] || '';
@@ -10,7 +10,7 @@ function toBoxShadow(shadow) {
   return [mod, ...values, shadowColor].join(' ');
 }
 
-export function shadowStyle({ shadow }) {
+export function shadowStyle({ shadow }: { shadow?: string | boolean }) {
   if (!shadow) return;
 
   if (shadow === true) shadow = 'var(--shadow)';

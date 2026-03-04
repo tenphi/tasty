@@ -16,7 +16,7 @@ import type {
   StateCondition,
   SupportsCondition,
 } from './conditions';
-import { not } from './conditions';
+import { getConditionUniqueId, not } from './conditions';
 
 // ============================================================================
 // Types
@@ -193,7 +193,7 @@ const conditionCache = new Lru<string, CSSComponents>(3000);
  */
 export function conditionToCSS(node: ConditionNode): CSSComponents {
   // Check cache
-  const key = getConditionKey(node);
+  const key = getConditionUniqueId(node);
   const cached = conditionCache.get(key);
   if (cached) {
     return cached;
@@ -218,9 +218,6 @@ export function clearConditionCache(): void {
 // Inner Implementation
 // ============================================================================
 
-/**
- * Create an empty selector variant
- */
 function emptyVariant(): SelectorVariant {
   return {
     modifierConditions: [],
@@ -1526,20 +1523,6 @@ function orToCSS(children: ConditionNode[]): CSSComponents {
 // ============================================================================
 // Utility Functions
 // ============================================================================
-
-/**
- * Get a cache key for a condition
- */
-function getConditionKey(node: ConditionNode): string {
-  if (node.kind === 'true') return 'TRUE';
-  if (node.kind === 'false') return 'FALSE';
-  if (node.kind === 'state') return node.uniqueId;
-  if (node.kind === 'compound') {
-    const childKeys = node.children.map(getConditionKey).sort();
-    return `${node.operator}(${childKeys.join(',')})`;
-  }
-  return 'UNKNOWN';
-}
 
 /**
  * Build at-rules array from a variant

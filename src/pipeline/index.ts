@@ -947,25 +947,44 @@ function computeStateCombinations(
 function cartesianProduct<T>(arrays: T[][]): T[][] {
   if (arrays.length === 0) return [[]];
 
-  // Filter out empty arrays
   const nonEmpty = arrays.filter((a) => a.length > 0);
   if (nonEmpty.length === 0) return [[]];
 
-  return nonEmpty.reduce<T[][]>(
-    (acc, arr) => acc.flatMap((combo) => arr.map((item) => [...combo, item])),
-    [[]],
-  );
+  let result: T[][] = [[]];
+  for (const arr of nonEmpty) {
+    const next: T[][] = [];
+    for (const combo of result) {
+      for (const item of arr) {
+        const newCombo = new Array<T>(combo.length + 1);
+        for (let i = 0; i < combo.length; i++) newCombo[i] = combo[i];
+        newCombo[combo.length] = item;
+        next.push(newCombo);
+      }
+    }
+    result = next;
+  }
+  return result;
+}
+
+const declStringCache = new WeakMap<Record<string, string>, string>();
+
+function stringifyDeclarations(decl: Record<string, string>): string {
+  let cached = declStringCache.get(decl);
+  if (cached === undefined) {
+    cached = JSON.stringify(decl);
+    declStringCache.set(decl, cached);
+  }
+  return cached;
 }
 
 /**
  * Merge rules with identical CSS output
  */
 function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
-  // Group by selectorSuffix + declarations
   const groups = new Map<string, ComputedRule[]>();
 
   for (const rule of rules) {
-    const key = `${rule.selectorSuffix}|${JSON.stringify(rule.declarations)}`;
+    const key = `${rule.selectorSuffix}|${stringifyDeclarations(rule.declarations)}`;
     if (!groups.has(key)) {
       groups.set(key, []);
     }

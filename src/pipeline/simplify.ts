@@ -546,56 +546,60 @@ function boundsWithinExcludedRange(
  * e.g., [data-theme="dark"] & [data-theme="light"] → FALSE
  * e.g., [data-theme="dark"] & ![data-theme] → FALSE
  */
-function hasAttributeConflict(terms: ConditionNode[]): boolean {
-  // Group modifiers by attribute
-  const modifiersByAttr = new Map<
+/**
+ * Generic value-conflict checker for grouped conditions.
+ *
+ * Groups terms by a key, splits into positive/negated, then checks:
+ *   1. Multiple distinct positive values → conflict
+ *   2. Positive value + negated existence (value === undefined) → conflict
+ *   3. Positive value + negated same value → conflict
+ */
+function hasGroupedValueConflict<T extends { negated: boolean }>(
+  terms: ConditionNode[],
+  match: (term: ConditionNode) => T | null,
+  groupKey: (term: T) => string,
+  getValue: (term: T) => string | undefined,
+): boolean {
+  const groups = new Map<
     string,
-    { positive: ModifierCondition[]; negated: ModifierCondition[] }
+    { positive: T[]; negated: T[] }
   >();
 
   for (const term of terms) {
-    if (term.kind !== 'state' || term.type !== 'modifier') continue;
+    const matched = match(term);
+    if (!matched) continue;
 
-    const attr = term.attribute;
-    if (!modifiersByAttr.has(attr)) {
-      modifiersByAttr.set(attr, { positive: [], negated: [] });
+    const key = groupKey(matched);
+    let group = groups.get(key);
+    if (!group) {
+      group = { positive: [], negated: [] };
+      groups.set(key, group);
     }
 
-    const group = modifiersByAttr.get(attr)!;
-    if (term.negated) {
-      group.negated.push(term);
+    if (matched.negated) {
+      group.negated.push(matched);
     } else {
-      group.positive.push(term);
+      group.positive.push(matched);
     }
   }
 
-  // Check each attribute for conflicts
-  for (const [_attr, group] of modifiersByAttr) {
-    // Multiple different values for same attribute in positive → conflict
+  for (const [, group] of groups) {
     const positiveValues = group.positive
-      .filter((m) => m.value !== undefined)
-      .map((m) => m.value);
-    const uniquePositiveValues = new Set(positiveValues);
-    if (uniquePositiveValues.size > 1) {
-      return true;
-    }
+      .map(getValue)
+      .filter((v) => v !== undefined);
+    if (new Set(positiveValues).size > 1) return true;
 
-    // Positive value + negated boolean for same attribute → conflict
-    // e.g., [data-theme="dark"] & ![data-theme]
-    const hasPositiveValue = group.positive.some((m) => m.value !== undefined);
-    const hasNegatedBoolean = group.negated.some((m) => m.value === undefined);
-    if (hasPositiveValue && hasNegatedBoolean) {
-      return true;
-    }
+    const hasPositiveValue = positiveValues.length > 0;
+    const hasNegatedExistence = group.negated.some(
+      (t) => getValue(t) === undefined,
+    );
+    if (hasPositiveValue && hasNegatedExistence) return true;
 
-    // Positive boolean + negated value (same value) → tautology not conflict
-    // But positive value + negated same value → conflict
     for (const pos of group.positive) {
-      if (pos.value !== undefined) {
+      const posVal = getValue(pos);
+      if (posVal !== undefined) {
         for (const neg of group.negated) {
-          if (neg.value === pos.value) {
-            return true; // [data-x="y"] & ![data-x="y"]
-          }
+          if (getValue(neg) === posVal) return true;
         }
       }
     }
@@ -604,81 +608,26 @@ function hasAttributeConflict(terms: ConditionNode[]): boolean {
   return false;
 }
 
-// ============================================================================
-// Container Style Query Conflict Detection
-// ============================================================================
+function hasAttributeConflict(terms: ConditionNode[]): boolean {
+  return hasGroupedValueConflict<ModifierCondition>(
+    terms,
+    (t) =>
+      t.kind === 'state' && t.type === 'modifier' ? t : null,
+    (t) => t.attribute,
+    (t) => t.value,
+  );
+}
 
-/**
- * Check for container style query conflicts
- * e.g., style(--variant: danger) & style(--variant: success) → FALSE
- * e.g., style(--variant: danger) & not style(--variant) → FALSE
- */
 function hasContainerStyleConflict(terms: ConditionNode[]): boolean {
-  // Group container style queries by property (and container name)
-  const styleByProp = new Map<
-    string,
-    { positive: ContainerCondition[]; negated: ContainerCondition[] }
-  >();
-
-  for (const term of terms) {
-    if (
-      term.kind !== 'state' ||
-      term.type !== 'container' ||
-      term.subtype !== 'style'
-    )
-      continue;
-
-    const key = `${term.containerName || '_'}:${term.property}`;
-    if (!styleByProp.has(key)) {
-      styleByProp.set(key, { positive: [], negated: [] });
-    }
-
-    const group = styleByProp.get(key)!;
-    if (term.negated) {
-      group.negated.push(term);
-    } else {
-      group.positive.push(term);
-    }
-  }
-
-  // Check each property for conflicts
-  for (const [, group] of styleByProp) {
-    // Multiple different values for same property in positive → conflict
-    // e.g., style(--variant: danger) & style(--variant: success)
-    const positiveValues = group.positive
-      .filter((c) => c.propertyValue !== undefined)
-      .map((c) => c.propertyValue);
-    const uniquePositiveValues = new Set(positiveValues);
-    if (uniquePositiveValues.size > 1) {
-      return true;
-    }
-
-    // Positive value + negated existence → conflict
-    // e.g., style(--variant: danger) & not style(--variant)
-    const hasPositiveValue = group.positive.some(
-      (c) => c.propertyValue !== undefined,
-    );
-    const hasNegatedExistence = group.negated.some(
-      (c) => c.propertyValue === undefined,
-    );
-    if (hasPositiveValue && hasNegatedExistence) {
-      return true;
-    }
-
-    // Positive value + negated same value → conflict
-    // e.g., style(--variant: danger) & not style(--variant: danger)
-    for (const pos of group.positive) {
-      if (pos.propertyValue !== undefined) {
-        for (const neg of group.negated) {
-          if (neg.propertyValue === pos.propertyValue) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-
-  return false;
+  return hasGroupedValueConflict<ContainerCondition>(
+    terms,
+    (t) =>
+      t.kind === 'state' && t.type === 'container' && t.subtype === 'style'
+        ? t
+        : null,
+    (t) => `${t.containerName || '_'}:${t.property}`,
+    (t) => t.propertyValue,
+  );
 }
 
 // ============================================================================
@@ -700,60 +649,56 @@ function hasContainerStyleConflict(terms: ConditionNode[]): boolean {
  *   Before: @container style(--variant: danger) and (not style(--variant: success))
  *   After:  @container style(--variant: danger)
  */
-function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
-  // Build sets of positive container style properties with specific values
-  const positiveContainerStyles = new Map<string, string | undefined>();
-
-  // Build sets of positive modifier attributes with specific values
-  const positiveModifiers = new Map<string, string | undefined>();
+/**
+ * Collect positive values from terms and build a "is this negation implied?" check.
+ *
+ * A negation is implied (redundant) when a positive term for the same group
+ * already pins a specific value, making "NOT other-value" obvious.
+ * e.g. style(--variant: danger) implies NOT style(--variant: success).
+ */
+function buildImpliedNegationCheck(
+  terms: ConditionNode[],
+): (term: ConditionNode) => boolean {
+  const positiveValues = new Map<string, string>();
 
   for (const term of terms) {
     if (term.kind !== 'state' || term.negated) continue;
 
     if (term.type === 'container' && term.subtype === 'style') {
-      const key = `${term.containerName || '_'}:${term.property}`;
       if (term.propertyValue !== undefined) {
-        positiveContainerStyles.set(key, term.propertyValue);
+        positiveValues.set(
+          `c:${term.containerName || '_'}:${term.property}`,
+          term.propertyValue,
+        );
       }
-    }
-
-    if (term.type === 'modifier' && term.value !== undefined) {
-      positiveModifiers.set(term.attribute, term.value);
+    } else if (term.type === 'modifier' && term.value !== undefined) {
+      positiveValues.set(`m:${term.attribute}`, term.value);
     }
   }
 
-  return terms.filter((term) => {
-    if (term.kind !== 'state' || !term.negated) return true;
+  return (term: ConditionNode): boolean => {
+    if (term.kind !== 'state' || !term.negated) return false;
 
-    // Check container style negations
     if (term.type === 'container' && term.subtype === 'style') {
-      const key = `${term.containerName || '_'}:${term.property}`;
-      const positiveValue = positiveContainerStyles.get(key);
-
-      if (positiveValue !== undefined) {
-        if (term.propertyValue === undefined) {
-          return true;
-        }
-
-        if (term.propertyValue !== positiveValue) {
-          return false;
-        }
-      }
+      if (term.propertyValue === undefined) return false;
+      const pos = positiveValues.get(
+        `c:${term.containerName || '_'}:${term.property}`,
+      );
+      return pos !== undefined && term.propertyValue !== pos;
     }
 
-    // Check modifier negations
-    if (term.type === 'modifier') {
-      const positiveValue = positiveModifiers.get(term.attribute);
-
-      if (positiveValue !== undefined && term.value !== undefined) {
-        if (term.value !== positiveValue) {
-          return false;
-        }
-      }
+    if (term.type === 'modifier' && term.value !== undefined) {
+      const pos = positiveValues.get(`m:${term.attribute}`);
+      return pos !== undefined && term.value !== pos;
     }
 
-    return true;
-  });
+    return false;
+  };
+}
+
+function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
+  const isImplied = buildImpliedNegationCheck(terms);
+  return terms.filter((t) => !isImplied(t));
 }
 
 // ============================================================================
@@ -913,60 +858,43 @@ function appendBoundsToUniqueId(
   }
 }
 
-function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
+function mergeDimensionRanges<
+  T extends MediaCondition | ContainerCondition,
+>(
+  conditions: T[],
+  idPrefix: string[],
+): T | null {
   if (conditions.length === 0) return null;
 
   const { lowerBound, upperBound } = tightenBounds(conditions);
   const base = conditions[0];
 
-  const merged: MediaCondition = {
-    kind: 'state',
-    type: 'media',
-    subtype: 'dimension',
+  const parts = [...idPrefix];
+  appendBoundsToUniqueId(parts, lowerBound, upperBound);
+
+  return {
+    ...base,
     negated: false,
     raw: buildMergedRaw(base.dimension || 'width', lowerBound, upperBound),
-    uniqueId: '',
-    dimension: base.dimension,
+    uniqueId: parts.join(':'),
     lowerBound,
     upperBound,
   };
+}
 
-  const dim = merged.dimension ?? 'width';
-  const parts: string[] = ['media', 'dim', dim];
-  appendBoundsToUniqueId(parts, lowerBound, upperBound);
-  merged.uniqueId = parts.join(':');
-
-  return merged;
+function mergeMediaRanges(conditions: MediaCondition[]): MediaCondition | null {
+  const dim = conditions[0]?.dimension ?? 'width';
+  return mergeDimensionRanges(conditions, ['media', 'dim', dim]);
 }
 
 function mergeContainerRanges(
   conditions: ContainerCondition[],
 ): ContainerCondition | null {
-  if (conditions.length === 0) return null;
-
-  const { lowerBound, upperBound } = tightenBounds(conditions);
   const base = conditions[0];
-
-  const merged: ContainerCondition = {
-    kind: 'state',
-    type: 'container',
-    subtype: 'dimension',
-    negated: false,
-    raw: buildMergedRaw(base.dimension || 'width', lowerBound, upperBound),
-    uniqueId: '',
-    containerName: base.containerName,
-    dimension: base.dimension,
-    lowerBound,
-    upperBound,
-  };
-
-  const name = merged.containerName || '_';
-  const dim = merged.dimension ?? 'width';
-  const parts: string[] = ['container', 'dim', name, dim];
-  appendBoundsToUniqueId(parts, lowerBound, upperBound);
-  merged.uniqueId = parts.join(':');
-
-  return merged;
+  if (!base) return null;
+  const name = base.containerName || '_';
+  const dim = base.dimension ?? 'width';
+  return mergeDimensionRanges(conditions, ['container', 'dim', name, dim]);
 }
 
 function buildMergedRaw(
@@ -993,11 +921,11 @@ function buildMergedRaw(
 // ============================================================================
 
 function sortTerms(terms: ConditionNode[]): ConditionNode[] {
-  return [...terms].sort((a, b) => {
-    const idA = getConditionUniqueId(a);
-    const idB = getConditionUniqueId(b);
-    return idA.localeCompare(idB);
-  });
+  const withIds = terms.map(
+    (t) => [getConditionUniqueId(t), t] as const,
+  );
+  withIds.sort((a, b) => a[0].localeCompare(b[0]));
+  return withIds.map(([, t]) => t);
 }
 
 // ============================================================================

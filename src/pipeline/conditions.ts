@@ -771,22 +771,30 @@ export function createSupportsCondition(
 // Utility Functions
 // ============================================================================
 
+const uniqueIdCache = new WeakMap<ConditionNode, string>();
+
 /**
- * Get the unique ID for any condition node
+ * Get the unique ID for any condition node.
+ * Results are memoized via WeakMap since condition nodes are immutable.
  */
 export function getConditionUniqueId(node: ConditionNode): string {
+  const cached = uniqueIdCache.get(node);
+  if (cached !== undefined) return cached;
+
+  let id: string;
   if (node.kind === 'true') {
-    return 'TRUE';
-  }
-  if (node.kind === 'false') {
-    return 'FALSE';
-  }
-  if (node.kind === 'state') {
-    return node.uniqueId;
-  }
-  if (node.kind === 'compound') {
+    id = 'TRUE';
+  } else if (node.kind === 'false') {
+    id = 'FALSE';
+  } else if (node.kind === 'state') {
+    id = node.uniqueId;
+  } else if (node.kind === 'compound') {
     const childIds = node.children.map(getConditionUniqueId).sort();
-    return `${node.operator}(${childIds.join(',')})`;
+    id = `${node.operator}(${childIds.join(',')})`;
+  } else {
+    id = 'UNKNOWN';
   }
-  return 'UNKNOWN';
+
+  uniqueIdCache.set(node, id);
+  return id;
 }

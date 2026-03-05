@@ -1,6 +1,8 @@
-# Tasty Style Helper
+# Usage Guide
 
 `tasty` is a powerful utility for creating styled React components with a declarative, design-system-integrated API. It combines the flexibility of CSS-in-JS with the consistency of a design system, enabling you to build maintainable, themeable components quickly.
+
+For global configuration (tokens, recipes, custom units, handlers), see **[Configuration](configuration.md)**.
 
 ---
 
@@ -147,192 +149,7 @@ const TokenCard = tasty({
 
 ## Configuration
 
-Configure the Tasty style system before your app renders using the `configure()` function. Configuration must be done **before any styles are generated** (before first render).
-
-```jsx
-import { configure } from '@tenphi/tasty';
-
-configure({
-  // CSP nonce for style elements
-  nonce: 'abc123',
-
-  // Global state aliases
-  states: {
-    '@mobile': '@media(w < 768px)',
-    '@tablet': '@media(768px <= w < 1024px)',
-    '@dark': '@root(theme=dark)',
-  },
-
-  // Parser configuration
-  parserCacheSize: 2000, // LRU cache size (default: 1000)
-
-  // Custom units (merged with built-in units)
-  units: {
-    vh: 'vh',
-    vw: 'vw',
-    custom: (n) => `${n * 10}px`, // Function-based unit
-  },
-
-  // Custom functions for the parser
-  funcs: {
-    double: (groups) => {
-      const value = parseFloat(groups[0]?.output || '0');
-      return `${value * 2}px`;
-    },
-  },
-});
-```
-
-### Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `nonce` | `string` | - | CSP nonce for style elements |
-| `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
-| `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
-| `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in) |
-| `funcs` | `Record<string, Function>` | - | Custom parser functions (merged with existing) |
-| `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
-| `tokens` | `Record<string, string \| number>` | - | Predefined tokens replaced during parsing |
-| `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
-| `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
-| `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
-
-### Predefined Tokens
-
-Define reusable tokens that are replaced during style parsing. Unlike component-level `tokens` prop (which renders as inline CSS custom properties), predefined tokens are baked into the generated CSS.
-
-```jsx
-configure({
-  tokens: {
-    $spacing: '2x',
-    '$card-padding': '4x',
-    '$button-height': '40px',
-    '#accent': '#purple',
-    '#surface': '#white',
-    '#surface-hover': '#gray.05',
-  },
-});
-
-const Card = tasty({
-  styles: {
-    padding: '$card-padding',
-    fill: '#surface',
-    border: '1bw solid #accent',
-  },
-});
-```
-
-### Recipes
-
-Recipes are predefined, named style bundles that can be applied to any component via the `recipe` style property.
-
-```jsx
-configure({
-  recipes: {
-    card: {
-      padding: '4x',
-      fill: '#surface',
-      radius: '1r',
-      border: true,
-    },
-    elevated: {
-      shadow: '2x 2x 4x #shadow',
-    },
-  },
-});
-
-// Apply a single recipe
-const Card = tasty({
-  styles: {
-    recipe: 'card',
-    color: '#text',
-  },
-});
-
-// Compose multiple recipes
-const ElevatedCard = tasty({
-  styles: {
-    recipe: 'card elevated',
-    color: '#text',
-  },
-});
-```
-
-**Post-merge recipes (`/` separator):**
-
-Recipes listed after `/` are applied *after* component styles using `mergeStyles`:
-
-```jsx
-const Input = tasty({
-  styles: {
-    recipe: 'reset input / input-autofill',
-    preset: 't3',
-  },
-});
-```
-
-Use `none` to skip base recipes and apply only post recipes:
-
-```jsx
-const Custom = tasty({
-  styles: {
-    recipe: 'none / disabled',
-    padding: '2x',
-  },
-});
-```
-
-### Built-in Units
-
-| Unit | Description | Example | CSS Output |
-|------|-------------|---------|------------|
-| `x` | Gap multiplier | `2x` | `calc(var(--gap) * 2)` |
-| `r` | Border radius | `1r` | `var(--radius)` |
-| `cr` | Card border radius | `1cr` | `var(--card-radius)` |
-| `bw` | Border width | `2bw` | `calc(var(--border-width) * 2)` |
-| `ow` | Outline width | `1ow` | `var(--outline-width)` |
-| `fs` | Font size | `1fs` | `var(--font-size)` |
-| `lh` | Line height | `1lh` | `var(--line-height)` |
-| `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
-
-### Custom Style Handlers
-
-```jsx
-import { configure, styleHandlers } from '@tenphi/tasty';
-
-configure({
-  handlers: {
-    fill: ({ fill }) => {
-      if (fill?.startsWith('gradient:')) {
-        return { background: fill.slice(9) };
-      }
-      return styleHandlers.fill({ fill });
-    },
-    elevation: ({ elevation }) => {
-      const level = parseInt(elevation) || 1;
-      return {
-        'box-shadow': `0 ${level * 2}px ${level * 4}px rgba(0,0,0,0.1)`,
-        'z-index': String(level * 100),
-      };
-    },
-  },
-});
-```
-
-### Extending Style Types (TypeScript)
-
-Use module augmentation to extend the `StylesInterface`:
-
-```tsx
-// tasty.d.ts
-declare module '@tenphi/tasty' {
-  interface StylesInterface {
-    elevation?: string;
-    gradient?: string;
-  }
-}
-```
+For tokens, recipes, custom units, style handlers, and other global settings, see **[Configuration](configuration.md)**.
 
 ---
 
@@ -432,6 +249,80 @@ fill: '#current.5',         // → color-mix(in oklab, currentcolor 50%, transpa
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
+### Built-in Units
+
+| Unit | Description | Example | CSS Output |
+|------|-------------|---------|------------|
+| `x` | Gap multiplier | `2x` | `calc(var(--gap) * 2)` |
+| `r` | Border radius | `1r` | `var(--radius)` |
+| `cr` | Card border radius | `1cr` | `var(--card-radius)` |
+| `bw` | Border width | `2bw` | `calc(var(--border-width) * 2)` |
+| `ow` | Outline width | `1ow` | `var(--outline-width)` |
+| `fs` | Font size | `1fs` | `var(--font-size)` |
+| `lh` | Line height | `1lh` | `var(--line-height)` |
+| `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
+
+You can register additional custom units via [`configure()`](configuration.md#options).
+
+### Predefined Tokens
+
+Tokens defined via [`configure({ tokens })`](configuration.md#predefined-tokens) are replaced at parse time and baked into the generated CSS:
+
+```jsx
+const Card = tasty({
+  styles: {
+    padding: '$card-padding',
+    fill: '#surface',
+    border: '1bw solid #accent',
+  },
+});
+```
+
+### Recipes
+
+Apply predefined style bundles (defined via [`configure({ recipes })`](configuration.md#recipes)) using the `recipe` style property:
+
+```jsx
+const Card = tasty({
+  styles: {
+    recipe: 'card',
+    color: '#text',
+  },
+});
+
+// Compose multiple recipes
+const ElevatedCard = tasty({
+  styles: {
+    recipe: 'card elevated',
+    color: '#text',
+  },
+});
+```
+
+**Post-merge recipes (`/` separator):**
+
+Recipes listed after `/` are applied *after* component styles using `mergeStyles`:
+
+```jsx
+const Input = tasty({
+  styles: {
+    recipe: 'reset input / input-autofill',
+    preset: 't3',
+  },
+});
+```
+
+Use `none` to skip base recipes and apply only post recipes:
+
+```jsx
+const Custom = tasty({
+  styles: {
+    recipe: 'none / disabled',
+    padding: '2x',
+  },
+});
+```
+
 ### Advanced States (`@` prefix)
 
 | Prefix | Purpose | Example |
@@ -523,10 +414,8 @@ const AnimatedGradient = tasty({
         inherits: false,
         initialValue: '0deg',
       },
-      '#theme': {
-        initialValue: 'purple',
-      },
     },
+    '#theme': 'okhsl(280 80% 50%)',
     background: 'linear-gradient($gradient-angle, #theme, transparent)',
     transition: '$$gradient-angle 0.3s, ##theme 0.3s',
   },
@@ -553,6 +442,10 @@ const Button = tasty({
 
 ### Sub-element Styling
 
+Sub-elements are inner parts of a compound component, styled via capitalized keys in `styles` and identified by `data-element` attributes in the DOM.
+
+> **Best Practice:** Use the `elements` prop to declare sub-element components. This gives you typed, reusable sub-components (`Card.Title`, `Card.Content`) instead of manually writing `data-element` attributes.
+
 ```jsx
 const Card = tasty({
   styles: {
@@ -560,17 +453,48 @@ const Card = tasty({
     Title: { preset: 'h3', color: '#primary' },
     Content: { color: '#text' },
   },
+  elements: {
+    Title: 'h3',
+    Content: 'div',
+  },
+});
+
+// Sub-components automatically get data-element attributes
+<Card>
+  <Card.Title>Card Title</Card.Title>
+  <Card.Content>Card content</Card.Content>
+</Card>
+```
+
+Each entry in `elements` can be a tag name string or a config object:
+
+```jsx
+elements: {
+  Title: 'h3',                          // shorthand: tag name only
+  Icon: { as: 'span', qa: 'card-icon' }, // full form: tag + QA attribute
+}
+```
+
+The sub-components produced by `elements` support `mods`, `tokens`, `isDisabled`, `isHidden`, and `isChecked` props — the same modifier interface as the root component.
+
+If you don't need sub-components (e.g., the inner elements are already rendered by a third-party library), you can still style them by key alone — just omit `elements` and apply `data-element` manually:
+
+```jsx
+const Card = tasty({
+  styles: {
+    padding: '4x',
+    Title: { preset: 'h3', color: '#primary' },
+  },
 });
 
 <Card>
   <div data-element="Title">Card Title</div>
-  <div data-element="Content">Card content</div>
 </Card>
 ```
 
 #### Selector Affix (`$`)
 
-Control sub-element selector combinator:
+Control how a sub-element selector attaches to the root selector using the `$` property inside the sub-element's styles:
 
 | Pattern | Result | Description |
 |---------|--------|-------------|
@@ -578,6 +502,23 @@ Control sub-element selector combinator:
 | `>` | `> [el]` | Direct child |
 | `>Body>Row>` | `> [Body] > [Row] > [el]` | Chained elements |
 | `::before` | `::before` | Root pseudo (no key) |
+| `@::before` | `[el]::before` | Pseudo on the sub-element |
+| `>@:hover` | `> [el]:hover` | Pseudo-class on the sub-element |
+| `>@.active` | `> [el].active` | Class on the sub-element |
+
+The `@` placeholder marks exactly where the `[data-element="..."]` selector is injected, allowing you to attach pseudo-classes, pseudo-elements, or class selectors directly to the sub-element instead of the root:
+
+```jsx
+const List = tasty({
+  styles: {
+    Item: {
+      $: '>@:last-child',
+      border: 'none',
+    },
+  },
+});
+// → .t0 > [data-element="Item"]:last-child { border: none }
+```
 
 ---
 
@@ -653,7 +594,7 @@ function MyTabs({ styles, tabListStyles, prefixStyles }) {
 - Use styled wrappers instead of `styles` prop directly
 - Use design tokens and custom units (`#text`, `2x`, `1r`)
 - Use semantic transition names (`theme 0.3s`)
-- Use sub-element styling for inner elements
+- Use `elements` prop to declare typed sub-components for compound components
 - Use `styleProps` for component APIs
 - Use `tokens` prop for dynamic values
 

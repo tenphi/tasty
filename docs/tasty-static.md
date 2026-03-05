@@ -331,7 +331,7 @@ const card = tastyStatic({
 
 ## Extending Style Types (TypeScript)
 
-If you add custom style properties, use module augmentation so `tastyStatic` recognizes them too. See [Extending Style Types](tasty.md#extending-style-types-typescript) in the main tasty docs.
+If you add custom style properties, use module augmentation so `tastyStatic` recognizes them too. See [Extending Style Types](configuration.md#extending-style-types-typescript) in the configuration docs.
 
 ---
 
@@ -372,4 +372,5 @@ const card = tastyStatic({
 
 ## Related
 
-- [Tasty Documentation](tasty.md) — Full tasty style system documentation
+- [Usage Guide](usage.md) — Runtime styling: component creation, state mappings, sub-elements, variants, and hooks
+- [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers

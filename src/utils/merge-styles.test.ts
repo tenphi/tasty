@@ -499,6 +499,49 @@ describe('mergeStyles', () => {
       ]);
     });
 
+    it('should apply extend-mode map after replace-mode variant', () => {
+      const base: Styles = {
+        border: 0,
+        fill: '#gray',
+      };
+      const variant: Styles = {
+        fill: {
+          '': '#white',
+          hovered: '#blue',
+          disabled: '#light-gray',
+        },
+        border: {
+          '': '#white.2',
+          pressed: '#primary-text',
+          disabled: '#clear',
+        },
+      };
+      const extensions: Styles = {
+        border: {
+          'type=primary': '#clear',
+        },
+      } as Styles;
+
+      const result = mergeStyles(base, variant, extensions);
+
+      expect(Object.keys(result.border as object)).toEqual([
+        '',
+        'pressed',
+        'disabled',
+        'type=primary',
+      ]);
+      expect((result.border as any)['']).toBe('#white.2');
+      expect((result.border as any).pressed).toBe('#primary-text');
+      expect((result.border as any).disabled).toBe('#clear');
+      expect((result.border as any)['type=primary']).toBe('#clear');
+
+      expect(result.fill).toEqual({
+        '': '#white',
+        hovered: '#blue',
+        disabled: '#light-gray',
+      });
+    });
+
     it('should support multi-level @inherit chaining', () => {
       const base: Styles = {
         fill: {

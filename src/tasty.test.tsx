@@ -184,6 +184,44 @@ describe('tasty() API', () => {
     expect(container).toMatchTastySnapshot();
   });
 
+  it('should apply extend-mode base styles on top of variant', () => {
+    const StyledBlock = tasty({
+      styles: {
+        padding: '2x',
+        border: {
+          'type=primary': '#clear',
+        },
+      },
+      variants: {
+        primary: {
+          border: {
+            '': '#white.2',
+            pressed: '#primary-text',
+            disabled: '#clear',
+          },
+          fill: {
+            '': '#white #primary',
+            hovered: '#white #primary-text',
+          },
+        },
+        secondary: {
+          border: {
+            '': '#primary.15',
+            pressed: '#primary.3',
+          },
+          fill: '#primary.10',
+        },
+      },
+    });
+    const { container: primary } = render(<StyledBlock variant="primary" />);
+    const { container: secondary } = render(
+      <StyledBlock variant="secondary" />,
+    );
+
+    expect(primary).toMatchTastySnapshot();
+    expect(secondary).toMatchTastySnapshot();
+  });
+
   it('should pass qa prop', () => {
     const StyledBlock = tasty({ qa: 'Field' });
     const { container } = render(<StyledBlock />);

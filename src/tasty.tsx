@@ -21,6 +21,7 @@ import type {
 import { getDisplayName } from './utils/get-display-name';
 import { isValidElementType } from './utils/is-valid-element-type';
 import { mergeStyles } from './utils/merge-styles';
+import { isSelector } from './pipeline';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens, stringifyTokens } from './utils/process-tokens';
 
@@ -461,10 +462,40 @@ function tastyElement<
   // This avoids creating separate component instances per variant
   let variantStylesMap: Record<string, Styles | undefined> | undefined;
   if (variants) {
+    // Split defaultStyles: extend-mode state maps (no '' key, non-selector)
+    // are pulled out and applied AFTER variant merge so they survive
+    // replace-mode maps in variants.
+    let baseStyles = defaultStyles;
+    let extensionStyles: Styles | undefined;
+
+    if (defaultStyles) {
+      for (const key of Object.keys(defaultStyles)) {
+        if (isSelector(key)) continue;
+
+        const value = (defaultStyles as Record<string, unknown>)[key];
+
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          !Array.isArray(value) &&
+          !('' in value)
+        ) {
+          if (!extensionStyles) {
+            baseStyles = { ...defaultStyles } as Styles;
+            extensionStyles = {} as Styles;
+          }
+          (extensionStyles as Record<string, unknown>)[key] = value;
+          delete (baseStyles as Record<string, unknown>)[key];
+        }
+      }
+    }
+
     const variantEntries = Object.entries(variants) as [string, Styles][];
     variantStylesMap = variantEntries.reduce(
       (map, [variant, variantStyles]) => {
-        map[variant] = mergeStyles(defaultStyles, variantStyles);
+        map[variant] = extensionStyles
+          ? mergeStyles(baseStyles, variantStyles, extensionStyles)
+          : mergeStyles(baseStyles, variantStyles);
         return map;
       },
       {} as Record<string, Styles | undefined>,

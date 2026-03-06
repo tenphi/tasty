@@ -28,7 +28,7 @@ That guarantee unlocks a concise, CSS-like DSL where design tokens, custom units
 - **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days.
 - **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts.
 - **Near-complete modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, etc. Some features that don't fit Tasty's component model (such as `@layer` and `!important`) are intentionally omitted, but real-world use cases are covered almost completely.
-- **Runtime or zero-runtime — your call** — Use `tasty()` for dynamic React components with runtime injection, or `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction. Same DSL, same tokens, same output.
+- **Runtime, zero-runtime, or SSR — your call** — Use `tasty()` for dynamic React components with runtime injection, `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction, or enable SSR with zero-cost client hydration for Next.js, Astro, or any React framework (experimental). Same DSL, same tokens, same output.
 - **Only generate what is used** — In runtime mode, Tasty injects CSS on demand for mounted components/variants, so your app avoids shipping style rules for UI states that are never rendered.
 - **Runtime performance that holds at scale** — The runtime path is tested against enterprise-scale applications and tuned with multi-level caching, chunk-level style reuse, style garbage collection, and a dedicated injector.
 - **Composable and extensible by design** — Extend any component's styles with proper merge semantics, and evolve built-in behavior through configuration and plugins.
@@ -415,6 +415,48 @@ If you choose the runtime approach, performance is usually a non-issue in practi
 - A dedicated style injector minimizes DOM/style-tag overhead.
 - This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
 
+### Server-Side Rendering (Experimental)
+
+SSR with zero-cost client hydration. Existing `tasty()` components work unchanged — SSR is opt-in and requires no per-component modifications. Supports Next.js (App Router with streaming), Astro (middleware + islands), and any React-based framework via the core API. Requires React 19+.
+
+**Next.js setup:**
+
+```tsx
+// app/tasty-registry.tsx
+'use client';
+
+import { TastyRegistry } from '@tenphi/tasty/ssr/next';
+
+export default function TastyStyleRegistry({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <TastyRegistry>{children}</TastyRegistry>;
+}
+```
+
+```tsx
+// app/layout.tsx
+import TastyStyleRegistry from './tasty-registry';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <TastyStyleRegistry>{children}</TastyStyleRegistry>
+      </body>
+    </html>
+  );
+}
+```
+
+See the [full SSR guide](docs/ssr.md) for Astro integration, streaming SSR, generic framework usage, and the complete API reference.
+
 ## Entry Points
 
 | Import | Description | Platform |
@@ -425,6 +467,9 @@ If you choose the runtime approach, performance is usually a non-issue in practi
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic extraction API | Node |
 | `@tenphi/tasty/next` | Next.js integration wrapper | Node |
+| `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
+| `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
+| `@tenphi/tasty/ssr/astro` | Astro middleware + auto-hydration | Node / Browser |
 
 ## Ecosystem
 
@@ -477,6 +522,7 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 - **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
+- **[Server-Side Rendering](docs/ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks: streaming support, cache hydration, and troubleshooting
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring
 

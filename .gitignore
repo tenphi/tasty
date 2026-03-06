@@ -35,3 +35,6 @@ vite.config.ts.timestamp-*
 
 # Package tarballs
 *.tgz
+
+# Plans
+*.plan.md

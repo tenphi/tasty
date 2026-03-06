@@ -440,6 +440,36 @@ const Button = tasty({
 <Button variant="danger">Delete</Button>
 ```
 
+#### Extending Variants with Base State Maps
+
+When base `styles` contain an extend-mode state map (an object **without** a `''` key), it is applied **after** the variant merge. This lets you add or override states across all variants without repeating yourself:
+
+```jsx
+const Badge = tasty({
+  styles: {
+    padding: '1x 2x',
+    // No '' key → extend mode: appended to every variant's border
+    border: {
+      'type=primary': '#clear',
+    },
+  },
+  variants: {
+    primary: {
+      border: { '': '#white.2', pressed: '#primary-text', disabled: '#clear' },
+      fill: { '': '#white #primary', hovered: '#white #primary-text' },
+    },
+    secondary: {
+      border: { '': '#primary.15', pressed: '#primary.3' },
+      fill: '#primary.10',
+    },
+  },
+});
+
+// Both variants get 'type=primary': '#clear' appended to their border map
+```
+
+Properties that are **not** extend-mode (simple values, state maps with `''`, `null`, `false`, selectors, sub-elements) merge with variants as before — the variant can fully replace them.
+
 ### Sub-element Styling
 
 Sub-elements are inner parts of a compound component, styled via capitalized keys in `styles` and identified by `data-element` attributes in the DOM.

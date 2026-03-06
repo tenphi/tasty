@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.6.0
+
+### Minor Changes
+
+- [#21](https://github.com/tenphi/tasty/pull/21) [`2546c41`](https://github.com/tenphi/tasty/commit/2546c4151a60194eac115e13cc07bcee00ea0636) Thanks [@tenphi](https://github.com/tenphi)! - Add extend-mode state maps: base styles with state maps lacking a `''` key are now applied after variant merge, allowing shared state overrides across all variants.
+
 ## 0.5.4
 
 ### Patch Changes

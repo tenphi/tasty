@@ -314,18 +314,11 @@ Use `/` to post-apply recipes after local styles when you need recipe states/sty
 
 Modern CSS features are natively supported:
 
-Color tokens are automatically registered as typed properties (`<color>`), so token-based transitions work without extra setup.
+Custom property types (`<color>`, `<number>`, `<length>`, `<angle>`, `<percentage>`, `<time>`) are automatically inferred from values and registered as CSS `@property` declarations — no manual setup needed:
 
 ```tsx
 const Pulse = tasty({
   styles: {
-    '@properties': {
-      '$pulse-scale': {
-        syntax: '<number>',
-        inherits: false,
-        initialValue: 1,
-      },
-    },
     animation: 'pulse 2s infinite',
     transform: 'scale($pulse-scale)',
     '@keyframes': {
@@ -337,6 +330,18 @@ const Pulse = tasty({
   },
 });
 ```
+
+The `$pulse-scale: 1` declaration is detected as `<number>` and a `@property --pulse-scale` rule is injected automatically. This also works for `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
+
+Use explicit `@properties` only when you need non-default settings (e.g. `inherits: false`):
+
+```tsx
+'@properties': {
+  '$pulse-scale': { syntax: '<number>', inherits: false, initialValue: 1 },
+},
+```
+
+Disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
 
 ### React Hooks
 

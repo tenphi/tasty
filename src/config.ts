@@ -88,6 +88,14 @@ export interface TastyConfig {
    */
   funcs?: Record<string, (groups: StyleDetails[]) => string>;
   /**
+   * Automatically infer and register CSS @property declarations
+   * from custom property values found in styles, keyframes, and global config.
+   * Covers all types: \<color\>, \<number\>, \<length\>, \<angle\>, \<percentage\>, \<time\>.
+   * When false, only explicitly declared @properties are registered.
+   * @default true
+   */
+  autoPropertyTypes?: boolean;
+  /**
    * Plugins that extend tasty with custom functions, units, or states.
    * Plugins are processed in order, with later plugins overriding earlier ones.
    * @example

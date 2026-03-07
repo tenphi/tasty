@@ -364,22 +364,15 @@ const ProfileCard = tasty({
 
 Use `/` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order. Use `none` to skip base recipes: `recipe: 'none / disabled'`.
 
-### Keyframes and `@property`
+### Auto-Inferred `@property`
 
-Modern CSS features are natively supported:
+CSS custom properties do not animate smoothly by default because the browser does not know how to interpolate their values. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule fixes that by declaring a property's syntax, such as `<number>` or `<color>`.
 
-Color tokens are automatically registered as typed properties (`<color>`), so token-based transitions work without extra setup.
+In Tasty, you usually do not need to declare `@property` manually. When a custom property is assigned a concrete value, Tasty infers the syntax and registers the matching `@property` for you:
 
 ```tsx
 const Pulse = tasty({
   styles: {
-    '@properties': {
-      '$pulse-scale': {
-        syntax: '<number>',
-        inherits: false,
-        initialValue: 1,
-      },
-    },
     animation: 'pulse 2s infinite',
     transform: 'scale($pulse-scale)',
     '@keyframes': {
@@ -390,6 +383,20 @@ const Pulse = tasty({
     },
   },
 });
+```
+
+Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from the `#name` token convention.
+
+If you prefer full manual control, disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
+
+### Explicit `@properties`
+
+Declare `@properties` yourself only when you need to override the defaults, for example to set `inherits: false` or provide a custom `initialValue`:
+
+```tsx
+'@properties': {
+  '$pulse-scale': { syntax: '<number>', inherits: false, initialValue: 1 },
+},
 ```
 
 ### React Hooks

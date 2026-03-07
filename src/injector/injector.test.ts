@@ -704,4 +704,115 @@ describe('StyleInjector', () => {
       dispose();
     });
   });
+
+  describe('autoPropertyTypes', () => {
+    it('should auto-register @property for custom properties in inject()', () => {
+      const rules: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--pulse-scale: 1; --gap: 10px',
+        },
+      ];
+      injector.inject(rules);
+
+      expect(injector.isPropertyDefined('--pulse-scale')).toBe(true);
+      expect(injector.isPropertyDefined('--gap')).toBe(true);
+    });
+
+    it('should auto-register @property for --*-color properties', () => {
+      const rules: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--theme-color: var(--purple-color)',
+        },
+      ];
+      injector.inject(rules);
+
+      expect(injector.isPropertyDefined('--theme-color')).toBe(true);
+    });
+
+    it('should auto-register @property for keyframe custom properties', () => {
+      injector.keyframes(
+        {
+          from: { '--pulse-scale': '0.9' as unknown as number },
+          to: { '--pulse-scale': '1.1' as unknown as number },
+        },
+        { name: 'pulse' },
+      );
+
+      expect(injector.isPropertyDefined('--pulse-scale')).toBe(true);
+    });
+
+    it('should auto-register @property for global rules', () => {
+      const globalRules: StyleResult[] = [
+        {
+          selector: ':root',
+          declarations: '--spacing: 8px',
+        },
+      ];
+      injector.injectGlobal(globalRules);
+
+      expect(injector.isPropertyDefined('--spacing')).toBe(true);
+    });
+
+    it('should resolve var() chain across inject calls', () => {
+      const rules1: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--a: var(--b)',
+        },
+      ];
+      injector.inject(rules1);
+      expect(injector.isPropertyDefined('--a')).toBe(false);
+
+      const rules2: StyleResult[] = [
+        {
+          selector: '.t1',
+          declarations: '--b: 42',
+        },
+      ];
+      injector.inject(rules2);
+      expect(injector.isPropertyDefined('--b')).toBe(true);
+      expect(injector.isPropertyDefined('--a')).toBe(true);
+    });
+
+    it('should disable auto-injection when autoPropertyTypes is false', () => {
+      const noAutoInjector = new StyleInjector({
+        forceTextInjection: true,
+        autoPropertyTypes: false,
+      });
+
+      const rules: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--scale: 1; --gap: 10px',
+        },
+      ];
+      noAutoInjector.inject(rules);
+
+      expect(noAutoInjector.isPropertyDefined('--scale')).toBe(false);
+      expect(noAutoInjector.isPropertyDefined('--gap')).toBe(false);
+    });
+
+    it('should not override explicit @property definitions', () => {
+      // Register explicit property first
+      injector.property('$scale', {
+        syntax: '<number>',
+        inherits: false,
+        initialValue: '1',
+      });
+
+      // Now inject with a different value
+      const rules: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--scale: 2',
+        },
+      ];
+      injector.inject(rules);
+
+      // Should still be defined (the explicit one took precedence)
+      expect(injector.isPropertyDefined('--scale')).toBe(true);
+    });
+  });
 });

@@ -18,7 +18,6 @@ import { renderStyles } from '../pipeline';
 import {
   extractLocalProperties,
   hasLocalProperties,
-  inferSyntaxFromValue,
 } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';

@@ -201,6 +201,7 @@ describe('PropertyTypeResolver', () => {
     it('should warn for color token with non-color value in dev mode', () => {
       const origEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       resolver.scanDeclarations(
@@ -228,6 +229,7 @@ describe('PropertyTypeResolver', () => {
     it('should warn for regular token with color value in dev mode', () => {
       const origEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       resolver.scanDeclarations(

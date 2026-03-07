@@ -310,11 +310,11 @@ const ProfileCard = tasty({
 
 Use `/` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order. Use `none` to skip base recipes: `recipe: 'none / disabled'`.
 
-### Keyframes and `@property`
+### Auto-Inferred `@property`
 
-CSS cannot animate or transition custom properties by default — the browser doesn't know their type. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule solves this by declaring a property's syntax (e.g. `<number>`, `<color>`), which unlocks smooth interpolation in transitions and keyframe animations.
+CSS custom properties do not animate smoothly by default because the browser does not know how to interpolate their values. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule fixes that by declaring a property's syntax, such as `<number>` or `<color>`.
 
-Tasty automatically infers the type from concrete values and registers `@property` for you — no manual declarations needed:
+In Tasty, you usually do not need to declare `@property` manually. When a custom property is assigned a concrete value, Tasty infers the syntax and registers the matching `@property` for you:
 
 ```tsx
 const Pulse = tasty({
@@ -331,17 +331,19 @@ const Pulse = tasty({
 });
 ```
 
-Here `$pulse-scale: 1` is detected as `<number>`, so `@property --pulse-scale` is injected automatically and the keyframe animation works. Supported types: `<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`, and `<color>`. This also works across `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
+Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Supported inferred syntaxes: `<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`, and `<color>`.
 
-Use explicit `@properties` only when you need non-default settings (e.g. `inherits: false`):
+If you prefer full manual control, disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
+
+### Explicit `@properties`
+
+Declare `@properties` yourself only when you need to override the defaults, for example to set `inherits: false` or provide a custom `initialValue`:
 
 ```tsx
 '@properties': {
   '$pulse-scale': { syntax: '<number>', inherits: false, initialValue: 1 },
 },
 ```
-
-Disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
 
 ### React Hooks
 

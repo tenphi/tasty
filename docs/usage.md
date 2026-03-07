@@ -428,8 +428,6 @@ Use explicit `@properties` when you need non-default settings like `inherits: fa
 },
 ```
 
-Disable auto-inference with `configure({ autoPropertyTypes: false })`.
-
 ### Variants & Theming
 
 ```jsx

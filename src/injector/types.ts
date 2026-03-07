@@ -1,4 +1,5 @@
 import type { StyleResult } from '../pipeline';
+import type { PropertyTypeResolver } from '../properties/property-type-resolver';
 
 export interface InjectResult {
   className: string;
@@ -37,6 +38,12 @@ export interface StyleInjectorConfig {
    * Example: { '@mobile': '@media(w < 920px)', '@dark': '@root(theme=dark)' }
    */
   states?: Record<string, string>;
+  /**
+   * Automatically infer and register CSS @property declarations
+   * from custom property values. When false, only explicit @properties are used.
+   * @default true
+   */
+  autoPropertyTypes?: boolean;
 }
 
 export interface RuleInfo {
@@ -107,6 +114,8 @@ export interface RootRegistry {
   injectedProperties: Map<string, string>; // propertyName -> normalized declaration
   /** Global rules tracking for index adjustment */
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
+  /** Resolver for auto-inferring @property types from declaration values */
+  propertyTypeResolver: PropertyTypeResolver;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

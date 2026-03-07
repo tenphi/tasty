@@ -10,6 +10,7 @@
  */
 
 import type { PropertyDefinition } from '../injector/types';
+import { COLOR_FUNCS, RE_HEX, RE_NUMBER, RE_RAW_UNIT } from '../parser/const';
 import type { Styles } from '../styles/types';
 import { getRgbValuesFromRgbaString, strToRgb } from '../utils/styles';
 
@@ -288,4 +289,131 @@ export function colorInitialValueToRgb(initialValue?: string | number): string {
   }
 
   return '0 0 0';
+}
+
+// ============================================================================
+// Value Type Inference
+// ============================================================================
+
+const VAR_COLOR_PATTERN = /^var\(--[a-z0-9-]+-color/;
+
+/**
+ * Check whether a CSS value is a color.
+ * Detects named CSS colors, hex values, color functions (rgb, hsl, oklch, etc.),
+ * transparent, currentcolor, and var(--*-color) references.
+ */
+export function isColorValue(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return false;
+
+  if (trimmed === 'transparent' || trimmed === 'currentcolor') return true;
+
+  if (VAR_COLOR_PATTERN.test(trimmed)) return true;
+
+  // Check for #hex values
+  if (trimmed.startsWith('#') && RE_HEX.test(trimmed.slice(1))) return true;
+
+  // Check for color functions: rgb(...), hsl(...), oklch(...), etc.
+  const parenIdx = trimmed.indexOf('(');
+  if (parenIdx > 0) {
+    const fname = trimmed.slice(0, parenIdx);
+    if (COLOR_FUNCS.has(fname)) return true;
+  }
+
+  // Check for named CSS colors via strToRgb
+  const rgb = strToRgb(trimmed);
+  return rgb != null;
+}
+
+/**
+ * Result of inferring a CSS @property syntax from a value.
+ */
+export interface InferredSyntax {
+  syntax: string;
+  initialValue: string;
+}
+
+const UNIT_TO_SYNTAX: Record<string, InferredSyntax> = {};
+
+const LENGTH_UNITS = [
+  'px',
+  'em',
+  'rem',
+  'vw',
+  'vh',
+  'vmin',
+  'vmax',
+  'ch',
+  'ex',
+  'cap',
+  'ic',
+  'lh',
+  'rlh',
+  'svw',
+  'svh',
+  'lvw',
+  'lvh',
+  'dvw',
+  'dvh',
+  'cqw',
+  'cqh',
+  'cqi',
+  'cqb',
+  'cqmin',
+  'cqmax',
+];
+
+const ANGLE_UNITS = ['deg', 'rad', 'grad', 'turn'];
+const TIME_UNITS = ['ms', 's'];
+
+for (const u of LENGTH_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<length>', initialValue: '0px' };
+}
+UNIT_TO_SYNTAX['%'] = { syntax: '<percentage>', initialValue: '0%' };
+for (const u of ANGLE_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<angle>', initialValue: '0deg' };
+}
+for (const u of TIME_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<time>', initialValue: '0s' };
+}
+
+/**
+ * Infer CSS @property syntax from a concrete value.
+ * Inference is purely value-based; name-based checks (e.g. --*-color naming)
+ * are handled by the validator in PropertyTypeResolver.
+ *
+ * @param value - The CSS value to infer from (e.g. '10px', '1', '45deg')
+ * @param _propName - Unused, kept for API compatibility
+ * @returns Inferred syntax and initial value, or null if not inferable
+ */
+export function inferSyntaxFromValue(
+  value: string,
+  _propName?: string,
+): InferredSyntax | null {
+  if (!value || typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // Value-based color detection
+  if (isColorValue(trimmed)) {
+    return { syntax: '<color>', initialValue: 'transparent' };
+  }
+
+  // Bare number
+  if (RE_NUMBER.test(trimmed)) {
+    return { syntax: '<number>', initialValue: '0' };
+  }
+
+  // Number with unit
+  const unitMatch = trimmed.match(RE_RAW_UNIT);
+  if (unitMatch) {
+    const unit = unitMatch[2];
+    const mapping = UNIT_TO_SYNTAX[unit];
+    if (mapping) return mapping;
+  }
+
+  return null;
 }

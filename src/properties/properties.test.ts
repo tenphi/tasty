@@ -4,6 +4,8 @@ import {
   extractLocalProperties,
   getEffectiveDefinition,
   hasLocalProperties,
+  inferSyntaxFromValue,
+  isColorValue,
   isValidPropertyName,
   normalizePropertyDefinition,
   normalizePropertyName,
@@ -299,6 +301,126 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(def1)).not.toBe(
         normalizePropertyDefinition(def2),
       );
+    });
+  });
+
+  describe('isColorValue', () => {
+    it('should detect named CSS colors', () => {
+      expect(isColorValue('red')).toBe(true);
+      expect(isColorValue('blue')).toBe(true);
+      expect(isColorValue('transparent')).toBe(true);
+      expect(isColorValue('currentcolor')).toBe(true);
+      expect(isColorValue('currentColor')).toBe(true);
+    });
+
+    it('should detect hex colors', () => {
+      expect(isColorValue('#fff')).toBe(true);
+      expect(isColorValue('#ff0000')).toBe(true);
+      expect(isColorValue('#ff000080')).toBe(true);
+    });
+
+    it('should detect color functions', () => {
+      expect(isColorValue('rgb(255 0 0)')).toBe(true);
+      expect(isColorValue('rgba(255, 0, 0, 0.5)')).toBe(true);
+      expect(isColorValue('hsl(0 100% 50%)')).toBe(true);
+      expect(isColorValue('oklch(0.5 0.2 240)')).toBe(true);
+    });
+
+    it('should detect var(--*-color) references', () => {
+      expect(isColorValue('var(--primary-color)')).toBe(true);
+      expect(isColorValue('var(--bg-color, red)')).toBe(true);
+    });
+
+    it('should reject non-color values', () => {
+      expect(isColorValue('10px')).toBe(false);
+      expect(isColorValue('1')).toBe(false);
+      expect(isColorValue('45deg')).toBe(false);
+      expect(isColorValue('auto')).toBe(false);
+      expect(isColorValue('var(--spacing)')).toBe(false);
+      expect(isColorValue('')).toBe(false);
+    });
+  });
+
+  describe('inferSyntaxFromValue', () => {
+    it('should infer <number> from bare numbers', () => {
+      expect(inferSyntaxFromValue('1')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+      expect(inferSyntaxFromValue('0.5')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+      expect(inferSyntaxFromValue('-3')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+    });
+
+    it('should infer <length> from length units', () => {
+      expect(inferSyntaxFromValue('10px')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('2rem')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('1em')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('100vw')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+    });
+
+    it('should infer <percentage> from percent values', () => {
+      expect(inferSyntaxFromValue('50%')).toEqual({
+        syntax: '<percentage>',
+        initialValue: '0%',
+      });
+    });
+
+    it('should infer <angle> from angle units', () => {
+      expect(inferSyntaxFromValue('45deg')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+      expect(inferSyntaxFromValue('1rad')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+      expect(inferSyntaxFromValue('0.5turn')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+    });
+
+    it('should infer <time> from time units', () => {
+      expect(inferSyntaxFromValue('300ms')).toEqual({
+        syntax: '<time>',
+        initialValue: '0s',
+      });
+      expect(inferSyntaxFromValue('1s')).toEqual({
+        syntax: '<time>',
+        initialValue: '0s',
+      });
+    });
+
+    it('should infer <color> from color values', () => {
+      expect(inferSyntaxFromValue('rgb(255 0 0)')).toEqual({
+        syntax: '<color>',
+        initialValue: 'transparent',
+      });
+    });
+
+    it('should return null for complex values', () => {
+      expect(inferSyntaxFromValue('calc(1px + 2px)')).toBeNull();
+      expect(inferSyntaxFromValue('auto')).toBeNull();
+      expect(inferSyntaxFromValue('')).toBeNull();
+      expect(inferSyntaxFromValue('var(--x) + 1')).toBeNull();
     });
   });
 });

@@ -177,28 +177,25 @@ export class StyleInjector {
       };
     });
 
-    // Before inserting, auto-register @property for any color custom properties being defined.
-    // Fast parse: split declarations by ';' and match "--*-color:"
-    // Do this only when we actually insert (i.e., no cache hit above)
-    const colorPropRegex = /^\s*(--[a-z0-9-]+-color)\s*:/i;
-    for (const rule of rulesToInsert) {
-      // Skip if no declarations
-      if (!rule.declarations) continue;
-      const parts = rule.declarations.split(/;+\s*/);
-      for (const part of parts) {
-        if (!part) continue;
-        const match = colorPropRegex.exec(part);
-        if (match) {
-          const propName = match[1];
-          // Register @property only if not already defined for this root
-          if (!this.isPropertyDefined(propName, { root })) {
-            this.property(propName, {
-              syntax: '<color>',
-              initialValue: 'transparent',
+    // Auto-register @property for custom properties with inferable types.
+    // Subsumes the previous color-only scan — now covers <number>, <length>,
+    // <angle>, <percentage>, <time>, and <color>.
+    if (this.config.autoPropertyTypes !== false) {
+      const resolver = registry.propertyTypeResolver;
+      for (const rule of rulesToInsert) {
+        if (!rule.declarations) continue;
+        resolver.scanDeclarations(
+          rule.declarations,
+          (name) => this.isPropertyDefined(name, { root }),
+          (name, syntax, initialValue) => {
+            this.property(name, {
+              syntax,
+              inherits: true,
+              initialValue,
               root,
             });
-          }
-        }
+          },
+        );
       }
     }
 
@@ -269,6 +266,26 @@ export class StyleInjector {
           /* noop */
         },
       };
+    }
+
+    // Auto-register @property for custom properties in global rules
+    if (this.config.autoPropertyTypes !== false) {
+      const resolver = registry.propertyTypeResolver;
+      for (const rule of rules) {
+        if (!rule.declarations) continue;
+        resolver.scanDeclarations(
+          rule.declarations,
+          (name) => this.isPropertyDefined(name, { root }),
+          (name, syntax, initialValue) => {
+            this.property(name, {
+              syntax,
+              inherits: true,
+              initialValue,
+              root,
+            });
+          },
+        );
+      }
     }
 
     // Use a non-tasty identifier to avoid any collisions with .t{number} classes
@@ -635,19 +652,38 @@ export class StyleInjector {
     }
 
     // Insert keyframes
-    const info = this.sheetManager.insertKeyframes(
+    const result = this.sheetManager.insertKeyframes(
       registry,
       steps,
       actualName,
       root,
     );
-    if (!info) {
+    if (!result) {
       return {
         toString: () => '',
         dispose: () => {
           /* noop */
         },
       };
+    }
+
+    const { info, declarations } = result;
+
+    // Auto-register @property for custom properties found in keyframe declarations
+    if (this.config.autoPropertyTypes !== false && declarations) {
+      const resolver = registry.propertyTypeResolver;
+      resolver.scanDeclarations(
+        declarations,
+        (name) => this.isPropertyDefined(name, { root }),
+        (name, syntax, initialValue) => {
+          this.property(name, {
+            syntax,
+            inherits: true,
+            initialValue,
+            root,
+          });
+        },
+      );
     }
 
     // Cache the result by content hash

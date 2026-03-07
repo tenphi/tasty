@@ -719,6 +719,18 @@ describe('StyleInjector', () => {
       expect(injector.isPropertyDefined('--gap')).toBe(true);
     });
 
+    it('should auto-register @property for --*-color properties', () => {
+      const rules: StyleResult[] = [
+        {
+          selector: '.t0',
+          declarations: '--theme-color: var(--purple-color)',
+        },
+      ];
+      injector.inject(rules);
+
+      expect(injector.isPropertyDefined('--theme-color')).toBe(true);
+    });
+
     it('should auto-register @property for keyframe custom properties', () => {
       injector.keyframes(
         {

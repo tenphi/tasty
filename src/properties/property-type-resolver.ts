@@ -44,6 +44,12 @@ export class PropertyTypeResolver {
 
       if (isPropertyDefined(propName)) continue;
 
+      // Name-based: --*-color properties are always <color> (from #name tokens)
+      if (propName.endsWith('-color')) {
+        registerProperty(propName, '<color>', 'transparent');
+        continue;
+      }
+
       // Single var() reference → record dependency for deferred resolution
       const varMatch = SINGLE_VAR_REF.exec(value);
       if (varMatch) {

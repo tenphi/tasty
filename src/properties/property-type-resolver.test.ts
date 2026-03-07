@@ -79,6 +79,18 @@ describe('PropertyTypeResolver', () => {
       });
     });
 
+    it('should register --*-color properties as <color> by name pattern', () => {
+      resolver.scanDeclarations(
+        '--theme-color: var(--purple-color)',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--theme-color')).toEqual({
+        syntax: '<color>',
+        initialValue: 'transparent',
+      });
+    });
+
     it('should handle multiple declarations', () => {
       resolver.scanDeclarations(
         '--scale: 1; --gap: 10px; --rotation: 45deg',

@@ -385,7 +385,7 @@ const Pulse = tasty({
 });
 ```
 
-Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Supported inferred syntaxes: `<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`, and `<color>`.
+Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from the `#name` token convention.
 
 If you prefer full manual control, disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
 

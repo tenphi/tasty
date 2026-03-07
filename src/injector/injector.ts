@@ -178,8 +178,7 @@ export class StyleInjector {
     });
 
     // Auto-register @property for custom properties with inferable types.
-    // Subsumes the previous color-only scan — now covers <number>, <length>,
-    // <angle>, <percentage>, <time>, and <color>.
+    // Colors are detected by --*-color name pattern, numeric types by value.
     if (this.config.autoPropertyTypes !== false) {
       const resolver = registry.propertyTypeResolver;
       const defined = registry.injectedProperties;

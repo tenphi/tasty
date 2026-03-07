@@ -418,7 +418,7 @@ const AnimatedGradient = tasty({
 });
 ```
 
-Here `$gradient-angle: '0deg'` is detected as `<angle>` and `#theme` as `<color>`, so both transitions work without any manual `@property` declarations. Supported types: `<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`, `<color>`.
+Here `$gradient-angle: '0deg'` is detected as `<angle>` and `#theme` as `<color>` (via the `#name` naming convention), so both transitions work without any manual `@property` declarations. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from `#name` tokens.
 
 Use explicit `@properties` when you need non-default settings like `inherits: false`:
 

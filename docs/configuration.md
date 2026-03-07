@@ -113,14 +113,14 @@ This works across all declaration contexts: component styles, `@keyframes`, glob
 
 Supported types:
 
-| Value example | Inferred syntax |
-|---------------|-----------------|
-| `1`, `0.5`, `-3` | `<number>` |
-| `10px`, `2rem`, `100vw` | `<length>` |
+| Detection | Inferred syntax |
+|-----------|-----------------|
+| `1`, `0.5`, `-3` (bare numbers) | `<number>` |
+| `10px`, `2rem`, `100vw` (length units) | `<length>` |
 | `50%` | `<percentage>` |
-| `45deg`, `0.5turn` | `<angle>` |
-| `300ms`, `1s` | `<time>` |
-| `red`, `#fff`, `rgb(...)`, `transparent` | `<color>` |
+| `45deg`, `0.5turn` (angle units) | `<angle>` |
+| `300ms`, `1s` (time units) | `<time>` |
+| `#name` tokens (by naming convention) | `<color>` |
 
 Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@properties` when you need different settings:
 

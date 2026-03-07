@@ -312,9 +312,9 @@ Use `/` to post-apply recipes after local styles when you need recipe states/sty
 
 ### Keyframes and `@property`
 
-Modern CSS features are natively supported:
+CSS cannot animate or transition custom properties by default — the browser doesn't know their type. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule solves this by declaring a property's syntax (e.g. `<number>`, `<color>`), which unlocks smooth interpolation in transitions and keyframe animations.
 
-Custom property types (`<color>`, `<number>`, `<length>`, `<angle>`, `<percentage>`, `<time>`) are automatically inferred from values and registered as CSS `@property` declarations — no manual setup needed:
+Tasty automatically infers the type from concrete values and registers `@property` for you — no manual declarations needed:
 
 ```tsx
 const Pulse = tasty({
@@ -331,7 +331,7 @@ const Pulse = tasty({
 });
 ```
 
-The `$pulse-scale: 1` declaration is detected as `<number>` and a `@property --pulse-scale` rule is injected automatically. This also works for `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
+Here `$pulse-scale: 1` is detected as `<number>`, so `@property --pulse-scale` is injected automatically and the keyframe animation works. Supported types: `<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`, and `<color>`. This also works across `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
 
 Use explicit `@properties` only when you need non-default settings (e.g. `inherits: false`):
 

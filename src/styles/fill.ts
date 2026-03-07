@@ -42,20 +42,26 @@ export function fillStyle({
 
     result['background-color'] = firstColor || colorValue;
 
-    // Apply second color as gradient layer (only if no explicit backgroundImage/image)
-    // Uses a registered custom property to enable CSS transitions
-    if (secondColor && !backgroundImage && !image) {
+    if (secondColor) {
       result['--tasty-second-fill-color'] = secondColor;
-      result['background-image'] =
-        'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))';
     }
   }
 
-  // Priority: backgroundImage > image (overrides second fill color if set)
+  const gradientLayer = result['--tasty-second-fill-color']
+    ? 'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))'
+    : null;
+
+  // Priority: backgroundImage > image
   const imageValue = backgroundImage ?? image;
   if (imageValue) {
     const parsed = parseStyle(imageValue);
-    result['background-image'] = parsed.output || imageValue;
+    const imgCss = parsed.output || imageValue;
+
+    result['background-image'] = gradientLayer
+      ? `${imgCss}, ${gradientLayer}`
+      : imgCss;
+  } else if (gradientLayer) {
+    result['background-image'] = gradientLayer;
   }
 
   // Other background properties (pass through with parseStyle for token support)

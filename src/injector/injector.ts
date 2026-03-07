@@ -182,11 +182,12 @@ export class StyleInjector {
     // <angle>, <percentage>, <time>, and <color>.
     if (this.config.autoPropertyTypes !== false) {
       const resolver = registry.propertyTypeResolver;
+      const defined = registry.injectedProperties;
       for (const rule of rulesToInsert) {
         if (!rule.declarations) continue;
         resolver.scanDeclarations(
           rule.declarations,
-          (name) => this.isPropertyDefined(name, { root }),
+          (name) => defined.has(name),
           (name, syntax, initialValue) => {
             this.property(name, {
               syntax,
@@ -271,11 +272,12 @@ export class StyleInjector {
     // Auto-register @property for custom properties in global rules
     if (this.config.autoPropertyTypes !== false) {
       const resolver = registry.propertyTypeResolver;
+      const defined = registry.injectedProperties;
       for (const rule of rules) {
         if (!rule.declarations) continue;
         resolver.scanDeclarations(
           rule.declarations,
-          (name) => this.isPropertyDefined(name, { root }),
+          (name) => defined.has(name),
           (name, syntax, initialValue) => {
             this.property(name, {
               syntax,
@@ -674,7 +676,7 @@ export class StyleInjector {
       const resolver = registry.propertyTypeResolver;
       resolver.scanDeclarations(
         declarations,
-        (name) => this.isPropertyDefined(name, { root }),
+        (name) => registry.injectedProperties.has(name),
         (name, syntax, initialValue) => {
           this.property(name, {
             syntax,

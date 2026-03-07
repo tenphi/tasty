@@ -79,18 +79,6 @@ describe('PropertyTypeResolver', () => {
       });
     });
 
-    it('should register a color property', () => {
-      resolver.scanDeclarations(
-        '--bg-color: transparent',
-        isPropertyDefined,
-        registerProperty,
-      );
-      expect(registered.get('--bg-color')).toEqual({
-        syntax: '<color>',
-        initialValue: 'transparent',
-      });
-    });
-
     it('should handle multiple declarations', () => {
       resolver.scanDeclarations(
         '--scale: 1; --gap: 10px; --rotation: 45deg',
@@ -185,64 +173,6 @@ describe('PropertyTypeResolver', () => {
         syntax: '<number>',
         initialValue: '0',
       });
-    });
-  });
-
-  describe('type mismatch validation', () => {
-    it('should skip for color token with non-color value', () => {
-      resolver.scanDeclarations(
-        '--scale-color: 10px',
-        isPropertyDefined,
-        registerProperty,
-      );
-      expect(registered.has('--scale-color')).toBe(false);
-    });
-
-    it('should warn for color token with non-color value in dev mode', () => {
-      const origEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      resolver.scanDeclarations(
-        '--scale-color: 10px',
-        isPropertyDefined,
-        registerProperty,
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Color token'),
-      );
-
-      warnSpy.mockRestore();
-      process.env.NODE_ENV = origEnv;
-    });
-
-    it('should skip for regular token with color value', () => {
-      resolver.scanDeclarations(
-        '--bg: rgb(255 0 0)',
-        isPropertyDefined,
-        registerProperty,
-      );
-      expect(registered.has('--bg')).toBe(false);
-    });
-
-    it('should warn for regular token with color value in dev mode', () => {
-      const origEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      resolver.scanDeclarations(
-        '--bg: rgb(255 0 0)',
-        isPropertyDefined,
-        registerProperty,
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('uses $ prefix instead of #'),
-      );
-
-      warnSpy.mockRestore();
-      process.env.NODE_ENV = origEnv;
     });
   });
 

@@ -719,18 +719,6 @@ describe('StyleInjector', () => {
       expect(injector.isPropertyDefined('--gap')).toBe(true);
     });
 
-    it('should auto-register @property for color properties in inject()', () => {
-      const rules: StyleResult[] = [
-        {
-          selector: '.t0',
-          declarations: '--bg-color: transparent',
-        },
-      ];
-      injector.inject(rules);
-
-      expect(injector.isPropertyDefined('--bg-color')).toBe(true);
-    });
-
     it('should auto-register @property for keyframe custom properties', () => {
       injector.keyframes(
         {
@@ -785,13 +773,13 @@ describe('StyleInjector', () => {
       const rules: StyleResult[] = [
         {
           selector: '.t0',
-          declarations: '--scale: 1; --bg-color: transparent',
+          declarations: '--scale: 1; --gap: 10px',
         },
       ];
       noAutoInjector.inject(rules);
 
       expect(noAutoInjector.isPropertyDefined('--scale')).toBe(false);
-      expect(noAutoInjector.isPropertyDefined('--bg-color')).toBe(false);
+      expect(noAutoInjector.isPropertyDefined('--gap')).toBe(false);
     });
 
     it('should not override explicit @property definitions', () => {

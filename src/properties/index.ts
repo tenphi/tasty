@@ -10,7 +10,7 @@
  */
 
 import type { PropertyDefinition } from '../injector/types';
-import { COLOR_FUNCS, RE_HEX, RE_NUMBER, RE_RAW_UNIT } from '../parser/const';
+import { RE_NUMBER, RE_RAW_UNIT } from '../parser/const';
 import type { Styles } from '../styles/types';
 import { getRgbValuesFromRgbaString, strToRgb } from '../utils/styles';
 
@@ -295,38 +295,6 @@ export function colorInitialValueToRgb(initialValue?: string | number): string {
 // Value Type Inference
 // ============================================================================
 
-const VAR_COLOR_PATTERN = /^var\(--[a-z0-9-]+-color/;
-
-/**
- * Check whether a CSS value is a color.
- * Detects named CSS colors, hex values, color functions (rgb, hsl, oklch, etc.),
- * transparent, currentcolor, and var(--*-color) references.
- */
-export function isColorValue(value: string): boolean {
-  if (!value || typeof value !== 'string') return false;
-
-  const trimmed = value.trim().toLowerCase();
-  if (!trimmed) return false;
-
-  if (trimmed === 'transparent' || trimmed === 'currentcolor') return true;
-
-  if (VAR_COLOR_PATTERN.test(trimmed)) return true;
-
-  // Check for #hex values
-  if (trimmed.startsWith('#') && RE_HEX.test(trimmed.slice(1))) return true;
-
-  // Check for color functions: rgb(...), hsl(...), oklch(...), etc.
-  const parenIdx = trimmed.indexOf('(');
-  if (parenIdx > 0) {
-    const fname = trimmed.slice(0, parenIdx);
-    if (COLOR_FUNCS.has(fname)) return true;
-  }
-
-  // Check for named CSS colors via strToRgb
-  const rgb = strToRgb(trimmed);
-  return rgb != null;
-}
-
 /**
  * Result of inferring a CSS @property syntax from a value.
  */
@@ -381,33 +349,23 @@ for (const u of TIME_UNITS) {
 
 /**
  * Infer CSS @property syntax from a concrete value.
- * Inference is purely value-based; name-based checks (e.g. --*-color naming)
- * are handled by the validator in PropertyTypeResolver.
+ * Only detects numeric types: \<number\>, \<length\>, \<percentage\>, \<angle\>, \<time\>.
+ * Color properties are handled separately via the #name token convention
+ * (--name-color gets \<color\> syntax automatically in getEffectiveDefinition).
  *
  * @param value - The CSS value to infer from (e.g. '10px', '1', '45deg')
- * @param _propName - Unused, kept for API compatibility
  * @returns Inferred syntax and initial value, or null if not inferable
  */
-export function inferSyntaxFromValue(
-  value: string,
-  _propName?: string,
-): InferredSyntax | null {
+export function inferSyntaxFromValue(value: string): InferredSyntax | null {
   if (!value || typeof value !== 'string') return null;
 
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  // Value-based color detection
-  if (isColorValue(trimmed)) {
-    return { syntax: '<color>', initialValue: 'transparent' };
-  }
-
-  // Bare number
   if (RE_NUMBER.test(trimmed)) {
     return { syntax: '<number>', initialValue: '0' };
   }
 
-  // Number with unit
   const unitMatch = trimmed.match(RE_RAW_UNIT);
   if (unitMatch) {
     const unit = unitMatch[2];

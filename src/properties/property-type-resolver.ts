@@ -5,8 +5,6 @@
  * Supports deferred resolution for var() reference chains of arbitrary depth.
  */
 
-import { isDevEnv } from '../utils/is-dev-env';
-
 import { inferSyntaxFromValue } from './index';
 
 const CUSTOM_PROP_DECL = /^\s*(--[a-z0-9_-]+)\s*:\s*(.+?)\s*$/i;
@@ -31,6 +29,8 @@ export class PropertyTypeResolver {
       initialValue: string,
     ) => void,
   ): void {
+    if (!declarations.includes('--')) return;
+
     const parts = declarations.split(/;+/);
 
     for (const part of parts) {
@@ -55,10 +55,8 @@ export class PropertyTypeResolver {
       // Skip complex expressions (calc, multiple var, etc.)
       if (this.isComplexValue(value)) continue;
 
-      const inferred = inferSyntaxFromValue(value, propName);
+      const inferred = inferSyntaxFromValue(value);
       if (!inferred) continue;
-
-      if (!this.validateTokenType(propName, inferred.syntax)) continue;
 
       this.resolve(
         propName,
@@ -71,7 +69,6 @@ export class PropertyTypeResolver {
   }
 
   private addDependency(propName: string, depName: string): void {
-    // Avoid self-references
     if (propName === depName) return;
 
     this.pendingDeps.set(propName, depName);
@@ -98,7 +95,6 @@ export class PropertyTypeResolver {
     ) => void,
     resolving?: Set<string>,
   ): void {
-    // Guard against circular references
     if (!resolving) resolving = new Set();
     if (resolving.has(propName)) return;
     resolving.add(propName);
@@ -107,7 +103,6 @@ export class PropertyTypeResolver {
       registerProperty(propName, syntax, initialValue);
     }
 
-    // Propagate to dependents
     const dependents = this.reverseDeps.get(propName);
     if (dependents) {
       this.reverseDeps.delete(propName);
@@ -116,7 +111,6 @@ export class PropertyTypeResolver {
         this.pendingDeps.delete(dependent);
 
         if (isPropertyDefined(dependent)) continue;
-        if (!this.validateTokenType(dependent, syntax)) continue;
 
         this.resolve(
           dependent,
@@ -130,46 +124,11 @@ export class PropertyTypeResolver {
     }
   }
 
-  /**
-   * Validate that the inferred type matches the token naming convention.
-   * Returns false (and warns) on mismatch.
-   */
-  private validateTokenType(propName: string, syntax: string): boolean {
-    const isColorProp = propName.endsWith('-color');
-
-    if (isColorProp && syntax !== '<color>') {
-      if (isDevEnv()) {
-        const tokenName = propName.replace(/^--/, '#').replace(/-color$/, '');
-        console.warn(
-          `[Tasty] Color token ${tokenName} has a non-color value. ` +
-            `Skipping @property auto-registration.`,
-        );
-      }
-      return false;
-    }
-
-    if (!isColorProp && syntax === '<color>') {
-      if (isDevEnv()) {
-        const tokenName = '$' + propName.replace(/^--/, '');
-        console.warn(
-          `[Tasty] Token ${tokenName} has a color value but uses $ prefix instead of #. ` +
-            `Use the # prefix for color properties. ` +
-            `Skipping @property auto-registration.`,
-        );
-      }
-      return false;
-    }
-
-    return true;
-  }
-
   private isComplexValue(value: string): boolean {
     if (value.includes('calc(')) return true;
-    // Multiple var() references
-    const varCount = (value.match(/var\(/g) || []).length;
-    if (varCount > 1) return true;
-    // var() with additional content around it (e.g. "var(--x) + 1")
-    if (varCount === 1 && !SINGLE_VAR_REF.test(value)) return true;
-    return false;
+    const firstVar = value.indexOf('var(');
+    if (firstVar === -1) return false;
+    if (value.indexOf('var(', firstVar + 4) !== -1) return true;
+    return !SINGLE_VAR_REF.test(value);
   }
 }

@@ -85,7 +85,7 @@ describe('Tasty style tests', () => {
         'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))',
     });
 
-    // Two colors with explicit backgroundImage - backgroundImage overrides second color
+    // Two colors with explicit backgroundImage - image on top, gradient below
     expect(
       fillStyle({
         fill: '#primary #secondary',
@@ -93,10 +93,12 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual({
       'background-color': 'var(--primary-color)',
-      'background-image': 'url(/image.png)',
+      '--tasty-second-fill-color': 'var(--secondary-color)',
+      'background-image':
+        'url(/image.png), linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))',
     });
 
-    // Two colors with explicit image - image overrides second color
+    // Two colors with explicit image - image on top, gradient below
     expect(
       fillStyle({
         fill: '#primary #secondary',
@@ -104,7 +106,9 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual({
       'background-color': 'var(--primary-color)',
-      'background-image': 'url(/image.png)',
+      '--tasty-second-fill-color': 'var(--secondary-color)',
+      'background-image':
+        'url(/image.png), linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))',
     });
 
     // Two colors with explicit background - background overrides everything

@@ -51,6 +51,7 @@ configure({
 | `tokens` | `Record<string, string \| number>` | - | Predefined tokens replaced during parsing |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
+| `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 
 ---
@@ -101,6 +102,49 @@ configure({
 Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@properties`. Recipes cannot reference other recipes.
 
 For how to apply, compose, and override recipes in components, see [Using Recipes](usage.md#recipes) in the usage guide.
+
+---
+
+## Auto Property Types
+
+CSS cannot transition or animate custom properties unless their type is declared via [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property). Tasty handles this automatically — when a custom property is assigned a concrete value (e.g. `'$scale': 1`, `'$gap': '10px'`, `'#accent': 'purple'`), the type is inferred and a `@property` rule is registered.
+
+This works across all declaration contexts: component styles, `@keyframes`, global config, and the zero-runtime Babel plugin. It also resolves `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
+
+Supported types:
+
+| Value example | Inferred syntax |
+|---------------|-----------------|
+| `1`, `0.5`, `-3` | `<number>` |
+| `10px`, `2rem`, `100vw` | `<length>` |
+| `50%` | `<percentage>` |
+| `45deg`, `0.5turn` | `<angle>` |
+| `300ms`, `1s` | `<time>` |
+| `red`, `#fff`, `rgb(...)`, `transparent` | `<color>` |
+
+Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@properties` when you need different settings:
+
+```jsx
+// In component styles
+styles: {
+  '@properties': {
+    '$scale': { syntax: '<number>', inherits: false, initialValue: 1 },
+  },
+}
+
+// Or globally
+configure({
+  properties: {
+    '$scale': { syntax: '<number>', inherits: false, initialValue: 1 },
+  },
+});
+```
+
+To disable auto-inference entirely (only explicit `@properties` will be used):
+
+```jsx
+configure({ autoPropertyTypes: false });
+```
 
 ---
 

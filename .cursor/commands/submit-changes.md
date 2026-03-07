@@ -24,11 +24,15 @@ Short description of what changed.
 
 Run `pnpm typecheck`. **Stop and report the error if it fails** — do not proceed to formatting or committing.
 
-## 3. Format code
+## 3. Lint
+
+Run `pnpm lint`. **Stop and report the error if it fails** — do not proceed to formatting or committing.
+
+## 4. Format code
 
 Run `pnpm format` to format code before committing.
 
-## 4. Commit
+## 5. Commit
 
 Use **Conventional Commits** format:
 
@@ -43,7 +47,7 @@ type(scope): short description
 - Before 1.0.0 release treat major changes as minor and minor as patches.
 - Do not include markdown files that are not in the repo yet and wasn't staged manually by the user.
 
-## 5. Push
+## 6. Push
 
 - **Never push to `main`**. Verify the current branch first.
 - If on `main`, stop and warn the user.

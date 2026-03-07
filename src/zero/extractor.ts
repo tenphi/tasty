@@ -15,10 +15,7 @@ import {
 } from '../keyframes';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
-import {
-  extractLocalProperties,
-  hasLocalProperties,
-} from '../properties';
+import { extractLocalProperties, hasLocalProperties } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
 

@@ -262,7 +262,6 @@ describe('properties', () => {
     it('should handle partial definitions', () => {
       const defSyntaxOnly = { syntax: '<color>' };
       const defInheritsOnly = { inherits: false };
-      const defInitialOnly = { initialValue: '10px' };
 
       expect(normalizePropertyDefinition(defSyntaxOnly)).toBe(
         '{"syntax":"<color>"}',
@@ -270,14 +269,15 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(defInheritsOnly)).toBe(
         '{"inherits":false}',
       );
-      expect(normalizePropertyDefinition(defInitialOnly)).toBe(
-        '{"initialValue":"10px"}',
-      );
     });
 
-    it('should convert numeric initialValue to string', () => {
-      const def = { initialValue: 42 };
-      expect(normalizePropertyDefinition(def)).toBe('{"initialValue":"42"}');
+    it('should ignore initialValue in comparison', () => {
+      const def1 = { syntax: '<length>', initialValue: '0px' };
+      const def2 = { syntax: '<length>', initialValue: '6px' };
+
+      expect(normalizePropertyDefinition(def1)).toBe(
+        normalizePropertyDefinition(def2),
+      );
     });
 
     it('should handle empty definition', () => {
@@ -285,9 +285,9 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(def)).toBe('{}');
     });
 
-    it('should produce different results for different values', () => {
-      const def1 = { syntax: '<color>', initialValue: 'red' };
-      const def2 = { syntax: '<color>', initialValue: 'blue' };
+    it('should produce different results for different syntax', () => {
+      const def1 = { syntax: '<color>' };
+      const def2 = { syntax: '<length>' };
 
       expect(normalizePropertyDefinition(def1)).not.toBe(
         normalizePropertyDefinition(def2),

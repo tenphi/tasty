@@ -180,7 +180,11 @@ export function normalizePropertyName(name: string): string {
 
 /**
  * Normalize a property definition to a consistent string representation.
- * Used for comparing definitions to detect changes/conflicts.
+ * Used for comparing definitions to detect type conflicts.
+ *
+ * Only `syntax` and `inherits` are compared — `initialValue` is intentionally
+ * excluded because different components may set different defaults for the
+ * same typed property (e.g. auto-inferred `0px` vs explicit `6px`).
  *
  * Keys are sorted alphabetically to ensure consistent comparison:
  * { inherits: true, syntax: '<color>' } === { syntax: '<color>', inherits: true }
@@ -188,12 +192,8 @@ export function normalizePropertyName(name: string): string {
 export function normalizePropertyDefinition(def: PropertyDefinition): string {
   const normalized: Record<string, unknown> = {};
 
-  // Add properties in alphabetical order
   if (def.inherits !== undefined) {
     normalized.inherits = def.inherits;
-  }
-  if (def.initialValue !== undefined) {
-    normalized.initialValue = String(def.initialValue);
   }
   if (def.syntax !== undefined) {
     normalized.syntax = def.syntax;

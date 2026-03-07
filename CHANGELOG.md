@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.6.1
+
+### Patch Changes
+
+- [#24](https://github.com/tenphi/tasty/pull/24) [`cb219ee`](https://github.com/tenphi/tasty/commit/cb219eed6cdcc9b85b3306c7faa2e44665ef69df) Thanks [@tenphi](https://github.com/tenphi)! - Support two-color fill alongside background image by combining both layers in background-image.
+
 ## 0.6.0
 
 ### Minor Changes

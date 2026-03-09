@@ -371,6 +371,13 @@ describe('properties', () => {
       });
     });
 
+    it('should return null for bare zero (ambiguous type)', () => {
+      expect(inferSyntaxFromValue('0')).toBeNull();
+      expect(inferSyntaxFromValue('+0')).toBeNull();
+      expect(inferSyntaxFromValue('-0')).toBeNull();
+      expect(inferSyntaxFromValue('0.0')).toBeNull();
+    });
+
     it('should return null for non-numeric values', () => {
       expect(inferSyntaxFromValue('calc(1px + 2px)')).toBeNull();
       expect(inferSyntaxFromValue('auto')).toBeNull();

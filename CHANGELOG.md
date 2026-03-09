@@ -1,5 +1,17 @@
 # @tenphi/tasty
 
+## 0.7.0
+
+### Minor Changes
+
+- [#23](https://github.com/tenphi/tasty/pull/23) [`9941b40`](https://github.com/tenphi/tasty/commit/9941b40895c771691cbf1bfe28245c6d237de7a3) Thanks [@tenphi](https://github.com/tenphi)! - Auto-infer CSS @property types from custom property values. Supports `<number>`, `<length>`, `<angle>`, `<percentage>`, `<time>`, and `<color>` with deferred var() chain resolution. Controlled by `autoPropertyTypes` config flag (default: true). Adds named CSS color support to `strToRgb`.
+
+### Patch Changes
+
+- [#23](https://github.com/tenphi/tasty/pull/23) [`871841f`](https://github.com/tenphi/tasty/commit/871841f47c88dd6df705275f39a633c25fb17cfa) Thanks [@tenphi](https://github.com/tenphi)! - Optimize @property auto-inference: skip non-custom-property declarations early, bypass token parsing indirection, remove color value detection and type mismatch validation overhead.
+
+- [#24](https://github.com/tenphi/tasty/pull/24) [`cb219ee`](https://github.com/tenphi/tasty/commit/cb219eed6cdcc9b85b3306c7faa2e44665ef69df) Thanks [@tenphi](https://github.com/tenphi)! - Support two-color fill alongside background image by combining both layers in background-image.
+
 ## 0.6.0
 
 ### Minor Changes

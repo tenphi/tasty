@@ -292,13 +292,11 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue: 'transparent',
   },
   // Current color context variable (set by the color style handler).
-  // Companion --current-color-rgb is auto-created.
   '#current': {
     inherits: true,
     initialValue: 'transparent',
   },
   // White and black are fundamental colors that need explicit initial values.
-  // Companion -rgb properties are auto-created from the color initial values.
   '#white': {
     inherits: true,
     initialValue: 'rgb(255 255 255)',

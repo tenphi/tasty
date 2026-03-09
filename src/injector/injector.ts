@@ -5,7 +5,6 @@
 
 import type { StyleResult } from '../pipeline';
 import {
-  colorInitialValueToRgb,
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
@@ -548,20 +547,6 @@ export class StyleInjector {
 
     // Track that this property was injected with its normalized definition
     registry.injectedProperties.set(cssName, normalizedDef);
-
-    // Auto-register companion -rgb property for color properties.
-    // E.g. --white-color gets a companion --white-color-rgb with syntax: '<number>+'
-    if (effectiveResult.isColor) {
-      const rgbCssName = `${cssName}-rgb`;
-      if (!this.isPropertyDefined(rgbCssName, { root })) {
-        this.property(rgbCssName, {
-          syntax: '<number>+',
-          inherits: definition.inherits,
-          initialValue: colorInitialValueToRgb(definition.initialValue),
-          root,
-        });
-      }
-    }
   }
 
   /**

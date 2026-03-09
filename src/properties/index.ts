@@ -336,6 +336,8 @@ export function inferSyntaxFromValue(value: string): InferredSyntax | null {
   if (!trimmed) return null;
 
   if (RE_NUMBER.test(trimmed)) {
+    // Bare zero is ambiguous (could be <length>, <angle>, <percentage>, etc.)
+    if (parseFloat(trimmed) === 0) return null;
     return { syntax: '<number>', initialValue: '0' };
   }
 

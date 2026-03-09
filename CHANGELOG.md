@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.7.1
+
+### Patch Changes
+
+- [#26](https://github.com/tenphi/tasty/pull/26) [`bbb1e4b`](https://github.com/tenphi/tasty/commit/bbb1e4b0bcaaf02ba3ea6f105339022e2f6bb682) Thanks [@tenphi](https://github.com/tenphi)! - Fix `@property` type inference for bare zero values. A value of `0` is ambiguous in CSS (could be `<length>`, `<angle>`, `<percentage>`, etc.), so it is no longer inferred as `<number>`. This prevents incorrect `@property` registrations that would reject subsequent typed values like `10px`.
+
 ## 0.7.0
 
 ### Minor Changes

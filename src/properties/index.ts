@@ -10,8 +10,8 @@
  */
 
 import type { PropertyDefinition } from '../injector/types';
+import { RE_NUMBER, RE_RAW_UNIT } from '../parser/const';
 import type { Styles } from '../styles/types';
-import { getRgbValuesFromRgbaString, strToRgb } from '../utils/styles';
 
 // ============================================================================
 // Constants
@@ -179,7 +179,11 @@ export function normalizePropertyName(name: string): string {
 
 /**
  * Normalize a property definition to a consistent string representation.
- * Used for comparing definitions to detect changes/conflicts.
+ * Used for comparing definitions to detect type conflicts.
+ *
+ * Only `syntax` and `inherits` are compared — `initialValue` is intentionally
+ * excluded because different components may set different defaults for the
+ * same typed property (e.g. auto-inferred `0px` vs explicit `6px`).
  *
  * Keys are sorted alphabetically to ensure consistent comparison:
  * { inherits: true, syntax: '<color>' } === { syntax: '<color>', inherits: true }
@@ -187,12 +191,8 @@ export function normalizePropertyName(name: string): string {
 export function normalizePropertyDefinition(def: PropertyDefinition): string {
   const normalized: Record<string, unknown> = {};
 
-  // Add properties in alphabetical order
   if (def.inherits !== undefined) {
     normalized.inherits = def.inherits;
-  }
-  if (def.initialValue !== undefined) {
-    normalized.initialValue = String(def.initialValue);
   }
   if (def.syntax !== undefined) {
     normalized.syntax = def.syntax;
@@ -265,27 +265,86 @@ export function getEffectiveDefinition(
 }
 
 // ============================================================================
-// Color RGB Companion Helpers
+// Value Type Inference
 // ============================================================================
 
 /**
- * Extract RGB triplet string from a color initial value.
- * Used when auto-creating the companion `-rgb` property for color @property definitions.
- *
- * @param initialValue - The color property's initial value (e.g., 'rgb(255 255 255)', 'transparent', '#fff')
- * @returns Space-separated RGB triplet (e.g., '255 255 255'), defaults to '0 0 0'
+ * Result of inferring a CSS @property syntax from a value.
  */
-export function colorInitialValueToRgb(initialValue?: string | number): string {
-  if (initialValue == null) return '0 0 0';
+export interface InferredSyntax {
+  syntax: string;
+  initialValue: string;
+}
 
-  const str = String(initialValue).trim();
-  if (!str || str === 'transparent') return '0 0 0';
+const UNIT_TO_SYNTAX: Record<string, InferredSyntax> = {};
 
-  const rgba = strToRgb(str);
-  if (rgba) {
-    const values = getRgbValuesFromRgbaString(rgba);
-    if (values.length >= 3) return values.slice(0, 3).join(' ');
+const LENGTH_UNITS = [
+  'px',
+  'em',
+  'rem',
+  'vw',
+  'vh',
+  'vmin',
+  'vmax',
+  'ch',
+  'ex',
+  'cap',
+  'ic',
+  'lh',
+  'rlh',
+  'svw',
+  'svh',
+  'lvw',
+  'lvh',
+  'dvw',
+  'dvh',
+  'cqw',
+  'cqh',
+  'cqi',
+  'cqb',
+  'cqmin',
+  'cqmax',
+];
+
+const ANGLE_UNITS = ['deg', 'rad', 'grad', 'turn'];
+const TIME_UNITS = ['ms', 's'];
+
+for (const u of LENGTH_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<length>', initialValue: '0px' };
+}
+UNIT_TO_SYNTAX['%'] = { syntax: '<percentage>', initialValue: '0%' };
+for (const u of ANGLE_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<angle>', initialValue: '0deg' };
+}
+for (const u of TIME_UNITS) {
+  UNIT_TO_SYNTAX[u] = { syntax: '<time>', initialValue: '0s' };
+}
+
+/**
+ * Infer CSS @property syntax from a concrete value.
+ * Only detects numeric types: \<number\>, \<length\>, \<percentage\>, \<angle\>, \<time\>.
+ * Color properties are handled separately via the #name token convention
+ * (--name-color gets \<color\> syntax automatically in getEffectiveDefinition).
+ *
+ * @param value - The CSS value to infer from (e.g. '10px', '1', '45deg')
+ * @returns Inferred syntax and initial value, or null if not inferable
+ */
+export function inferSyntaxFromValue(value: string): InferredSyntax | null {
+  if (!value || typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (RE_NUMBER.test(trimmed)) {
+    return { syntax: '<number>', initialValue: '0' };
   }
 
-  return '0 0 0';
+  const unitMatch = trimmed.match(RE_RAW_UNIT);
+  if (unitMatch) {
+    const unit = unitMatch[2];
+    const mapping = UNIT_TO_SYNTAX[unit];
+    if (mapping) return mapping;
+  }
+
+  return null;
 }

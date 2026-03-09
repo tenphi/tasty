@@ -15,6 +15,8 @@ import {
 } from '../keyframes';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
+import { extractLocalProperties, hasLocalProperties } from '../properties';
+import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
 
 export interface ExtractedChunk {
@@ -290,4 +292,134 @@ function keyframesToCSS(name: string, steps: KeyframesSteps): string {
  */
 function camelToKebab(str: string): string {
   return str.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+// ============================================================================
+// Property Extraction (auto-infer @property types for zero-runtime)
+// ============================================================================
+
+export interface ExtractedProperty {
+  name: string;
+  css: string;
+}
+
+/**
+ * Extract auto-inferred @property declarations from styles.
+ * Scans rendered style declarations and keyframe declarations for custom properties
+ * whose types can be inferred from their values.
+ *
+ * @param styles - The styles object
+ * @param options - Options including autoPropertyTypes flag
+ * @returns Array of @property CSS rules to inject
+ */
+export function extractPropertiesFromStyles(
+  styles: Styles,
+  options?: { autoPropertyTypes?: boolean },
+): ExtractedProperty[] {
+  if (options?.autoPropertyTypes === false) return [];
+
+  const registered = new Set<string>();
+  const results: ExtractedProperty[] = [];
+
+  // Collect explicitly declared properties (they take precedence)
+  if (hasLocalProperties(styles)) {
+    const localProps = extractLocalProperties(styles);
+    if (localProps) {
+      for (const token of Object.keys(localProps)) {
+        // Normalize token to CSS name
+        let cssName: string;
+        if (token.startsWith('#')) {
+          cssName = `--${token.slice(1)}-color`;
+        } else if (token.startsWith('$')) {
+          cssName = `--${token.slice(1)}`;
+        } else if (token.startsWith('--')) {
+          cssName = token;
+        } else {
+          cssName = `--${token}`;
+        }
+        registered.add(cssName);
+      }
+    }
+  }
+
+  const resolver = new PropertyTypeResolver();
+
+  const registerProperty = (
+    name: string,
+    syntax: string,
+    initialValue: string,
+  ) => {
+    if (registered.has(name)) return;
+    registered.add(name);
+
+    const parts: string[] = [];
+    parts.push(`syntax: "${syntax}";`);
+    parts.push(`inherits: true;`);
+    parts.push(`initial-value: ${initialValue};`);
+
+    const css = `@property ${name} { ${parts.join(' ')} }`;
+    results.push({ name, css });
+  };
+
+  const isPropertyDefined = (name: string) => registered.has(name);
+
+  // Scan rendered style declarations
+  const chunkMap = categorizeStyleKeys(styles as Record<string, unknown>);
+  for (const [chunkName, chunkStyleKeys] of chunkMap) {
+    if (chunkStyleKeys.length === 0) continue;
+    const renderResult = renderStylesForChunk(
+      styles,
+      chunkName,
+      chunkStyleKeys,
+    );
+    for (const rule of renderResult.rules) {
+      if (!rule.declarations) continue;
+      resolver.scanDeclarations(
+        rule.declarations,
+        isPropertyDefined,
+        registerProperty,
+      );
+    }
+  }
+
+  // Scan keyframe declarations
+  if (hasLocalKeyframes(styles)) {
+    const localKf = extractLocalKeyframes(styles);
+    if (localKf) {
+      for (const steps of Object.values(localKf)) {
+        scanKeyframeSteps(steps, resolver, isPropertyDefined, registerProperty);
+      }
+    }
+  }
+
+  return results;
+}
+
+function scanKeyframeSteps(
+  steps: KeyframesSteps,
+  resolver: PropertyTypeResolver,
+  isPropertyDefined: (name: string) => boolean,
+  registerProperty: (
+    name: string,
+    syntax: string,
+    initialValue: string,
+  ) => void,
+): void {
+  for (const value of Object.values(steps)) {
+    if (typeof value === 'string') {
+      resolver.scanDeclarations(value, isPropertyDefined, registerProperty);
+    } else if (value && typeof value === 'object') {
+      const declarations = Object.entries(value)
+        .map(([prop, val]) => {
+          const cssProperty = camelToKebab(prop);
+          return `${cssProperty}: ${val}`;
+        })
+        .join('; ');
+      resolver.scanDeclarations(
+        declarations,
+        isPropertyDefined,
+        registerProperty,
+      );
+    }
+  }
 }

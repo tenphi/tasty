@@ -405,21 +405,27 @@ const Pulse = tasty({
 
 ### Properties (`@property`)
 
+CSS cannot transition or animate custom properties unless the browser knows their type. Tasty solves this automatically — when you assign a concrete value to a custom property, the type is inferred and a CSS `@property` rule is registered behind the scenes:
+
 ```jsx
 const AnimatedGradient = tasty({
   styles: {
-    '@properties': {
-      '$gradient-angle': {
-        syntax: '<angle>',
-        inherits: false,
-        initialValue: '0deg',
-      },
-    },
+    '$gradient-angle': '0deg',
     '#theme': 'okhsl(280 80% 50%)',
     background: 'linear-gradient($gradient-angle, #theme, transparent)',
     transition: '$$gradient-angle 0.3s, ##theme 0.3s',
   },
 });
+```
+
+Here `$gradient-angle: '0deg'` is detected as `<angle>` and `#theme` as `<color>` (via the `#name` naming convention), so both transitions work without any manual `@property` declarations. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from `#name` tokens.
+
+Use explicit `@properties` when you need non-default settings like `inherits: false`:
+
+```jsx
+'@properties': {
+  '$gradient-angle': { syntax: '<angle>', inherits: false, initialValue: '0deg' },
+},
 ```
 
 ### Variants & Theming

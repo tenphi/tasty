@@ -47,6 +47,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "tasty.config.ts"
   ],
   "sideEffects": false,
@@ -149,7 +150,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "45 kB"
+      "limit": "47 kB"
     },
     {
       "name": "core (import *)",
@@ -172,7 +173,7 @@
         "path",
         "crypto"
       ],
-      "limit": "25 kB"
+      "limit": "27 kB"
     },
     {
       "name": "babel-plugin",
@@ -183,7 +184,7 @@
         "path",
         "crypto"
       ],
-      "limit": "35 kB"
+      "limit": "37 kB"
     }
   ]
 }

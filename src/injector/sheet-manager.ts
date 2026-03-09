@@ -1,3 +1,4 @@
+import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 
 import type {
@@ -70,6 +71,7 @@ export class SheetManager {
         keyframesCounter: 0,
         injectedProperties: new Map<string, string>(),
         globalRules: new Map(),
+        propertyTypeResolver: new PropertyTypeResolver(),
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);
@@ -887,15 +889,21 @@ export class SheetManager {
   }
 
   /**
-   * Convert keyframes steps to CSS string
+   * Convert keyframes steps to CSS string.
+   * Returns both the CSS text and a combined declarations string for property type scanning.
    */
-  private stepsToCSS(steps: KeyframesSteps): string {
+  stepsToCSS(steps: KeyframesSteps): {
+    css: string;
+    declarations: string;
+  } {
     const rules: string[] = [];
+    const allDeclarations: string[] = [];
 
     for (const [key, value] of Object.entries(steps)) {
       // Support raw CSS strings for backwards compatibility
       if (typeof value === 'string') {
         rules.push(`${key} { ${value.trim()} }`);
+        allDeclarations.push(value.trim());
         continue;
       }
 
@@ -965,20 +973,22 @@ export class SheetManager {
         .join('; ');
 
       rules.push(`${key} { ${declarations.trim()} }`);
+      allDeclarations.push(declarations);
     }
 
-    return rules.join(' ');
+    return { css: rules.join(' '), declarations: allDeclarations.join('; ') };
   }
 
   /**
-   * Insert keyframes rule
+   * Insert keyframes rule.
+   * Returns the KeyframesInfo and the raw declarations string for property type scanning.
    */
   insertKeyframes(
     registry: RootRegistry,
     steps: KeyframesSteps,
     name: string,
     root: Document | ShadowRoot,
-  ): KeyframesInfo | null {
+  ): { info: KeyframesInfo; declarations: string } | null {
     let targetSheet = this.findAvailableSheet(registry, root);
     if (!targetSheet) {
       targetSheet = this.createSheet(registry, root);
@@ -988,7 +998,7 @@ export class SheetManager {
     const sheetIndex = registry.sheets.indexOf(targetSheet);
 
     try {
-      const cssSteps = this.stepsToCSS(steps);
+      const { css: cssSteps, declarations } = this.stepsToCSS(steps);
       const fullRule = `@keyframes ${name} { ${cssSteps} }`;
 
       const styleElement = targetSheet.sheet;
@@ -1008,10 +1018,13 @@ export class SheetManager {
       targetSheet.ruleCount++;
 
       return {
-        name,
-        ruleIndex,
-        sheetIndex,
-        cssText: this.config.devMode ? fullRule : undefined,
+        info: {
+          name,
+          ruleIndex,
+          sheetIndex,
+          cssText: this.config.devMode ? fullRule : undefined,
+        },
+        declarations,
       };
     } catch (error) {
       console.warn('Failed to insert keyframes:', error);

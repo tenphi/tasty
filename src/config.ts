@@ -88,6 +88,14 @@ export interface TastyConfig {
    */
   funcs?: Record<string, (groups: StyleDetails[]) => string>;
   /**
+   * Automatically infer and register CSS @property declarations
+   * from custom property values found in styles, keyframes, and global config.
+   * Covers all types: \<color\>, \<number\>, \<length\>, \<angle\>, \<percentage\>, \<time\>.
+   * When false, only explicitly declared @properties are registered.
+   * @default true
+   */
+  autoPropertyTypes?: boolean;
+  /**
    * Plugins that extend tasty with custom functions, units, or states.
    * Plugins are processed in order, with later plugins overriding earlier ones.
    * @example
@@ -284,13 +292,11 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue: 'transparent',
   },
   // Current color context variable (set by the color style handler).
-  // Companion --current-color-rgb is auto-created.
   '#current': {
     inherits: true,
     initialValue: 'transparent',
   },
   // White and black are fundamental colors that need explicit initial values.
-  // Companion -rgb properties are auto-created from the color initial values.
   '#white': {
     inherits: true,
     initialValue: 'rgb(255 255 255)',

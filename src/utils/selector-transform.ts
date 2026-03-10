@@ -11,8 +11,6 @@
  */
 const ELEMENT_NAME_RE = /(^|[\s>+~,(])([A-Z][a-zA-Z0-9]*)/g;
 
-export { ELEMENT_NAME_RE };
-
 /**
  * Replace capitalized PascalCase words with `[data-element="Name"]` selectors.
  *

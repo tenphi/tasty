@@ -416,7 +416,7 @@ const Card = tasty({
 | `:has(>)` | `:has(> *)` | Has any direct child |
 | `:is(> Field + input)` | `:is(> [data-element="Field"] + input)` | Structural match |
 | `:has(button)` | `:has(button)` | HTML tag (lowercase, unchanged) |
-| `!:has(> Icon)` | `:not(:has(> [data-element="Icon"])))` | Negation (use `!`) |
+| `!:has(> Icon)` | `:not(:has(> [data-element="Icon"]))` | Negation (use `!`) |
 | `!:is(Panel)` | `:not([data-element="Panel"])` | Negation (use `!:is`) |
 
 Combine with other states using boolean logic:
@@ -426,6 +426,8 @@ Combine with other states using boolean logic:
 '@parent(hovered) & :has(> Icon)'       // parent check + structural
 ':has(> Icon) | :has(> Button)'         // OR: either sub-element present
 ```
+
+> **Nesting limit:** The state key parser supports up to 2 levels of nested parentheses inside `:is()`, `:has()`, `:not()`, and `:where()` — e.g. `:has(Input:not(:disabled))` works, but 3+ levels like `:has(:is(:not(:hover)))` will not be tokenized correctly. This covers virtually all practical use cases.
 
 ---
 

@@ -6,7 +6,9 @@
 
 import type {
   ConditionNode,
+  ModifierCondition,
   ParentCondition,
+  PseudoCondition,
   RootCondition,
 } from './conditions';
 import {
@@ -27,6 +29,24 @@ import { simplifyCondition } from './simplify';
 function assertParentCondition(node: ConditionNode): ParentCondition {
   if (node.kind !== 'state' || node.type !== 'parent') {
     throw new Error(`Expected parent condition, got ${node.kind}`);
+  }
+  return node;
+}
+
+function assertModifierCondition(node: ConditionNode): ModifierCondition {
+  if (node.kind !== 'state' || node.type !== 'modifier') {
+    throw new Error(
+      `Expected modifier condition, got ${node.kind}${node.kind === 'state' ? `:${node.type}` : ''}`,
+    );
+  }
+  return node;
+}
+
+function assertPseudoCondition(node: ConditionNode): PseudoCondition {
+  if (node.kind !== 'state' || node.type !== 'pseudo') {
+    throw new Error(
+      `Expected pseudo condition, got ${node.kind}${node.kind === 'state' ? `:${node.type}` : ''}`,
+    );
   }
   return node;
 }
@@ -2673,12 +2693,9 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
 
   describe(':not() normalization', () => {
     it('should normalize :not(Panel) to negated :is()', () => {
-      const node = parseStateKey(':not(Panel)');
-      expect(node.kind).toBe('state');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toBe(':is([data-element="Panel"])');
-        expect(node.negated).toBe(true);
-      }
+      const node = assertPseudoCondition(parseStateKey(':not(Panel)'));
+      expect(node.pseudo).toBe(':is([data-element="Panel"])');
+      expect(node.negated).toBe(true);
     });
 
     it('should produce :not([data-element="Panel"]) in CSS output', () => {
@@ -2694,22 +2711,16 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
     });
 
     it('should produce same uniqueId for :not(X) and !:is(X)', () => {
-      const fromNot = parseStateKey(':not(button)');
-      const fromBangIs = parseStateKey('!:is(button)');
-
-      if (fromNot.kind === 'state' && fromBangIs.kind === 'state') {
-        expect(fromNot.uniqueId).toBe(fromBangIs.uniqueId);
-      }
+      const fromNot = assertPseudoCondition(parseStateKey(':not(button)'));
+      const fromBangIs = assertPseudoCondition(parseStateKey('!:is(button)'));
+      expect(fromNot.uniqueId).toBe(fromBangIs.uniqueId);
     });
 
     it('should resolve double negation !:not(X) to :is(X) → X', () => {
       const node = parseStateKey(':not(:first-child)');
-      const doubleNeg = not(node);
-
-      if (doubleNeg.kind === 'state' && doubleNeg.type === 'pseudo') {
-        expect(doubleNeg.negated).toBe(false);
-        expect(doubleNeg.pseudo).toBe(':is(:first-child)');
-      }
+      const doubleNeg = assertPseudoCondition(not(node));
+      expect(doubleNeg.negated).toBe(false);
+      expect(doubleNeg.pseudo).toBe(':is(:first-child)');
 
       const css = conditionToCSS(doubleNeg);
       expect(css.variants.length).toBe(1);
@@ -2834,39 +2845,29 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
 
   describe('trailing combinator auto-completion', () => {
     it('should append * to :has(>) → :has(> *)', () => {
-      const node = parseStateKey(':has(>)');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toBe(':has(> *)');
-      }
+      const node = assertPseudoCondition(parseStateKey(':has(>)'));
+      expect(node.pseudo).toBe(':has(> *)');
     });
 
     it('should append * to :has(Icon >) → :has([data-element="Icon"] > *)', () => {
-      const node = parseStateKey(':has(Icon >)');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toBe(':has([data-element="Icon"] > *)');
-      }
+      const node = assertPseudoCondition(parseStateKey(':has(Icon >)'));
+      expect(node.pseudo).toBe(':has([data-element="Icon"] > *)');
     });
 
     it('should append * to :is(Field +) → :is(... + *)', () => {
-      const node = parseStateKey(':is(Field +)');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toContain('+ *)');
-      }
+      const node = assertPseudoCondition(parseStateKey(':is(Field +)'));
+      expect(node.pseudo).toContain('+ *)');
     });
 
     it('should append * to :has(Body ~) → :has(... ~ *)', () => {
-      const node = parseStateKey(':has(Body ~)');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toContain('~ *)');
-      }
+      const node = assertPseudoCondition(parseStateKey(':has(Body ~)'));
+      expect(node.pseudo).toContain('~ *)');
     });
 
     it('should work with :not(>) → negated :is(> *)', () => {
-      const node = parseStateKey(':not(>)');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toBe(':is(> *)');
-        expect(node.negated).toBe(true);
-      }
+      const node = assertPseudoCondition(parseStateKey(':not(>)'));
+      expect(node.pseudo).toBe(':is(> *)');
+      expect(node.negated).toBe(true);
     });
 
     it('should produce valid CSS in rendered output', () => {
@@ -2882,17 +2883,19 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
 
   describe('nested parentheses', () => {
     it('should handle :has(Input:not(:disabled))', () => {
-      const node = parseStateKey(':has(Input:not(:disabled))');
-      expect(node.kind).toBe('state');
-      if (node.kind === 'state' && node.type === 'pseudo') {
-        expect(node.pseudo).toContain('[data-element="Input"]');
-        expect(node.pseudo).toContain(':not(:disabled)');
-      }
+      const node = assertPseudoCondition(
+        parseStateKey(':has(Input:not(:disabled))'),
+      );
+      expect(node.pseudo).toContain('[data-element="Input"]');
+      expect(node.pseudo).toContain(':not(:disabled)');
     });
 
     it('should handle :is(:not(:first-child):not(:last-child))', () => {
-      const node = parseStateKey(':is(:not(:first-child):not(:last-child))');
-      expect(node.kind).toBe('state');
+      const node = assertPseudoCondition(
+        parseStateKey(':is(:not(:first-child):not(:last-child))'),
+      );
+      expect(node.pseudo).toContain(':not(:first-child)');
+      expect(node.pseudo).toContain(':not(:last-child)');
     });
   });
 
@@ -2951,6 +2954,119 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
       );
       expect(iconRule).toBeDefined();
       expect(buttonRule).toBeDefined();
+    });
+  });
+});
+
+// ============================================================================
+// Value mod partial-match operators (^=, $=, *=)
+// ============================================================================
+
+describe('Value mod partial-match operators', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+    clearParseCache();
+  });
+
+  describe('parseStateKey', () => {
+    it('should parse type^=fullscreen as starts-with modifier', () => {
+      const node = assertModifierCondition(
+        parseStateKey('type^=fullscreen'),
+      );
+      expect(node.attribute).toBe('data-type');
+      expect(node.value).toBe('fullscreen');
+      expect(node.operator).toBe('^=');
+    });
+
+    it('should parse type$=screen as ends-with modifier', () => {
+      const node = assertModifierCondition(parseStateKey('type$=screen'));
+      expect(node.attribute).toBe('data-type');
+      expect(node.value).toBe('screen');
+      expect(node.operator).toBe('$=');
+    });
+
+    it('should parse type*=full as contains modifier', () => {
+      const node = assertModifierCondition(parseStateKey('type*=full'));
+      expect(node.attribute).toBe('data-type');
+      expect(node.value).toBe('full');
+      expect(node.operator).toBe('*=');
+    });
+
+    it('should parse quoted values with ^= operator', () => {
+      const node = assertModifierCondition(
+        parseStateKey('type^="fullscreen"'),
+      );
+      expect(node.attribute).toBe('data-type');
+      expect(node.value).toBe('fullscreen');
+      expect(node.operator).toBe('^=');
+    });
+
+    it('should parse single-quoted values with $= operator', () => {
+      const node = assertModifierCondition(
+        parseStateKey("type$='screen'"),
+      );
+      expect(node.attribute).toBe('data-type');
+      expect(node.value).toBe('screen');
+      expect(node.operator).toBe('$=');
+    });
+
+    it('should convert camelCase keys with operators', () => {
+      const node = assertModifierCondition(
+        parseStateKey('dataType^=fullscreen'),
+      );
+      expect(node.attribute).toBe('data-data-type');
+      expect(node.operator).toBe('^=');
+    });
+  });
+
+  describe('CSS output', () => {
+    it('should render ^= operator in attribute selector', () => {
+      const result = renderStyles(
+        { display: { '': 'block', 'type^=full': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes('[data-type^="full"]'),
+      );
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+
+    it('should render $= operator in attribute selector', () => {
+      const result = renderStyles(
+        { display: { '': 'block', 'type$=screen': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes('[data-type$="screen"]'),
+      );
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+
+    it('should render *= operator in attribute selector', () => {
+      const result = renderStyles(
+        { display: { '': 'block', 'name*=test': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes('[data-name*="test"]'),
+      );
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+
+    it('should combine partial-match operator with boolean logic', () => {
+      const result = renderStyles(
+        { display: { '': 'block', 'type^=full & active': 'flex' } },
+        '.c',
+      );
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-type^="full"]') &&
+          r.selector.includes('[data-active]'),
+      );
+      expect(rule).toBeDefined();
     });
   });
 });

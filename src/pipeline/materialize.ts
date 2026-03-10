@@ -881,15 +881,18 @@ function hasSelectorConditionContradiction(
  * with opposite negation. E.g. :not([data-hovered] *) and :is([data-hovered] *)
  * in the same variant is impossible.
  */
+function getBranchesKey(branches: ParsedSelectorCondition[][]): string {
+  return branches
+    .map((b) => b.map(getSelectorConditionKey).sort().join('+'))
+    .sort()
+    .join(',');
+}
+
 function hasParentGroupContradiction(groups: ParentGroup[]): boolean {
   const byBaseKey = new Map<string, boolean>();
 
   for (const g of groups) {
-    const branchKeys = g.branches
-      .map((b) => b.map(getSelectorConditionKey).sort().join('+'))
-      .sort()
-      .join(',');
-    const baseKey = `${g.direct ? '>' : ''}(${branchKeys})`;
+    const baseKey = `${g.direct ? '>' : ''}(${getBranchesKey(g.branches)})`;
     const existing = byBaseKey.get(baseKey);
     if (existing !== undefined && existing !== !g.negated) {
       return true;
@@ -1410,11 +1413,7 @@ function isParentGroupsSuperset(a: ParentGroup[], b: ParentGroup[]): boolean {
 }
 
 function getParentGroupKey(g: ParentGroup): string {
-  const branchKeys = g.branches
-    .map((b) => b.map(getSelectorConditionKey).sort().join('+'))
-    .sort()
-    .join(',');
-  return `${g.negated ? '!' : ''}${g.direct ? '>' : ''}(${branchKeys})`;
+  return `${g.negated ? '!' : ''}${g.direct ? '>' : ''}(${getBranchesKey(g.branches)})`;
 }
 
 /**

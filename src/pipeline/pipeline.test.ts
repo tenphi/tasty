@@ -23,11 +23,7 @@ import {
   trueCondition,
 } from './conditions';
 import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
-import {
-  conditionToCSS,
-  parentGroupsToCSS,
-  pseudoToCSS,
-} from './materialize';
+import { conditionToCSS, parentGroupsToCSS, pseudoToCSS } from './materialize';
 import { clearParseCache, parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
@@ -950,10 +946,34 @@ describe('conditionToCSS()', () => {
   });
 
   it('should produce single variant with multi-condition AND branches inside @parent OR', () => {
-    const hovered = createModifierCondition('data-hovered', undefined, '=', false, 'hovered');
-    const pressed = createModifierCondition('data-pressed', undefined, '=', false, 'pressed');
-    const focused = createModifierCondition('data-focused', undefined, '=', false, 'focused');
-    const active = createModifierCondition('data-active', undefined, '=', false, 'active');
+    const hovered = createModifierCondition(
+      'data-hovered',
+      undefined,
+      '=',
+      false,
+      'hovered',
+    );
+    const pressed = createModifierCondition(
+      'data-pressed',
+      undefined,
+      '=',
+      false,
+      'pressed',
+    );
+    const focused = createModifierCondition(
+      'data-focused',
+      undefined,
+      '=',
+      false,
+      'focused',
+    );
+    const active = createModifierCondition(
+      'data-active',
+      undefined,
+      '=',
+      false,
+      'active',
+    );
 
     const inner = or(and(hovered, pressed), and(focused, active));
     const parent = createParentCondition(inner, false, false, '@parent(...)');
@@ -979,10 +999,34 @@ describe('conditionToCSS()', () => {
   });
 
   it('should render multi-condition AND branches inside @parent OR as comma-separated :is()', () => {
-    const hovered = createModifierCondition('data-hovered', undefined, '=', false, 'hovered');
-    const pressed = createModifierCondition('data-pressed', undefined, '=', false, 'pressed');
-    const focused = createModifierCondition('data-focused', undefined, '=', false, 'focused');
-    const active = createModifierCondition('data-active', undefined, '=', false, 'active');
+    const hovered = createModifierCondition(
+      'data-hovered',
+      undefined,
+      '=',
+      false,
+      'hovered',
+    );
+    const pressed = createModifierCondition(
+      'data-pressed',
+      undefined,
+      '=',
+      false,
+      'pressed',
+    );
+    const focused = createModifierCondition(
+      'data-focused',
+      undefined,
+      '=',
+      false,
+      'focused',
+    );
+    const active = createModifierCondition(
+      'data-active',
+      undefined,
+      '=',
+      false,
+      'active',
+    );
 
     const inner = or(and(hovered, pressed), and(focused, active));
     const parent = createParentCondition(inner, false, false, '@parent(...)');
@@ -2882,9 +2926,7 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
           pseudo: ':where([data-element="Section"] > [data-element="Header"])',
           negated: false,
         }),
-      ).toBe(
-        ':where([data-element="Section"] > [data-element="Header"])',
-      );
+      ).toBe(':where([data-element="Section"] > [data-element="Header"])');
     });
 
     it('double negation of :not(:first-child) unwraps in rendered CSS', () => {
@@ -3040,9 +3082,7 @@ describe('Value mod partial-match operators', () => {
 
   describe('parseStateKey', () => {
     it('should parse type^=fullscreen as starts-with modifier', () => {
-      const node = assertModifierCondition(
-        parseStateKey('type^=fullscreen'),
-      );
+      const node = assertModifierCondition(parseStateKey('type^=fullscreen'));
       expect(node.attribute).toBe('data-type');
       expect(node.value).toBe('fullscreen');
       expect(node.operator).toBe('^=');
@@ -3063,18 +3103,14 @@ describe('Value mod partial-match operators', () => {
     });
 
     it('should parse quoted values with ^= operator', () => {
-      const node = assertModifierCondition(
-        parseStateKey('type^="fullscreen"'),
-      );
+      const node = assertModifierCondition(parseStateKey('type^="fullscreen"'));
       expect(node.attribute).toBe('data-type');
       expect(node.value).toBe('fullscreen');
       expect(node.operator).toBe('^=');
     });
 
     it('should parse single-quoted values with $= operator', () => {
-      const node = assertModifierCondition(
-        parseStateKey("type$='screen'"),
-      );
+      const node = assertModifierCondition(parseStateKey("type$='screen'"));
       expect(node.attribute).toBe('data-type');
       expect(node.value).toBe('screen');
       expect(node.operator).toBe('$=');

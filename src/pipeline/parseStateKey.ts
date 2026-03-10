@@ -351,9 +351,7 @@ class Parser {
       if (enhancedMatch) {
         const fn = enhancedMatch[1];
         const prefix = enhancedMatch[0];
-        let content = transformSelectorContent(
-          value.slice(prefix.length, -1),
-        );
+        let content = transformSelectorContent(value.slice(prefix.length, -1));
 
         // Auto-complete trailing combinator: :has(Icon >) → :has(... > *)
         content = content.replace(/([>+~])\s*$/, '$1 *');

@@ -450,8 +450,8 @@ export function classify(
     return { bucket: Bucket.Value, processed: token };
   }
 
-  // 9c. Plain unit-less numbers should be treated as value tokens so that
-  // code such as `scrollbar={10}` resolves correctly.
+  // 9c. Plain unit-less numbers should be treated as value tokens (e.g.,
+  // numeric arguments in custom style handlers).
   if (RE_NUMBER.test(token)) {
     return { bucket: Bucket.Value, processed: token };
   }

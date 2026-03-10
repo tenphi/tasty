@@ -55,11 +55,6 @@ export const BASE_TOKENS: Styles = {
   '$fade-transition': '200ms',
 
   // Scrollbar tokens
-  '$scrollbar-width': '1.5x',
-  '$scrollbar-outline-width': '1ow',
-  '$scrollbar-radius': '1.5r',
   '#scrollbar-thumb': '#text.5',
-  '#scrollbar-outline': '#clear',
-  '#scrollbar-bg': '#dark-bg',
-  '#scrollbar-corner': '#clear',
+  '#scrollbar-track': '#dark-bg',
 };

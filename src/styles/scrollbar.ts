@@ -2,7 +2,7 @@ import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
 interface ScrollbarStyleProps {
-  scrollbar?: string | boolean | number;
+  scrollbar?: string | boolean;
   overflow?: string;
 }
 
@@ -14,7 +14,7 @@ export function scrollbarStyle({
   scrollbar,
   overflow,
 }: ScrollbarStyleProps): Record<string, string> | undefined {
-  if (!scrollbar && scrollbar !== 0) return;
+  if (!scrollbar) return;
 
   const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
@@ -31,10 +31,11 @@ export function scrollbarStyle({
     return style;
   }
 
-  if (mods.includes('thin')) {
-    style['scrollbar-width'] = 'thin';
-  } else if (mods.includes('auto') || values.includes('auto')) {
+  // `auto` is a VALUE_KEYWORD in the parser, so it lands in `values` not `mods`
+  if (mods.includes('auto') || values.includes('auto')) {
     style['scrollbar-width'] = 'auto';
+  } else {
+    style['scrollbar-width'] = 'thin';
   }
 
   const thumbColor = colors?.[0] || defaultThumbColor;

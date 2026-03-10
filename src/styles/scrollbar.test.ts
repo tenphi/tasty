@@ -38,6 +38,7 @@ describe('scrollbarStyle', () => {
   it('handles custom thumb and track colors', () => {
     const result = scrollbarStyle({ scrollbar: '#red #blue' })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['scrollbar-color']).toBe(
       'var(--red-color) var(--blue-color)',
     );
@@ -63,6 +64,7 @@ describe('scrollbarStyle', () => {
   it('uses default track color when only thumb is specified', () => {
     const result = scrollbarStyle({ scrollbar: '#danger' })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['scrollbar-color']).toBe(
       'var(--danger-color) var(--scrollbar-track-color, transparent)',
     );
@@ -85,6 +87,7 @@ describe('scrollbarStyle', () => {
   it('handles "always" modifier', () => {
     const result = scrollbarStyle({ scrollbar: 'always' })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['overflow']).toBe('scroll');
     expect(result['scrollbar-gutter']).toBe('stable');
   });
@@ -95,6 +98,7 @@ describe('scrollbarStyle', () => {
       overflow: 'auto',
     })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['overflow']).toBe('auto');
     expect(result['scrollbar-gutter']).toBe('stable');
   });
@@ -104,6 +108,7 @@ describe('scrollbarStyle', () => {
       scrollbar: 'always #primary #white',
     })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['overflow']).toBe('scroll');
     expect(result['scrollbar-gutter']).toBe('stable');
     expect(result['scrollbar-color']).toBe(
@@ -128,6 +133,7 @@ describe('scrollbarStyle', () => {
       scrollbar: 'always both-edges',
     })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['overflow']).toBe('scroll');
     expect(result['scrollbar-gutter']).toBe('stable both-edges');
   });
@@ -137,6 +143,7 @@ describe('scrollbarStyle', () => {
       scrollbar: '#red #blue #green',
     })!;
 
+    expect(result['scrollbar-width']).toBe('thin');
     expect(result['scrollbar-color']).toBe(
       'var(--red-color) var(--blue-color)',
     );

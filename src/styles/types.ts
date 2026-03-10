@@ -164,20 +164,20 @@ export interface StylesInterface extends Omit<
    */
   fade?: 'top' | 'right' | 'bottom' | 'left' | string;
   /**
-   * The scrollbar style provides a powerful and flexible way to control the appearance and behavior of scrollbars across browsers. It supports custom sizing, color, visibility, and advanced modifiers for modern UI needs.
+   * Scrollbar styling using standard CSS properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
    *
-   * Syntax: `[modifiers] [size] [color1] [color2] [color3]`
+   * Syntax: `[modifiers...] [thumb-color] [track-color]`
    *
-   * Modifiers: `thin`, `none`, `auto`, `stable`, `both-edges`, `always`, `styled`
+   * Modifiers: `thin`, `none`, `auto`, `stable`, `both-edges`, `always`
    *
    * Examples:
-   * - `scrollbar={true}` // thin scrollbar, default color
-   * - `scrollbar="thin 10px #purple.40 #dark.04"`
-   * - `scrollbar="styled 12px #purple.40 #dark.04 #white.10"`
+   * - `scrollbar={true}` // thin scrollbar, default colors
+   * - `scrollbar="thin #purple.40 #dark.04"`
    * - `scrollbar="none"`
-   * - `scrollbar="always 8px #primary.50 #white.02"`
+   * - `scrollbar="always #primary.50 #white.02"`
+   * - `scrollbar="thin stable #red #blue"`
    */
-  scrollbar?: string | boolean | number;
+  scrollbar?: string | boolean;
   /**
    * Set font weight for bold texts.
    */

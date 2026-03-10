@@ -199,7 +199,9 @@ describe('scrollbarStyle', () => {
 
   describe('conflicting modifiers', () => {
     it('"none" wins over other modifiers and warns', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
       const result = scrollbarStyle({ scrollbar: 'none always' })!;
 
@@ -216,7 +218,9 @@ describe('scrollbarStyle', () => {
     });
 
     it('"none" with colors warns about ignored tokens', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
       const result = scrollbarStyle({ scrollbar: 'none #red #blue' })!;
 
@@ -231,7 +235,9 @@ describe('scrollbarStyle', () => {
     });
 
     it('"none stable" warns and ignores stable', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
       const result = scrollbarStyle({ scrollbar: 'none stable' })!;
 
@@ -246,7 +252,9 @@ describe('scrollbarStyle', () => {
     });
 
     it('"none" alone does not warn', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
       scrollbarStyle({ scrollbar: 'none' });
 

@@ -387,18 +387,42 @@ function pseudoToParsed(state: PseudoCondition): ParsedPseudoCondition {
 }
 
 /**
- * Convert parsed pseudo to CSS selector string (for final output)
+ * Convert parsed pseudo to CSS selector string (for final output).
+ *
+ * :not() is normalized to negated :is() at parse time, so pseudo.pseudo
+ * never starts with ':not(' here. When negated:
+ * - :is(X) → :not(X)     (unwrap :is)
+ * - :where(X) → :not(X)  (unwrap :where)
+ * - :has(X) → :not(:has(X))
+ * - other → :not(other)
+ *
+ * When not negated, single-argument :is() is unwrapped since it's a no-op
+ * (this happens after double-negation of :not()).
  */
 export function pseudoToCSS(pseudo: ParsedPseudoCondition): string {
+  const p = pseudo.pseudo;
+
   if (pseudo.negated) {
-    // Wrap in :not() if not already
-    if (pseudo.pseudo.startsWith(':not(')) {
-      // Double negation - remove :not()
-      return pseudo.pseudo.slice(5, -1);
+    if (p.startsWith(':is(') || p.startsWith(':where(')) {
+      return `:not(${p.slice(p.indexOf('(') + 1, -1)})`;
     }
-    return `:not(${pseudo.pseudo})`;
+    return `:not(${p})`;
   }
-  return pseudo.pseudo;
+
+  // Unwrap single-argument :is()/:where() when the inner content can
+  // safely compound with the base selector. Tag names (a, div, button)
+  // and combinators (>, +, ~) cannot — they'd produce broken selectors
+  // like `.t0.t0a` instead of `.t0.t0:is(a)`.
+  if ((p.startsWith(':is(') || p.startsWith(':where(')) && !p.includes(',')) {
+    const inner = p.slice(p.indexOf('(') + 1, -1);
+    const ch = inner[0];
+
+    if (ch === ':' || ch === '.' || ch === '[' || ch === '#') {
+      return inner;
+    }
+  }
+
+  return p;
 }
 
 /**

@@ -20,7 +20,7 @@ import {
   trueCondition,
 } from './conditions';
 import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
-import { conditionToCSS } from './materialize';
+import { conditionToCSS, pseudoToCSS } from './materialize';
 import { clearParseCache, parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
@@ -2270,10 +2270,11 @@ describe('@supports queries snapshot tests', () => {
     expect(result.length).toBe(3);
 
     // Verify A & B rule exists
+    // :has(> Icon) is transformed to :has(> [data-element="Icon"])
     const supportsWithHas = result.find(
       (r) =>
         r.atRules?.[0]?.includes('selector(:has(*)') &&
-        r.selector.includes(':has(> Icon)') &&
+        r.selector.includes(':has(> [data-element="Icon"])') &&
         !r.selector.includes(':not'),
     );
     expect(supportsWithHas).toBeDefined();
@@ -2290,7 +2291,7 @@ describe('@supports queries snapshot tests', () => {
     const supportsNoHas = result.find(
       (r) =>
         r.atRules?.[0]?.includes('selector(:has(*)') &&
-        r.selector.includes(':not(:has(> Icon))'),
+        r.selector.includes(':not(:has(> [data-element="Icon"]))'),
     );
     expect(supportsNoHas).toBeDefined();
     expect(supportsNoHas!.declarations).toContain('block');
@@ -2319,10 +2320,11 @@ describe('@supports queries snapshot tests', () => {
     expect(result.length).toBe(3);
 
     // Verify rules exist
+    // :has(> Icon) is transformed to :has(> [data-element="Icon"])
     const supportsHasWithIcon = result.filter(
       (r) =>
         r.atRules?.[0]?.includes('selector(:has(*)') &&
-        r.selector.includes(':has(> Icon)') &&
+        r.selector.includes(':has(> [data-element="Icon"])') &&
         !r.selector.includes(':not(:has'),
     );
     expect(supportsHasWithIcon.length).toBe(1);
@@ -2331,7 +2333,7 @@ describe('@supports queries snapshot tests', () => {
     const supportsHasNoIcon = result.filter(
       (r) =>
         r.atRules?.[0]?.includes('selector(:has(*)') &&
-        r.selector.includes(':not(:has(> Icon))'),
+        r.selector.includes(':not(:has(> [data-element="Icon"]))'),
     );
     expect(supportsHasNoIcon.length).toBe(1);
     expect(supportsHasNoIcon[0].declarations).toContain('flex');
@@ -2582,5 +2584,373 @@ describe('Sub-element scoped predefined states', () => {
     );
     expect(placeholderActive).toBeDefined();
     expect(placeholderActive!.declarations).toContain('lightblue');
+  });
+});
+
+// ============================================================================
+// Enhanced pseudo-classes: :is(), :has(), :not(), :where()
+// ============================================================================
+
+describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+    clearParseCache();
+  });
+
+  describe('element-name transformation', () => {
+    it('should transform :has(> Icon) capitalized name to [data-element]', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':has(> Icon)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(':has(> [data-element="Icon"])'),
+      );
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+
+    it('should transform :is(> Field + input:checked)', () => {
+      const result = renderStyles(
+        {
+          display: {
+            '': 'block',
+            ':is(> Field + input:checked)': 'grid',
+          },
+        },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes('> [data-element="Field"] + input:checked'),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should transform :has(Body > Row) with multiple elements', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':has(Body > Row)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(
+          ':has([data-element="Body"] > [data-element="Row"])',
+        ),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should transform :where(Section > Header)', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':where(Section > Header)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(
+          '[data-element="Section"] > [data-element="Header"]',
+        ),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should leave lowercase HTML tags unchanged in :has()', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':has(button)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) => r.selector.includes(':has(button)'));
+      expect(rule).toBeDefined();
+    });
+
+    it('should leave lowercase HTML tags unchanged in :is()', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':is(fieldset > label)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) => r.selector.includes('fieldset > label'));
+      expect(rule).toBeDefined();
+    });
+  });
+
+  describe(':not() normalization', () => {
+    it('should normalize :not(Panel) to negated :is()', () => {
+      const node = parseStateKey(':not(Panel)');
+      expect(node.kind).toBe('state');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toBe(':is([data-element="Panel"])');
+        expect(node.negated).toBe(true);
+      }
+    });
+
+    it('should produce :not([data-element="Panel"]) in CSS output', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':not(Panel)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(':not([data-element="Panel"])'),
+      );
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+
+    it('should produce same uniqueId for :not(X) and !:is(X)', () => {
+      const fromNot = parseStateKey(':not(button)');
+      const fromBangIs = parseStateKey('!:is(button)');
+
+      if (fromNot.kind === 'state' && fromBangIs.kind === 'state') {
+        expect(fromNot.uniqueId).toBe(fromBangIs.uniqueId);
+      }
+    });
+
+    it('should resolve double negation !:not(X) to :is(X) → X', () => {
+      const node = parseStateKey(':not(:first-child)');
+      const doubleNeg = not(node);
+
+      if (doubleNeg.kind === 'state' && doubleNeg.type === 'pseudo') {
+        expect(doubleNeg.negated).toBe(false);
+        expect(doubleNeg.pseudo).toBe(':is(:first-child)');
+      }
+
+      const css = conditionToCSS(doubleNeg);
+      expect(css.variants.length).toBe(1);
+      expect(css.variants[0].pseudoConditions[0].pseudo).toBe(
+        ':is(:first-child)',
+      );
+      expect(css.variants[0].pseudoConditions[0].negated).toBe(false);
+    });
+  });
+
+  describe('negation in CSS output', () => {
+    it('should output !:is(button) as :not(button)', () => {
+      const result = renderStyles(
+        { display: { '': 'block', '!:is(button)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) => r.selector.includes(':not(button)'));
+      expect(rule).toBeDefined();
+    });
+
+    it('should output !:has(> Icon) as :not(:has(...))', () => {
+      const result = renderStyles(
+        { display: { '': 'block', '!:has(> Icon)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(':not(:has(> [data-element="Icon"]))'),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should output !:where(Section) as :not(Section)', () => {
+      const result = renderStyles(
+        { display: { '': 'block', '!:where(Section)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) =>
+        r.selector.includes(':not([data-element="Section"])'),
+      );
+      expect(rule).toBeDefined();
+    });
+  });
+
+  describe(':is()/:where() unwrap safety', () => {
+    it('should unwrap :is(:first-child) → :first-child (pseudo-class)', () => {
+      expect(pseudoToCSS({ pseudo: ':is(:first-child)', negated: false })).toBe(
+        ':first-child',
+      );
+    });
+
+    it('should unwrap :is(.active) → .active (class selector)', () => {
+      expect(pseudoToCSS({ pseudo: ':is(.active)', negated: false })).toBe(
+        '.active',
+      );
+    });
+
+    it('should unwrap :is([disabled]) → [disabled] (attribute)', () => {
+      expect(pseudoToCSS({ pseudo: ':is([disabled])', negated: false })).toBe(
+        '[disabled]',
+      );
+    });
+
+    it('should NOT unwrap :is(a) — tag name breaks compound selectors', () => {
+      expect(pseudoToCSS({ pseudo: ':is(a)', negated: false })).toBe(':is(a)');
+    });
+
+    it('should NOT unwrap :is(button) — tag name', () => {
+      expect(pseudoToCSS({ pseudo: ':is(button)', negated: false })).toBe(
+        ':is(button)',
+      );
+    });
+
+    it('should NOT unwrap :is(> div) — combinator', () => {
+      expect(pseudoToCSS({ pseudo: ':is(> div)', negated: false })).toBe(
+        ':is(> div)',
+      );
+    });
+
+    it('should NOT unwrap multi-arg :is(a, b)', () => {
+      expect(pseudoToCSS({ pseudo: ':is(a, b)', negated: false })).toBe(
+        ':is(a, b)',
+      );
+    });
+
+    it('should unwrap :where(:hover) → :hover', () => {
+      expect(pseudoToCSS({ pseudo: ':where(:hover)', negated: false })).toBe(
+        ':hover',
+      );
+    });
+
+    it('should NOT unwrap :where(div)', () => {
+      expect(pseudoToCSS({ pseudo: ':where(div)', negated: false })).toBe(
+        ':where(div)',
+      );
+    });
+
+    it('double negation of :not(:first-child) unwraps in rendered CSS', () => {
+      const result = renderStyles(
+        { color: { '': 'red', ':not(:first-child)': 'blue' } },
+        '.c',
+      );
+      const defaultRule = result.find(
+        (r) => !r.selector.includes(':not') && r.declarations.includes('red'),
+      );
+      expect(defaultRule).toBeDefined();
+      expect(defaultRule!.selector).toContain(':first-child');
+      expect(defaultRule!.selector).not.toContain(':is(');
+    });
+
+    it('double negation of :not(a) keeps :is(a) wrapper in rendered CSS', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':not(a)': 'flex' } },
+        '.c',
+      );
+      const defaultRule = result.find(
+        (r) => !r.selector.includes(':not') && r.declarations.includes('block'),
+      );
+      expect(defaultRule).toBeDefined();
+      expect(defaultRule!.selector).toContain(':is(a)');
+    });
+  });
+
+  describe('trailing combinator auto-completion', () => {
+    it('should append * to :has(>) → :has(> *)', () => {
+      const node = parseStateKey(':has(>)');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toBe(':has(> *)');
+      }
+    });
+
+    it('should append * to :has(Icon >) → :has([data-element="Icon"] > *)', () => {
+      const node = parseStateKey(':has(Icon >)');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toBe(':has([data-element="Icon"] > *)');
+      }
+    });
+
+    it('should append * to :is(Field +) → :is(... + *)', () => {
+      const node = parseStateKey(':is(Field +)');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toContain('+ *)');
+      }
+    });
+
+    it('should append * to :has(Body ~) → :has(... ~ *)', () => {
+      const node = parseStateKey(':has(Body ~)');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toContain('~ *)');
+      }
+    });
+
+    it('should work with :not(>) → negated :is(> *)', () => {
+      const node = parseStateKey(':not(>)');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toBe(':is(> *)');
+        expect(node.negated).toBe(true);
+      }
+    });
+
+    it('should produce valid CSS in rendered output', () => {
+      const result = renderStyles(
+        { display: { '': 'block', ':has(>)': 'flex' } },
+        '.c',
+      );
+      const rule = result.find((r) => r.selector.includes(':has(> *)'));
+      expect(rule).toBeDefined();
+      expect(rule!.declarations).toContain('flex');
+    });
+  });
+
+  describe('nested parentheses', () => {
+    it('should handle :has(Input:not(:disabled))', () => {
+      const node = parseStateKey(':has(Input:not(:disabled))');
+      expect(node.kind).toBe('state');
+      if (node.kind === 'state' && node.type === 'pseudo') {
+        expect(node.pseudo).toContain('[data-element="Input"]');
+        expect(node.pseudo).toContain(':not(:disabled)');
+      }
+    });
+
+    it('should handle :is(:not(:first-child):not(:last-child))', () => {
+      const node = parseStateKey(':is(:not(:first-child):not(:last-child))');
+      expect(node.kind).toBe('state');
+    });
+  });
+
+  describe('boolean logic combinations', () => {
+    it('should combine :has(> Icon) & hovered', () => {
+      const result = renderStyles(
+        {
+          display: {
+            '': 'block',
+            ':has(> Icon) & hovered': 'flex',
+          },
+        },
+        '.c',
+      );
+      const rule = result.find(
+        (r) =>
+          r.selector.includes(':has(> [data-element="Icon"])') &&
+          r.selector.includes('[data-hovered]'),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should combine @parent(hovered) & :has(> Icon)', () => {
+      const result = renderStyles(
+        {
+          display: {
+            '': 'block',
+            '@parent(hovered) & :has(> Icon)': 'flex',
+          },
+        },
+        '.c',
+      );
+      const rule = result.find(
+        (r) =>
+          r.selector.includes(':is([data-hovered]') &&
+          r.selector.includes(':has(> [data-element="Icon"])'),
+      );
+      expect(rule).toBeDefined();
+    });
+
+    it('should combine :has(> Icon) | :has(> Button)', () => {
+      const result = renderStyles(
+        {
+          display: {
+            '': 'block',
+            ':has(> Icon) | :has(> Button)': 'flex',
+          },
+        },
+        '.c',
+      );
+      const iconRule = result.find((r) =>
+        r.selector.includes(':has(> [data-element="Icon"])'),
+      );
+      const buttonRule = result.find((r) =>
+        r.selector.includes(':has(> [data-element="Button"])'),
+      );
+      expect(iconRule).toBeDefined();
+      expect(buttonRule).toBeDefined();
+    });
   });
 });

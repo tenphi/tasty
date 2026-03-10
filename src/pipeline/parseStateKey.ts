@@ -14,6 +14,7 @@ import {
   resolvePredefinedState,
 } from '../states';
 import { camelToKebab } from '../utils/case-converter';
+import { transformSelectorContent } from '../utils/selector-transform';
 
 import type { ConditionNode, NumericBound } from './conditions';
 import { emitWarning } from './warnings';
@@ -73,12 +74,13 @@ const parseCache = new Lru<string, ConditionNode>(5000);
  * Matches: operators, parentheses, @-prefixed states, value mods, boolean mods,
  * pseudo-classes, class selectors, and attribute selectors.
  *
- * Note: For @supports and @(...) container queries we need to handle nested parentheses
- * like @supports($, :has(*)) or @(scroll-state(stuck: top)).
- * We use a pattern that allows one level of nesting: [^()]*(?:\([^)]*\))?[^)]*
+ * Note: For @supports, @(...) container queries, and :is/:has/:not/:where
+ * we need to handle nested parentheses.
+ * We use a pattern that allows up to 2 levels of nesting:
+ *   [^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*
  */
 const STATE_TOKEN_PATTERN =
-  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^)]*\))?[^)]*\))|(@root\([^)]+\))|(@parent\([^)]+\))|(@own\([^)]+\))|(@\([^()]*(?:\([^)]*\))?[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
+  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^)]*\))?[^)]*\))|(@root\([^)]+\))|(@parent\([^)]+\))|(@own\([^)]+\))|(@\([^()]*(?:\([^)]*\))?[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:(?:is|has|not|where)\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
 
 // ============================================================================
 // Token Types
@@ -340,8 +342,27 @@ class Parser {
       return this.parsePredefinedState(value);
     }
 
-    // Pseudo-class (e.g., :hover, :focus-visible, :nth-child(2n))
+    // Enhanced pseudo-classes: :is(), :has(), :not(), :where()
+    // Transform capitalized words to [data-element="..."] selectors,
+    // auto-complete trailing combinators with *, and
+    // normalize :not(X) → negated :is(X) for deduplication.
     if (value.startsWith(':')) {
+      const enhancedMatch = /^:(is|has|not|where)\(/.exec(value);
+      if (enhancedMatch) {
+        const fn = enhancedMatch[1];
+        let transformed = transformSelectorContent(value);
+
+        // Auto-complete trailing combinator: :has(Icon >) → :has(... > *)
+        transformed = transformed.replace(/([>+~])\s*\)$/, '$1 *)');
+
+        if (fn === 'not') {
+          const inner = transformed.slice(5, -1);
+          return createPseudoCondition(`:is(${inner})`, true, value);
+        }
+
+        return createPseudoCondition(transformed, false, value);
+      }
+
       return createPseudoCondition(value, false, value);
     }
 

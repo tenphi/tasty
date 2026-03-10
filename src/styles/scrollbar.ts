@@ -1,6 +1,7 @@
 import { makeEmptyDetails } from '../parser/types';
 import type { CSSMap } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
+import { warn } from '../utils/warnings';
 
 interface ScrollbarStyleProps {
   scrollbar?: string | boolean | number;
@@ -45,11 +46,24 @@ export function scrollbarStyle({
 
   const root: Record<string, string> = {};
 
-  const isAuto = values.includes('auto');
+  const sizeValues = values.filter((v) => v !== 'auto');
+  const hasCustomSize = sizeValues.length > 0;
+  const isStyled = mods.includes('styled');
+  const needsWebkit = isStyled || hasCustomSize;
 
-  if (mods.includes('thin')) {
+  if (needsWebkit && mods.includes('thin')) {
+    warn(
+      'scrollbar: "thin" has no effect when "styled" or a custom size is used — webkit pseudo-elements require scrollbar-width: auto.',
+    );
+  }
+
+  // webkit pseudo-elements only work when scrollbar-width is auto.
+  // When we emit webkit rules, force auto so they actually take effect.
+  if (needsWebkit) {
+    root['scrollbar-width'] = 'auto';
+  } else if (mods.includes('thin')) {
     root['scrollbar-width'] = 'thin';
-  } else if (isAuto) {
+  } else if (values.includes('auto')) {
     root['scrollbar-width'] = 'auto';
   }
 
@@ -69,15 +83,6 @@ export function scrollbarStyle({
     if (!root['scrollbar-gutter']) {
       root['scrollbar-gutter'] = 'stable';
     }
-  }
-
-  const sizeValues = values.filter((v) => v !== 'auto');
-  const hasCustomSize = sizeValues.length > 0;
-  const isStyled = mods.includes('styled');
-  const needsWebkit = isStyled || hasCustomSize;
-
-  if (needsWebkit && !root['scrollbar-width']) {
-    root['scrollbar-width'] = 'thin';
   }
 
   const result: CSSMap[] = [root];

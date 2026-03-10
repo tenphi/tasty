@@ -39,7 +39,7 @@ describe('scrollbarStyle', () => {
     const root = findRoot(result)!;
     const sb = findBySelector(result, '::-webkit-scrollbar')!;
 
-    expect(root['scrollbar-width']).toBe('thin');
+    expect(root['scrollbar-width']).toBe('auto');
     expect(sb['width']).toBe('10');
     expect(sb['height']).toBe('10');
   });
@@ -69,7 +69,7 @@ describe('scrollbarStyle', () => {
     const sb = findBySelector(result, '::-webkit-scrollbar')!;
     const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
 
-    expect(root['scrollbar-width']).toBe('thin');
+    expect(root['scrollbar-width']).toBe('auto');
     expect(sb['width']).toBe('8px');
     expect(thumb['border-radius']).toBe('8px');
     expect(thumb['min-height']).toBe('24px');
@@ -111,12 +111,13 @@ describe('scrollbarStyle', () => {
     expect(hasWebkitRules(result)).toBe(false);
   });
 
-  it('combines modifiers correctly', () => {
+  it('combines modifiers correctly (styled overrides thin)', () => {
     const result = scrollbarStyle({ scrollbar: 'thin styled #red' })!;
     const root = findRoot(result)!;
     const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
 
-    expect(root['scrollbar-width']).toBe('thin');
+    // styled forces scrollbar-width: auto so webkit pseudo-elements work
+    expect(root['scrollbar-width']).toBe('auto');
     expect(root['scrollbar-color']).toBe(
       'var(--red-color) var(--scrollbar-track-color, transparent)',
     );
@@ -195,6 +196,58 @@ describe('scrollbarStyle', () => {
     expect(hasWebkitRules(withSize)).toBe(true);
     const sb = findBySelector(withSize, '::-webkit-scrollbar')!;
     expect(sb['width']).toBe('12px');
+  });
+
+  it('combines "always" with "styled" for always-visible enhanced scrollbar', () => {
+    const result = scrollbarStyle({ scrollbar: 'always styled #red #blue' })!;
+    const root = findRoot(result)!;
+    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
+
+    expect(root['overflow']).toBe('auto');
+    expect(root['scrollbar-gutter']).toBe('stable');
+    expect(root['scrollbar-width']).toBe('auto');
+    expect(root['scrollbar-color']).toBe(
+      'var(--red-color) var(--blue-color)',
+    );
+    expect(thumb['background']).toBe('var(--red-color)');
+    expect(thumb['border-radius']).toBe('8px');
+    expect(thumb['transition']).toBeDefined();
+    expect(hasWebkitRules(result)).toBe(true);
+  });
+
+  it('combines "always" with custom size', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'always 12px #red #blue',
+    })!;
+    const root = findRoot(result)!;
+    const sb = findBySelector(result, '::-webkit-scrollbar')!;
+
+    expect(root['overflow']).toBe('auto');
+    expect(root['scrollbar-gutter']).toBe('stable');
+    expect(root['scrollbar-width']).toBe('auto');
+    expect(sb['width']).toBe('12px');
+    expect(sb['height']).toBe('12px');
+    expect(hasWebkitRules(result)).toBe(true);
+  });
+
+  it('warns when "thin" is combined with "styled" or custom size', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    scrollbarStyle({ scrollbar: 'thin styled' });
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Tasty:',
+      expect.stringContaining('"thin" has no effect'),
+    );
+
+    warnSpy.mockClear();
+
+    scrollbarStyle({ scrollbar: 'thin 12px' });
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Tasty:',
+      expect.stringContaining('"thin" has no effect'),
+    );
+
+    warnSpy.mockRestore();
   });
 });
 

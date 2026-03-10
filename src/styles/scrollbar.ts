@@ -1,4 +1,5 @@
 import { makeEmptyDetails } from '../parser/types';
+import type { CSSMap } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
 interface ScrollbarStyleProps {
@@ -7,171 +8,150 @@ interface ScrollbarStyleProps {
 }
 
 /**
- * Creates cross-browser compatible scrollbar styles
+ * Standards-first scrollbar styling.
  *
- * Supports both Firefox (scrollbar-width, scrollbar-color) and
- * WebKit/Chromium browsers (::-webkit-scrollbar)
+ * Uses `scrollbar-width`, `scrollbar-color`, and `scrollbar-gutter` as the
+ * primary approach. Adds `::-webkit-scrollbar-*` pseudo-elements only when
+ * the `styled` modifier or a custom size value is specified — for features
+ * the standard API cannot express (border-radius, transitions, explicit
+ * dimensions).
+ *
+ * Returns CSSMap[] where pseudo-element rules use $ for sub-selectors.
  */
-export function scrollbarStyle({ scrollbar, overflow }: ScrollbarStyleProps) {
-  // Check if scrollbar is defined
+export function scrollbarStyle({
+  scrollbar,
+  overflow,
+}: ScrollbarStyleProps): CSSMap[] | undefined {
   if (!scrollbar && scrollbar !== 0) return;
 
-  // Support true as alias for thin
   const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
   const { mods, colors, values } = processed.groups[0] ?? makeEmptyDetails();
-  type NestedStyle = Record<string, string>;
-  type ScrollbarStyleMap = Record<string, string | NestedStyle>;
-  const style: ScrollbarStyleMap = {};
 
-  function getNested(key: string): NestedStyle {
-    const v = style[key];
-    if (v && typeof v === 'object') return v;
-    return {};
-  }
-
-  // Default colors for scrollbar
   const defaultThumbColor = 'var(--scrollbar-thumb-color)';
   const defaultTrackColor = 'var(--scrollbar-track-color, transparent)';
 
-  // Setup default Firefox scrollbar style
-  style['scrollbar-color'] = `${defaultThumbColor} transparent`;
-
-  // Default scrollbar size
-  const defaultSize = '8px';
-  const sizeValue = values[0] || defaultSize;
-
-  // Process modifiers
-  if (mods.includes('thin')) {
-    style['scrollbar-width'] = 'thin';
-  } else if (mods.includes('none')) {
-    style['scrollbar-width'] = 'none';
-    // Remove scrollbar-color as it's not needed when scrollbar is hidden
-    delete style['scrollbar-color'];
-    // Also hide WebKit scrollbars
-    style['&::-webkit-scrollbar'] = {
-      width: '0px',
-      height: '0px',
-      display: 'none',
-    };
-
-    return style;
-  } else if (mods.includes('auto')) {
-    style['scrollbar-width'] = 'auto';
+  if (mods.includes('none')) {
+    return [
+      { 'scrollbar-width': 'none' },
+      {
+        $: '::-webkit-scrollbar',
+        width: '0px',
+        height: '0px',
+        display: 'none',
+      },
+    ];
   }
 
-  // Handle scrollbar gutter behavior
+  const root: Record<string, string> = {};
+
+  const isAuto = values.includes('auto');
+
+  if (mods.includes('thin')) {
+    root['scrollbar-width'] = 'thin';
+  } else if (isAuto) {
+    root['scrollbar-width'] = 'auto';
+  }
+
+  const thumbColor = colors?.[0] || defaultThumbColor;
+  const trackColor = colors?.[1] || defaultTrackColor;
+  root['scrollbar-color'] = `${thumbColor} ${trackColor}`;
+
   if (mods.includes('stable') || mods.includes('both-edges')) {
-    // scrollbar-gutter is supported in newer browsers only
-    style['scrollbar-gutter'] = mods.includes('both-edges')
+    root['scrollbar-gutter'] = mods.includes('both-edges')
       ? 'stable both-edges'
       : 'stable';
   }
 
-  // Custom size setup for WebKit
-  if (sizeValue) {
-    style['&::-webkit-scrollbar'] = {
-      ...getNested('&::-webkit-scrollbar'),
+  if (mods.includes('always')) {
+    root['overflow'] = overflow || 'auto';
+
+    if (!root['scrollbar-gutter']) {
+      root['scrollbar-gutter'] = 'stable';
+    }
+  }
+
+  const sizeValues = values.filter((v) => v !== 'auto');
+  const hasCustomSize = sizeValues.length > 0;
+  const isStyled = mods.includes('styled');
+  const needsWebkit = isStyled || hasCustomSize;
+
+  if (needsWebkit && !root['scrollbar-width']) {
+    root['scrollbar-width'] = 'thin';
+  }
+
+  const result: CSSMap[] = [root];
+
+  if (needsWebkit) {
+    const defaultSize = '8px';
+    const sizeValue = sizeValues[0] || defaultSize;
+    const cornerColor = colors?.[2] || trackColor;
+
+    const webkitScrollbar: Record<string, string> = {
       width: sizeValue,
       height: sizeValue,
     };
-  }
 
-  // Extract colors (support up to 3: thumb, track, corner)
-  // These will be used in various places throughout the function
-  const thumbColor = colors && colors[0] ? colors[0] : defaultThumbColor;
-  const trackColor = colors && colors[1] ? colors[1] : defaultTrackColor;
-  const cornerColor = colors && colors[2] ? colors[2] : trackColor;
+    const webkitTrack: Record<string, string> = {};
+    const webkitThumb: Record<string, string> = {};
+    const webkitCorner: Record<string, string> = {};
 
-  // Apply colors if they are specified
-  if (colors && colors.length) {
-    // Firefox
-    style['scrollbar-color'] = `${thumbColor} ${trackColor}`;
-
-    // WebKit - always set these for consistency
-    const webkitScrollbar = getNested('&::-webkit-scrollbar');
-    webkitScrollbar['background'] = trackColor;
-    style['&::-webkit-scrollbar'] = webkitScrollbar;
-
-    style['&::-webkit-scrollbar-track'] = {
-      ...getNested('&::-webkit-scrollbar-track'),
-      background: trackColor,
-    };
-
-    style['&::-webkit-scrollbar-thumb'] = {
-      ...getNested('&::-webkit-scrollbar-thumb'),
-      background: thumbColor,
-    };
-
-    style['&::-webkit-scrollbar-corner'] = {
-      ...getNested('&::-webkit-scrollbar-corner'),
-      background: cornerColor,
-    };
-  }
-
-  // Handle 'always' mode: force scrollbars to show
-  if (mods.includes('always')) {
-    style['overflow'] = overflow || 'scroll';
-
-    // Use auto for WebKit browsers since they don't support 'always'
-    // This is closer to the expected behavior
-    if (!style['scrollbar-gutter']) {
-      style['scrollbar-gutter'] = 'stable';
+    if (colors?.length) {
+      webkitScrollbar['background'] = trackColor;
+      webkitTrack['background'] = trackColor;
+      webkitThumb['background'] = thumbColor;
+      webkitCorner['background'] = cornerColor;
     }
 
-    // Ensure scrollbars appear in WebKit even with little content
-    const alwaysScrollbar = getNested('&::-webkit-scrollbar');
-    alwaysScrollbar['display'] = 'block';
-    style['&::-webkit-scrollbar'] = alwaysScrollbar;
+    if (isStyled) {
+      const baseTransition = [
+        'background var(--transition)',
+        'border-radius var(--transition)',
+        'box-shadow var(--transition)',
+        'width var(--transition)',
+        'height var(--transition)',
+        'border var(--transition)',
+      ].join(', ');
+
+      webkitScrollbar['transition'] = baseTransition;
+      if (!webkitScrollbar['background']) {
+        webkitScrollbar['background'] = defaultTrackColor;
+      }
+
+      if (!webkitThumb['background']) {
+        webkitThumb['background'] = defaultThumbColor;
+      }
+      webkitThumb['border-radius'] = '8px';
+      webkitThumb['min-height'] = '24px';
+      webkitThumb['transition'] = baseTransition;
+
+      if (!webkitTrack['background']) {
+        webkitTrack['background'] = defaultTrackColor;
+      }
+      webkitTrack['transition'] = baseTransition;
+
+      if (!webkitCorner['background']) {
+        webkitCorner['background'] = defaultTrackColor;
+      }
+      webkitCorner['transition'] = baseTransition;
+    }
+
+    result.push({ $: '::-webkit-scrollbar', ...webkitScrollbar });
+
+    if (Object.keys(webkitTrack).length) {
+      result.push({ $: '::-webkit-scrollbar-track', ...webkitTrack });
+    }
+
+    if (Object.keys(webkitThumb).length) {
+      result.push({ $: '::-webkit-scrollbar-thumb', ...webkitThumb });
+    }
+
+    if (Object.keys(webkitCorner).length) {
+      result.push({ $: '::-webkit-scrollbar-corner', ...webkitCorner });
+    }
   }
 
-  // Enhanced 'styled' mode with better transitions and appearance
-  if (mods.includes('styled')) {
-    const baseTransition = [
-      'background var(--transition)',
-      'border-radius var(--transition)',
-      'box-shadow var(--transition)',
-      'width var(--transition)',
-      'height var(--transition)',
-      'border var(--transition)',
-    ].join(', ');
-
-    // Firefox
-    style['scrollbar-width'] = style['scrollbar-width'] || 'thin';
-    style['scrollbar-color'] =
-      style['scrollbar-color'] || `${defaultThumbColor} ${defaultTrackColor}`;
-
-    // WebKit
-    style['&::-webkit-scrollbar'] = {
-      width: sizeValue,
-      height: sizeValue,
-      transition: baseTransition,
-      background: defaultTrackColor,
-      ...getNested('&::-webkit-scrollbar'),
-    };
-
-    style['&::-webkit-scrollbar-thumb'] = {
-      'border-radius': '8px',
-      'min-height': '24px',
-      transition: baseTransition,
-      background: defaultThumbColor,
-      ...getNested('&::-webkit-scrollbar-thumb'),
-    };
-
-    style['&::-webkit-scrollbar-track'] = {
-      background: defaultTrackColor,
-      transition: baseTransition,
-      ...getNested('&::-webkit-scrollbar-track'),
-    };
-
-    style['&::-webkit-scrollbar-corner'] = {
-      background: defaultTrackColor,
-      transition: baseTransition,
-      ...getNested('&::-webkit-scrollbar-corner'),
-    };
-  }
-
-  return style;
+  return result;
 }
 
 scrollbarStyle.__lookupStyles = ['scrollbar', 'overflow'];

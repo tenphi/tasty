@@ -334,6 +334,10 @@ const Custom = tasty({
 | `@parent` | Parent/ancestor element states | `@parent(hovered)` |
 | `@own` | Sub-element's own state | `@own(hovered)` |
 | `@starting` | Entry animation | `@starting` |
+| `:is()` | CSS `:is()` structural pseudo-class | `:is(fieldset > label)` |
+| `:has()` | CSS `:has()` relational pseudo-class | `:has(> Icon)` |
+| `:not()` | CSS `:not()` negation (prefer `!:is()`) | `:not(:first-child)` |
+| `:where()` | CSS `:where()` (zero specificity) | `:where(Section)` |
 
 #### `@parent(...)` — Parent Element States
 
@@ -359,7 +363,7 @@ const Highlight = tasty({
 | `@parent(.active)` | `:is(.active *)` |
 | `@parent(hovered & focused)` | `:is([data-hovered][data-focused] *)` (same ancestor) |
 | `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
-| `@parent(hovered \| focused)` | `:is([data-hovered] *)`, `:is([data-focused] *)` (OR variants) |
+| `@parent(hovered \| focused)` | `:is([data-hovered] *, [data-focused] *)` (OR inside single wrapper) |
 
 For sub-elements, the parent check applies to the root element's ancestors:
 
@@ -376,6 +380,54 @@ const Card = tasty({
 });
 // → .t0.t0:is([data-hovered] *) [data-element="Label"]
 ```
+
+#### `:is()`, `:has()` — CSS Structural Pseudo-classes
+
+Use CSS structural pseudo-classes directly in state keys. Capitalized words become `[data-element="..."]` selectors; lowercase words are HTML tags. A trailing combinator (`>`, `+`, `~`) is auto-completed with `*`.
+
+`:where()` and `:not()` are also supported but rarely needed — use `:is()` and `!` negation instead.
+
+> **Performance warning:** CSS structural pseudo-classes — especially `:has()` — can be costly for the browser to evaluate because they require inspecting the DOM tree beyond the matched element. Tasty already provides a rich, purpose-built state system (`@parent()`, `@own()`, modifiers, boolean logic) that covers the vast majority of use cases without the performance trade-off. **Prefer Tasty's built-in mechanisms and treat `:has()` / `:is()` as a last resort** for conditions that cannot be expressed any other way.
+
+```jsx
+const Card = tasty({
+  styles: {
+    display: {
+      '': 'block',
+      ':has(> Icon)': 'grid',              // has Icon as direct child
+      ':has(+ Icon)': 'grid',              // immediately followed by an Icon sibling
+      ':has(~ Icon)': 'grid',              // has an Icon sibling somewhere after
+      ':has(Icon +)': 'grid',              // immediately preceded by an Icon sibling (auto-completes to `Icon + *`)
+      ':has(Icon ~)': 'grid',              // has an Icon sibling somewhere before (auto-completes to `Icon ~ *`)
+      ':is(fieldset > label)': 'inline',   // is a label inside a fieldset (HTML tags)
+      '!:has(> Icon)': 'flex',             // negation: no Icon child
+    },
+  },
+});
+```
+
+| Syntax | CSS Output | Meaning |
+|--------|------------|---------|
+| `:has(> Icon)` | `:has(> [data-element="Icon"])` | Has Icon as direct child |
+| `:has(+ Icon)` | `:has(+ [data-element="Icon"])` | Immediately followed by an Icon sibling |
+| `:has(~ Icon)` | `:has(~ [data-element="Icon"])` | Has an Icon sibling somewhere after |
+| `:has(Icon +)` | `:has([data-element="Icon"] + *)` | Immediately preceded by an Icon sibling |
+| `:has(Icon ~)` | `:has([data-element="Icon"] ~ *)` | Has an Icon sibling somewhere before |
+| `:has(>)` | `:has(> *)` | Has any direct child |
+| `:is(> Field + input)` | `:is(> [data-element="Field"] + input)` | Structural match |
+| `:has(button)` | `:has(button)` | HTML tag (lowercase, unchanged) |
+| `!:has(> Icon)` | `:not(:has(> [data-element="Icon"]))` | Negation (use `!`) |
+| `!:is(Panel)` | `:not([data-element="Panel"])` | Negation (use `!:is`) |
+
+Combine with other states using boolean logic:
+
+```jsx
+':has(> Icon) & hovered'                // structural + data attribute
+'@parent(hovered) & :has(> Icon)'       // parent check + structural
+':has(> Icon) | :has(> Button)'         // OR: either sub-element present
+```
+
+> **Nesting limit:** The state key parser supports up to 2 levels of nested parentheses inside `:is()`, `:has()`, `:not()`, and `:where()` — e.g. `:has(Input:not(:disabled))` works, but 3+ levels like `:has(:is(:not(:hover)))` will not be tokenized correctly. This covers virtually all practical use cases.
 
 ---
 

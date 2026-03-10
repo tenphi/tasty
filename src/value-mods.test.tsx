@@ -1,7 +1,6 @@
 import { render } from '@testing-library/react';
 
 import { tasty } from './tasty';
-import { getModSelector } from './utils/styles';
 
 describe('Value Mods', () => {
   describe('modAttrs generation', () => {
@@ -412,126 +411,6 @@ describe('Value Mods', () => {
   });
 
   describe(':has() selector transformation', () => {
-    describe('getModSelector unit tests', () => {
-      it('should transform :has(Item) to :has([data-element="Item"])', () => {
-        expect(getModSelector(':has(Item)')).toBe(
-          ':has([data-element="Item"])',
-        );
-      });
-
-      it('should transform :has(Body > Row) with multiple elements', () => {
-        expect(getModSelector(':has(Body > Row)')).toBe(
-          ':has([data-element="Body"] > [data-element="Row"])',
-        );
-      });
-
-      it('should preserve non-capitalized selectors in :has()', () => {
-        expect(getModSelector(':has(.selected)')).toBe(':has(.selected)');
-      });
-
-      it('should handle mixed selectors :has(.class Item)', () => {
-        expect(getModSelector(':has(.wrapper Item)')).toBe(
-          ':has(.wrapper [data-element="Item"])',
-        );
-      });
-
-      it('should handle :has() with combinators', () => {
-        expect(getModSelector(':has(> Item)')).toBe(
-          ':has(> [data-element="Item"])',
-        );
-      });
-
-      it('should handle multiple capitalized elements with spaces', () => {
-        expect(getModSelector(':has(Body Item Row)')).toBe(
-          ':has([data-element="Body"] [data-element="Item"] [data-element="Row"])',
-        );
-      });
-
-      it('should warn when combinator lacks spaces in :has()', () => {
-        const consoleErrorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {
-            /* noop */
-          });
-
-        // Test various invalid patterns
-        getModSelector(':has(Body>Row)');
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[Tasty] Invalid :has() selector syntax'),
-        );
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining(':has(Body>Row)'),
-        );
-
-        consoleErrorSpy.mockClear();
-
-        getModSelector(':has(Header+Content)');
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[Tasty] Invalid :has() selector syntax'),
-        );
-
-        consoleErrorSpy.mockClear();
-
-        getModSelector(':has(List~Item)');
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[Tasty] Invalid :has() selector syntax'),
-        );
-
-        consoleErrorSpy.mockRestore();
-      });
-
-      it('should not warn when combinator has proper spaces in :has()', () => {
-        const consoleErrorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {
-            /* noop */
-          });
-
-        getModSelector(':has(Body > Row)');
-        getModSelector(':has(Header + Content)');
-        getModSelector(':has(List ~ Item)');
-        getModSelector(':has(> Item)');
-
-        expect(consoleErrorSpy).not.toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
-      });
-
-      it('should transform type^=fullscreen to [data-type^="fullscreen"]', () => {
-        expect(getModSelector('type^=fullscreen')).toBe(
-          '[data-type^="fullscreen"]',
-        );
-      });
-
-      it('should transform type$=screen to [data-type$="screen"]', () => {
-        expect(getModSelector('type$=screen')).toBe('[data-type$="screen"]');
-      });
-
-      it('should transform type*=full to [data-type*="full"]', () => {
-        expect(getModSelector('type*=full')).toBe('[data-type*="full"]');
-      });
-
-      it('should handle quoted values with ^= operator', () => {
-        expect(getModSelector('type^="fullscreen"')).toBe(
-          '[data-type^="fullscreen"]',
-        );
-      });
-
-      it('should handle single-quoted values with $= operator', () => {
-        expect(getModSelector("type$='screen'")).toBe('[data-type$="screen"]');
-      });
-
-      it('should handle quoted values with *= operator', () => {
-        expect(getModSelector('name*="test"')).toBe('[data-name*="test"]');
-      });
-
-      it('should convert camelCase keys with operators', () => {
-        expect(getModSelector('dataType^=fullscreen')).toBe(
-          '[data-data-type^="fullscreen"]',
-        );
-      });
-    });
-
     it('should transform :has(Item) to :has([data-element="Item"]) in component', () => {
       const Container = tasty({
         as: 'div',

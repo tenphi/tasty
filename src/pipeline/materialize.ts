@@ -113,12 +113,17 @@ type ParsedSelectorCondition = ParsedModifierCondition | ParsedPseudoCondition;
 
 /**
  * A group of parent conditions originating from a single @parent() call.
- * Each group produces its own :is() wrapper in the final CSS.
+ * Each group produces its own :is()/:not() wrapper in the final CSS.
  * Separate @parent() calls = separate groups = can match different ancestors.
- * @parent(a & b) = one group with two conditions = same ancestor must match both.
+ *
+ * Each branch is an AND conjunction of conditions (one selector fragment).
+ * Multiple branches are OR'd together inside the :is()/:not() wrapper.
+ * Example: @parent(hovered & pressed | active)
+ *   branches: [[hovered, pressed], [active]]
+ *   renders:  :is([data-hovered][data-pressed] *, [data-active] *)
  */
 export interface ParentGroup {
-  conditions: ParsedSelectorCondition[];
+  branches: ParsedSelectorCondition[][];
   direct: boolean;
   negated: boolean;
 }
@@ -382,18 +387,45 @@ function pseudoToParsed(state: PseudoCondition): ParsedPseudoCondition {
 }
 
 /**
- * Convert parsed pseudo to CSS selector string (for final output)
+ * Convert parsed pseudo to CSS selector string (for final output).
+ *
+ * :not() is normalized to negated :is() at parse time, so pseudo.pseudo
+ * never starts with ':not(' here. When negated:
+ * - :is(X) → :not(X)     (unwrap :is)
+ * - :where(X) → :not(X)  (unwrap :where)
+ * - :has(X) → :not(:has(X))
+ * - other → :not(other)
+ *
+ * When not negated, single-argument :is()/:where() is unwrapped when the
+ * inner content is a simple compound selector that can safely append to
+ * the base selector (this happens after double-negation of :not()).
  */
 export function pseudoToCSS(pseudo: ParsedPseudoCondition): string {
+  const p = pseudo.pseudo;
+
   if (pseudo.negated) {
-    // Wrap in :not() if not already
-    if (pseudo.pseudo.startsWith(':not(')) {
-      // Double negation - remove :not()
-      return pseudo.pseudo.slice(5, -1);
+    if (p.startsWith(':is(') || p.startsWith(':where(')) {
+      return `:not(${p.slice(p.indexOf('(') + 1, -1)})`;
     }
-    return `:not(${pseudo.pseudo})`;
+    return `:not(${p})`;
   }
-  return pseudo.pseudo;
+
+  if ((p.startsWith(':is(') || p.startsWith(':where(')) && !p.includes(',')) {
+    const inner = p.slice(p.indexOf('(') + 1, -1);
+    const ch = inner[0];
+
+    // Only unwrap when the inner content is a simple compound selector:
+    // must start with a compoundable character and contain no whitespace
+    // (whitespace implies combinators like `>`, `+`, `~`, or descendant).
+    if (
+      (ch === ':' || ch === '.' || ch === '[' || ch === '#') &&
+      !/\s/.test(inner)
+    ) {
+      return inner;
+    }
+  }
+
+  return p;
 }
 
 /**
@@ -583,9 +615,10 @@ function innerConditionToVariants(
   // This is safe because the negated conditions are appended directly to the same
   // selector (e.g. :root:not([a]):not([b])), so collapsing OR branches is correct.
   //
-  // @parent uses a different strategy (parentConditionToVariants) because each OR
-  // branch must become its own :not(... *) wrapper — the * combinator scopes to a
-  // specific ancestor, so branches cannot be merged into one selector.
+  // @parent uses a different strategy (parentConditionToVariants) because
+  // conditions are scoped to ancestors via the * combinator. OR branches are
+  // kept inside a single ParentGroup and rendered as comma-separated arguments
+  // in :is()/:not(), e.g. :is([a] *, [b] *). Negation just swaps :is for :not.
   const effectiveCondition = negated ? not(innerCondition) : innerCondition;
   const innerCSS = conditionToCSS(effectiveCondition);
 
@@ -613,11 +646,12 @@ function innerConditionToVariants(
 }
 
 /**
- * Convert a @parent() inner condition into SelectorVariants with ParentGroups.
+ * Convert a @parent() inner condition into a single SelectorVariant with
+ * one ParentGroup whose branches represent the inner OR alternatives.
  *
- * Positive: each inner OR branch becomes a separate variant with one :is() group.
- * Negated: !(A | B) = !A & !B — all branches become :not() groups collected
- * into a single variant so they produce :not([a] *):not([b] *) on one element.
+ * Both positive and negated cases produce one variant with one group.
+ * Negation simply sets the `negated` flag, which swaps :is() for :not()
+ * in the final CSS output — no structural transformation is needed.
  */
 function parentConditionToVariants(
   innerCondition: ConditionNode,
@@ -630,43 +664,24 @@ function parentConditionToVariants(
     return { variants: [], isImpossible: true };
   }
 
-  if (negated) {
-    // Collect all OR branches into one variant as separate :not() groups.
-    const v = emptyVariant();
-
-    for (const innerVariant of innerCSS.variants) {
-      const conditions = collectSelectorConditions(innerVariant);
-
-      if (conditions.length > 0) {
-        v.parentGroups.push({ conditions, direct, negated: true });
-      }
-    }
-
-    if (v.parentGroups.length === 0) {
-      return { variants: [emptyVariant()], isImpossible: false };
-    }
-
-    return { variants: [v], isImpossible: false };
-  }
-
-  // Positive: each OR branch is a separate variant
-  const variants: SelectorVariant[] = [];
+  const branches: ParsedSelectorCondition[][] = [];
 
   for (const innerVariant of innerCSS.variants) {
     const conditions = collectSelectorConditions(innerVariant);
 
     if (conditions.length > 0) {
-      const v = emptyVariant();
-      v.parentGroups.push({ conditions, direct, negated: false });
-      variants.push(v);
+      branches.push(conditions);
     }
   }
 
-  if (variants.length === 0) {
+  if (branches.length === 0) {
     return { variants: [emptyVariant()], isImpossible: false };
   }
 
-  return { variants, isImpossible: false };
+  const v = emptyVariant();
+  v.parentGroups.push({ branches, direct, negated });
+
+  return { variants: [v], isImpossible: false };
 }
 
 /**
@@ -692,12 +707,15 @@ export function parentGroupsToCSS(groups: ParentGroup[]): string {
   let result = '';
   for (const group of groups) {
     const combinator = group.direct ? ' > *' : ' *';
-    let parts = '';
-    for (const cond of group.conditions) {
-      parts += selectorConditionToCSS(cond);
-    }
+    const selectorArgs = group.branches.map((branch) => {
+      let parts = '';
+      for (const cond of branch) {
+        parts += selectorConditionToCSS(cond);
+      }
+      return parts + combinator;
+    });
     const wrapper = group.negated ? ':not' : ':is';
-    result += `${wrapper}(${parts}${combinator})`;
+    result += `${wrapper}(${selectorArgs.join(', ')})`;
   }
   return result;
 }
@@ -866,11 +884,23 @@ function hasSelectorConditionContradiction(
  * with opposite negation. E.g. :not([data-hovered] *) and :is([data-hovered] *)
  * in the same variant is impossible.
  */
+function getBranchesKey(branches: ParsedSelectorCondition[][]): string {
+  if (branches.length === 1) {
+    const b = branches[0];
+    if (b.length === 1) return getSelectorConditionKey(b[0]);
+    return b.map(getSelectorConditionKey).sort().join('+');
+  }
+  return branches
+    .map((b) => b.map(getSelectorConditionKey).sort().join('+'))
+    .sort()
+    .join(',');
+}
+
 function hasParentGroupContradiction(groups: ParentGroup[]): boolean {
   const byBaseKey = new Map<string, boolean>();
 
   for (const g of groups) {
-    const baseKey = `${g.direct ? '>' : ''}(${g.conditions.map(getSelectorConditionKey).sort().join(',')})`;
+    const baseKey = `${g.direct ? '>' : ''}(${getBranchesKey(g.branches)})`;
     const existing = byBaseKey.get(baseKey);
     if (existing !== undefined && existing !== !g.negated) {
       return true;
@@ -1239,6 +1269,25 @@ function getVariantKey(v: SelectorVariant): string {
 }
 
 /**
+ * Total number of leaf conditions in a variant (for superset / dedup comparisons).
+ */
+function variantConditionCount(v: SelectorVariant): number {
+  return (
+    v.modifierConditions.length +
+    v.pseudoConditions.length +
+    v.ownConditions.length +
+    v.mediaConditions.length +
+    v.containerConditions.length +
+    v.supportsConditions.length +
+    v.rootConditions.length +
+    v.parentGroups.reduce(
+      (sum, g) => sum + g.branches.reduce((s, b) => s + b.length, 0),
+      0,
+    )
+  );
+}
+
+/**
  * Check if variant A is a superset of variant B (A is more restrictive)
  *
  * If A has all of B's conditions plus more, then A is redundant
@@ -1286,30 +1335,7 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
   // Check if a.parentGroups is superset of b.parentGroups
   if (!isParentGroupsSuperset(a.parentGroups, b.parentGroups)) return false;
 
-  // A is a superset if it has all of B's items (possibly more)
-  // and at least one category has strictly more items
-  const parentConditionCount = (groups: ParentGroup[]) =>
-    groups.reduce((sum, g) => sum + g.conditions.length, 0);
-  const aTotal =
-    a.mediaConditions.length +
-    a.containerConditions.length +
-    a.supportsConditions.length +
-    a.modifierConditions.length +
-    a.pseudoConditions.length +
-    a.rootConditions.length +
-    parentConditionCount(a.parentGroups) +
-    a.ownConditions.length;
-  const bTotal =
-    b.mediaConditions.length +
-    b.containerConditions.length +
-    b.supportsConditions.length +
-    b.modifierConditions.length +
-    b.pseudoConditions.length +
-    b.rootConditions.length +
-    parentConditionCount(b.parentGroups) +
-    b.ownConditions.length;
-
-  return aTotal > bTotal;
+  return variantConditionCount(a) > variantConditionCount(b);
 }
 
 /**
@@ -1388,7 +1414,7 @@ function isParentGroupsSuperset(a: ParentGroup[], b: ParentGroup[]): boolean {
 }
 
 function getParentGroupKey(g: ParentGroup): string {
-  return `${g.negated ? '!' : ''}${g.direct ? '>' : ''}(${g.conditions.map(getSelectorConditionKey).sort().join(',')})`;
+  return `${g.negated ? '!' : ''}${g.direct ? '>' : ''}(${getBranchesKey(g.branches)})`;
 }
 
 /**
@@ -1413,15 +1439,6 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
 
   // Second pass: remove supersets (more restrictive variants)
   // Sort by total condition count (fewer conditions = less restrictive = keep)
-  const variantConditionCount = (v: SelectorVariant) =>
-    v.modifierConditions.length +
-    v.pseudoConditions.length +
-    v.ownConditions.length +
-    v.mediaConditions.length +
-    v.containerConditions.length +
-    v.supportsConditions.length +
-    v.rootConditions.length +
-    v.parentGroups.reduce((sum, g) => sum + g.conditions.length, 0);
   result.sort((a, b) => variantConditionCount(a) - variantConditionCount(b));
 
   // Remove variants that are supersets of earlier (less restrictive) variants

@@ -34,11 +34,7 @@ export function scrollbarStyle({
   const style: Record<string, string> = {};
 
   if (mods.includes('none')) {
-    const ignored = [
-      ...mods.filter((m) => m !== 'none'),
-      ...values,
-      ...colors,
-    ];
+    const ignored = [...mods.filter((m) => m !== 'none'), ...values, ...colors];
 
     if (ignored.length) {
       warn(

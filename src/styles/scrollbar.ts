@@ -9,6 +9,12 @@ interface ScrollbarStyleProps {
 /**
  * Standard CSS scrollbar styling via `scrollbar-width`, `scrollbar-color`,
  * and `scrollbar-gutter`.
+ *
+ * Width values: `thin` (default), `auto`, `none`
+ * Modifiers: `stable`, `both-edges`, `always`
+ *
+ * Note: `auto` is classified as a VALUE_KEYWORD by the parser, so it lands
+ * in `values` rather than `mods`. Both locations are checked for robustness.
  */
 export function scrollbarStyle({
   scrollbar,
@@ -16,7 +22,8 @@ export function scrollbarStyle({
 }: ScrollbarStyleProps): Record<string, string> | undefined {
   if (!scrollbar) return;
 
-  const value = scrollbar === true || scrollbar === '' ? 'thin' : scrollbar;
+  // `true` is treated as `thin` (empty string is falsy, caught by the guard above)
+  const value = scrollbar === true ? 'thin' : scrollbar;
   const processed = parseStyle(String(value));
   const { mods, colors, values } = processed.groups[0] ?? makeEmptyDetails();
 
@@ -31,7 +38,9 @@ export function scrollbarStyle({
     return style;
   }
 
-  // `auto` is a VALUE_KEYWORD in the parser, so it lands in `values` not `mods`
+  // `thin` is the default — accepted as a value for readability but always
+  // the fallback when neither `auto` nor `none` is specified.
+  // `auto` is a VALUE_KEYWORD in the parser, so it may land in `values`.
   if (mods.includes('auto') || values.includes('auto')) {
     style['scrollbar-width'] = 'auto';
   } else {
@@ -49,9 +58,14 @@ export function scrollbarStyle({
   }
 
   if (mods.includes('always')) {
-    style['overflow'] = overflow || 'scroll';
+    const effectiveOverflow = overflow || 'scroll';
+    style['overflow'] = effectiveOverflow;
 
-    if (!style['scrollbar-gutter']) {
+    // scrollbar-gutter only applies with scroll/auto overflow
+    if (
+      !style['scrollbar-gutter'] &&
+      (effectiveOverflow === 'scroll' || effectiveOverflow === 'auto')
+    ) {
       style['scrollbar-gutter'] = 'stable';
     }
   }

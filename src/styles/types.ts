@@ -166,13 +166,15 @@ export interface StylesInterface extends Omit<
   /**
    * Scrollbar styling using standard CSS properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
    *
-   * Syntax: `[modifiers...] [thumb-color] [track-color]`
+   * Syntax: `[width] [modifiers...] [thumb-color] [track-color]`
    *
-   * Modifiers: `thin`, `none`, `auto`, `stable`, `both-edges`, `always`
+   * Width values: `thin` (default), `auto`, `none`
+   * Modifiers: `stable`, `both-edges`, `always`
    *
    * Examples:
    * - `scrollbar={true}` // thin scrollbar, default colors
    * - `scrollbar="thin #purple.40 #dark.04"`
+   * - `scrollbar="auto #red #blue"`
    * - `scrollbar="none"`
    * - `scrollbar="always #primary.50 #white.02"`
    * - `scrollbar="thin stable #red #blue"`

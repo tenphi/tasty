@@ -21,18 +21,33 @@ describe('scrollbarStyle', () => {
     expect(result['scrollbar-color']).toBeUndefined();
   });
 
-  it('handles "thin" modifier', () => {
+  it('handles "thin" width value', () => {
     const result = scrollbarStyle({ scrollbar: 'thin' })!;
 
     expect(result['scrollbar-width']).toBe('thin');
     expect(result['scrollbar-color']).toBeDefined();
   });
 
-  it('handles "auto" modifier', () => {
+  it('handles "auto" width value', () => {
     const result = scrollbarStyle({ scrollbar: 'auto' })!;
 
     expect(result['scrollbar-width']).toBe('auto');
     expect(result['scrollbar-color']).toBeDefined();
+  });
+
+  it('handles "auto" with custom colors', () => {
+    const result = scrollbarStyle({ scrollbar: 'auto #red #blue' })!;
+
+    expect(result['scrollbar-width']).toBe('auto');
+    expect(result['scrollbar-color']).toBe(
+      'var(--red-color) var(--blue-color)',
+    );
+  });
+
+  it('handles empty string as thin', () => {
+    const result = scrollbarStyle({ scrollbar: '' });
+
+    expect(result).toBeUndefined();
   });
 
   it('handles custom thumb and track colors', () => {
@@ -92,7 +107,7 @@ describe('scrollbarStyle', () => {
     expect(result['scrollbar-gutter']).toBe('stable');
   });
 
-  it('handles "always" with user-provided overflow', () => {
+  it('handles "always" with overflow="auto"', () => {
     const result = scrollbarStyle({
       scrollbar: 'always',
       overflow: 'auto',
@@ -101,6 +116,17 @@ describe('scrollbarStyle', () => {
     expect(result['scrollbar-width']).toBe('thin');
     expect(result['overflow']).toBe('auto');
     expect(result['scrollbar-gutter']).toBe('stable');
+  });
+
+  it('skips scrollbar-gutter when "always" is used with non-scrollable overflow', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'always',
+      overflow: 'hidden',
+    })!;
+
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['overflow']).toBe('hidden');
+    expect(result['scrollbar-gutter']).toBeUndefined();
   });
 
   it('handles "always" with colors', () => {

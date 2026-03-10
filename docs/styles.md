@@ -491,28 +491,34 @@ If the name is not a semantic name, it is used as a literal CSS property name.
 
 Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
 
-**Syntax:** `[modifiers...] [thumb-color] [track-color]`
+**Syntax:** `[width] [modifiers...] [thumb-color] [track-color]`
 
-**Modifiers:**
+**Width values** (controls `scrollbar-width`, default is `thin`):
+
+| Value | Effect |
+|-------|--------|
+| `thin` | Thin scrollbar (default) |
+| `auto` | Browser-default scrollbar width |
+| `none` | Hide scrollbar (still scrollable, no colors applied) |
+
+**Modifiers** (controls gutter and overflow behavior):
 
 | Modifier | Effect |
 |----------|--------|
-| `thin` | Thin scrollbar (`scrollbar-width: thin`) |
-| `none` | Hide scrollbar (still scrollable) |
-| `auto` | Browser-default scrollbar width (`scrollbar-width: auto`) |
 | `stable` | Reserve space for scrollbar (`scrollbar-gutter: stable`) |
 | `both-edges` | Reserve space on both sides (`scrollbar-gutter: stable both-edges`) |
 | `always` | Force scrollbars visible (`overflow: scroll` + `scrollbar-gutter: stable`) |
 
 **Colors:** Up to 2 color values for thumb and track (optional), applied via `scrollbar-color`.
 
-**Defaults:** thumb = `$scrollbar-thumb-color`, track = `transparent`
+**Defaults:** thumb = `#scrollbar-thumb` (`#text.5`), track = `#scrollbar-track` (`#dark-bg`) with CSS fallback to `transparent` when tokens are not configured.
 
 | Value | Effect |
 |-------|--------|
 | `true` | Thin scrollbar with default thumb/track colors |
 | `"none"` | Hidden scrollbar (still scrollable) |
 | `"thin #purple.40 #dark.04"` | Thin scrollbar with custom colors |
+| `"auto #red #blue"` | Browser-default width with custom colors |
 | `"always #primary.50 #white.02"` | Always visible with custom colors |
 | `"thin stable #red #blue"` | Thin, gutter reserved, custom colors |
 

@@ -16,13 +16,18 @@ import {
   createContainerDimensionCondition,
   createMediaDimensionCondition,
   createModifierCondition,
+  createParentCondition,
   falseCondition,
   not,
   or,
   trueCondition,
 } from './conditions';
 import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
-import { conditionToCSS, pseudoToCSS } from './materialize';
+import {
+  conditionToCSS,
+  parentGroupsToCSS,
+  pseudoToCSS,
+} from './materialize';
 import { clearParseCache, parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
@@ -942,6 +947,51 @@ describe('conditionToCSS()', () => {
       operator: undefined,
       negated: false,
     });
+  });
+
+  it('should produce single variant with multi-condition AND branches inside @parent OR', () => {
+    const hovered = createModifierCondition('data-hovered', undefined, '=', false, 'hovered');
+    const pressed = createModifierCondition('data-pressed', undefined, '=', false, 'pressed');
+    const focused = createModifierCondition('data-focused', undefined, '=', false, 'focused');
+    const active = createModifierCondition('data-active', undefined, '=', false, 'active');
+
+    const inner = or(and(hovered, pressed), and(focused, active));
+    const parent = createParentCondition(inner, false, false, '@parent(...)');
+    const css = conditionToCSS(parent);
+
+    expect(css.variants.length).toBe(1);
+
+    const group = css.variants[0].parentGroups[0];
+    expect(group.branches).toHaveLength(2);
+    expect(group.negated).toBe(false);
+
+    const branch0Attrs = group.branches[0].map(
+      (c) => 'attribute' in c && c.attribute,
+    );
+    const branch1Attrs = group.branches[1].map(
+      (c) => 'attribute' in c && c.attribute,
+    );
+
+    expect(branch0Attrs).toContain('data-hovered');
+    expect(branch0Attrs).toContain('data-pressed');
+    expect(branch1Attrs).toContain('data-focused');
+    expect(branch1Attrs).toContain('data-active');
+  });
+
+  it('should render multi-condition AND branches inside @parent OR as comma-separated :is()', () => {
+    const hovered = createModifierCondition('data-hovered', undefined, '=', false, 'hovered');
+    const pressed = createModifierCondition('data-pressed', undefined, '=', false, 'pressed');
+    const focused = createModifierCondition('data-focused', undefined, '=', false, 'focused');
+    const active = createModifierCondition('data-active', undefined, '=', false, 'active');
+
+    const inner = or(and(hovered, pressed), and(focused, active));
+    const parent = createParentCondition(inner, false, false, '@parent(...)');
+    const css = conditionToCSS(parent);
+
+    const rendered = parentGroupsToCSS(css.variants[0].parentGroups);
+    expect(rendered).toBe(
+      ':is([data-hovered][data-pressed] *, [data-focused][data-active] *)',
+    );
   });
 
   it('should produce single variant for @root with AND inside', () => {
@@ -2659,14 +2709,14 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
       expect(rule).toBeDefined();
     });
 
-    it('should transform :where(Section > Header)', () => {
+    it('should transform :where(Section > Header) and preserve wrapper', () => {
       const result = renderStyles(
         { display: { '': 'block', ':where(Section > Header)': 'flex' } },
         '.c',
       );
       const rule = result.find((r) =>
         r.selector.includes(
-          '[data-element="Section"] > [data-element="Header"]',
+          ':where([data-element="Section"] > [data-element="Header"])',
         ),
       );
       expect(rule).toBeDefined();
@@ -2814,6 +2864,26 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
     it('should NOT unwrap :where(div)', () => {
       expect(pseudoToCSS({ pseudo: ':where(div)', negated: false })).toBe(
         ':where(div)',
+      );
+    });
+
+    it('should NOT unwrap :is() with combinators (whitespace)', () => {
+      expect(
+        pseudoToCSS({
+          pseudo: ':is([data-element="A"] > [data-element="B"])',
+          negated: false,
+        }),
+      ).toBe(':is([data-element="A"] > [data-element="B"])');
+    });
+
+    it('should NOT unwrap :where() with combinators (whitespace)', () => {
+      expect(
+        pseudoToCSS({
+          pseudo: ':where([data-element="Section"] > [data-element="Header"])',
+          negated: false,
+        }),
+      ).toBe(
+        ':where([data-element="Section"] > [data-element="Header"])',
       );
     });
 

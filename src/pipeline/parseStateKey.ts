@@ -350,17 +350,19 @@ class Parser {
       const enhancedMatch = /^:(is|has|not|where)\(/.exec(value);
       if (enhancedMatch) {
         const fn = enhancedMatch[1];
-        let transformed = transformSelectorContent(value);
+        const prefix = enhancedMatch[0];
+        let content = transformSelectorContent(
+          value.slice(prefix.length, -1),
+        );
 
         // Auto-complete trailing combinator: :has(Icon >) → :has(... > *)
-        transformed = transformed.replace(/([>+~])\s*\)$/, '$1 *)');
+        content = content.replace(/([>+~])\s*$/, '$1 *');
 
         if (fn === 'not') {
-          const inner = transformed.slice(5, -1);
-          return createPseudoCondition(`:is(${inner})`, true, value);
+          return createPseudoCondition(`:is(${content})`, true, value);
         }
 
-        return createPseudoCondition(transformed, false, value);
+        return createPseudoCondition(`:${fn}(${content})`, false, value);
       }
 
       return createPseudoCondition(value, false, value);

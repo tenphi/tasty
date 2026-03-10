@@ -396,8 +396,9 @@ function pseudoToParsed(state: PseudoCondition): ParsedPseudoCondition {
  * - :has(X) → :not(:has(X))
  * - other → :not(other)
  *
- * When not negated, single-argument :is() is unwrapped since it's a no-op
- * (this happens after double-negation of :not()).
+ * When not negated, single-argument :is()/:where() is unwrapped when the
+ * inner content is a simple compound selector that can safely append to
+ * the base selector (this happens after double-negation of :not()).
  */
 export function pseudoToCSS(pseudo: ParsedPseudoCondition): string {
   const p = pseudo.pseudo;
@@ -409,15 +410,17 @@ export function pseudoToCSS(pseudo: ParsedPseudoCondition): string {
     return `:not(${p})`;
   }
 
-  // Unwrap single-argument :is()/:where() when the inner content can
-  // safely compound with the base selector. Tag names (a, div, button)
-  // and combinators (>, +, ~) cannot — they'd produce broken selectors
-  // like `.t0.t0a` instead of `.t0.t0:is(a)`.
   if ((p.startsWith(':is(') || p.startsWith(':where(')) && !p.includes(',')) {
     const inner = p.slice(p.indexOf('(') + 1, -1);
     const ch = inner[0];
 
-    if (ch === ':' || ch === '.' || ch === '[' || ch === '#') {
+    // Only unwrap when the inner content is a simple compound selector:
+    // must start with a compoundable character and contain no whitespace
+    // (whitespace implies combinators like `>`, `+`, `~`, or descendant).
+    if (
+      (ch === ':' || ch === '.' || ch === '[' || ch === '#') &&
+      !/\s/.test(inner)
+    ) {
       return inner;
     }
   }
@@ -882,6 +885,11 @@ function hasSelectorConditionContradiction(
  * in the same variant is impossible.
  */
 function getBranchesKey(branches: ParsedSelectorCondition[][]): string {
+  if (branches.length === 1) {
+    const b = branches[0];
+    if (b.length === 1) return getSelectorConditionKey(b[0]);
+    return b.map(getSelectorConditionKey).sort().join('+');
+  }
   return branches
     .map((b) => b.map(getSelectorConditionKey).sort().join('+'))
     .sort()
@@ -1261,6 +1269,25 @@ function getVariantKey(v: SelectorVariant): string {
 }
 
 /**
+ * Total number of leaf conditions in a variant (for superset / dedup comparisons).
+ */
+function variantConditionCount(v: SelectorVariant): number {
+  return (
+    v.modifierConditions.length +
+    v.pseudoConditions.length +
+    v.ownConditions.length +
+    v.mediaConditions.length +
+    v.containerConditions.length +
+    v.supportsConditions.length +
+    v.rootConditions.length +
+    v.parentGroups.reduce(
+      (sum, g) => sum + g.branches.reduce((s, b) => s + b.length, 0),
+      0,
+    )
+  );
+}
+
+/**
  * Check if variant A is a superset of variant B (A is more restrictive)
  *
  * If A has all of B's conditions plus more, then A is redundant
@@ -1308,33 +1335,7 @@ function isVariantSuperset(a: SelectorVariant, b: SelectorVariant): boolean {
   // Check if a.parentGroups is superset of b.parentGroups
   if (!isParentGroupsSuperset(a.parentGroups, b.parentGroups)) return false;
 
-  // A is a superset if it has all of B's items (possibly more)
-  // and at least one category has strictly more items
-  const parentConditionCount = (groups: ParentGroup[]) =>
-    groups.reduce(
-      (sum, g) => sum + g.branches.reduce((s, b) => s + b.length, 0),
-      0,
-    );
-  const aTotal =
-    a.mediaConditions.length +
-    a.containerConditions.length +
-    a.supportsConditions.length +
-    a.modifierConditions.length +
-    a.pseudoConditions.length +
-    a.rootConditions.length +
-    parentConditionCount(a.parentGroups) +
-    a.ownConditions.length;
-  const bTotal =
-    b.mediaConditions.length +
-    b.containerConditions.length +
-    b.supportsConditions.length +
-    b.modifierConditions.length +
-    b.pseudoConditions.length +
-    b.rootConditions.length +
-    parentConditionCount(b.parentGroups) +
-    b.ownConditions.length;
-
-  return aTotal > bTotal;
+  return variantConditionCount(a) > variantConditionCount(b);
 }
 
 /**
@@ -1438,18 +1439,6 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
 
   // Second pass: remove supersets (more restrictive variants)
   // Sort by total condition count (fewer conditions = less restrictive = keep)
-  const variantConditionCount = (v: SelectorVariant) =>
-    v.modifierConditions.length +
-    v.pseudoConditions.length +
-    v.ownConditions.length +
-    v.mediaConditions.length +
-    v.containerConditions.length +
-    v.supportsConditions.length +
-    v.rootConditions.length +
-    v.parentGroups.reduce(
-      (sum, g) => sum + g.branches.reduce((s, b) => s + b.length, 0),
-      0,
-    );
   result.sort((a, b) => variantConditionCount(a) - variantConditionCount(b));
 
   // Remove variants that are supersets of earlier (less restrictive) variants

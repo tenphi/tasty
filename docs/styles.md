@@ -489,39 +489,32 @@ If the name is not a semantic name, it is used as a literal CSS property name.
 
 ### `scrollbar`
 
-Cross-browser scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-color`) with WebKit pseudo-element (`::-webkit-scrollbar-*`) enhancement for advanced customization.
+Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
 
-**Syntax:** `[modifiers...] [size] [thumb-color] [track-color] [corner-color]`
+**Syntax:** `[modifiers...] [thumb-color] [track-color]`
 
 **Modifiers:**
 
 | Modifier | Effect |
 |----------|--------|
-| `thin` | Thin scrollbar (`scrollbar-width: thin`). Standard-only — no webkit pseudo-elements |
+| `thin` | Thin scrollbar (`scrollbar-width: thin`) |
 | `none` | Hide scrollbar (still scrollable) |
-| `auto` | Browser-default scrollbar width |
+| `auto` | Browser-default scrollbar width (`scrollbar-width: auto`) |
 | `stable` | Reserve space for scrollbar (`scrollbar-gutter: stable`) |
 | `both-edges` | Reserve space on both sides (`scrollbar-gutter: stable both-edges`) |
-| `always` | Force scrollbars visible (`overflow: auto` + `scrollbar-gutter: stable`) |
-| `styled` | Enhanced appearance with rounded thumb, transitions, and custom sizing via webkit pseudo-elements |
+| `always` | Force scrollbars visible (`overflow: scroll` + `scrollbar-gutter: stable`) |
 
-**Colors:** Up to 3 color values for thumb, track, and corner (optional). When used without `styled` or a custom size, colors are applied via `scrollbar-color` only (standard API).
+**Colors:** Up to 2 color values for thumb and track (optional), applied via `scrollbar-color`.
 
-**Defaults:** size = `8px`, thumb = `$scrollbar-thumb-color`, track = `transparent`, corner = same as track
-
-**WebKit behavior:** The `::-webkit-scrollbar-*` pseudo-elements are only emitted when `styled` is used or a custom size is specified. These pseudo-elements require `scrollbar-width: auto` to take effect in modern Chromium browsers — when `scrollbar-width: thin` is set, browsers use the standard thin scrollbar and ignore webkit pseudo-elements entirely. For this reason, `styled` (and custom sizes) always set `scrollbar-width: auto`. The `thin` modifier is only effective without `styled`.
+**Defaults:** thumb = `$scrollbar-thumb-color`, track = `transparent`
 
 | Value | Effect |
 |-------|--------|
-| `true` | Thin scrollbar with default thumb/track colors (standard only) |
+| `true` | Thin scrollbar with default thumb/track colors |
 | `"none"` | Hidden scrollbar (still scrollable) |
-| `"thin #purple.40 #dark.04"` | Thin scrollbar with custom colors (standard only) |
-| `"styled 12px #purple.40 #dark.04 #white.10"` | Styled, 12px, rounded thumb, transitions |
-| `"always #primary.50 #white.02"` | Always visible with custom colors (standard only) |
-| `"always styled #red #blue"` | Always visible, styled, default 8px size, webkit pseudo-elements |
-| `"styled #red #blue"` | Styled with colors, default 8px size, webkit pseudo-elements |
-
-**Custom size vs `styled`:** A custom size alone (e.g. `"12px #red #blue"`) emits webkit pseudo-elements for explicit dimensions, but without `styled` there are no border-radius, min-height, or transition enhancements. Use `styled` when you want a polished scrollbar appearance.
+| `"thin #purple.40 #dark.04"` | Thin scrollbar with custom colors |
+| `"always #primary.50 #white.02"` | Always visible with custom colors |
+| `"thin stable #red #blue"` | Thin, gutter reserved, custom colors |
 
 ### `fade`
 

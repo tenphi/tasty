@@ -1,263 +1,151 @@
-import type { CSSMap } from '../utils/styles';
 import { renderStyles } from '../pipeline/index';
 
 import { scrollbarStyle } from './scrollbar';
-
-function findBySelector(
-  result: CSSMap[],
-  selector: string,
-): CSSMap | undefined {
-  return result.find((r) => r.$ === selector);
-}
-
-function findRoot(result: CSSMap[]): CSSMap | undefined {
-  return result.find((r) => !r.$);
-}
-
-function hasWebkitRules(result: CSSMap[]): boolean {
-  return result.some(
-    (r) => typeof r.$ === 'string' && r.$.startsWith('::-webkit-scrollbar'),
-  );
-}
 
 describe('scrollbarStyle', () => {
   it('returns undefined when scrollbar is not defined', () => {
     expect(scrollbarStyle({})).toBeUndefined();
   });
 
-  it('handles boolean true value as thin (standard only)', () => {
+  it('handles boolean true as thin', () => {
     const result = scrollbarStyle({ scrollbar: true })!;
-    const root = findRoot(result)!;
 
-    expect(root['scrollbar-width']).toBe('thin');
-    expect(root['scrollbar-color']).toBeDefined();
-    expect(hasWebkitRules(result)).toBe(false);
-  });
-
-  it('handles number value as custom size (webkit enhancement)', () => {
-    const result = scrollbarStyle({ scrollbar: 10 })!;
-    const root = findRoot(result)!;
-    const sb = findBySelector(result, '::-webkit-scrollbar')!;
-
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(sb['width']).toBe('10');
-    expect(sb['height']).toBe('10');
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-color']).toBeDefined();
   });
 
   it('handles "none" modifier', () => {
     const result = scrollbarStyle({ scrollbar: 'none' })!;
-    const root = findRoot(result)!;
-    const sb = findBySelector(result, '::-webkit-scrollbar')!;
 
-    expect(root['scrollbar-width']).toBe('none');
-    expect(root['scrollbar-color']).toBeUndefined();
-    expect(sb['width']).toBe('0px');
+    expect(result['scrollbar-width']).toBe('none');
+    expect(result['scrollbar-color']).toBeUndefined();
   });
 
-  it('handles "auto" modifier (standard only)', () => {
+  it('handles "thin" modifier', () => {
+    const result = scrollbarStyle({ scrollbar: 'thin' })!;
+
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-color']).toBeDefined();
+  });
+
+  it('handles "auto" modifier', () => {
     const result = scrollbarStyle({ scrollbar: 'auto' })!;
-    const root = findRoot(result)!;
 
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(root['scrollbar-color']).toBeDefined();
-    expect(hasWebkitRules(result)).toBe(false);
+    expect(result['scrollbar-width']).toBe('auto');
+    expect(result['scrollbar-color']).toBeDefined();
   });
 
-  it('handles "styled" modifier with proper defaults', () => {
-    const result = scrollbarStyle({ scrollbar: 'styled' })!;
-    const root = findRoot(result)!;
-    const sb = findBySelector(result, '::-webkit-scrollbar')!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
+  it('handles custom thumb and track colors', () => {
+    const result = scrollbarStyle({ scrollbar: '#red #blue' })!;
 
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(sb['width']).toBe('8px');
-    expect(thumb['border-radius']).toBe('8px');
-    expect(thumb['min-height']).toBe('24px');
+    expect(result['scrollbar-color']).toBe(
+      'var(--red-color) var(--blue-color)',
+    );
   });
 
-  it('handles custom colors (standard only)', () => {
-    const result = scrollbarStyle({ scrollbar: '#red #blue #green' })!;
-    const root = findRoot(result)!;
+  it('handles thin with custom colors', () => {
+    const result = scrollbarStyle({ scrollbar: 'thin #purple #dark' })!;
 
-    expect(root['scrollbar-color']).toBe('var(--red-color) var(--blue-color)');
-    expect(hasWebkitRules(result)).toBe(false);
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-color']).toBe(
+      'var(--purple-color) var(--dark-color)',
+    );
   });
 
-  it('handles "always" modifier with overflow (standard only)', () => {
-    const result = scrollbarStyle({
-      scrollbar: 'always',
-    })!;
-    const root = findRoot(result)!;
+  it('uses default colors when none specified', () => {
+    const result = scrollbarStyle({ scrollbar: 'thin' })!;
 
-    expect(root['overflow']).toBe('auto');
-    expect(root['scrollbar-gutter']).toBe('stable');
-    expect(hasWebkitRules(result)).toBe(false);
+    expect(result['scrollbar-color']).toBe(
+      'var(--scrollbar-thumb-color) var(--scrollbar-track-color, transparent)',
+    );
+  });
+
+  it('uses default track color when only thumb is specified', () => {
+    const result = scrollbarStyle({ scrollbar: '#danger' })!;
+
+    expect(result['scrollbar-color']).toBe(
+      'var(--danger-color) var(--scrollbar-track-color, transparent)',
+    );
   });
 
   it('handles "stable" modifier', () => {
     const result = scrollbarStyle({ scrollbar: 'thin stable' })!;
-    const root = findRoot(result)!;
 
-    expect(root['scrollbar-width']).toBe('thin');
-    expect(root['scrollbar-gutter']).toBe('stable');
-    expect(hasWebkitRules(result)).toBe(false);
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-gutter']).toBe('stable');
   });
 
   it('handles "both-edges" modifier', () => {
     const result = scrollbarStyle({ scrollbar: 'thin both-edges' })!;
-    const root = findRoot(result)!;
 
-    expect(root['scrollbar-gutter']).toBe('stable both-edges');
-    expect(hasWebkitRules(result)).toBe(false);
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-gutter']).toBe('stable both-edges');
   });
 
-  it('combines modifiers correctly (styled overrides thin)', () => {
-    const result = scrollbarStyle({ scrollbar: 'thin styled #red' })!;
-    const root = findRoot(result)!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
+  it('handles "always" modifier', () => {
+    const result = scrollbarStyle({ scrollbar: 'always' })!;
 
-    // styled forces scrollbar-width: auto so webkit pseudo-elements work
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(root['scrollbar-color']).toBe(
-      'var(--red-color) var(--scrollbar-track-color, transparent)',
-    );
-    expect(thumb['background']).toBe('var(--red-color)');
+    expect(result['overflow']).toBe('scroll');
+    expect(result['scrollbar-gutter']).toBe('stable');
   });
 
-  it('applies custom colors to styled scrollbars', () => {
+  it('handles "always" with user-provided overflow', () => {
     const result = scrollbarStyle({
-      scrollbar: 'styled #purple #dark #light-grey',
+      scrollbar: 'always',
+      overflow: 'auto',
     })!;
-    const root = findRoot(result)!;
-    const sb = findBySelector(result, '::-webkit-scrollbar')!;
-    const track = findBySelector(result, '::-webkit-scrollbar-track')!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
-    const corner = findBySelector(result, '::-webkit-scrollbar-corner')!;
 
-    expect(root['scrollbar-color']).toBe(
-      'var(--purple-color) var(--dark-color)',
-    );
-    expect(sb['background']).toBe('var(--dark-color)');
-    expect(track['background']).toBe('var(--dark-color)');
-    expect(thumb['background']).toBe('var(--purple-color)');
-    expect(corner['background']).toBe('var(--light-grey-color)');
+    expect(result['overflow']).toBe('auto');
+    expect(result['scrollbar-gutter']).toBe('stable');
   });
 
-  it('applies partial custom colors with defaults', () => {
-    const result = scrollbarStyle({ scrollbar: 'styled #danger' })!;
-    const root = findRoot(result)!;
-    const track = findBySelector(result, '::-webkit-scrollbar-track')!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
+  it('handles "always" with colors', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'always #primary #white',
+    })!;
 
-    expect(root['scrollbar-color']).toBe(
-      'var(--danger-color) var(--scrollbar-track-color, transparent)',
-    );
-    expect(thumb['background']).toBe('var(--danger-color)');
-    expect(track['background']).toBe(
-      'var(--scrollbar-track-color, transparent)',
+    expect(result['overflow']).toBe('scroll');
+    expect(result['scrollbar-gutter']).toBe('stable');
+    expect(result['scrollbar-color']).toBe(
+      'var(--primary-color) var(--white-color)',
     );
   });
 
-  it('ensures all CSS properties are kebab-cased', () => {
-    const result = scrollbarStyle({ scrollbar: 'styled thin' })!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
+  it('combines thin + stable + colors', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'thin stable #red #blue',
+    })!;
 
-    expect(thumb['border-radius']).toBe('8px');
-    expect(thumb['min-height']).toBe('24px');
-  });
-
-  it('returns an array of CSSMap entries with $ for pseudo-elements', () => {
-    const result = scrollbarStyle({ scrollbar: 'styled #red #blue' })!;
-
-    expect(Array.isArray(result)).toBe(true);
-
-    const root = findRoot(result)!;
-    expect(root.$).toBeUndefined();
-
-    const pseudoEntries = result.filter((r) => r.$);
-    expect(pseudoEntries.length).toBeGreaterThan(0);
-
-    for (const entry of pseudoEntries) {
-      expect(typeof entry.$).toBe('string');
-      expect((entry.$ as string).startsWith('::-webkit-scrollbar')).toBe(true);
-      for (const [key, val] of Object.entries(entry)) {
-        if (key === '$') continue;
-        expect(typeof val).toBe('string');
-      }
-    }
-  });
-
-  it('emits webkit for custom size but not for colors alone', () => {
-    const colorsOnly = scrollbarStyle({ scrollbar: '#red #blue' })!;
-    expect(hasWebkitRules(colorsOnly)).toBe(false);
-    expect(colorsOnly).toHaveLength(1);
-
-    const withSize = scrollbarStyle({ scrollbar: '12px #red #blue' })!;
-    expect(hasWebkitRules(withSize)).toBe(true);
-    const sb = findBySelector(withSize, '::-webkit-scrollbar')!;
-    expect(sb['width']).toBe('12px');
-  });
-
-  it('combines "always" with "styled" for always-visible enhanced scrollbar', () => {
-    const result = scrollbarStyle({ scrollbar: 'always styled #red #blue' })!;
-    const root = findRoot(result)!;
-    const thumb = findBySelector(result, '::-webkit-scrollbar-thumb')!;
-
-    expect(root['overflow']).toBe('auto');
-    expect(root['scrollbar-gutter']).toBe('stable');
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(root['scrollbar-color']).toBe(
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['scrollbar-gutter']).toBe('stable');
+    expect(result['scrollbar-color']).toBe(
       'var(--red-color) var(--blue-color)',
     );
-    expect(thumb['background']).toBe('var(--red-color)');
-    expect(thumb['border-radius']).toBe('8px');
-    expect(thumb['transition']).toBeDefined();
-    expect(hasWebkitRules(result)).toBe(true);
   });
 
-  it('combines "always" with custom size', () => {
+  it('combines always + both-edges', () => {
     const result = scrollbarStyle({
-      scrollbar: 'always 12px #red #blue',
+      scrollbar: 'always both-edges',
     })!;
-    const root = findRoot(result)!;
-    const sb = findBySelector(result, '::-webkit-scrollbar')!;
 
-    expect(root['overflow']).toBe('auto');
-    expect(root['scrollbar-gutter']).toBe('stable');
-    expect(root['scrollbar-width']).toBe('auto');
-    expect(sb['width']).toBe('12px');
-    expect(sb['height']).toBe('12px');
-    expect(hasWebkitRules(result)).toBe(true);
+    expect(result['overflow']).toBe('scroll');
+    expect(result['scrollbar-gutter']).toBe('stable both-edges');
   });
 
-  it('warns when "thin" is combined with "styled" or custom size', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('ignores extra colors beyond thumb and track', () => {
+    const result = scrollbarStyle({
+      scrollbar: '#red #blue #green',
+    })!;
 
-    scrollbarStyle({ scrollbar: 'thin styled' });
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Tasty:',
-      expect.stringContaining('"thin" has no effect'),
+    expect(result['scrollbar-color']).toBe(
+      'var(--red-color) var(--blue-color)',
     );
-
-    warnSpy.mockClear();
-
-    scrollbarStyle({ scrollbar: 'thin 12px' });
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Tasty:',
-      expect.stringContaining('"thin" has no effect'),
-    );
-
-    warnSpy.mockRestore();
   });
 });
 
 describe('scrollbar pipeline integration', () => {
   it('should produce valid CSS without [object Object]', () => {
-    const styles = {
-      scrollbar: 'styled 1x #purple.40 #dark.04',
-    };
-
-    const result = renderStyles(styles, '.demo');
+    const result = renderStyles({ scrollbar: 'thin #purple #dark' }, '.demo');
 
     expect(result.length).toBeGreaterThan(0);
 
@@ -265,33 +153,17 @@ describe('scrollbar pipeline integration', () => {
       expect(rule.declarations).not.toContain('[object Object]');
     }
 
-    const scrollbarRule = result.find((r) =>
-      r.selector.toString().includes('::-webkit-scrollbar-thumb'),
-    );
-    expect(scrollbarRule).toBeDefined();
-    expect(scrollbarRule!.declarations).toContain('background');
-  });
-
-  it('should generate correct selectors for pseudo-elements', () => {
-    const styles = {
-      scrollbar: 'styled #red #blue',
-    };
-
-    const result = renderStyles(styles, '.test');
-
-    const selectors = result.map((r) => r.selector);
-
-    expect(selectors).toContain('.test');
-    expect(
-      selectors.some((s) => s.toString().includes('::-webkit-scrollbar')),
-    ).toBe(true);
+    const rootRule = result.find((r) => r.selector === '.demo');
+    expect(rootRule).toBeDefined();
+    expect(rootRule!.declarations).toContain('scrollbar-width');
+    expect(rootRule!.declarations).toContain('scrollbar-color');
   });
 
   it('should handle scrollbar with state conditions', () => {
     const styles = {
       scrollbar: {
-        '': 'styled',
-        hovered: 'styled #red',
+        '': 'thin',
+        hovered: 'thin #red',
       },
     };
 
@@ -304,19 +176,12 @@ describe('scrollbar pipeline integration', () => {
     }
   });
 
-  it('should produce standard-only CSS for basic scrollbar', () => {
-    const result = renderStyles({ scrollbar: 'thin #red #blue' }, '.basic');
+  it('should produce correct declarations for "none"', () => {
+    const result = renderStyles({ scrollbar: 'none' }, '.hidden');
 
-    expect(result.length).toBeGreaterThan(0);
-
-    const hasWebkit = result.some((r) =>
-      r.selector.toString().includes('::-webkit-scrollbar'),
-    );
-    expect(hasWebkit).toBe(false);
-
-    const rootRule = result.find((r) => r.selector === '.basic');
+    const rootRule = result.find((r) => r.selector === '.hidden');
     expect(rootRule).toBeDefined();
     expect(rootRule!.declarations).toContain('scrollbar-width');
-    expect(rootRule!.declarations).toContain('scrollbar-color');
+    expect(rootRule!.declarations).not.toContain('scrollbar-color');
   });
 });

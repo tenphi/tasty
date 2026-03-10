@@ -2,4 +2,4 @@
 '@tenphi/tasty': patch
 ---
 
-Refactor scrollbar style handler to return CSSMap[] with $ sub-selectors instead of nested objects, fixing pipeline integration for complex style handlers.
+Simplify scrollbar style handler to use standard CSS properties only (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`), removing all `::-webkit-scrollbar-*` pseudo-element logic and the `styled` modifier.

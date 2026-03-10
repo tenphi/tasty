@@ -26,7 +26,6 @@ import { presetStyle } from './preset';
 import { radiusStyle } from './radius';
 import { scrollbarStyle } from './scrollbar';
 import { shadowStyle } from './shadow';
-import { styledScrollbarStyle } from './styledScrollbar';
 import { transitionStyle } from './transition';
 import { widthStyle } from './width';
 
@@ -178,8 +177,6 @@ export function predefine() {
     justifyStyle,
     presetStyle,
     outlineStyle,
-    // DEPRECATED: `styledScrollbar` is deprecated, use `scrollbar` instead
-    styledScrollbarStyle,
     scrollbarStyle,
     fadeStyle,
     insetStyle,
@@ -433,7 +430,6 @@ export const styleHandlers = {
   radius: wrapHandler(radiusStyle),
   scrollbar: wrapHandler(scrollbarStyle),
   shadow: wrapHandler(shadowStyle),
-  styledScrollbar: wrapHandler(styledScrollbarStyle),
   transition: wrapHandler(transitionStyle),
   width: wrapHandler(widthStyle),
 } as const;

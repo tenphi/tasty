@@ -164,11 +164,6 @@ export interface StylesInterface extends Omit<
    */
   fade?: 'top' | 'right' | 'bottom' | 'left' | string;
   /**
-   * @deprecated Use `scrollbar` style instead.
-   * Whether the element has styled scrollbar.
-   */
-  styledScrollbar?: boolean;
-  /**
    * The scrollbar style provides a powerful and flexible way to control the appearance and behavior of scrollbars across browsers. It supports custom sizing, color, visibility, and advanced modifiers for modern UI needs.
    *
    * Syntax: `[modifiers] [size] [color1] [color2] [color3]`

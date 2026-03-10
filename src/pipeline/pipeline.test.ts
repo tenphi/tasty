@@ -830,8 +830,9 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentGroups).toHaveLength(1);
     expect(css.variants[0].parentGroups[0].direct).toBe(false);
-    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
-    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
+    expect(css.variants[0].parentGroups[0].branches).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0]).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0][0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
@@ -845,8 +846,9 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentGroups).toHaveLength(1);
     expect(css.variants[0].parentGroups[0].direct).toBe(true);
-    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
-    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
+    expect(css.variants[0].parentGroups[0].branches).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0]).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0][0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
@@ -860,8 +862,9 @@ describe('conditionToCSS()', () => {
     expect(css.variants.length).toBe(1);
     expect(css.variants[0].parentGroups).toHaveLength(1);
     expect(css.variants[0].parentGroups[0].negated).toBe(true);
-    expect(css.variants[0].parentGroups[0].conditions).toHaveLength(1);
-    expect(css.variants[0].parentGroups[0].conditions[0]).toEqual({
+    expect(css.variants[0].parentGroups[0].branches).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0]).toHaveLength(1);
+    expect(css.variants[0].parentGroups[0].branches[0][0]).toEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
@@ -896,32 +899,29 @@ describe('conditionToCSS()', () => {
     });
   });
 
-  it('should produce two variants for @parent with OR inside', () => {
+  it('should produce single variant for @parent with OR inside', () => {
     const result = parseStateKey('@parent(hovered | focused)');
     const css = conditionToCSS(result);
-    expect(css.variants.length).toBe(2);
+    expect(css.variants.length).toBe(1);
 
-    const parentConditions = css.variants.map(
-      (v) => v.parentGroups[0].conditions[0],
-    );
-    expect(parentConditions).toContainEqual({
+    const group = css.variants[0].parentGroups[0];
+    expect(group.branches).toHaveLength(2);
+    expect(group.direct).toBe(false);
+    expect(group.negated).toBe(false);
+
+    const branchConditions = group.branches.map((b) => b[0]);
+    expect(branchConditions).toContainEqual({
       attribute: 'data-hovered',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-    expect(parentConditions).toContainEqual({
+    expect(branchConditions).toContainEqual({
       attribute: 'data-focused',
       value: undefined,
       operator: undefined,
       negated: false,
     });
-
-    for (const v of css.variants) {
-      expect(v.parentGroups).toHaveLength(1);
-      expect(v.parentGroups[0].conditions).toHaveLength(1);
-      expect(v.parentGroups[0].direct).toBe(false);
-    }
   });
 
   it('should produce single variant for @root with AND inside', () => {
@@ -1382,8 +1382,7 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRules.length).toBeGreaterThanOrEqual(1);
 
     const allSelectors = blueRules.map((r) => r.selector).join(', ');
-    expect(allSelectors).toContain(':is([data-hovered]');
-    expect(allSelectors).toContain(':is([data-focused]');
+    expect(allSelectors).toContain(':is([data-hovered] *, [data-focused] *)');
   });
 });
 

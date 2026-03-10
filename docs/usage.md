@@ -359,7 +359,7 @@ const Highlight = tasty({
 | `@parent(.active)` | `:is(.active *)` |
 | `@parent(hovered & focused)` | `:is([data-hovered][data-focused] *)` (same ancestor) |
 | `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
-| `@parent(hovered \| focused)` | `:is([data-hovered] *)`, `:is([data-focused] *)` (OR variants) |
+| `@parent(hovered \| focused)` | `:is([data-hovered] *, [data-focused] *)` (OR inside single wrapper) |
 
 For sub-elements, the parent check applies to the root element's ancestors:
 

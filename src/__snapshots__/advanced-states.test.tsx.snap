@@ -81,8 +81,8 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should generate 
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `
-".t0.t0:is([data-hovered] *), .t0.t0:is([data-focused] *) { background-color: var(--blue-color); }
-.t0.t0:not([data-hovered] *):not([data-focused] *) { background-color: var(--white-color); }"
+".t0.t0:is([data-hovered] *, [data-focused] *) { background-color: var(--blue-color); }
+.t0.t0:not([data-hovered] *, [data-focused] *) { background-color: var(--white-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `

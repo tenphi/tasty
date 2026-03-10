@@ -511,7 +511,9 @@ Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-c
 
 **Colors:** Up to 2 color values for thumb and track (optional), applied via `scrollbar-color`.
 
-**Defaults:** thumb = `#scrollbar-thumb` (`#text.5`), track = `#scrollbar-track` (`#dark-bg`) with CSS fallback to `transparent` when tokens are not configured.
+**Defaults:** When no colors are specified, the thumb color comes from the `#scrollbar-thumb` token (`#text.5`) and the track color from the `#scrollbar-track` token (`#dark-bg`). These tokens are provided by the base token set. If the base tokens are not loaded, the track falls back to `transparent` via a CSS fallback, while the thumb has no CSS-level fallback — the browser treats the entire `scrollbar-color` declaration as invalid and reverts to the platform-default scrollbar appearance.
+
+**Note:** `none` takes precedence over all other modifiers and colors. Combining `none` with other tokens (e.g., `"none always #red"`) produces a warning, and only `scrollbar-width: none` is applied.
 
 | Value | Effect |
 |-------|--------|

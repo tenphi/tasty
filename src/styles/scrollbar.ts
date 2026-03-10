@@ -1,5 +1,6 @@
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
+import { warn } from '../utils/warnings';
 
 interface ScrollbarStyleProps {
   scrollbar?: string | boolean;
@@ -33,6 +34,18 @@ export function scrollbarStyle({
   const style: Record<string, string> = {};
 
   if (mods.includes('none')) {
+    const ignored = [
+      ...mods.filter((m) => m !== 'none'),
+      ...values,
+      ...colors,
+    ];
+
+    if (ignored.length) {
+      warn(
+        `scrollbar="none" hides the scrollbar; other tokens are ignored: ${ignored.join(', ')}`,
+      );
+    }
+
     style['scrollbar-width'] = 'none';
 
     return style;

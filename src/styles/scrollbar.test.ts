@@ -44,7 +44,7 @@ describe('scrollbarStyle', () => {
     );
   });
 
-  it('handles empty string as thin', () => {
+  it('returns undefined for empty string', () => {
     const result = scrollbarStyle({ scrollbar: '' });
 
     expect(result).toBeUndefined();
@@ -173,6 +173,87 @@ describe('scrollbarStyle', () => {
     expect(result['scrollbar-color']).toBe(
       'var(--red-color) var(--blue-color)',
     );
+  });
+
+  it('skips scrollbar-gutter when "always" is used with overflow="visible"', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'always',
+      overflow: 'visible',
+    })!;
+
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['overflow']).toBe('visible');
+    expect(result['scrollbar-gutter']).toBeUndefined();
+  });
+
+  it('skips scrollbar-gutter when "always" is used with overflow="clip"', () => {
+    const result = scrollbarStyle({
+      scrollbar: 'always',
+      overflow: 'clip',
+    })!;
+
+    expect(result['scrollbar-width']).toBe('thin');
+    expect(result['overflow']).toBe('clip');
+    expect(result['scrollbar-gutter']).toBeUndefined();
+  });
+
+  describe('conflicting modifiers', () => {
+    it('"none" wins over other modifiers and warns', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = scrollbarStyle({ scrollbar: 'none always' })!;
+
+      expect(result['scrollbar-width']).toBe('none');
+      expect(result['overflow']).toBeUndefined();
+      expect(result['scrollbar-gutter']).toBeUndefined();
+      expect(result['scrollbar-color']).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tasty:'),
+        expect.stringContaining('none'),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('"none" with colors warns about ignored tokens', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = scrollbarStyle({ scrollbar: 'none #red #blue' })!;
+
+      expect(result['scrollbar-width']).toBe('none');
+      expect(result['scrollbar-color']).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tasty:'),
+        expect.stringContaining('none'),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('"none stable" warns and ignores stable', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = scrollbarStyle({ scrollbar: 'none stable' })!;
+
+      expect(result['scrollbar-width']).toBe('none');
+      expect(result['scrollbar-gutter']).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tasty:'),
+        expect.stringContaining('none'),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('"none" alone does not warn', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      scrollbarStyle({ scrollbar: 'none' });
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
   });
 });
 

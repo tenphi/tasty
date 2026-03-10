@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.9.0
+
+### Minor Changes
+
+- [#31](https://github.com/tenphi/tasty/pull/31) [`5852321`](https://github.com/tenphi/tasty/commit/5852321733f97170a4d6cb5b62b898d8afde22a3) Thanks [@tenphi](https://github.com/tenphi)! - Simplify scrollbar style handler to use standard CSS properties only (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`), removing all `::-webkit-scrollbar-*` pseudo-element logic and the `styled` modifier.
+
 ## 0.8.0
 
 ### Minor Changes

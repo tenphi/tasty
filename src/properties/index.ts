@@ -288,9 +288,7 @@ export function colorInitialValueToRgb(
   if (val === 'black') return '0 0 0';
 
   // rgb(R G B) or rgb(R, G, B) — extract components
-  const rgbMatch = val.match(
-    /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/,
-  );
+  const rgbMatch = val.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
   if (rgbMatch) {
     return `${rgbMatch[1]} ${rgbMatch[2]} ${rgbMatch[3]}`;
   }

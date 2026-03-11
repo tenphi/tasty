@@ -99,13 +99,13 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
           path.resolve(projectDir, 'package.json'),
         );
 
-          const babelPluginConfig = [
-            babelPluginPath,
-            {
-              output: absoluteOutput,
-              ...(tastyConfig ? { config: tastyConfig } : {}),
-            },
-          ];
+        const babelPluginConfig = [
+          babelPluginPath,
+          {
+            output: absoluteOutput,
+            ...(tastyConfig ? { config: tastyConfig } : {}),
+          },
+        ];
 
         // Add our plugin to the existing babel config or create new rule
         const existingRule = config.module?.rules?.find(

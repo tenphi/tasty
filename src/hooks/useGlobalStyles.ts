@@ -1,14 +1,28 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
+import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectGlobal } from '../injector';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
+import type { ServerStyleCollector } from '../ssr/collector';
+import { TastySSRContext } from '../ssr/context';
+import { formatGlobalRules } from '../ssr/format-global-rules';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
 import { resolveRecipes } from '../utils/resolve-recipes';
+
+function resolveSSRCollector(
+  reactContext: ServerStyleCollector | null,
+): ServerStyleCollector | null {
+  if (reactContext) return reactContext;
+  return getRegisteredSSRCollector();
+}
 
 /**
  * Hook to inject global styles for a given selector.
  * Useful for styling elements by selector without generating classNames.
+ *
+ * SSR-aware: when a ServerStyleCollector is available, CSS is collected
+ * during the render phase instead of being injected into the DOM.
  *
  * @param selector - CSS selector to apply styles to (e.g., '.my-class', ':root', 'body')
  * @param styles - Tasty styles object
@@ -27,6 +41,9 @@ import { resolveRecipes } from '../utils/resolve-recipes';
  * ```
  */
 export function useGlobalStyles(selector: string, styles?: Styles): void {
+  const ssrContextValue = useContext(TastySSRContext);
+  const ssrCollector = resolveSSRCollector(ssrContextValue);
+
   const disposeRef = useRef<(() => void) | null>(null);
 
   // Resolve recipes before rendering (zero overhead if no recipes configured)
@@ -40,7 +57,6 @@ export function useGlobalStyles(selector: string, styles?: Styles): void {
   const styleResults = useMemo((): StyleResult[] => {
     if (!resolvedStyles) return [];
 
-    // Validate selector - empty string would cause renderStyles to return RenderResult instead of StyleResult[]
     if (!selector) {
       if (process.env.NODE_ENV !== 'production') {
         console.warn(
@@ -52,11 +68,23 @@ export function useGlobalStyles(selector: string, styles?: Styles): void {
     }
 
     const result = renderStyles(resolvedStyles, selector);
-    // When a non-empty selector is provided, renderStyles returns StyleResult[]
     return result as StyleResult[];
   }, [resolvedStyles, selector]);
 
-  // Inject as global styles
+  // SSR path: collect CSS during render
+  useMemo(() => {
+    if (!ssrCollector || styleResults.length === 0) return;
+
+    ssrCollector.collectInternals();
+
+    const css = formatGlobalRules(styleResults);
+    if (css) {
+      const key = `global:${selector}:${css.length}:${css.slice(0, 64)}`;
+      ssrCollector.collectGlobalStyles(key, css);
+    }
+  }, [ssrCollector, styleResults, selector]);
+
+  // Client path: inject via DOM
   useInsertionEffect(() => {
     disposeRef.current?.();
 

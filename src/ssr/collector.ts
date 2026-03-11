@@ -43,6 +43,11 @@ export class ServerStyleCollector {
   private flushedPropertyKeys = new Set<string>();
   private keyframeRules = new Map<string, string>();
   private flushedKeyframeKeys = new Set<string>();
+  private globalStyles = new Map<string, string>();
+  private flushedGlobalKeys = new Set<string>();
+  private rawCSS = new Map<string, string>();
+  private flushedRawKeys = new Set<string>();
+  private keyframesCounter = 0;
   private internalsCollected = false;
 
   /**
@@ -139,6 +144,31 @@ export class ServerStyleCollector {
   }
 
   /**
+   * Allocate a keyframe name for SSR. Uses provided name or generates one.
+   */
+  allocateKeyframeName(providedName?: string): string {
+    return providedName ?? `k${this.keyframesCounter++}`;
+  }
+
+  /**
+   * Record global styles (from useGlobalStyles). Deduplicated by key.
+   */
+  collectGlobalStyles(key: string, css: string): void {
+    if (!this.globalStyles.has(key)) {
+      this.globalStyles.set(key, css);
+    }
+  }
+
+  /**
+   * Record raw CSS text (from useRawCSS). Deduplicated by key.
+   */
+  collectRawCSS(key: string, css: string): void {
+    if (!this.rawCSS.has(key)) {
+      this.rawCSS.set(key, css);
+    }
+  }
+
+  /**
    * Extract all CSS collected so far as a single string.
    * Includes @property and @keyframes rules.
    * Used for non-streaming SSR (renderToString).
@@ -147,6 +177,14 @@ export class ServerStyleCollector {
     const parts: string[] = [];
 
     for (const css of this.propertyRules.values()) {
+      parts.push(css);
+    }
+
+    for (const css of this.rawCSS.values()) {
+      parts.push(css);
+    }
+
+    for (const css of this.globalStyles.values()) {
       parts.push(css);
     }
 
@@ -172,6 +210,20 @@ export class ServerStyleCollector {
       if (!this.flushedPropertyKeys.has(name)) {
         parts.push(css);
         this.flushedPropertyKeys.add(name);
+      }
+    }
+
+    for (const [key, css] of this.rawCSS) {
+      if (!this.flushedRawKeys.has(key)) {
+        parts.push(css);
+        this.flushedRawKeys.add(key);
+      }
+    }
+
+    for (const [key, css] of this.globalStyles) {
+      if (!this.flushedGlobalKeys.has(key)) {
+        parts.push(css);
+        this.flushedGlobalKeys.add(key);
       }
     }
 

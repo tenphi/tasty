@@ -1,6 +1,17 @@
-import { useInsertionEffect, useMemo } from 'react';
+import { useContext, useInsertionEffect, useMemo } from 'react';
 
 import { getGlobalInjector } from '../config';
+import type { ServerStyleCollector } from '../ssr/collector';
+import { TastySSRContext } from '../ssr/context';
+import { formatPropertyCSS } from '../ssr/format-property';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+
+function resolveSSRCollector(
+  reactContext: ServerStyleCollector | null,
+): ServerStyleCollector | null {
+  if (reactContext) return reactContext;
+  return getRegisteredSSRCollector();
+}
 
 export interface UsePropertyOptions {
   /**
@@ -78,6 +89,9 @@ export interface UsePropertyOptions {
  * ```
  */
 export function useProperty(name: string, options?: UsePropertyOptions): void {
+  const ssrContextValue = useContext(TastySSRContext);
+  const ssrCollector = resolveSSRCollector(ssrContextValue);
+
   // Memoize the options to create a stable dependency
   const optionsKey = useMemo(() => {
     if (!options) return '';
@@ -88,6 +102,23 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
     });
   }, [options?.syntax, options?.inherits, options?.initialValue]);
 
+  // SSR path: collect @property CSS during render
+  useMemo(() => {
+    if (!ssrCollector || !name) return;
+
+    ssrCollector.collectInternals();
+
+    const css = formatPropertyCSS(name, {
+      syntax: options?.syntax,
+      inherits: options?.inherits,
+      initialValue: options?.initialValue,
+    });
+    if (css) {
+      ssrCollector.collectProperty(name, css);
+    }
+  }, [ssrCollector, name, optionsKey]);
+
+  // Client path: inject via DOM
   useInsertionEffect(() => {
     if (!name) {
       if (process.env.NODE_ENV !== 'production') {
@@ -98,23 +129,15 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
 
     const injector = getGlobalInjector();
 
-    // Check if already defined (properties are persistent)
-    // The injector handles token parsing internally
     if (injector.isPropertyDefined(name, { root: options?.root })) {
       return;
     }
 
-    // Register the property
-    // The injector handles $name, #name, --name parsing and auto-sets
-    // syntax for color tokens
     injector.property(name, {
       syntax: options?.syntax,
       inherits: options?.inherits,
       initialValue: options?.initialValue,
       root: options?.root,
     });
-
-    // No cleanup - @property rules are global and persistent
-    // Re-registering is a no-op anyway due to the isPropertyDefined check
   }, [name, optionsKey, options?.root]);
 }

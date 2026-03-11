@@ -16,7 +16,12 @@
  * ```
  */
 
+import { createRequire } from 'module';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Next.js types (inline to avoid requiring next as a dependency)
 interface WebpackConfigContext {
@@ -44,6 +49,12 @@ export interface TastyZeroNextOptions {
    * @default true
    */
   enabled?: boolean;
+
+  /**
+   * Tasty configuration for build-time processing.
+   * Forwarded to the Babel plugin as `config`.
+   */
+  config?: import('./babel').TastyZeroConfig;
 }
 
 /**
@@ -63,7 +74,11 @@ export interface TastyZeroNextOptions {
  * ```
  */
 export function withTastyZero(options: TastyZeroNextOptions = {}) {
-  const { output = 'public/tasty.css', enabled = true } = options;
+  const {
+    output = 'public/tasty.css',
+    enabled = true,
+    config: tastyConfig,
+  } = options;
 
   return (nextConfig: NextConfig = {}): NextConfig => {
     if (!enabled) {
@@ -74,53 +89,62 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
       ...nextConfig,
 
       webpack(config: any, context: WebpackConfigContext) {
-        const { isServer, dir } = context;
+        const { dir } = context;
 
-        // Only process on client build to avoid duplicate CSS generation
-        if (!isServer) {
-          // Get absolute output path
-          const absoluteOutput = path.resolve(dir || process.cwd(), output);
+        const projectDir = dir || process.cwd();
+        const absoluteOutput = path.resolve(projectDir, output);
 
-          // Find existing babel-loader rule or add new one
+        const babelPluginPath = path.resolve(__dirname, 'babel.js');
+        const projectRequire = createRequire(
+          path.resolve(projectDir, 'package.json'),
+        );
+
           const babelPluginConfig = [
-            require.resolve('./babel'),
-            { output: absoluteOutput },
+            babelPluginPath,
+            {
+              output: absoluteOutput,
+              ...(tastyConfig ? { config: tastyConfig } : {}),
+            },
           ];
 
-          // Add our plugin to the existing babel config or create new rule
-          const existingRule = config.module?.rules?.find(
-            (rule: any) =>
-              rule.use?.loader === 'babel-loader' ||
-              rule.use?.some?.((u: any) => u.loader === 'babel-loader'),
-          );
+        // Add our plugin to the existing babel config or create new rule
+        const existingRule = config.module?.rules?.find(
+          (rule: any) =>
+            rule.use?.loader === 'babel-loader' ||
+            rule.use?.some?.((u: any) => u.loader === 'babel-loader'),
+        );
 
-          if (existingRule) {
-            // Add to existing babel-loader
-            const babelUse = Array.isArray(existingRule.use)
-              ? existingRule.use.find((u: any) => u.loader === 'babel-loader')
-              : existingRule.use;
+        if (existingRule) {
+          // Add to existing babel-loader
+          const babelUse = Array.isArray(existingRule.use)
+            ? existingRule.use.find((u: any) => u.loader === 'babel-loader')
+            : existingRule.use;
 
-            if (babelUse?.options) {
-              babelUse.options.plugins = babelUse.options.plugins || [];
-              babelUse.options.plugins.push(babelPluginConfig);
-            }
-          } else {
-            // Add new rule for our plugin
-            config.module = config.module || {};
-            config.module.rules = config.module.rules || [];
-            config.module.rules.push({
-              test: /\.(tsx?|jsx?)$/,
-              exclude: /node_modules/,
-              use: [
-                {
-                  loader: require.resolve('babel-loader'),
-                  options: {
-                    plugins: [babelPluginConfig],
-                  },
-                },
-              ],
-            });
+          if (babelUse?.options) {
+            babelUse.options.plugins = babelUse.options.plugins || [];
+            babelUse.options.plugins.push(babelPluginConfig);
           }
+        } else {
+          // Add new rule for our plugin
+          config.module = config.module || {};
+          config.module.rules = config.module.rules || [];
+          config.module.rules.push({
+            test: /\.(tsx?|jsx?)$/,
+            exclude: /node_modules/,
+            use: [
+              {
+                loader: projectRequire.resolve('babel-loader'),
+                options: {
+                  babelrc: false,
+                  configFile: false,
+                  parserOpts: {
+                    plugins: ['typescript', 'jsx', 'decorators-legacy'],
+                  },
+                  plugins: [babelPluginConfig],
+                },
+              },
+            ],
+          });
         }
 
         // Chain with existing webpack config

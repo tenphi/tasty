@@ -8,58 +8,49 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./static": {
-      "import": {
-        "types": "./dist/static/index.d.ts",
-        "default": "./dist/static/index.js"
-      }
+      "types": "./dist/static/index.d.ts",
+      "import": "./dist/static/index.js",
+      "default": "./dist/static/index.js"
     },
     "./babel-plugin": {
-      "import": {
-        "types": "./dist/zero/babel.d.ts",
-        "default": "./dist/zero/babel.js"
-      }
+      "types": "./dist/zero/babel.d.ts",
+      "import": "./dist/zero/babel.js",
+      "default": "./dist/zero/babel.js"
     },
     "./zero": {
-      "import": {
-        "types": "./dist/zero/index.d.ts",
-        "default": "./dist/zero/index.js"
-      }
+      "types": "./dist/zero/index.d.ts",
+      "import": "./dist/zero/index.js",
+      "default": "./dist/zero/index.js"
     },
     "./next": {
-      "import": {
-        "types": "./dist/zero/next.d.ts",
-        "default": "./dist/zero/next.js"
-      }
+      "types": "./dist/zero/next.d.ts",
+      "import": "./dist/zero/next.js",
+      "default": "./dist/zero/next.js"
     },
     "./core": {
-      "import": {
-        "types": "./dist/core/index.d.ts",
-        "default": "./dist/core/index.js"
-      }
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js",
+      "default": "./dist/core/index.js"
     },
     "./ssr": {
-      "import": {
-        "types": "./dist/ssr/index.d.ts",
-        "default": "./dist/ssr/index.js"
-      }
+      "types": "./dist/ssr/index.d.ts",
+      "import": "./dist/ssr/index.js",
+      "default": "./dist/ssr/index.js"
     },
     "./ssr/next": {
-      "import": {
-        "types": "./dist/ssr/next.d.ts",
-        "default": "./dist/ssr/next.js"
-      }
+      "types": "./dist/ssr/next.d.ts",
+      "import": "./dist/ssr/next.js",
+      "default": "./dist/ssr/next.js"
     },
     "./ssr/astro": {
-      "import": {
-        "types": "./dist/ssr/astro.d.ts",
-        "default": "./dist/ssr/astro.js"
-      }
+      "types": "./dist/ssr/astro.d.ts",
+      "import": "./dist/ssr/astro.js",
+      "default": "./dist/ssr/astro.js"
     },
     "./tasty.config": "./tasty.config.ts"
   },

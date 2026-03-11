@@ -159,8 +159,7 @@ describe('transitionStyle', () => {
     it('handles custom property without timing (no double -- prefix)', () => {
       const result = transitionStyle({ transition: '--angle' });
       expect(result).toEqual({
-        transition:
-          '--angle var(--angle-transition, var(--transition))',
+        transition: '--angle var(--angle-transition, var(--transition))',
       });
     });
 

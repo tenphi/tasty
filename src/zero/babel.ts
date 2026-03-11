@@ -239,7 +239,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
   const configOption = options.config;
   const config: TastyZeroConfig =
-    typeof configOption === 'function' ? configOption() : (configOption || {});
+    typeof configOption === 'function' ? configOption() : configOption || {};
   const devMode = config.devMode ?? false;
 
   configure(config);

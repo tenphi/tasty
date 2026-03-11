@@ -32,9 +32,7 @@ export function collectAutoInferredProperties(
   if (styles) {
     const localProps = styles['@properties'];
     if (localProps && typeof localProps === 'object') {
-      for (const token of Object.keys(
-        localProps as Record<string, unknown>,
-      )) {
+      for (const token of Object.keys(localProps as Record<string, unknown>)) {
         const parsed = parsePropertyToken(token);
         if (parsed.isValid) {
           registered.add(parsed.cssName);

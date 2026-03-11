@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetConfig } from '../config';
 import { allocateClassName, inject, trackRef } from '../injector';
 
+import { collectAutoInferredProperties } from './collect-auto-properties';
 import { ServerStyleCollector } from './collector';
 import { formatRules } from './format-rules';
 import { formatKeyframesCSS } from './format-keyframes';
@@ -536,5 +537,163 @@ describe('hydrateTastyCache', () => {
     const newAlloc = allocateClassName('NEW:chunk');
     expect(newAlloc.isNewAllocation).toBe(true);
     expect(newAlloc.className).toMatch(/^t\d+$/);
+  });
+});
+
+// ============================================================================
+// collectAutoInferredProperties (SSR auto-property inference)
+// ============================================================================
+
+describe('collectAutoInferredProperties', () => {
+  it('infers <angle> from custom property values', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [
+        { selector: '', declarations: '--angle: 0deg' },
+        { selector: ':hover', declarations: '--angle: 30deg' },
+      ],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --angle');
+    expect(css).toContain('"<angle>"');
+    expect(css).toContain('initial-value: 0deg');
+  });
+
+  it('infers <length> from pixel values', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [{ selector: '', declarations: '--offset: 10px' }],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --offset');
+    expect(css).toContain('"<length>"');
+    expect(css).toContain('initial-value: 0px');
+  });
+
+  it('infers <color> from --*-color name pattern', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [
+        {
+          selector: '',
+          declarations: '--accent-color: oklch(0.5 0.15 272)',
+        },
+      ],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --accent-color');
+    expect(css).toContain('"<color>"');
+  });
+
+  it('skips explicitly declared properties', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [{ selector: '', declarations: '--angle: 45deg' }],
+      collector,
+      {
+        '@properties': {
+          $angle: { syntax: '<angle>', inherits: false, initialValue: '0deg' },
+        },
+      } as any,
+    );
+
+    const css = collector.getCSS();
+    expect(css).not.toContain('@property --angle');
+  });
+
+  it('handles multiple properties in a single declaration block', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [
+        {
+          selector: '',
+          declarations: '--x: 10px; --y: 20px; --rotation: 45deg',
+        },
+      ],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --x');
+    expect(css).toContain('@property --y');
+    expect(css).toContain('@property --rotation');
+  });
+
+  it('deduplicates properties across multiple rules', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [
+        { selector: '', declarations: '--angle: 0deg' },
+        { selector: ':hover', declarations: '--angle: 30deg' },
+        { selector: ':active', declarations: '--angle: 60deg' },
+      ],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    const matches = css.match(/@property --angle/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  it('skips rules without declarations', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [{ selector: '', declarations: '' }],
+      collector,
+    );
+
+    expect(collector.getCSS()).toBe('');
+  });
+
+  it('works end-to-end with rendered styles containing $angle', async () => {
+    resetConfig();
+    const { renderStylesForChunk, categorizeStyleKeys, generateChunkCacheKey } =
+      await import('../chunks');
+
+    const collector = new ServerStyleCollector();
+    const styles = {
+      $angle: {
+        '': '0deg',
+        ':hover': '30deg',
+        ':active': '60deg',
+      },
+      transition: 'image, $$angle',
+    } as any;
+
+    const chunkMap = categorizeStyleKeys(styles);
+
+    for (const [chunkName, styleKeys] of chunkMap) {
+      if (styleKeys.length === 0) continue;
+      const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
+      const { isNewAllocation, className } =
+        collector.allocateClassName(cacheKey);
+      if (isNewAllocation) {
+        const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
+        if (renderResult.rules.length > 0) {
+          collector.collectChunk(cacheKey, className, renderResult.rules);
+          collectAutoInferredProperties(renderResult.rules, collector, styles);
+        }
+      }
+    }
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --angle');
+    expect(css).toContain('"<angle>"');
+    expect(css).toContain('initial-value: 0deg');
+
+    resetConfig();
   });
 });

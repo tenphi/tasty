@@ -6,7 +6,7 @@ import {
   generateChunkCacheKey,
   renderStylesForChunk,
 } from '../chunks';
-import { getGlobalKeyframes, hasGlobalKeyframes } from '../config';
+import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from '../config';
 import { allocateClassName, inject, keyframes, property } from '../injector';
 import type { KeyframesSteps } from '../injector/types';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../keyframes';
 import type { RenderResult } from '../pipeline';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
+import { collectAutoInferredProperties } from '../ssr/collect-auto-properties';
 import type { ServerStyleCollector } from '../ssr/collector';
 import { TastySSRContext } from '../ssr/context';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
@@ -313,7 +314,7 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
         }
       }
 
-      // Collect @property rules on the server
+      // Collect explicit @property rules on the server
       if (hasLocalProperties(currentStyles)) {
         const localProperties = extractLocalProperties(currentStyles);
         if (localProperties) {
@@ -323,6 +324,16 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
               ssrCollector.collectProperty(token, css);
             }
           }
+        }
+      }
+
+      // Auto-infer @property types from rendered declarations (SSR).
+      // On the client this happens inside StyleInjector.inject(), which
+      // runs in useInsertionEffect and therefore never executes on the server.
+      if (getConfig().autoPropertyTypes !== false) {
+        const allRules = chunks.flatMap((c) => c.renderResult.rules);
+        if (allRules.length > 0) {
+          collectAutoInferredProperties(allRules, ssrCollector, currentStyles);
         }
       }
     } else {

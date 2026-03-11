@@ -91,7 +91,10 @@ function isEasing(token: string): boolean {
 }
 
 function getTiming(name: string): string {
-  return `var(--${name}-transition, var(--transition))`;
+  const varName = name.startsWith('--')
+    ? `${name}-transition`
+    : `--${name}-transition`;
+  return `var(${varName}, var(--transition))`;
 }
 
 type TransitionEntry = [

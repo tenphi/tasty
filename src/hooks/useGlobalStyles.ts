@@ -1,8 +1,10 @@
 import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
+import { getConfig } from '../config';
 import { injectGlobal } from '../injector';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
+import { collectAutoInferredProperties } from '../ssr/collect-auto-properties';
 import type { ServerStyleCollector } from '../ssr/collector';
 import { TastySSRContext } from '../ssr/context';
 import { formatGlobalRules } from '../ssr/format-global-rules';
@@ -81,6 +83,10 @@ export function useGlobalStyles(selector: string, styles?: Styles): void {
     if (css) {
       const key = `global:${selector}:${css.length}:${css.slice(0, 64)}`;
       ssrCollector.collectGlobalStyles(key, css);
+    }
+
+    if (getConfig().autoPropertyTypes !== false) {
+      collectAutoInferredProperties(styleResults, ssrCollector, resolvedStyles);
     }
   }, [ssrCollector, styleResults, selector]);
 

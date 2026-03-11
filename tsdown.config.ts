@@ -16,7 +16,7 @@ export default defineConfig({
   outDir: 'dist',
   unbundle: true,
   dts: true,
-  external: ['fs', 'path', 'crypto', 'node:async_hooks', 'next/navigation'],
+  external: ['fs', 'path', 'crypto', 'module', 'url', 'node:async_hooks', 'next/navigation'],
   platform: 'browser',
   target: 'es2022',
   sourcemap: true,

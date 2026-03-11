@@ -1,8 +1,6 @@
 /**
  * Next.js configuration wrapper for tasty-zero.
  *
- * Provides a convenient way to configure the Babel plugin for Next.js projects.
- *
  * @example
  * ```javascript
  * // next.config.js
@@ -10,6 +8,7 @@
  *
  * module.exports = withTastyZero({
  *   output: 'public/tasty.css',
+ *   configFile: './app/tasty-zero.config.ts',
  * })({
  *   // your Next.js config
  * });
@@ -20,7 +19,9 @@ import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import type { TastyZeroConfig } from './babel';
+import { createJiti } from 'jiti';
+
+import type { TastyZeroBabelOptions, TastyZeroConfig } from './babel';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,32 +55,45 @@ export interface TastyZeroNextOptions {
 
   /**
    * Tasty configuration for build-time processing.
-   * Forwarded to the Babel plugin as `config`.
+   * For static configs that don't change during dev.
+   *
+   * For configs that depend on theme files, use `configFile` instead.
    */
   config?: TastyZeroConfig;
+
+  /**
+   * Path to a TypeScript/JavaScript module that exports the tasty zero config
+   * as its default export. The module is re-evaluated on each webpack
+   * compilation, enabling hot reload when the file (or its imports) change.
+   *
+   * @example './app/tasty-zero.config.ts'
+   */
+  configFile?: string;
+
+  /**
+   * Extra file paths (relative to project root) that the config depends on.
+   * When any of these files change, the Babel cache is invalidated and
+   * the config is re-evaluated.
+   *
+   * The `configFile` itself is always tracked automatically.
+   * Use this for transitive dependencies that aren't directly imported
+   * by the config file, or when using `config` instead of `configFile`.
+   *
+   * @example ['./app/theme.ts']
+   */
+  configDeps?: string[];
 }
 
 /**
  * Next.js configuration wrapper for tasty-zero.
- *
- * @param options - Configuration options
- * @returns A function that wraps the Next.js config
- *
- * @example
- * ```javascript
- * // next.config.js
- * const { withTastyZero } = require('@tenphi/tasty/next');
- *
- * module.exports = withTastyZero()({
- *   reactStrictMode: true,
- * });
- * ```
  */
 export function withTastyZero(options: TastyZeroNextOptions = {}) {
   const {
     output = 'public/tasty.css',
     enabled = true,
     config: tastyConfig,
+    configFile,
+    configDeps = [],
   } = options;
 
   return (nextConfig: NextConfig = {}): NextConfig => {
@@ -101,13 +115,36 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
           path.resolve(projectDir, 'package.json'),
         );
 
-        const babelPluginConfig = [
-          babelPluginPath,
-          {
-            output: absoluteOutput,
-            ...(tastyConfig ? { config: tastyConfig } : {}),
-          },
+        const absoluteConfigFile = configFile
+          ? path.resolve(projectDir, configFile)
+          : undefined;
+
+        const allDeps = [
+          ...(absoluteConfigFile ? [absoluteConfigFile] : []),
+          ...configDeps.map((dep) => path.resolve(projectDir, dep)),
         ];
+
+        const babelPluginOptions: TastyZeroBabelOptions = {
+          output: absoluteOutput,
+        };
+
+        if (absoluteConfigFile) {
+          const jiti = createJiti(projectDir, {
+            moduleCache: false,
+          });
+
+          babelPluginOptions.config = () => {
+            return jiti(absoluteConfigFile) as TastyZeroConfig;
+          };
+        } else if (tastyConfig) {
+          babelPluginOptions.config = tastyConfig;
+        }
+
+        if (allDeps.length > 0) {
+          babelPluginOptions.configDeps = allDeps;
+        }
+
+        const babelPluginConfig = [babelPluginPath, babelPluginOptions];
 
         // Add our plugin to the existing babel config or create new rule
         const existingRule = config.module?.rules?.find(

@@ -17,6 +17,8 @@
  * ```
  */
 
+import * as fs from 'fs';
+
 import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 
@@ -137,8 +139,22 @@ export interface TastyZeroConfig {
 export interface TastyZeroBabelOptions {
   /** Output path for generated CSS (default: 'tasty.css') */
   output?: string;
-  /** Tasty configuration for build-time processing */
-  config?: TastyZeroConfig;
+  /**
+   * Tasty configuration for build-time processing.
+   * Can be a static object or a factory function that returns fresh config.
+   * A factory is called on each plugin invocation, enabling hot reload
+   * of config values that depend on external files (e.g. theme tokens).
+   */
+  config?: TastyZeroConfig | (() => TastyZeroConfig);
+  /**
+   * Absolute file paths whose content affects the generated CSS.
+   * When any of these files change, babel-loader invalidates its cache
+   * and re-runs the plugin with fresh config values.
+   *
+   * Typically includes theme files that define Glaze palettes or token values.
+   * Paths must be absolute (resolved by the Next.js wrapper).
+   */
+  configDeps?: string[];
 }
 
 /**
@@ -159,16 +175,73 @@ interface PluginState extends PluginPass {
   sourceFile?: string;
 }
 
+function mtime(filePath: string): number | null {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function clearRequireCacheTree(filePath: string): void {
+  let resolved: string;
+
+  try {
+    resolved = require.resolve(filePath);
+  } catch {
+    return;
+  }
+
+  const mod = require.cache[resolved];
+
+  if (!mod) return;
+
+  const dir = resolved.substring(0, resolved.lastIndexOf('/'));
+
+  if (mod.children) {
+    for (const child of mod.children) {
+      if (child.id.startsWith(dir) && !child.id.includes('node_modules')) {
+        clearRequireCacheTree(child.id);
+      }
+    }
+  }
+
+  delete require.cache[resolved];
+}
+
 // @ts-expect-error PluginState vs PluginPass type mismatch in @babel/helper-plugin-utils
 export default declare<TastyZeroBabelOptions>((api, options) => {
   api.assertVersion(7);
 
   const outputPath = options.output || 'tasty.css';
-  const config = options.config || {};
+  const configDeps = options.configDeps || [];
+
+  // Register external dependencies for babel-loader cache invalidation.
+  // When any configDeps file changes, babel-loader discards the cached
+  // transform result and re-runs the plugin, picking up fresh config.
+  if (configDeps.length > 0) {
+    api.cache.using(() => configDeps.map(mtime).join(','));
+
+    for (const dep of configDeps) {
+      api.addExternalDependency(dep);
+    }
+  } else {
+    api.cache.forever();
+  }
+
+  // When configDeps are set, use jiti to load TypeScript config files.
+  // Clear the require cache first so we always get fresh values.
+  if (configDeps.length > 0) {
+    for (const dep of configDeps) {
+      clearRequireCacheTree(dep);
+    }
+  }
+
+  const configOption = options.config;
+  const config: TastyZeroConfig =
+    typeof configOption === 'function' ? configOption() : (configOption || {});
   const devMode = config.devMode ?? false;
 
-  // Apply configuration using the shared configure() function
-  // This handles plugin merging, states, units, funcs, handlers, tokens, etc.
   configure(config);
 
   const cssWriter = new CSSWriter(outputPath, { devMode });

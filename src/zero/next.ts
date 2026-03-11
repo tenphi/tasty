@@ -20,6 +20,8 @@ import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
+import type { TastyZeroConfig } from './babel';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -54,7 +56,7 @@ export interface TastyZeroNextOptions {
    * Tasty configuration for build-time processing.
    * Forwarded to the Babel plugin as `config`.
    */
-  config?: import('./babel').TastyZeroConfig;
+  config?: TastyZeroConfig;
 }
 
 /**

@@ -148,7 +148,6 @@ export const DISPLAY_CHUNK_STYLES = [
   'gap',
   // scrollbarStyle handler (requires overflow)
   'scrollbar',
-  'styledScrollbar', // styledScrollbarStyle (deprecated)
 ] as const;
 
 /**

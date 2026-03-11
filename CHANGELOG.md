@@ -1,5 +1,43 @@
 # @tenphi/tasty
 
+## 0.9.0
+
+### Minor Changes
+
+- [#31](https://github.com/tenphi/tasty/pull/31) [`5852321`](https://github.com/tenphi/tasty/commit/5852321733f97170a4d6cb5b62b898d8afde22a3) Thanks [@tenphi](https://github.com/tenphi)! - Simplify scrollbar style handler to use standard CSS properties only (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`), removing all `::-webkit-scrollbar-*` pseudo-element logic and the `styled` modifier.
+
+## 0.8.0
+
+### Minor Changes
+
+- [#28](https://github.com/tenphi/tasty/pull/28) [`cf339c4`](https://github.com/tenphi/tasty/commit/cf339c44943c6efe3d4d11910811f04aed00e79f) Thanks [@tenphi](https://github.com/tenphi)! - Consolidate `@parent()` OR branches into a single `:is()`/`:not()` wrapper with comma-separated selector arguments instead of expanding to separate selectors.
+
+- [#28](https://github.com/tenphi/tasty/pull/28) [`361b5a1`](https://github.com/tenphi/tasty/commit/361b5a10518cd95148bb857612e90795a6f0a124) Thanks [@tenphi](https://github.com/tenphi)! - Add support for `:is()`, `:has()`, `:not()`, and `:where()` pseudo-classes in state keys with automatic element name transformation and `:not()` normalization.
+
+## 0.7.1
+
+### Patch Changes
+
+- [#26](https://github.com/tenphi/tasty/pull/26) [`bbb1e4b`](https://github.com/tenphi/tasty/commit/bbb1e4b0bcaaf02ba3ea6f105339022e2f6bb682) Thanks [@tenphi](https://github.com/tenphi)! - Fix `@property` type inference for bare zero values. A value of `0` is ambiguous in CSS (could be `<length>`, `<angle>`, `<percentage>`, etc.), so it is no longer inferred as `<number>`. This prevents incorrect `@property` registrations that would reject subsequent typed values like `10px`.
+
+## 0.7.0
+
+### Minor Changes
+
+- [#23](https://github.com/tenphi/tasty/pull/23) [`9941b40`](https://github.com/tenphi/tasty/commit/9941b40895c771691cbf1bfe28245c6d237de7a3) Thanks [@tenphi](https://github.com/tenphi)! - Auto-infer CSS @property types from custom property values. Supports `<number>`, `<length>`, `<angle>`, `<percentage>`, `<time>`, and `<color>` with deferred var() chain resolution. Controlled by `autoPropertyTypes` config flag (default: true). Adds named CSS color support to `strToRgb`.
+
+### Patch Changes
+
+- [#23](https://github.com/tenphi/tasty/pull/23) [`871841f`](https://github.com/tenphi/tasty/commit/871841f47c88dd6df705275f39a633c25fb17cfa) Thanks [@tenphi](https://github.com/tenphi)! - Optimize @property auto-inference: skip non-custom-property declarations early, bypass token parsing indirection, remove color value detection and type mismatch validation overhead.
+
+- [#24](https://github.com/tenphi/tasty/pull/24) [`cb219ee`](https://github.com/tenphi/tasty/commit/cb219eed6cdcc9b85b3306c7faa2e44665ef69df) Thanks [@tenphi](https://github.com/tenphi)! - Support two-color fill alongside background image by combining both layers in background-image.
+
+## 0.6.0
+
+### Minor Changes
+
+- [#21](https://github.com/tenphi/tasty/pull/21) [`2546c41`](https://github.com/tenphi/tasty/commit/2546c4151a60194eac115e13cc07bcee00ea0636) Thanks [@tenphi](https://github.com/tenphi)! - Add extend-mode state maps: base styles with state maps lacking a `''` key are now applied after variant merge, allowing shared state overrides across all variants.
+
 ## 0.5.4
 
 ### Patch Changes

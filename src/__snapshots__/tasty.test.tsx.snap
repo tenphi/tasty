@@ -1,25 +1,42 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`tasty() API > should allow multiple wrapping 1`] = `
-".t13.t13 { border: var(--border-width) solid var(--black-color); color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
-.t14.t14 { padding: 16px 0px 0px; }
-.t15.t15 { display: flex; }
-.t16.t16 { position: static; }"
+".t16.t16 { border: var(--border-width) solid var(--black-color); color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+.t17.t17 { padding: 16px 0px 0px; }
+.t18.t18 { display: flex; }
+.t19.t19 { position: static; }"
 `;
 
 exports[`tasty() API > should allow nested modifiers 1`] = `
-".t17.t17:not(:first-child) { color: var(--black-color); --current-color: var(--black-color); --current-color-rgb: var(--black-color-rgb); }
-.t17.t17:first-child { color: var(--clear-color); --current-color: var(--clear-color); --current-color-rgb: var(--clear-color-rgb); }"
+".t20.t20:not(:first-child) { color: var(--black-color); --current-color: var(--black-color); --current-color-rgb: var(--black-color-rgb); }
+.t20.t20:first-child { color: var(--clear-color); --current-color: var(--clear-color); --current-color-rgb: var(--clear-color-rgb); }"
+`;
+
+exports[`tasty() API > should apply extend-mode base styles on top of variant 1`] = `
+".t10.t10[data-type="primary"], .t10.t10:not([data-type="primary"])[data-disabled] { border: var(--border-width) solid var(--clear-color); }
+.t10.t10:not([data-disabled]):not([data-type="primary"])[data-pressed] { border: var(--border-width) solid var(--primary-text-color); }
+.t10.t10:not([data-disabled]):not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid rgb(var(--white-color-rgb) / .2); }
+.t10.t10[data-hovered] { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t10.t10:not([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t11.t11 { padding: 16px; }"
+`;
+
+exports[`tasty() API > should apply extend-mode base styles on top of variant 2`] = `
+".t12.t12[data-type="primary"] { border: var(--border-width) solid var(--clear-color); }
+.t12.t12:not([data-type="primary"])[data-pressed] { border: var(--border-width) solid rgb(var(--primary-color-rgb) / .3); }
+.t12.t12:not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid rgb(var(--primary-color-rgb) / .15); }
+.t12.t12 { background-color: rgb(var(--primary-color-rgb) / .10); }
+.t11.t11 { padding: 16px; }"
 `;
 
 exports[`tasty() API > should be able to override styles 1`] = `".t7.t7 { color: rgb(var(--black-color-rgb) / .1); --current-color: rgb(var(--black-color-rgb) / .1); --current-color-rgb: var(--black-color-rgb); }"`;
 
 exports[`tasty() API > should create element styles 1`] = `
-".t10.t10[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
-.t10.t10:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
+".t13.t13[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
+.t13.t13:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
 `;
 
-exports[`tasty() API > should define style props 1`] = `".t12.t12 { border: 1px solid var(--border-color); }"`;
+exports[`tasty() API > should define style props 1`] = `".t15.t15 { border: 1px solid var(--border-color); }"`;
 
 exports[`tasty() API > should fallback to default variant 1`] = `".t9.t9 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }"`;
 
@@ -28,9 +45,9 @@ exports[`tasty() API > should handle color fallback syntax 1`] = `".t0.t0 { colo
 exports[`tasty() API > should handle fill fallback syntax 1`] = `".t1.t1 { background-color: var(--surface-color, var(--white-color)); }"`;
 
 exports[`tasty() API > should merge element styles 1`] = `
-".t11.t11[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
-.t11.t11:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
-.t11.t11 [data-element="Element"] { background-color: var(--black-color); }"
+".t14.t14[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
+.t14.t14:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+.t14.t14 [data-element="Element"] { background-color: var(--black-color); }"
 `;
 
 exports[`tasty() API > should merge styles 1`] = `
@@ -46,21 +63,21 @@ exports[`tasty() API > should merge styles in custom prop 1`] = `
 `;
 
 exports[`tasty() API > should optimize attribute selectors 1`] = `
-".t18.t18[data-size="large"] { padding: 24px 0px 0px; }
-.t18.t18[data-size="medium"] { padding: 16px 0px 0px; }
-.t18.t18:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".t21.t21[data-size="large"] { padding: 24px 0px 0px; }
+.t21.t21[data-size="medium"] { padding: 16px 0px 0px; }
+.t21.t21:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 2`] = `
-".t19.t19[data-size="large"] { padding: 24px 0px 0px; }
-.t19.t19[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
-.t19.t19:not([data-size="large"]):not([data-selected]), .t19.t19:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".t22.t22[data-size="large"] { padding: 24px 0px 0px; }
+.t22.t22[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
+.t22.t22:not([data-size="large"]):not([data-selected]), .t22.t22:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
-".t20.t20[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t20.t20[data-size="medium"], .t20.t20:not([data-size="medium"])[data-selected]:not([data-size="large"]) { padding: 16px 0px 0px; }
-.t20.t20:not([data-size="medium"]):not([data-selected]) { padding: 8px 0px 0px; }"
+".t23.t23[data-selected][data-size="large"] { padding: 24px 0px 0px; }
+.t23.t23[data-size="medium"], .t23.t23:not([data-size="medium"])[data-selected]:not([data-size="large"]) { padding: 16px 0px 0px; }
+.t23.t23:not([data-size="medium"]):not([data-selected]) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should pass styles from tasty 1`] = `".t2.t2 { color: rgb(var(--clear-color-rgb) / .1); --current-color: rgb(var(--clear-color-rgb) / .1); --current-color-rgb: var(--clear-color-rgb); }"`;

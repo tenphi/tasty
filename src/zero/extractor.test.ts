@@ -1,5 +1,6 @@
 import {
   extractKeyframesFromStyles,
+  extractPropertiesFromStyles,
   extractStylesWithChunks,
 } from './extractor';
 
@@ -184,5 +185,71 @@ describe('CSSWriter deduplication', () => {
 
     // Same CSS content means CSSWriter will deduplicate
     expect(result1.keyframes[0].css).toBe(result2.keyframes[0].css);
+  });
+});
+
+describe('extractPropertiesFromStyles', () => {
+  it('should extract @property for custom properties in styles', () => {
+    const styles = {
+      '$pulse-scale': 1 as unknown as string,
+      transform: 'scale($pulse-scale)',
+    };
+
+    const properties = extractPropertiesFromStyles(styles);
+
+    const scaleRule = properties.find((p) => p.name === '--pulse-scale');
+    expect(scaleRule).toBeDefined();
+    expect(scaleRule!.css).toContain('syntax: "<number>"');
+    expect(scaleRule!.css).toContain('inherits: true');
+    expect(scaleRule!.css).toContain('initial-value: 0');
+  });
+
+  it('should return empty when autoPropertyTypes is false', () => {
+    const styles = {
+      '$pulse-scale': 1 as unknown as string,
+      transform: 'scale($pulse-scale)',
+    };
+
+    const properties = extractPropertiesFromStyles(styles, {
+      autoPropertyTypes: false,
+    });
+    expect(properties).toEqual([]);
+  });
+
+  it('should not extract for explicitly declared properties', () => {
+    const styles = {
+      '$pulse-scale': 1 as unknown as string,
+      transform: 'scale($pulse-scale)',
+      '@properties': {
+        '$pulse-scale': {
+          syntax: '<number>',
+          inherits: false,
+          initialValue: '1',
+        },
+      },
+    };
+
+    const properties = extractPropertiesFromStyles(styles);
+
+    const scaleRule = properties.find((p) => p.name === '--pulse-scale');
+    expect(scaleRule).toBeUndefined();
+  });
+
+  it('should extract from keyframe declarations', () => {
+    const styles = {
+      animation: 'pulse 1s',
+      '@keyframes': {
+        pulse: {
+          from: { '--pulse-scale': '0.9' },
+          to: { '--pulse-scale': '1.1' },
+        },
+      },
+    };
+
+    const properties = extractPropertiesFromStyles(styles);
+
+    const scaleRule = properties.find((p) => p.name === '--pulse-scale');
+    expect(scaleRule).toBeDefined();
+    expect(scaleRule!.css).toContain('syntax: "<number>"');
   });
 });

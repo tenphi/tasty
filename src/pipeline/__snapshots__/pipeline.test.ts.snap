@@ -179,7 +179,7 @@ exports[`@supports queries snapshot tests > should render @supports with modifie
       "@supports selector(:has(*))",
     ],
     "declarations": "display: grid;",
-    "selector": ".demo:has(> Icon)",
+    "selector": ".demo:has(> [data-element="Icon"])",
   },
   {
     "atRules": [
@@ -193,7 +193,7 @@ exports[`@supports queries snapshot tests > should render @supports with modifie
       "@supports selector(:has(*))",
     ],
     "declarations": "display: block;",
-    "selector": ".demo:not(:has(> Icon))",
+    "selector": ".demo:not(:has(> [data-element="Icon"]))",
   },
 ]
 `;
@@ -231,14 +231,14 @@ exports[`@supports queries snapshot tests > should render @supports with multipl
       "@supports selector(:has(*))",
     ],
     "declarations": "display: grid;",
-    "selector": ".demo:has(> Icon)",
+    "selector": ".demo:has(> [data-element="Icon"])",
   },
   {
     "atRules": [
       "@supports selector(:has(*))",
     ],
     "declarations": "display: flex;",
-    "selector": ".demo:not(:has(> Icon))",
+    "selector": ".demo:not(:has(> [data-element="Icon"]))",
   },
   {
     "atRules": [

@@ -1,6 +1,6 @@
 {
   "name": "@tenphi/tasty",
-  "version": "0.5.4",
+  "version": "0.9.0",
   "description": "A design-system-integrated styling system and DSL for concise, state-aware UI styling",
   "type": "module",
   "main": "./dist/index.js",
@@ -65,6 +65,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "tasty.config.ts"
   ],
   "sideEffects": [
@@ -171,7 +172,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "45 kB"
+      "limit": "47 kB"
     },
     {
       "name": "core (import *)",
@@ -194,7 +195,7 @@
         "path",
         "crypto"
       ],
-      "limit": "25 kB"
+      "limit": "27 kB"
     },
     {
       "name": "babel-plugin",
@@ -205,7 +206,7 @@
         "path",
         "crypto"
       ],
-      "limit": "35 kB"
+      "limit": "37 kB"
     }
   ]
 }

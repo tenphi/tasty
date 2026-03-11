@@ -4,6 +4,7 @@ import {
   extractLocalProperties,
   getEffectiveDefinition,
   hasLocalProperties,
+  inferSyntaxFromValue,
   isValidPropertyName,
   normalizePropertyDefinition,
   normalizePropertyName,
@@ -260,7 +261,6 @@ describe('properties', () => {
     it('should handle partial definitions', () => {
       const defSyntaxOnly = { syntax: '<color>' };
       const defInheritsOnly = { inherits: false };
-      const defInitialOnly = { initialValue: '10px' };
 
       expect(normalizePropertyDefinition(defSyntaxOnly)).toBe(
         '{"syntax":"<color>"}',
@@ -268,14 +268,15 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(defInheritsOnly)).toBe(
         '{"inherits":false}',
       );
-      expect(normalizePropertyDefinition(defInitialOnly)).toBe(
-        '{"initialValue":"10px"}',
-      );
     });
 
-    it('should convert numeric initialValue to string', () => {
-      const def = { initialValue: 42 };
-      expect(normalizePropertyDefinition(def)).toBe('{"initialValue":"42"}');
+    it('should ignore initialValue in comparison', () => {
+      const def1 = { syntax: '<length>', initialValue: '0px' };
+      const def2 = { syntax: '<length>', initialValue: '6px' };
+
+      expect(normalizePropertyDefinition(def1)).toBe(
+        normalizePropertyDefinition(def2),
+      );
     });
 
     it('should handle empty definition', () => {
@@ -283,9 +284,9 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(def)).toBe('{}');
     });
 
-    it('should produce different results for different values', () => {
-      const def1 = { syntax: '<color>', initialValue: 'red' };
-      const def2 = { syntax: '<color>', initialValue: 'blue' };
+    it('should produce different results for different syntax', () => {
+      const def1 = { syntax: '<color>' };
+      const def2 = { syntax: '<length>' };
 
       expect(normalizePropertyDefinition(def1)).not.toBe(
         normalizePropertyDefinition(def2),
@@ -299,6 +300,89 @@ describe('properties', () => {
       expect(normalizePropertyDefinition(def1)).not.toBe(
         normalizePropertyDefinition(def2),
       );
+    });
+  });
+
+  describe('inferSyntaxFromValue', () => {
+    it('should infer <number> from bare numbers', () => {
+      expect(inferSyntaxFromValue('1')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+      expect(inferSyntaxFromValue('0.5')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+      expect(inferSyntaxFromValue('-3')).toEqual({
+        syntax: '<number>',
+        initialValue: '0',
+      });
+    });
+
+    it('should infer <length> from length units', () => {
+      expect(inferSyntaxFromValue('10px')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('2rem')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('1em')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+      expect(inferSyntaxFromValue('100vw')).toEqual({
+        syntax: '<length>',
+        initialValue: '0px',
+      });
+    });
+
+    it('should infer <percentage> from percent values', () => {
+      expect(inferSyntaxFromValue('50%')).toEqual({
+        syntax: '<percentage>',
+        initialValue: '0%',
+      });
+    });
+
+    it('should infer <angle> from angle units', () => {
+      expect(inferSyntaxFromValue('45deg')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+      expect(inferSyntaxFromValue('1rad')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+      expect(inferSyntaxFromValue('0.5turn')).toEqual({
+        syntax: '<angle>',
+        initialValue: '0deg',
+      });
+    });
+
+    it('should infer <time> from time units', () => {
+      expect(inferSyntaxFromValue('300ms')).toEqual({
+        syntax: '<time>',
+        initialValue: '0s',
+      });
+      expect(inferSyntaxFromValue('1s')).toEqual({
+        syntax: '<time>',
+        initialValue: '0s',
+      });
+    });
+
+    it('should return null for bare zero (ambiguous type)', () => {
+      expect(inferSyntaxFromValue('0')).toBeNull();
+      expect(inferSyntaxFromValue('+0')).toBeNull();
+      expect(inferSyntaxFromValue('-0')).toBeNull();
+      expect(inferSyntaxFromValue('0.0')).toBeNull();
+    });
+
+    it('should return null for non-numeric values', () => {
+      expect(inferSyntaxFromValue('calc(1px + 2px)')).toBeNull();
+      expect(inferSyntaxFromValue('auto')).toBeNull();
+      expect(inferSyntaxFromValue('')).toBeNull();
+      expect(inferSyntaxFromValue('var(--x) + 1')).toBeNull();
     });
   });
 });

@@ -502,4 +502,4 @@ tastyDebug.chunks({ root: shadowRoot, log: true });
 
 `tastyDebug` reads directly from the [Style Injector](./injector.md)'s internal registries. It does not inject, modify, or intercept any styles. The `cleanup()` method is the only method with side effects — it triggers the injector's garbage collection for unused styles.
 
-For most development, you'll use the [Tasty style system](./tasty.md) to create components and the debug utilities to inspect the resulting CSS at runtime.
+For most development, you'll use the [Tasty style system](./usage.md) to create components and the debug utilities to inspect the resulting CSS at runtime.

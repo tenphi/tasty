@@ -350,6 +350,19 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
 
     const currentStyles = stylesRef.current.styles;
 
+    // Register explicit @properties first so they take precedence over auto-inference
+    // that happens during keyframe and style chunk injection.
+    // Token formats: $name → --name, #name → --name-color (with auto syntax: '<color>')
+    // Note: Global properties are injected once when styles are first generated (see markStylesGenerated)
+    if (currentStyles && hasLocalProperties(currentStyles)) {
+      const localProperties = extractLocalProperties(currentStyles);
+      if (localProperties) {
+        for (const [token, definition] of Object.entries(localProperties)) {
+          property(token, definition);
+        }
+      }
+    }
+
     // Get keyframes that are actually used (returns null if none - zero overhead)
     const usedKeyframes = currentStyles
       ? getUsedKeyframes(currentStyles)
@@ -372,16 +385,6 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
       // Clear map if no replacements needed
       if (nameMap.size === 0) {
         nameMap = null;
-      }
-    }
-
-    // Register local @properties if defined (no dispose needed - properties are permanent)
-    if (currentStyles && hasLocalProperties(currentStyles)) {
-      const localProperties = extractLocalProperties(currentStyles);
-      if (localProperties) {
-        for (const [token, definition] of Object.entries(localProperties)) {
-          property(token, definition);
-        }
       }
     }
 

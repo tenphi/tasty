@@ -23,16 +23,17 @@ That guarantee unlocks a concise, CSS-like DSL where design tokens, custom units
 
 ## Why Tasty
 
-- **Deterministic at any scale** — Exclusive selector generation eliminates the entire class of cascade/specificity bugs. Every state combination resolves to exactly one CSS rule per property. Refactor freely.
+- **Deterministic at any scale** — Exclusive selector generation eliminates the entire class of cascade/specificity bugs. Every state combination resolves to exactly one CSS rule per property. Refactor freely. See [How It Actually Works](#how-it-actually-works).
 - **AI-friendly by design** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, understand, and refactor even advanced state bindings as confidently as a human — because there's no hidden cascade logic or implicit ordering to second-guess.
-- **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days.
-- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts.
+- **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days. See [Style Properties](docs/styles.md).
+- **CSS properties as normal component props** — `styleProps` lets you expose selected styles as typed React props. Use `<Button placeSelf="end">` or `<Space flow="row" gap="2x">` without extra wrappers, utility classes, or `styles` overrides. The same props also accept state maps, so responsive values work with the same API. See [CSS properties as props](#css-properties-as-props).
+- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts. See [Configuration](docs/configuration.md).
 - **Near-complete modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, etc. Some features that don't fit Tasty's component model (such as `@layer` and `!important`) are intentionally omitted, but real-world use cases are covered almost completely.
 - **Runtime, zero-runtime, or SSR — your call** — Use `tasty()` for dynamic React components with runtime injection, `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction, or enable SSR with zero-cost client hydration for Next.js, Astro, or any React framework (experimental). Same DSL, same tokens, same output.
 - **Only generate what is used** — In runtime mode, Tasty injects CSS on demand for mounted components/variants, so your app avoids shipping style rules for UI states that are never rendered.
 - **Runtime performance that holds at scale** — The runtime path is tested against enterprise-scale applications and tuned with multi-level caching, chunk-level style reuse, style garbage collection, and a dedicated injector.
 - **Composable and extensible by design** — Extend any component's styles with proper merge semantics, and evolve built-in behavior through configuration and plugins.
-- **TypeScript-first** — Full type definitions, module augmentation for custom properties, and autocomplete for tokens, presets, and themes.
+- **TypeScript-first** — Full type definitions, module augmentation for custom properties, and autocomplete for tokens, presets, and themes. See [Configuration](docs/configuration.md).
 
 ## Installation
 
@@ -129,6 +130,59 @@ configure({
 ```
 
 Predefined states turn complex selector logic into single tokens. Use `@mobile` instead of writing media query expressions in every component.
+
+### CSS properties as props
+
+With `styleProps`, a component can expose the styles you choose as normal typed props. That means you can adjust layout, spacing, alignment, or positioning right where the component is used, instead of introducing wrapper elements or reaching for a separate styling API.
+
+This is especially good for prototyping and fast UI iteration: you can shape interfaces quickly, while still staying inside a typed, design-system-aware component API that scales to production.
+
+```tsx
+import { tasty, FLOW_STYLES, POSITION_STYLES } from '@tenphi/tasty';
+
+const Space = tasty({
+  styles: {
+    display: 'flex',
+    flow: 'column',
+    gap: '1x',
+  },
+  styleProps: FLOW_STYLES,
+});
+
+const Button = tasty({
+  as: 'button',
+  styles: {
+    padding: '1.5x 3x',
+    fill: '#primary',
+    color: '#primary-text',
+    radius: true,
+  },
+  styleProps: POSITION_STYLES,
+});
+```
+
+Now you can compose layout and tweak component positioning directly in JSX:
+
+```tsx
+<Space flow="row" gap="2x" placeItems="center">
+  <Title>Dashboard</Title>
+  <Button placeSelf="end">Add Item</Button>
+</Space>
+```
+
+The same props also support state maps, so responsive values use the exact same API:
+
+```tsx
+<Space
+  flow={{ '': 'column', '@tablet': 'row' }}
+  gap={{ '': '2x', '@tablet': '4x' }}
+>
+  <Sidebar />
+  <Content />
+</Space>
+```
+
+Layout components can expose flow props. Buttons can expose positioning props. Each component can offer only the style props that make sense for its role, while still keeping tokens, custom units, and state maps fully typed. This works in runtime `tasty()` components, not in `tastyStatic()`.
 
 ## How It Actually Works
 
@@ -310,22 +364,15 @@ const ProfileCard = tasty({
 
 Use `/` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order. Use `none` to skip base recipes: `recipe: 'none / disabled'`.
 
-### Keyframes and `@property`
+### Auto-Inferred `@property`
 
-Modern CSS features are natively supported:
+CSS custom properties do not animate smoothly by default because the browser does not know how to interpolate their values. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule fixes that by declaring a property's syntax, such as `<number>` or `<color>`.
 
-Color tokens are automatically registered as typed properties (`<color>`), so token-based transitions work without extra setup.
+In Tasty, you usually do not need to declare `@property` manually. When a custom property is assigned a concrete value, Tasty infers the syntax and registers the matching `@property` for you:
 
 ```tsx
 const Pulse = tasty({
   styles: {
-    '@properties': {
-      '$pulse-scale': {
-        syntax: '<number>',
-        inherits: false,
-        initialValue: 1,
-      },
-    },
     animation: 'pulse 2s infinite',
     transform: 'scale($pulse-scale)',
     '@keyframes': {
@@ -336,6 +383,20 @@ const Pulse = tasty({
     },
   },
 });
+```
+
+Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from the `#name` token convention.
+
+If you prefer full manual control, disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
+
+### Explicit `@properties`
+
+Declare `@properties` yourself only when you need to override the defaults, for example to set `inherits: false` or provide a custom `initialValue`:
+
+```tsx
+'@properties': {
+  '$pulse-scale': { syntax: '<number>', inherits: false, initialValue: 1 },
+},
 ```
 
 ### React Hooks
@@ -518,7 +579,8 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ## Documentation
 
-- **[Runtime API (tasty)](docs/tasty.md)** — Full runtime styling documentation: component creation, state mappings, sub-elements, variants, hooks, and configuration
+- **[Usage Guide](docs/usage.md)** — Runtime styling: component creation, state mappings, sub-elements, variants, and hooks
+- **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 - **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
 - **[Server-Side Rendering](docs/ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks: streaming support, cache hydration, and troubleshooting

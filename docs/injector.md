@@ -511,7 +511,7 @@ const StyledButton = tasty({
 // 4. dispose() is called when component unmounts
 ```
 
-For most development, you'll use the [Tasty style system](./tasty.md) rather than the injector directly. The injector provides the high-performance foundation that makes Tasty's declarative styling possible.
+For most development, you'll use the [Tasty style system](./usage.md) rather than the injector directly. The injector provides the high-performance foundation that makes Tasty's declarative styling possible.
 
 ---
 
@@ -525,4 +525,4 @@ Direct injector usage is recommended for:
 - **Performance-critical scenarios** where you need direct control
 - **Testing utilities** that need to inject or extract CSS
 
-For regular component styling, prefer the [`tasty()` API](./tasty.md) which provides a more developer-friendly interface.
+For regular component styling, prefer the [`tasty()` API](./usage.md) which provides a more developer-friendly interface.

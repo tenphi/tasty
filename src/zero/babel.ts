@@ -29,6 +29,7 @@ import type { StyleHandlerDefinition } from '../utils/styles';
 import { CSSWriter } from './css-writer';
 import {
   extractKeyframesFromStyles,
+  extractPropertiesFromStyles,
   extractStylesForSelector,
   extractStylesWithChunks,
 } from './extractor';
@@ -126,6 +127,11 @@ export interface TastyZeroConfig {
    * ```
    */
   recipes?: Record<string, RecipeStyles>;
+  /**
+   * Automatically infer and register CSS @property declarations from values.
+   * @default true
+   */
+  autoPropertyTypes?: boolean;
 }
 
 export interface TastyZeroBabelOptions {
@@ -223,6 +229,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             cssWriter,
             state.sourceFile,
             config.keyframes,
+            config.autoPropertyTypes,
           );
         } else if (t.isObjectExpression(firstArg)) {
           // Styles mode: tastyStatic(styles)
@@ -233,6 +240,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state,
             globalRegistry,
             config.keyframes,
+            config.autoPropertyTypes,
           );
         } else if (t.isIdentifier(firstArg)) {
           // Extension mode: tastyStatic(base, styles)
@@ -243,6 +251,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state,
             globalRegistry,
             config.keyframes,
+            config.autoPropertyTypes,
           );
         } else {
           throw path.buildCodeFrameError(
@@ -348,6 +357,7 @@ function handleStylesMode(
   state: PluginState,
   globalRegistry: StaticStyleRegistry,
   globalKeyframes?: Record<string, KeyframesSteps>,
+  autoPropertyTypes?: boolean,
 ): void {
   const stylesArg = args[0];
 
@@ -372,6 +382,12 @@ function handleStylesMode(
   // Add keyframes CSS
   for (const kf of keyframes) {
     cssWriter.add(kf.css, kf.css, state.sourceFile);
+  }
+
+  // Extract and add auto-inferred @property rules
+  const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
+  for (const prop of properties) {
+    cssWriter.add(prop.css, prop.css, state.sourceFile);
   }
 
   // Extract styles with chunking
@@ -408,6 +424,7 @@ function handleExtensionMode(
   state: PluginState,
   globalRegistry: StaticStyleRegistry,
   globalKeyframes?: Record<string, KeyframesSteps>,
+  autoPropertyTypes?: boolean,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -462,6 +479,14 @@ function handleExtensionMode(
     cssWriter.add(kf.css, kf.css, state.sourceFile);
   }
 
+  // Extract and add auto-inferred @property rules
+  const properties = extractPropertiesFromStyles(mergedStyles, {
+    autoPropertyTypes,
+  });
+  for (const prop of properties) {
+    cssWriter.add(prop.css, prop.css, state.sourceFile);
+  }
+
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(mergedStyles);
 
@@ -501,6 +526,7 @@ function handleSelectorMode(
   cssWriter: CSSWriter,
   sourceFile?: string,
   globalKeyframes?: Record<string, KeyframesSteps>,
+  autoPropertyTypes?: boolean,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -538,6 +564,12 @@ function handleSelectorMode(
   // Add keyframes CSS
   for (const kf of keyframes) {
     cssWriter.add(kf.css, kf.css, sourceFile);
+  }
+
+  // Extract and add auto-inferred @property rules
+  const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
+  for (const prop of properties) {
+    cssWriter.add(prop.css, prop.css, sourceFile);
   }
 
   // Extract styles for selector

@@ -489,33 +489,40 @@ If the name is not a semantic name, it is used as a literal CSS property name.
 
 ### `scrollbar`
 
-Cross-browser scrollbar styling. Sets Firefox (`scrollbar-width`, `scrollbar-color`) and WebKit (`::-webkit-scrollbar` pseudo-elements) properties.
+Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
 
-**Syntax:** `[modifiers...] [size] [thumb-color] [track-color] [corner-color]`
+**Syntax:** `[width] [modifiers...] [thumb-color] [track-color]`
 
-**Modifiers:**
+**Width values** (controls `scrollbar-width`, default is `thin`):
+
+| Value | Effect |
+|-------|--------|
+| `thin` | Thin scrollbar (default) |
+| `auto` | Browser-default scrollbar width |
+| `none` | Hide scrollbar (still scrollable, no colors applied) |
+
+**Modifiers** (controls gutter and overflow behavior):
 
 | Modifier | Effect |
 |----------|--------|
-| `thin` | Thin scrollbar (`scrollbar-width: thin`) |
-| `none` | Hide scrollbar (still scrollable) |
-| `auto` | Browser-default scrollbar width |
 | `stable` | Reserve space for scrollbar (`scrollbar-gutter: stable`) |
 | `both-edges` | Reserve space on both sides (`scrollbar-gutter: stable both-edges`) |
 | `always` | Force scrollbars visible (`overflow: scroll` + `scrollbar-gutter: stable`) |
-| `styled` | Enhanced appearance with rounded thumb, transitions, and custom sizing |
 
-**Colors:** Up to 3 color values for thumb, track, and corner (optional).
+**Colors:** Up to 2 color values for thumb and track (optional), applied via `scrollbar-color`.
 
-**Defaults:** size = `8px`, thumb = `$scrollbar-thumb-color`, track = `transparent`, corner = same as track
+**Defaults:** When no colors are specified, the thumb color comes from the `#scrollbar-thumb` token (`#text.5`) and the track color from the `#scrollbar-track` token (`#dark-bg`). These tokens are provided by the base token set. If the base tokens are not loaded, the track falls back to `transparent` via a CSS fallback, while the thumb has no CSS-level fallback — the browser treats the entire `scrollbar-color` declaration as invalid and reverts to the platform-default scrollbar appearance.
+
+**Note:** `none` takes precedence over all other modifiers and colors. Combining `none` with other tokens (e.g., `"none always #red"`) produces a warning, and only `scrollbar-width: none` is applied.
 
 | Value | Effect |
 |-------|--------|
 | `true` | Thin scrollbar with default thumb/track colors |
 | `"none"` | Hidden scrollbar (still scrollable) |
-| `"thin 10px #purple.40 #dark.04"` | Thin, 10px, thumb `#purple.40`, track `#dark.04` |
-| `"styled 12px #purple.40 #dark.04 #white.10"` | Styled, 12px, thumb `#purple.40`, track `#dark.04`, corner `#white.10` |
-| `"always 8px #primary.50 #white.02"` | Always visible, 8px, thumb `#primary.50`, track `#white.02` |
+| `"thin #purple.40 #dark.04"` | Thin scrollbar with custom colors |
+| `"auto #red #blue"` | Browser-default width with custom colors |
+| `"always #primary.50 #white.02"` | Always visible with custom colors |
+| `"thin stable #red #blue"` | Thin, gutter reserved, custom colors |
 
 ### `fade`
 

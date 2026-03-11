@@ -265,6 +265,41 @@ export function getEffectiveDefinition(
 }
 
 // ============================================================================
+// Color Utilities
+// ============================================================================
+
+/**
+ * Convert a color initialValue to an RGB string for the companion `-rgb` property.
+ * Used by SSR to emit `@property --name-color-rgb { syntax: "<number>+"; ... }`.
+ */
+export function colorInitialValueToRgb(
+  initialValue: string | number | undefined,
+): string {
+  if (initialValue == null) return '0 0 0';
+
+  const val = String(initialValue).trim().toLowerCase();
+
+  if (val === 'transparent' || val === 'rgba(0,0,0,0)' || val === '') {
+    return '0 0 0';
+  }
+
+  // Named color: white
+  if (val === 'white') return '255 255 255';
+  if (val === 'black') return '0 0 0';
+
+  // rgb(R G B) or rgb(R, G, B) — extract components
+  const rgbMatch = val.match(
+    /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/,
+  );
+  if (rgbMatch) {
+    return `${rgbMatch[1]} ${rgbMatch[2]} ${rgbMatch[3]}`;
+  }
+
+  // Fallback for any other value
+  return '0 0 0';
+}
+
+// ============================================================================
 // Value Type Inference
 // ============================================================================
 

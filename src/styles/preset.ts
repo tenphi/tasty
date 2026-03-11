@@ -30,10 +30,8 @@ function setCSSValue(
       return 'inherit';
     }
 
-    const defaultValue = `var(--default-${styleName}, ${
-      styleName === 'font-family'
-        ? 'var(--font, NonexistentFontName)'
-        : 'inherit'
+    const defaultValue = `var(--default-${styleName}${
+      styleName === 'font-family' ? ', var(--font, NonexistentFontName)' : ''
     })`;
     const fontSuffix =
       styleName === 'font-family' ? ', var(--font, sans-serif)' : '';

@@ -343,9 +343,9 @@ const ANGLE_UNITS = ['deg', 'rad', 'grad', 'turn'];
 const TIME_UNITS = ['ms', 's'];
 
 for (const u of LENGTH_UNITS) {
-  UNIT_TO_SYNTAX[u] = { syntax: '<length>', initialValue: '0px' };
+  UNIT_TO_SYNTAX[u] = { syntax: '<length-percentage>', initialValue: '0px' };
 }
-UNIT_TO_SYNTAX['%'] = { syntax: '<percentage>', initialValue: '0%' };
+UNIT_TO_SYNTAX['%'] = { syntax: '<length-percentage>', initialValue: '0px' };
 for (const u of ANGLE_UNITS) {
   UNIT_TO_SYNTAX[u] = { syntax: '<angle>', initialValue: '0deg' };
 }
@@ -355,7 +355,8 @@ for (const u of TIME_UNITS) {
 
 /**
  * Infer CSS @property syntax from a concrete value.
- * Only detects numeric types: \<number\>, \<length\>, \<percentage\>, \<angle\>, \<time\>.
+ * Detects numeric types: \<number\>, \<length-percentage\>, \<angle\>, \<time\>.
+ * Length and percentage values both map to \<length-percentage\> for maximum flexibility.
  * Color properties are handled separately via the #name token convention
  * (--name-color gets \<color\> syntax automatically in getEffectiveDefinition).
  *

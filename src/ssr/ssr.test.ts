@@ -562,7 +562,7 @@ describe('collectAutoInferredProperties', () => {
     expect(css).toContain('initial-value: 0deg');
   });
 
-  it('infers <length> from pixel values', () => {
+  it('infers <length-percentage> from pixel values', () => {
     const collector = new ServerStyleCollector();
 
     collectAutoInferredProperties(
@@ -572,7 +572,7 @@ describe('collectAutoInferredProperties', () => {
 
     const css = collector.getCSS();
     expect(css).toContain('@property --offset');
-    expect(css).toContain('"<length>"');
+    expect(css).toContain('"<length-percentage>"');
     expect(css).toContain('initial-value: 0px');
   });
 

@@ -31,14 +31,14 @@ describe('PropertyTypeResolver', () => {
       });
     });
 
-    it('should register a length property', () => {
+    it('should register a length-percentage property from length value', () => {
       resolver.scanDeclarations(
         '--gap: 10px',
         isPropertyDefined,
         registerProperty,
       );
       expect(registered.get('--gap')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
     });
@@ -67,15 +67,15 @@ describe('PropertyTypeResolver', () => {
       });
     });
 
-    it('should register a percentage property', () => {
+    it('should register a length-percentage property from percentage value', () => {
       resolver.scanDeclarations(
         '--progress: 50%',
         isPropertyDefined,
         registerProperty,
       );
       expect(registered.get('--progress')).toEqual({
-        syntax: '<percentage>',
-        initialValue: '0%',
+        syntax: '<length-percentage>',
+        initialValue: '0px',
       });
     });
 
@@ -118,11 +118,11 @@ describe('PropertyTypeResolver', () => {
         registerProperty,
       );
       expect(registered.get('--b')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
       expect(registered.get('--a')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
     });
@@ -223,6 +223,56 @@ describe('PropertyTypeResolver', () => {
         registerProperty,
       );
       expect(registered.size).toBe(0);
+    });
+  });
+
+  describe('line-height name-based inference', () => {
+    it('should register --line-height with var() as <number> | <length-percentage>', () => {
+      resolver.scanDeclarations(
+        '--line-height: var(--lh)',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--line-height')).toEqual({
+        syntax: '<number> | <length-percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should register --*-line-height with var() as <number> | <length-percentage>', () => {
+      resolver.scanDeclarations(
+        '--heading-line-height: var(--lh)',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--heading-line-height')).toEqual({
+        syntax: '<number> | <length-percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should use name-based type even when value is a bare number', () => {
+      resolver.scanDeclarations(
+        '--line-height: 1.5',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--line-height')).toEqual({
+        syntax: '<number> | <length-percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should use name-based type even when value is a length', () => {
+      resolver.scanDeclarations(
+        '--body-line-height: 24px',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--body-line-height')).toEqual({
+        syntax: '<number> | <length-percentage>',
+        initialValue: '0',
+      });
     });
   });
 });

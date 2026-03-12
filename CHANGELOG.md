@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 0.10.0
+
+### Minor Changes
+
+- [#20](https://github.com/tenphi/tasty/pull/20) [`d5bec8b`](https://github.com/tenphi/tasty/commit/d5bec8b91a60e183033a4829dd23ac683f927037) Thanks [@tenphi](https://github.com/tenphi)! - Add server-side rendering (SSR) support with zero-cost client hydration. New entry points: `@tenphi/tasty/ssr`, `@tenphi/tasty/ssr/next`, `@tenphi/tasty/ssr/astro`. Next.js App Router (`TastyRegistry`), Astro (`tastyMiddleware`), and generic framework integration via `ServerStyleCollector`, `TastySSRContext`, `runWithCollector`, and `hydrateTastyCache`. Requires React 19+.
+
+### Patch Changes
+
+- [#20](https://github.com/tenphi/tasty/pull/20) [`f39678d`](https://github.com/tenphi/tasty/commit/f39678d3071979d5847aea067a349bd97fcfd806) Thanks [@tenphi](https://github.com/tenphi)! - Upgrade auto-inferred `@property` types: length and percentage values now register as `<length-percentage>` instead of separate `<length>`/`<percentage>`, enabling smooth transitions between mixed units. Add name-based inference for `--*-line-height` properties as `<number> | <length-percentage>`.
+
 ## 0.9.0
 
 ### Minor Changes

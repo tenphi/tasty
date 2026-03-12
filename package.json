@@ -81,7 +81,9 @@
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "hygiene": "pnpm lint && pnpm format:check && pnpm typecheck",
+    "hygiene:fix": "pnpm lint:fix && pnpm format && pnpm typecheck"
   },
   "repository": {
     "type": "git",

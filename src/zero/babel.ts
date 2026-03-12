@@ -223,7 +223,9 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     api.cache.using(() => configDeps.map(mtime).join(','));
 
     for (const dep of configDeps) {
-      (api as unknown as { addExternalDependency(path: string): void }).addExternalDependency(dep);
+      (
+        api as unknown as { addExternalDependency(path: string): void }
+      ).addExternalDependency(dep);
     }
   } else {
     api.cache.forever();

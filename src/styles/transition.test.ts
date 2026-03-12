@@ -148,6 +148,54 @@ describe('transitionStyle', () => {
     });
   });
 
+  describe('CSS custom property names ($$token / ##token)', () => {
+    it('handles custom property with explicit timing', () => {
+      const result = transitionStyle({ transition: '--angle 0.3s' });
+      expect(result).toEqual({
+        transition: '--angle 0.3s',
+      });
+    });
+
+    it('handles custom property without timing (no double -- prefix)', () => {
+      const result = transitionStyle({ transition: '--angle' });
+      expect(result).toEqual({
+        transition: '--angle var(--angle-transition, var(--transition))',
+      });
+    });
+
+    it('handles custom property with easing only', () => {
+      const result = transitionStyle({
+        transition: '--accent-color ease-in',
+      });
+      expect(result).toEqual({
+        transition:
+          '--accent-color var(--accent-color-transition, var(--transition)) ease-in',
+      });
+    });
+
+    it('handles custom property with easing and delay', () => {
+      const result = transitionStyle({
+        transition: '--angle ease-out 0.1s',
+      });
+      expect(result).toEqual({
+        transition:
+          '--angle var(--angle-transition, var(--transition)) ease-out 0.1s',
+      });
+    });
+
+    it('handles multiple custom properties', () => {
+      const result = transitionStyle({
+        transition: '--angle 0.3s, --accent-color ease-in',
+      });
+      expect(result).toEqual({
+        transition: [
+          '--angle 0.3s',
+          '--accent-color var(--accent-color-transition, var(--transition)) ease-in',
+        ].join(', '),
+      });
+    });
+  });
+
   describe('deduplication via map', () => {
     it('later transitions override earlier ones for same CSS properties', () => {
       const result = transitionStyle({

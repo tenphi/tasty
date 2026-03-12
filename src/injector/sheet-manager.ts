@@ -890,6 +890,7 @@ export class SheetManager {
 
   /**
    * Convert keyframes steps to CSS string.
+   * Public so the SSR collector can format keyframes without DOM access.
    * Returns both the CSS text and a combined declarations string for property type scanning.
    */
   stepsToCSS(steps: KeyframesSteps): {

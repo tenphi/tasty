@@ -1,11 +1,22 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
+import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import { keyframes } from '../injector';
 import type { KeyframesResult, KeyframesSteps } from '../injector/types';
+import type { ServerStyleCollector } from '../ssr/collector';
+import { TastySSRContext } from '../ssr/context';
+import { formatKeyframesCSS } from '../ssr/format-keyframes';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseKeyframesOptions {
   name?: string;
   root?: Document | ShadowRoot;
+}
+
+function resolveSSRCollector(
+  reactContext: ServerStyleCollector | null,
+): ServerStyleCollector | null {
+  if (reactContext) return reactContext;
+  return getRegisteredSSRCollector();
 }
 
 /**
@@ -72,6 +83,9 @@ export function useKeyframes(
   depsOrOptions?: readonly unknown[] | UseKeyframesOptions,
   options?: UseKeyframesOptions,
 ): string {
+  const ssrContextValue = useContext(TastySSRContext);
+  const ssrCollector = resolveSSRCollector(ssrContextValue);
+
   // Detect which overload is being used
   const isFactory = typeof stepsOrFactory === 'function';
 
@@ -99,24 +113,27 @@ export function useKeyframes(
     isFactory ? (deps ?? []) : [stepsOrFactory],
   );
 
-  // Store keyframes results for cleanup - we need to track both the render-time
-  // injection (for the name) and the effect-time injection (for Strict Mode safety)
+  // Store keyframes results for cleanup (client only)
   const renderResultRef = useRef<KeyframesResult | null>(null);
   const effectResultRef = useRef<KeyframesResult | null>(null);
 
-  // Inject keyframes during render to ensure the animation name is available
-  // immediately. The keyframes() function uses reference counting internally,
-  // so multiple calls with the same content are deduplicated.
   const name = useMemo(() => {
-    // Dispose previous render-time result if deps changed
-    renderResultRef.current?.dispose();
-    renderResultRef.current = null;
-
     if (!stepsData) {
       return '';
     }
 
-    // Inject keyframes synchronously
+    // SSR path: format and collect, return name without DOM injection
+    if (ssrCollector) {
+      const actualName = ssrCollector.allocateKeyframeName(opts?.name);
+      const css = formatKeyframesCSS(actualName, stepsData);
+      ssrCollector.collectKeyframes(actualName, css);
+      return actualName;
+    }
+
+    // Client path: inject keyframes synchronously for immediate name availability
+    renderResultRef.current?.dispose();
+    renderResultRef.current = null;
+
     const result = keyframes(stepsData, {
       name: opts?.name,
       root: opts?.root,
@@ -125,20 +142,13 @@ export function useKeyframes(
     renderResultRef.current = result;
 
     return result.toString();
-  }, [stepsData, opts?.name, opts?.root]);
+  }, [stepsData, opts?.name, opts?.root, ssrCollector]);
 
-  // Handle injection and cleanup in useInsertionEffect to properly support
-  // React 18+ Strict Mode double-invocation (mount → unmount → mount).
-  // The effect setup re-injects the keyframes if cleanup was called, ensuring
-  // the CSS exists after Strict Mode remounts.
+  // Client path: handle Strict Mode double-invocation and cleanup
   useInsertionEffect(() => {
-    // Dispose previous effect-time result
     effectResultRef.current?.dispose();
     effectResultRef.current = null;
 
-    // Re-inject keyframes. This ensures the CSS exists after Strict Mode cleanup.
-    // The keyframes() function uses reference counting, so this is idempotent
-    // if the CSS wasn't disposed.
     if (stepsData) {
       const result = keyframes(stepsData, {
         name: opts?.name,
@@ -147,9 +157,6 @@ export function useKeyframes(
       effectResultRef.current = result;
     }
 
-    // Cleanup on unmount or when dependencies change.
-    // Dispose both the effect-time and render-time results to properly
-    // decrement the reference count.
     return () => {
       effectResultRef.current?.dispose();
       effectResultRef.current = null;

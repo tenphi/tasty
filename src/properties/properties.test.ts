@@ -319,29 +319,29 @@ describe('properties', () => {
       });
     });
 
-    it('should infer <length> from length units', () => {
+    it('should infer <length-percentage> from length units', () => {
       expect(inferSyntaxFromValue('10px')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
       expect(inferSyntaxFromValue('2rem')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
       expect(inferSyntaxFromValue('1em')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
       expect(inferSyntaxFromValue('100vw')).toEqual({
-        syntax: '<length>',
+        syntax: '<length-percentage>',
         initialValue: '0px',
       });
     });
 
-    it('should infer <percentage> from percent values', () => {
+    it('should infer <length-percentage> from percent values', () => {
       expect(inferSyntaxFromValue('50%')).toEqual({
-        syntax: '<percentage>',
-        initialValue: '0%',
+        syntax: '<length-percentage>',
+        initialValue: '0px',
       });
     });
 

@@ -265,6 +265,39 @@ export function getEffectiveDefinition(
 }
 
 // ============================================================================
+// Color Utilities
+// ============================================================================
+
+/**
+ * Convert a color initialValue to an RGB string for the companion `-rgb` property.
+ * Used by SSR to emit `@property --name-color-rgb { syntax: "<number>+"; ... }`.
+ */
+export function colorInitialValueToRgb(
+  initialValue: string | number | undefined,
+): string {
+  if (initialValue == null) return '0 0 0';
+
+  const val = String(initialValue).trim().toLowerCase();
+
+  if (val === 'transparent' || val === 'rgba(0,0,0,0)' || val === '') {
+    return '0 0 0';
+  }
+
+  // Named color: white
+  if (val === 'white') return '255 255 255';
+  if (val === 'black') return '0 0 0';
+
+  // rgb(R G B) or rgb(R, G, B) — extract components
+  const rgbMatch = val.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  if (rgbMatch) {
+    return `${rgbMatch[1]} ${rgbMatch[2]} ${rgbMatch[3]}`;
+  }
+
+  // Fallback for any other value
+  return '0 0 0';
+}
+
+// ============================================================================
 // Value Type Inference
 // ============================================================================
 
@@ -310,9 +343,9 @@ const ANGLE_UNITS = ['deg', 'rad', 'grad', 'turn'];
 const TIME_UNITS = ['ms', 's'];
 
 for (const u of LENGTH_UNITS) {
-  UNIT_TO_SYNTAX[u] = { syntax: '<length>', initialValue: '0px' };
+  UNIT_TO_SYNTAX[u] = { syntax: '<length-percentage>', initialValue: '0px' };
 }
-UNIT_TO_SYNTAX['%'] = { syntax: '<percentage>', initialValue: '0%' };
+UNIT_TO_SYNTAX['%'] = { syntax: '<length-percentage>', initialValue: '0px' };
 for (const u of ANGLE_UNITS) {
   UNIT_TO_SYNTAX[u] = { syntax: '<angle>', initialValue: '0deg' };
 }
@@ -322,7 +355,8 @@ for (const u of TIME_UNITS) {
 
 /**
  * Infer CSS @property syntax from a concrete value.
- * Only detects numeric types: \<number\>, \<length\>, \<percentage\>, \<angle\>, \<time\>.
+ * Detects numeric types: \<number\>, \<length-percentage\>, \<angle\>, \<time\>.
+ * Length and percentage values both map to \<length-percentage\> for maximum flexibility.
  * Color properties are handled separately via the #name token convention
  * (--name-color gets \<color\> syntax automatically in getEffectiveDefinition).
  *

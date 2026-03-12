@@ -50,6 +50,12 @@ export class PropertyTypeResolver {
         continue;
       }
 
+      // Name-based: --*-line-height accepts numbers, lengths, and percentages
+      if (propName.endsWith('-line-height')) {
+        registerProperty(propName, '<number> | <length-percentage>', '0');
+        continue;
+      }
+
       // Single var() reference → record dependency for deferred resolution
       const varMatch = SINGLE_VAR_REF.exec(value);
       if (varMatch) {

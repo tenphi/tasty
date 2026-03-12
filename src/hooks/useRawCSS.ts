@@ -1,9 +1,19 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
+import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectRawCSS } from '../injector';
+import type { ServerStyleCollector } from '../ssr/collector';
+import { TastySSRContext } from '../ssr/context';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseRawCSSOptions {
   root?: Document | ShadowRoot;
+}
+
+function resolveSSRCollector(
+  reactContext: ServerStyleCollector | null,
+): ServerStyleCollector | null {
+  if (reactContext) return reactContext;
+  return getRegisteredSSRCollector();
 }
 
 /**
@@ -67,6 +77,9 @@ export function useRawCSS(
   depsOrOptions?: readonly unknown[] | UseRawCSSOptions,
   options?: UseRawCSSOptions,
 ): void {
+  const ssrContextValue = useContext(TastySSRContext);
+  const ssrCollector = resolveSSRCollector(ssrContextValue);
+
   // Detect which overload is being used
   const isFactory = typeof cssOrFactory === 'function';
 
@@ -85,10 +98,18 @@ export function useRawCSS(
     isFactory ? (deps ?? []) : [cssOrFactory],
   );
 
+  // SSR path: collect raw CSS during render
+  useMemo(() => {
+    if (!ssrCollector || !css.trim()) return;
+
+    const key = `raw:${css.length}:${css.slice(0, 64)}`;
+    ssrCollector.collectRawCSS(key, css);
+  }, [ssrCollector, css]);
+
   const disposeRef = useRef<(() => void) | null>(null);
 
+  // Client path: inject via DOM
   useInsertionEffect(() => {
-    // Dispose previous injection if any
     disposeRef.current?.();
 
     if (!css.trim()) {
@@ -96,11 +117,9 @@ export function useRawCSS(
       return;
     }
 
-    // Inject new CSS
     const { dispose } = injectRawCSS(css, opts);
     disposeRef.current = dispose;
 
-    // Cleanup on unmount or when css changes
     return () => {
       disposeRef.current?.();
       disposeRef.current = null;

@@ -517,12 +517,10 @@ export class StyleInjector {
     if (existingDef !== undefined) {
       // Property already exists - check if definitions match
       if (existingDef !== normalizedDef) {
-        // Different definition - warn but don't replace (CSS @property can't be redefined)
         if (isDevEnv()) {
-          console.warn(
+          console.debug(
             `[Tasty] @property ${cssName} was already defined with a different declaration. ` +
-              `The new declaration will be ignored. ` +
-              `Original: ${existingDef}, New: ${normalizedDef}`,
+              `The new declaration will be ignored.`,
           );
         }
       }

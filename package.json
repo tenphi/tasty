@@ -1,6 +1,6 @@
 {
   "name": "@tenphi/tasty",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "A design-system-integrated styling system and DSL for concise, state-aware UI styling",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.10.2
+
+### Patch Changes
+
+- [`6a7972a`](https://github.com/tenphi/tasty/commit/6a7972a9933127f824f9395ecc4483187bff6952) Thanks [@tenphi](https://github.com/tenphi)! - Move `jiti` from `dependencies` to optional `peerDependencies` since it is only needed by the Next.js zero-runtime wrapper (`@tenphi/tasty/next`). Document requirements for SSR and zero-runtime entry points.
+
 ## 0.10.1
 
 ### Patch Changes

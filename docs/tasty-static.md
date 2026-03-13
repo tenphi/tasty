@@ -11,9 +11,30 @@
 - **Performance-critical pages** — Zero runtime overhead for styling
 - **Landing pages** — Minimal bundle size with pre-generated CSS
 
-## Quick Start
+## Requirements
 
-The zero-runtime mode is part of the main `@tenphi/tasty` package. No additional packages required.
+The zero-runtime mode is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
+
+| Dependency | Version | Required for |
+|---|---|---|
+| `@babel/core` | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`) |
+| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin |
+| `@babel/types` | >= 7.24 | Babel plugin |
+| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/next`) when using `configFile` option |
+
+All of these are declared as optional peer dependencies of `@tenphi/tasty`. Install only what your setup requires:
+
+```bash
+# For any Babel-based setup (Vite, custom Babel config, etc.)
+pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types
+
+# For Next.js with TypeScript config file
+pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types jiti
+```
+
+---
+
+## Quick Start
 
 ### Basic Usage
 

@@ -2,7 +2,17 @@
 
 Tasty supports server-side rendering with zero-cost client hydration. Your existing `tasty()` components work unchanged -- SSR is opt-in and requires no per-component modifications.
 
-**Requires React 19+.**
+---
+
+## Requirements
+
+| Dependency | Version | Required for |
+|---|---|---|
+| `react` | >= 18 | All SSR entry points (peer dependency of `@tenphi/tasty`) |
+| `next` | >= 13 | Next.js integration (`@tenphi/tasty/ssr/next`) — App Router with `useServerInsertedHTML` |
+| Node.js | >= 20 | Generic / streaming SSR (`@tenphi/tasty/ssr`) — uses `node:async_hooks` for `AsyncLocalStorage` |
+
+The Astro integration (`@tenphi/tasty/ssr/astro`) has no additional dependencies beyond `react`.
 
 ---
 

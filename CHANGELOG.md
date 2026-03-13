@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.10.1
+
+### Patch Changes
+
+- [`ff3cdf8`](https://github.com/tenphi/tasty/commit/ff3cdf86abacd2688d6862504c29471f15d66498) Thanks [@tenphi](https://github.com/tenphi)! - Add name-based `--*-opacity` suffix rule to `autoPropertyTypes`: custom properties ending with `-opacity` are now automatically typed as `<number> | <percentage>` with initial value `0`, enabling smooth CSS transitions for opacity values.
+
 ## 0.10.0
 
 ### Minor Changes

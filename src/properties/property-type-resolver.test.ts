@@ -275,4 +275,54 @@ describe('PropertyTypeResolver', () => {
       });
     });
   });
+
+  describe('opacity name-based inference', () => {
+    it('should register --opacity with var() as <number> | <percentage>', () => {
+      resolver.scanDeclarations(
+        '--opacity: var(--op)',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--opacity')).toEqual({
+        syntax: '<number> | <percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should register --*-opacity with var() as <number> | <percentage>', () => {
+      resolver.scanDeclarations(
+        '--bg-opacity: var(--op)',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--bg-opacity')).toEqual({
+        syntax: '<number> | <percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should use name-based type even when value is a bare number', () => {
+      resolver.scanDeclarations(
+        '--opacity: 0.5',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--opacity')).toEqual({
+        syntax: '<number> | <percentage>',
+        initialValue: '0',
+      });
+    });
+
+    it('should use name-based type even when value is a percentage', () => {
+      resolver.scanDeclarations(
+        '--bg-opacity: 50%',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--bg-opacity')).toEqual({
+        syntax: '<number> | <percentage>',
+        initialValue: '0',
+      });
+    });
+  });
 });

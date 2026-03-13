@@ -56,6 +56,12 @@ export class PropertyTypeResolver {
         continue;
       }
 
+      // Name-based: --*-opacity accepts numbers and percentages
+      if (propName.endsWith('-opacity')) {
+        registerProperty(propName, '<number> | <percentage>', '0');
+        continue;
+      }
+
       // Single var() reference → record dependency for deferred resolution
       const varMatch = SINGLE_VAR_REF.exec(value);
       if (varMatch) {

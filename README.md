@@ -602,6 +602,7 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 - **[Server-Side Rendering](docs/ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks: streaming support, cache hydration, and troubleshooting
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring
+- **[Comparison](docs/comparison.md)** — How Tasty compares to Tailwind, Panda CSS, vanilla-extract, StyleX, Stitches, and Emotion: positioning, trade-offs, and when each tool fits best
 
 ## License
 

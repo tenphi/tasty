@@ -86,7 +86,7 @@ That makes Tasty less of a "better way to write CSS objects" and more of a **sta
 Beyond state resolution, Tasty includes several structural capabilities that most other tools do not offer:
 
 - **CSS properties as typed React props** — `styleProps` lets a component expose selected style properties as normal props (`<Button placeSelf="end">`), including state maps for responsive values. No other tool provides this as a first-class, typed, design-system-aware feature.
-- **Sub-element styling** — Compound components declare inner parts via capitalized keys in `styles` and `data-element` attributes. States, tokens, and recipes apply across the entire element tree from a single definition. See [Usage Guide — Sub-element Styling](usage.md#sub-element-styling).
+- **Sub-element styling** — Compound components declare inner parts via capitalized keys in `styles` and `data-element` attributes. States, tokens, and recipes apply across the entire element tree from a single definition. See [Runtime API — Sub-element Styling](runtime.md#sub-element-styling).
 - **Auto-inferred `@property`** — When a custom property is assigned a concrete value, Tasty infers the CSS `@property` syntax and registers it automatically, enabling smooth transitions on custom properties without manual declarations.
 - **AI-friendly style definitions** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, refactor, and generate Tasty styles as confidently as a human — no hidden cascade logic or implicit ordering to second-guess.
 - **Companion ecosystem** — An [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) with 27 lint rules, a [VS Code extension](https://github.com/tenphi/tasty-vscode-extension) for syntax highlighting, and [Glaze](https://github.com/tenphi/glaze) for OKHSL color theme generation with automatic WCAG contrast solving.
@@ -404,7 +404,8 @@ Tasty is most compelling when the problem is not just "how do we write styles," 
 ## Learn more
 
 - [README](../README.md) — overview, quick start, and feature highlights
-- [Usage Guide](usage.md) — component creation, state mappings, sub-elements, variants, and hooks
+- [Style DSL](dsl.md) — state maps, tokens, units, extending semantics, keyframes, @property
+- [Runtime API](runtime.md) — `tasty()` factory, component props, variants, sub-elements, hooks
 - [Style Properties](styles.md) — complete reference for all enhanced style properties
 - [Configuration](configuration.md) — tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Zero Runtime (tastyStatic)](tasty-static.md) — build-time static styling with Babel plugin

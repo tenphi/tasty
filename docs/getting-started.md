@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full API reference, see the [Usage Guide](usage.md).
+This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md).
 
 ---
 
@@ -186,7 +186,8 @@ All three share the same DSL, tokens, units, and state mappings.
 ## Next steps
 
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components: sub-elements, styleProps, tokens, extension
-- **[Usage Guide](usage.md)** — Full runtime API: component creation, state mappings, sub-elements, variants, hooks
+- **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
+- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
 - **[Building a Design System](design-system.md)** — Practical guide to building a DS layer with Tasty: tokens, recipes, primitives, compound components
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties

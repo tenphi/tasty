@@ -630,18 +630,36 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ## Documentation
 
+### Start here
+
 - **[Getting Started](docs/getting-started.md)** — Installation, first component, configuration, ESLint plugin setup, editor tooling, and rendering mode decision tree
 - **[Methodology](docs/methodology.md)** — The recommended patterns for structuring Tasty components: root + sub-elements, styleProps, tokens, styles vs style, wrapping and extension
+
+### Guides
+
 - **[Building a Design System](docs/design-system.md)** — Practical guide to building a DS layer: token vocabulary, state aliases, recipes, primitives, compound components, override contracts
-- **[Usage Guide](docs/usage.md)** — Runtime styling: component creation, state mappings, sub-elements, variants, and hooks
+- **[Adoption Guide](docs/adoption.md)** — Where Tasty sits in the stack, who should adopt it, what you define yourself, and how to introduce it incrementally into an existing design system
+
+### Reference
+
+- **[Style DSL](docs/dsl.md)** — The Tasty style language: state maps, tokens, units, color syntax, extending semantics, recipes, keyframes, and @property
+- **[Runtime API](docs/runtime.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and hooks
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
+
+### Rendering modes
+
 - **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
 - **[Server-Side Rendering](docs/ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks: streaming support, cache hydration, and troubleshooting
+
+### Internals
+
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring
+
+### Context
+
 - **[Comparison](docs/comparison.md)** — How Tasty compares to Tailwind, Panda CSS, vanilla-extract, StyleX, Stitches, and Emotion: positioning, trade-offs, and when each tool fits best
-- **[Adoption Guide](docs/adoption.md)** — Where Tasty sits in the stack, who should adopt it, what you define yourself, and how to introduce it incrementally into an existing design system
 
 ## License
 

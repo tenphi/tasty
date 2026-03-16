@@ -45,7 +45,7 @@ configure({
 | `nonce` | `string` | - | CSP nonce for style elements |
 | `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
 | `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
-| `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](usage.md#built-in-units) |
+| `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
 | `funcs` | `Record<string, Function>` | - | Custom parser functions (merged with existing) |
 | `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
 | `tokens` | `Record<string, string \| number>` | - | Predefined tokens replaced during parsing |
@@ -78,7 +78,7 @@ When a component uses `padding: '$card-padding'`, the parser replaces it with `'
 
 > **Important:** Predefined tokens are for parse-time substitution. To define the actual CSS custom property values that color tokens and custom units resolve to at runtime (e.g. setting `--primary-color` or `--gap`), use `useGlobalStyles(':root', { '#primary': '...', '$gap': '8px' })`. See [Getting Started — Define design tokens and unit values](getting-started.md#define-design-tokens-and-unit-values) for the setup pattern.
 
-Once defined, tokens can be used in any component's styles — see [Using Predefined Tokens](usage.md#predefined-tokens) in the usage guide.
+Once defined, tokens can be used in any component's styles — see [Predefined Tokens](dsl.md#predefined-tokens) in the Style DSL reference.
 
 ---
 
@@ -104,7 +104,7 @@ configure({
 
 Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@properties`. Recipes cannot reference other recipes.
 
-For how to apply, compose, and override recipes in components, see [Using Recipes](usage.md#recipes) in the usage guide.
+For how to apply, compose, and override recipes in components, see [Recipes](dsl.md#recipes) in the Style DSL reference.
 
 ---
 
@@ -211,4 +211,4 @@ declare module '@tenphi/tasty' {
 }
 ```
 
-See [Usage Guide](usage.md) for component creation, state mappings, sub-elements, variants, and hooks.
+See [Style DSL](dsl.md) for state maps, tokens, units, and extending semantics, and [Runtime API](runtime.md) for `tasty()`, hooks, and component props.

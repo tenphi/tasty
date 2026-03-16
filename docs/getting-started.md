@@ -76,35 +76,43 @@ createRoot(document.getElementById('root')!).render(<App />);
 
 ### Define design tokens and unit values
 
-Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` also multiply CSS custom properties. Define all of them on `:root` using `useGlobalStyles`:
+Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` also multiply CSS custom properties. Define them via `configure({ tokens })`:
 
 ```tsx
-// src/DesignTokens.tsx
-import { useGlobalStyles } from '@tenphi/tasty';
+// src/tasty-config.ts
+import { configure } from '@tenphi/tasty';
 
-export function DesignTokens() {
-  useGlobalStyles(':root', {
-    // Color tokens — #primary in styles → var(--primary-color)
+configure({
+  tokens: {
     '#primary': 'oklch(55% 0.25 265)',
     '#surface': '#fff',
     '#text': '#111',
-
-    // Unit values — 2x → calc(var(--gap) * 2)
     '$gap': '8px',
     '$radius': '4px',
     '$border-width': '1px',
     '$outline-width': '2px',
-  });
-
-  return null;
-}
+  },
+});
 ```
 
-Render `<DesignTokens />` near the root of your app. Every component using `#primary`, `2x`, or `1r` adjusts automatically.
+Tokens support state maps for responsive or theme-aware values:
 
-> **Note:** `configure({ tokens })` is a different mechanism — it replaces tokens with literal values at parse time (baked into CSS). Use it for value aliases like `$card-padding: '4x'` that should be resolved during style generation, not for defining color or unit values. See [Configuration — Predefined Tokens](configuration.md#predefined-tokens) for details.
+```tsx
+configure({
+  tokens: {
+    '#primary': {
+      '': 'oklch(55% 0.25 265)',
+      '@dark': 'oklch(75% 0.2 265)',
+    },
+  },
+});
+```
 
-See [Configuration](configuration.md) for the full `configure()` API — predefined tokens, recipes, custom units, style handlers, and TypeScript extensions.
+Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered.
+
+> **Note:** `configure({ replaceTokens })` is a separate mechanism — it replaces tokens with literal values at parse time (baked into CSS). Use it for value aliases like `$card-padding: '4x'` that should be resolved during style generation, not for defining color or unit values. See [Configuration — Replace Tokens](configuration.md#replace-tokens-parse-time-substitution) for details.
+
+See [Configuration](configuration.md) for the full `configure()` API — tokens, replace tokens, recipes, custom units, style handlers, and TypeScript extensions.
 
 ---
 

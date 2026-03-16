@@ -22,8 +22,8 @@ import * as fs from 'fs';
 import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 
-import { configure } from '../config';
-import type { RecipeStyles, Styles } from '../styles/types';
+import { configure, getGlobalConfigTokens } from '../config';
+import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import type { StyleHandlerDefinition } from '../utils/styles';
@@ -74,7 +74,7 @@ export interface TastyZeroConfig {
    */
   funcs?: Record<string, (groups: StyleDetails[]) => string>;
   /**
-   * Plugins that extend tasty with custom functions, units, states, handlers, or tokens.
+   * Plugins that extend tasty with custom functions, units, states, and handlers.
    * Plugins are processed in order, with later plugins overriding earlier ones.
    * @example
    * ```ts
@@ -112,11 +112,17 @@ export interface TastyZeroConfig {
    */
   handlers?: Record<string, StyleHandlerDefinition>;
   /**
-   * Predefined tokens that are replaced during style parsing.
+   * Design tokens injected as CSS custom properties on `:root`.
+   * Values are parsed through the Tasty DSL. Supports state maps.
+   * @example { '$gap': '4px', '#primary': { '': '#purple', '@dark': '#light-purple' } }
+   */
+  tokens?: ConfigTokens;
+  /**
+   * Predefined tokens replaced during style parsing (parse-time substitution).
    * Use `$name` for custom properties and `#name` for color tokens.
    * @example { $spacing: '2x', '#accent': '#purple' }
    */
-  tokens?: Record<`$${string}` | `#${string}`, string | number>;
+  replaceTokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys).
@@ -247,6 +253,15 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   configure(config);
 
   const cssWriter = new CSSWriter(outputPath, { devMode });
+
+  // Emit configured tokens as :root CSS custom properties
+  const tokenStyles = getGlobalConfigTokens();
+  if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+    const result = extractStylesForSelector(':root', tokenStyles);
+    if (result.css) {
+      cssWriter.add(':root:tokens', result.css);
+    }
+  }
 
   // Global registry for cross-file references (same build)
   const globalRegistry: StaticStyleRegistry = {};

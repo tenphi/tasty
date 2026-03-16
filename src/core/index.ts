@@ -106,6 +106,8 @@ export type {
   Styles,
   StylesWithoutSelectors,
   RecipeStyles,
+  ConfigTokens,
+  ConfigTokenValue,
   NoType,
   Selector,
   SuffixForSelector,

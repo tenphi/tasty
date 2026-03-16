@@ -12,7 +12,7 @@
  */
 
 import { StyleInjector } from './injector/injector';
-import { clearPipelineCache, isSelector } from './pipeline';
+import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
 import {
   normalizeHandlerDefinition,
@@ -31,8 +31,9 @@ import {
 
 import type { KeyframesSteps, PropertyDefinition } from './injector/types';
 import type { StyleDetails, UnitHandler } from './parser/types';
+import type { StyleResult } from './pipeline';
 import type { TastyPlugin } from './plugins/types';
-import type { RecipeStyles } from './styles/types';
+import type { RecipeStyles, ConfigTokens } from './styles/types';
 import type { StyleHandlerDefinition } from './utils/styles';
 
 /**
@@ -181,20 +182,43 @@ export interface TastyConfig {
    */
   handlers?: Record<string, StyleHandlerDefinition>;
   /**
-   * Predefined tokens that are replaced during style parsing.
-   * Token values are processed through the parser (like component tokens).
+   * Design tokens injected as CSS custom properties on `:root`.
+   * Values are parsed through the Tasty DSL. Supports state maps
+   * for responsive/theme-aware tokens.
+   *
+   * - `$name` keys become `--name` CSS custom properties
+   * - `#name` keys become `--name-color` and `--name-color-rgb` properties
+   *
+   * Tokens are injected once when the first style is rendered.
+   *
+   * @example
+   * ```ts
+   * configure({
+   *   tokens: {
+   *     '$gap': '4px',
+   *     '#primary': {
+   *       '': '#purple',
+   *       '@dark': '#light-purple',
+   *     },
+   *   },
+   * });
+   * ```
+   */
+  tokens?: ConfigTokens;
+  /**
+   * Predefined tokens that are replaced during style parsing (parse-time substitution).
    * Use `$name` for custom properties and `#name` for color tokens.
+   * Values are substituted inline before CSS generation, unlike `tokens` which
+   * inject CSS custom properties on `:root`.
    *
    * For color tokens (#name), boolean `true` is converted to `transparent`.
    *
    * @example
    * ```ts
    * configure({
-   *   tokens: {
+   *   replaceTokens: {
    *     $spacing: '2x',
-   *     '$card-padding': '4x',
    *     '#accent': '#purple',
-   *     '#surface': '#white',
    *     '#overlay': true, // → transparent
    *   },
    * });
@@ -202,13 +226,13 @@ export interface TastyConfig {
    * // Now use in styles - tokens are replaced at parse time:
    * const Card = tasty({
    *   styles: {
-   *     padding: '$card-padding',  // → calc(4 * var(--gap))
-   *     fill: '#surface',          // → var(--white-color)
+   *     padding: '$spacing',  // → calc(2 * var(--gap))
+   *     fill: '#accent',      // → var(--purple-color)
    *   },
    * });
    * ```
    */
-  tokens?: Record<`$${string}`, string | number | boolean> &
+  replaceTokens?: Record<`$${string}`, string | number | boolean> &
     Record<`#${string}`, string | number | boolean>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
@@ -276,6 +300,9 @@ let globalProperties: Record<string, PropertyDefinition> | null = null;
 
 // Global recipes storage (null = no recipes configured)
 let globalRecipes: Record<string, RecipeStyles> | null = null;
+
+// Global token styles storage (injected as :root CSS custom properties)
+let globalConfigTokens: ConfigTokens | null = null;
 
 /**
  * Internal properties required by tasty core features.
@@ -471,6 +498,17 @@ export function markStylesGenerated(): void {
       injector.property(token, definition);
     }
   }
+
+  // Inject configured tokens as :root CSS custom properties
+  if (globalConfigTokens && Object.keys(globalConfigTokens).length > 0) {
+    const tokenRules = renderStyles(
+      globalConfigTokens,
+      ':root',
+    ) as StyleResult[];
+    if (tokenRules.length > 0) {
+      injector.injectGlobal(tokenRules);
+    }
+  }
 }
 
 /**
@@ -636,6 +674,36 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
   globalRecipes = recipes;
 }
 
+// ============================================================================
+// Global Token Styles Management
+// ============================================================================
+
+/**
+ * Get global token styles for :root injection.
+ * Returns null if no tokens configured.
+ */
+export function getGlobalConfigTokens(): ConfigTokens | null {
+  return globalConfigTokens;
+}
+
+/**
+ * Set global token styles (called from configure).
+ * Internal use only.
+ */
+function setGlobalConfigTokens(styles: ConfigTokens): void {
+  if (stylesGenerated) {
+    warnOnce(
+      'tokens-after-styles',
+      `[Tasty] Cannot update tokens after styles have been generated.\n` +
+        `The new tokens will be ignored.`,
+    );
+    return;
+  }
+  globalConfigTokens = globalConfigTokens
+    ? { ...globalConfigTokens, ...styles }
+    : styles;
+}
+
 /**
  * Check if configuration is locked (styles have been generated)
  */
@@ -683,7 +751,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedUnits: Record<string, string | UnitHandler> = {};
   let mergedFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
   let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
-  let mergedTokens: Record<string, string | number | boolean> = {};
+  let mergedReplaceTokens: Record<string, string | number | boolean> = {};
+  let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
   let mergedRecipes: Record<string, RecipeStyles> = {};
 
   // Process plugins in order
@@ -701,8 +770,14 @@ export function configure(config: Partial<TastyConfig> = {}): void {
       if (plugin.handlers) {
         mergedHandlers = { ...mergedHandlers, ...plugin.handlers };
       }
+      if (plugin.replaceTokens) {
+        mergedReplaceTokens = {
+          ...mergedReplaceTokens,
+          ...plugin.replaceTokens,
+        };
+      }
       if (plugin.tokens) {
-        mergedTokens = { ...mergedTokens, ...plugin.tokens };
+        mergedConfigTokens = { ...mergedConfigTokens, ...plugin.tokens };
       }
       if (plugin.recipes) {
         mergedRecipes = { ...mergedRecipes, ...plugin.recipes };
@@ -723,11 +798,30 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   if (config.handlers) {
     mergedHandlers = { ...mergedHandlers, ...config.handlers };
   }
+  if (config.replaceTokens) {
+    mergedReplaceTokens = { ...mergedReplaceTokens, ...config.replaceTokens };
+  }
   if (config.tokens) {
-    mergedTokens = { ...mergedTokens, ...config.tokens };
+    mergedConfigTokens = { ...mergedConfigTokens, ...config.tokens };
   }
   if (config.recipes) {
     mergedRecipes = { ...mergedRecipes, ...config.recipes };
+  }
+
+  // Warn on tokens/replaceTokens key conflicts
+  if (devMode) {
+    const tokenKeys = new Set(Object.keys(mergedConfigTokens));
+    for (const key of Object.keys(mergedReplaceTokens)) {
+      if (tokenKeys.has(key)) {
+        warnOnce(
+          `token-conflict-${key}`,
+          `[Tasty] Token "${key}" is defined in both \`tokens\` and \`replaceTokens\`. ` +
+            `\`replaceTokens\` performs parse-time substitution, so the \`tokens\` ` +
+            `CSS custom property will be injected but never used by Tasty styles. ` +
+            `Remove it from one of the two.`,
+        );
+      }
+    }
   }
 
   // Handle predefined states
@@ -775,26 +869,26 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     }
   }
 
-  // Handle predefined tokens
-  // Note: Tokens are processed by the classifier, not here.
-  // We just store the raw values; the classifier will process them when encountered.
-  if (Object.keys(mergedTokens).length > 0) {
-    // Store tokens (keys are normalized to lowercase by setGlobalPredefinedTokens)
+  // Handle replaceTokens (parse-time substitution)
+  if (Object.keys(mergedReplaceTokens).length > 0) {
     const processedTokens: Record<string, string> = {};
-    for (const [key, value] of Object.entries(mergedTokens)) {
+    for (const [key, value] of Object.entries(mergedReplaceTokens)) {
       if (key.startsWith('#')) {
-        // Color token - use shared helper for boolean handling
         const normalized = normalizeColorTokenValue(value);
-        if (normalized === null) continue; // Skip false values
+        if (normalized === null) continue;
         processedTokens[key] = String(normalized);
       } else if (value === false) {
-        // Skip false values for non-color tokens
         continue;
       } else {
         processedTokens[key] = String(value);
       }
     }
     setGlobalPredefinedTokens(processedTokens);
+  }
+
+  // Handle tokens (CSS custom properties on :root)
+  if (Object.keys(mergedConfigTokens).length > 0) {
+    setGlobalConfigTokens(mergedConfigTokens);
   }
 
   // Handle recipes
@@ -812,6 +906,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     properties: _properties,
     handlers: _handlers,
     tokens: _tokens,
+    replaceTokens: _replaceTokens,
     recipes: _recipes,
     ...injectorConfig
   } = config;
@@ -867,6 +962,7 @@ export function resetConfig(): void {
   globalKeyframes = null;
   globalProperties = null;
   globalRecipes = null;
+  globalConfigTokens = null;
   resetGlobalPredefinedTokens();
   resetHandlers();
   clearPipelineCache();

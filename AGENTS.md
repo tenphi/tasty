@@ -80,7 +80,6 @@ src/
   plugins/               Plugin system (OKHSL color support, etc.)
   keyframes/             @keyframes support
   properties/            CSS @property support
-  tokens/                Built-in design tokens (colors, spacing, typography, etc.)
   ssr/                   Server-side rendering (collector, hydration, framework bindings)
   utils/                 Shared utilities
 ```
@@ -89,7 +88,7 @@ src/
 
 - `tasty(options)` — create a styled React component
 - `tasty(BaseComponent, options)` — extend an existing component with styles
-- `configure(opts)` — set global config (tokens, units, states, plugins)
+- `configure(opts)` — set global config (tokens, replaceTokens, units, states, plugins)
 - `useStyles(styles)` — generate a className from a style object
 - `useGlobalStyles(selector, styles)` — inject global styles
 - `useRawCSS(css)` — inject raw CSS
@@ -102,9 +101,9 @@ src/
 | [`docs/getting-started.md`](docs/getting-started.md) | Getting started guide — prerequisites, installation, first component, configuration setup, ESLint plugin setup, editor tooling, rendering mode decision tree. Start here for initial setup. |
 | [`docs/methodology.md`](docs/methodology.md) | Methodology — the recommended patterns for structuring Tasty components: root + sub-elements model (vs BEM), `styleProps` as the public API, `tokens` prop, `styles` vs `style` props, wrapping/extension, how configuration simplifies components, and anti-patterns. |
 | [`docs/design-system.md`](docs/design-system.md) | Building a design system — practical how-to for DS teams: designing token vocabularies, defining state aliases, creating recipes, building layout primitives with `styleProps`, compound components with sub-elements, override contracts, and project structure. |
-| [`docs/dsl.md`](docs/dsl.md) | Style DSL reference — the Tasty style language shared by runtime and static modes: state maps, state key types, color tokens, built-in units, predefined tokens, recipes, extending/replacing semantics, advanced states (@media, @parent, @root, :is, :has), keyframes, and @property. |
+| [`docs/dsl.md`](docs/dsl.md) | Style DSL reference — the Tasty style language shared by runtime and static modes: state maps, state key types, color tokens, built-in units, replace tokens, recipes, extending/replacing semantics, advanced states (@media, @parent, @root, :is, :has), keyframes, and @property. |
 | [`docs/runtime.md`](docs/runtime.md) | Runtime API — React-specific `tasty()` factory, component creation, extending, `styleProps`, variants, sub-element styling (`elements` prop, selector affix), and hooks (`useStyles`, `useGlobalStyles`, `useRawCSS`, `useMergeStyles`). |
-| [`docs/configuration.md`](docs/configuration.md) | Global configuration via `configure()` — CSP nonce, custom state aliases, parser cache size, custom units, custom functions, design tokens, typography presets, recipes, and plugins. |
+| [`docs/configuration.md`](docs/configuration.md) | Global configuration via `configure()` — CSP nonce, custom state aliases, parser cache size, custom units, custom functions, design tokens (`:root` CSS variables), replace tokens (parse-time substitution), recipes, and plugins. |
 | [`docs/styles.md`](docs/styles.md) | Style properties reference — documents all custom style handlers (`fill`, `padding`, `margin`, `border`, `radius`, `flow`, `preset`, `shadow`, `outline`, `display`, `width`/`height`, `gap`, `inset`, `fade`, `scrollbar`) with their enhanced syntax and modifiers. |
 | [`docs/tasty-static.md`](docs/tasty-static.md) | Zero-runtime mode (`tastyStatic`) — build-time CSS generation for static sites and performance-critical pages. Covers Babel plugin setup, Next.js integration, static config files, and limitations. |
 | [`docs/injector.md`](docs/injector.md) | Internal style injector architecture — hash-based deduplication, reference counting, CSS nesting flattening, keyframes injection, sheet management, SSR support, and Shadow DOM roots. Low-level infrastructure doc. |

@@ -191,12 +191,13 @@ The `tokens` prop sets `style="--progress: 75%"` on the DOM element. The `$progr
 
 | Need | Use |
 |------|-----|
-| Value changes per instance at render time (progress, user color, avatar size) | `tokens` prop |
-| Value is constant across all instances (card padding, border radius) | Predefined token in `configure({ tokens })` |
+| Value changes per instance at render time (progress, user color, avatar size) | `tokens` prop (on component) |
+| Value is constant across all instances (card padding, border radius) | `configure({ tokens })` for `:root` CSS custom properties |
+| Value should be inlined at parse time (alias for another token) | `configure({ replaceTokens })` |
 | Value changes based on component state (hover, disabled, breakpoint) | State map in `styles` |
 | Value changes based on a variant (primary, danger, outline) | `variants` option |
 
-Predefined tokens (via `configure`) are resolved at parse time and baked into the generated CSS. The `tokens` prop is resolved at render time via inline CSS custom properties. Use predefined tokens for design-system constants and the `tokens` prop for truly dynamic values.
+Design tokens (via `configure({ tokens })`) are injected as CSS custom properties on `:root`. Replace tokens (via `configure({ replaceTokens })`) are resolved at parse time and baked into the generated CSS. The `tokens` prop on components is resolved at render time via inline CSS custom properties. Use design tokens for design-system constants, replace tokens for value aliases, and the `tokens` prop for truly dynamic per-instance values.
 
 ---
 
@@ -373,7 +374,7 @@ styles: {
 
 The recipe encapsulates the shared pattern. Change `card`'s radius from `1r` to `2r` and every component using it updates.
 
-### Predefined tokens enforce consistency
+### Design tokens enforce consistency
 
 ```tsx
 configure({
@@ -384,7 +385,7 @@ configure({
 });
 ```
 
-Components use `$card-padding` instead of hardcoding `4x`. If the DS team decides to change card padding, the token is the single source of truth.
+Components use `$card-padding` instead of hardcoding `4x`. If the DS team decides to change card padding, the token is the single source of truth. Tokens support state maps for theme-aware values. Token values are parsed through the Tasty DSL, so you can use units (`4x`), color syntax (`#purple`), and other DSL features in token definitions.
 
 See [Configuration](configuration.md) for the full `configure()` API.
 

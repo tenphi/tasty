@@ -515,16 +515,6 @@ export class StyleInjector {
     // Check if already defined
     const existingDef = registry.injectedProperties.get(cssName);
     if (existingDef !== undefined) {
-      // Property already exists - check if definitions match
-      if (existingDef !== normalizedDef) {
-        if (isDevEnv()) {
-          console.debug(
-            `[Tasty] @property ${cssName} was already defined with a different declaration. ` +
-              `The new declaration will be ignored.`,
-          );
-        }
-      }
-      // Either exact match or warned - skip injection
       return;
     }
 

@@ -1,10 +1,22 @@
-import type { TypographyPreset } from '../tokens/typography';
-import { TYPOGRAPHY_PRESETS } from '../tokens/typography';
+import type { ConfigTokens } from '../styles/types';
 
-import type { Styles } from '../styles/types';
-
-// Re-export types for convenience
-export type { TypographyPreset };
+/**
+ * Typography preset configuration.
+ * Each preset defines font properties that get expanded into CSS custom properties.
+ *
+ * Use with `generateTypographyTokens()` to create typography tokens for your design system.
+ */
+export interface TypographyPreset {
+  fontSize: string;
+  lineHeight: string;
+  letterSpacing?: string;
+  fontWeight: string | number;
+  boldFontWeight?: string | number;
+  iconSize?: string;
+  textTransform?: string;
+  fontFamily?: string;
+  fontStyle?: string;
+}
 
 /**
  * Generate typography tokens with $ prefix for CSS custom properties.
@@ -20,24 +32,19 @@ export type { TypographyPreset };
  * - `${name}-font-family` (if defined)
  * - `${name}-font-style` (if defined)
  *
- * @param presets - Typography presets object (defaults to TYPOGRAPHY_PRESETS)
- * @returns Styles object with $ prefixed keys
+ * @param presets - Typography presets object
+ * @returns ConfigTokens object with $ prefixed keys
  *
  * @example
- * // Using default presets
- * const tokens = generateTypographyTokens();
- * // tokens['$h1-font-size'] === '36px'
- *
- * @example
- * // Using custom presets
  * const customTokens = generateTypographyTokens({
- *   myHeading: { fontSize: '24px', lineHeight: '32px', fontWeight: '700' }
+ *   myHeading: { fontSize: '24px', lineHeight: '32px', fontWeight: '700' },
+ *   body: { fontSize: '16px', lineHeight: '24px', fontWeight: '400' },
  * });
  */
 export function generateTypographyTokens(
-  presets: Record<string, TypographyPreset> = TYPOGRAPHY_PRESETS,
-): Styles {
-  const tokens: Record<string, string | number> = {};
+  presets: Record<string, TypographyPreset>,
+): ConfigTokens {
+  const tokens: Record<`$${string}`, string | number> = {};
 
   for (const [name, preset] of Object.entries(presets)) {
     tokens[`$${name}-font-size`] = preset.fontSize;
@@ -46,12 +53,7 @@ export function generateTypographyTokens(
     tokens[`$${name}-font-weight`] = preset.fontWeight;
 
     if (preset.boldFontWeight !== undefined) {
-      // Handle different property naming for c1 (uses font-bold-weight instead of bold-font-weight)
-      const boldKey =
-        name === 'c1'
-          ? `$${name}-font-bold-weight`
-          : `$${name}-bold-font-weight`;
-      tokens[boldKey] = preset.boldFontWeight;
+      tokens[`$${name}-bold-font-weight`] = preset.boldFontWeight;
     }
 
     if (preset.iconSize !== undefined) {
@@ -71,5 +73,5 @@ export function generateTypographyTokens(
     }
   }
 
-  return tokens as Styles;
+  return tokens as ConfigTokens;
 }

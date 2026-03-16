@@ -1,5 +1,5 @@
 import type { StyleDetails, UnitHandler } from '../parser/types';
-import type { RecipeStyles } from '../styles/types';
+import type { RecipeStyles, ConfigTokens } from '../styles/types';
 import type { StyleHandlerDefinition } from '../utils/styles';
 
 /**
@@ -28,8 +28,15 @@ export interface TastyPlugin {
    * ```
    */
   handlers?: Record<string, StyleHandlerDefinition>;
+  /**
+   * Design tokens injected as CSS custom properties on `:root`.
+   * Values are parsed through the Tasty DSL. Supports state maps.
+   * - `$name` → `--name` CSS custom property
+   * - `#name` → `--name-color` and `--name-color-rgb`
+   */
+  tokens?: ConfigTokens;
   /** Predefined tokens replaced during style parsing (`$name` or `#name`) */
-  tokens?: Record<`$${string}` | `#${string}`, string | number>;
+  replaceTokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys).

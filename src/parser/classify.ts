@@ -136,7 +136,7 @@ export function classify(
     };
   }
 
-  // 0c. Check for predefined tokens (configured via configure({ tokens: {...} }))
+  // 0c. Check for predefined tokens (configured via configure({ replaceTokens: {...} }))
   // Must happen before default $ and # handling to allow overriding
   if (token[0] === '$' || token[0] === '#') {
     const predefinedTokens = getGlobalPredefinedTokens();

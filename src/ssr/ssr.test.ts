@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resetConfig } from '../config';
+import { configure, resetConfig } from '../config';
 import { allocateClassName, inject, trackRef } from '../injector';
 
 import { collectAutoInferredProperties } from './collect-auto-properties';
@@ -322,6 +322,44 @@ describe('ServerStyleCollector', () => {
       'key-b': 't1',
     });
     expect(state.classCounter).toBe(2);
+  });
+
+  it('collectInternals includes configured tokens as :root CSS custom properties', () => {
+    resetConfig();
+    configure({
+      tokens: {
+        '$my-gap': '8px',
+        '#primary': 'purple',
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    expect(css).toContain('--my-gap');
+    expect(css).toContain('8px');
+    expect(css).toContain('--primary-color');
+  });
+
+  it('flushCSS includes configured tokens on first flush', () => {
+    resetConfig();
+    configure({
+      tokens: {
+        '$my-gap': '8px',
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const flush1 = collector.flushCSS();
+    expect(flush1).toContain('--my-gap');
+    expect(flush1).toContain('8px');
+
+    // Second flush should not repeat tokens
+    const flush2 = collector.flushCSS();
+    expect(flush2).not.toContain('--my-gap');
   });
 });
 

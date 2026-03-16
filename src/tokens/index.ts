@@ -23,14 +23,13 @@ import { SHADOW_TOKENS } from './shadows';
 import { SIZE_TOKENS } from './sizes';
 import { SPACE_TOKENS } from './spacing';
 
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
- * All design tokens combined into a single Styles object.
- * Keys use $ prefix for CSS custom properties.
+ * All design tokens combined into a single ConfigTokens object.
+ * Keys use $ or # prefix for CSS custom properties.
  *
- * Ready for use with `configure({ tokens: TOKENS })` or
- * `useGlobalStyles('body', TOKENS)`.
+ * Ready for use with `configure({ tokens: TOKENS })`.
  *
  * Includes:
  * - Base tokens ($gap, $radius, etc.)
@@ -40,7 +39,7 @@ import type { Styles } from '../styles/types';
  * - Layout tokens ($max-content-width, $topbar-height, etc.)
  * - Color tokens ($purple-color, $purple-color-rgb, etc.)
  */
-export const TOKENS: Styles = {
+export const TOKENS: ConfigTokens = {
   ...BASE_TOKENS,
   ...SPACE_TOKENS,
   ...SIZE_TOKENS,

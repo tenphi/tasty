@@ -581,3 +581,25 @@ export interface StylesIndexSignature {
 export type Styles = StylesWithoutSelectors &
   SpecialStyleProperties &
   StylesIndexSignature;
+
+/**
+ * Value type for design tokens passed to `configure({ tokens })`.
+ * Can be a direct value or a state map for responsive/theme-aware tokens.
+ */
+export type ConfigTokenValue =
+  | string
+  | number
+  | boolean
+  | Record<string, string | number | boolean | undefined | null | '@inherit'>;
+
+/**
+ * Design tokens injected as CSS custom properties on `:root`.
+ * Keys must start with `$` (value tokens) or `#` (color tokens).
+ *
+ * - `$name` keys become `--name` CSS custom properties
+ * - `#name` keys become `--name-color` and `--name-color-rgb` properties
+ */
+export type ConfigTokens = Record<
+  `$${string}` | `#${string}`,
+  ConfigTokenValue
+>;

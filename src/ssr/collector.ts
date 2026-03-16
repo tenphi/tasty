@@ -12,7 +12,7 @@
 
 import {
   getGlobalProperties,
-  getGlobalTokenStyles,
+  getGlobalConfigTokens,
   hasGlobalProperties,
   INTERNAL_PROPERTIES,
   INTERNAL_TOKENS,
@@ -93,7 +93,7 @@ export class ServerStyleCollector {
     }
 
     // Inject configured tokens as :root CSS custom properties
-    const tokenStyles = getGlobalTokenStyles();
+    const tokenStyles = getGlobalConfigTokens();
     if (tokenStyles && Object.keys(tokenStyles).length > 0) {
       const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
       if (tokenRules.length > 0) {

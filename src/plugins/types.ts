@@ -1,5 +1,5 @@
 import type { StyleDetails, UnitHandler } from '../parser/types';
-import type { RecipeStyles } from '../styles/types';
+import type { RecipeStyles, ConfigTokens } from '../styles/types';
 import type { StyleHandlerDefinition } from '../utils/styles';
 
 /**
@@ -34,13 +34,7 @@ export interface TastyPlugin {
    * - `$name` → `--name` CSS custom property
    * - `#name` → `--name-color` and `--name-color-rgb`
    */
-  tokens?: Record<
-    `$${string}` | `#${string}`,
-    | string
-    | number
-    | boolean
-    | Record<string, string | number | boolean | undefined | null | '@inherit'>
-  >;
+  tokens?: ConfigTokens;
   /** Predefined tokens replaced during style parsing (`$name` or `#name`) */
   replaceTokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**

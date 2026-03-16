@@ -1,6 +1,6 @@
 import type { TypographyPreset } from '../tokens/typography';
 
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 // Re-export types for convenience
 export type { TypographyPreset };
@@ -20,7 +20,7 @@ export type { TypographyPreset };
  * - `${name}-font-style` (if defined)
  *
  * @param presets - Typography presets object
- * @returns Styles object with $ prefixed keys
+ * @returns ConfigTokens object with $ prefixed keys
  *
  * @example
  * const customTokens = generateTypographyTokens({
@@ -30,8 +30,8 @@ export type { TypographyPreset };
  */
 export function generateTypographyTokens(
   presets: Record<string, TypographyPreset>,
-): Styles {
-  const tokens: Record<string, string | number> = {};
+): ConfigTokens {
+  const tokens: Record<`$${string}`, string | number> = {};
 
   for (const [name, preset] of Object.entries(presets)) {
     tokens[`$${name}-font-size`] = preset.fontSize;
@@ -40,11 +40,7 @@ export function generateTypographyTokens(
     tokens[`$${name}-font-weight`] = preset.fontWeight;
 
     if (preset.boldFontWeight !== undefined) {
-      const boldKey =
-        name === 'c1'
-          ? `$${name}-font-bold-weight`
-          : `$${name}-bold-font-weight`;
-      tokens[boldKey] = preset.boldFontWeight;
+      tokens[`$${name}-bold-font-weight`] = preset.boldFontWeight;
     }
 
     if (preset.iconSize !== undefined) {
@@ -64,5 +60,5 @@ export function generateTypographyTokens(
     }
   }
 
-  return tokens as Styles;
+  return tokens as ConfigTokens;
 }

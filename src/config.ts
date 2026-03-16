@@ -33,7 +33,7 @@ import type { KeyframesSteps, PropertyDefinition } from './injector/types';
 import type { StyleDetails, UnitHandler } from './parser/types';
 import type { StyleResult } from './pipeline';
 import type { TastyPlugin } from './plugins/types';
-import type { RecipeStyles, Styles } from './styles/types';
+import type { RecipeStyles, ConfigTokens } from './styles/types';
 import type { StyleHandlerDefinition } from './utils/styles';
 
 /**
@@ -204,13 +204,7 @@ export interface TastyConfig {
    * });
    * ```
    */
-  tokens?: Record<
-    `$${string}` | `#${string}`,
-    | string
-    | number
-    | boolean
-    | Record<string, string | number | boolean | undefined | null | '@inherit'>
-  >;
+  tokens?: ConfigTokens;
   /**
    * Predefined tokens that are replaced during style parsing (parse-time substitution).
    * Use `$name` for custom properties and `#name` for color tokens.
@@ -308,7 +302,7 @@ let globalProperties: Record<string, PropertyDefinition> | null = null;
 let globalRecipes: Record<string, RecipeStyles> | null = null;
 
 // Global token styles storage (injected as :root CSS custom properties)
-let globalTokenStyles: Styles | null = null;
+let globalConfigTokens: ConfigTokens | null = null;
 
 /**
  * Internal properties required by tasty core features.
@@ -506,9 +500,9 @@ export function markStylesGenerated(): void {
   }
 
   // Inject configured tokens as :root CSS custom properties
-  if (globalTokenStyles && Object.keys(globalTokenStyles).length > 0) {
+  if (globalConfigTokens && Object.keys(globalConfigTokens).length > 0) {
     const tokenRules = renderStyles(
-      globalTokenStyles,
+      globalConfigTokens,
       ':root',
     ) as StyleResult[];
     if (tokenRules.length > 0) {
@@ -688,15 +682,15 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
  * Get global token styles for :root injection.
  * Returns null if no tokens configured.
  */
-export function getGlobalTokenStyles(): Styles | null {
-  return globalTokenStyles;
+export function getGlobalConfigTokens(): ConfigTokens | null {
+  return globalConfigTokens;
 }
 
 /**
  * Set global token styles (called from configure).
  * Internal use only.
  */
-function setGlobalTokenStyles(styles: Styles): void {
+function setGlobalConfigTokens(styles: ConfigTokens): void {
   if (stylesGenerated) {
     warnOnce(
       'tokens-after-styles',
@@ -705,8 +699,8 @@ function setGlobalTokenStyles(styles: Styles): void {
     );
     return;
   }
-  globalTokenStyles = globalTokenStyles
-    ? { ...globalTokenStyles, ...styles }
+  globalConfigTokens = globalConfigTokens
+    ? { ...globalConfigTokens, ...styles }
     : styles;
 }
 
@@ -758,7 +752,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
   let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
   let mergedReplaceTokens: Record<string, string | number | boolean> = {};
-  let mergedTokenStyles: Styles = {};
+  let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
   let mergedRecipes: Record<string, RecipeStyles> = {};
 
   // Process plugins in order
@@ -783,7 +777,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
         };
       }
       if (plugin.tokens) {
-        mergedTokenStyles = { ...mergedTokenStyles, ...plugin.tokens };
+        mergedConfigTokens = { ...mergedConfigTokens, ...plugin.tokens };
       }
       if (plugin.recipes) {
         mergedRecipes = { ...mergedRecipes, ...plugin.recipes };
@@ -808,10 +802,26 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     mergedReplaceTokens = { ...mergedReplaceTokens, ...config.replaceTokens };
   }
   if (config.tokens) {
-    mergedTokenStyles = { ...mergedTokenStyles, ...(config.tokens as Styles) };
+    mergedConfigTokens = { ...mergedConfigTokens, ...config.tokens };
   }
   if (config.recipes) {
     mergedRecipes = { ...mergedRecipes, ...config.recipes };
+  }
+
+  // Warn on tokens/replaceTokens key conflicts
+  if (devMode) {
+    const tokenKeys = new Set(Object.keys(mergedConfigTokens));
+    for (const key of Object.keys(mergedReplaceTokens)) {
+      if (tokenKeys.has(key)) {
+        warnOnce(
+          `token-conflict-${key}`,
+          `[Tasty] Token "${key}" is defined in both \`tokens\` and \`replaceTokens\`. ` +
+            `\`replaceTokens\` performs parse-time substitution, so the \`tokens\` ` +
+            `CSS custom property will be injected but never used by Tasty styles. ` +
+            `Remove it from one of the two.`,
+        );
+      }
+    }
   }
 
   // Handle predefined states
@@ -877,8 +887,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   }
 
   // Handle tokens (CSS custom properties on :root)
-  if (Object.keys(mergedTokenStyles).length > 0) {
-    setGlobalTokenStyles(mergedTokenStyles);
+  if (Object.keys(mergedConfigTokens).length > 0) {
+    setGlobalConfigTokens(mergedConfigTokens);
   }
 
   // Handle recipes
@@ -952,7 +962,7 @@ export function resetConfig(): void {
   globalKeyframes = null;
   globalProperties = null;
   globalRecipes = null;
-  globalTokenStyles = null;
+  globalConfigTokens = null;
   resetGlobalPredefinedTokens();
   resetHandlers();
   clearPipelineCache();

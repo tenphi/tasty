@@ -1,4 +1,4 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
  * Base design system tokens.
@@ -6,7 +6,7 @@ import type { Styles } from '../styles/types';
  *
  * Keys use $ prefix for CSS custom properties.
  */
-export const BASE_TOKENS: Styles = {
+export const BASE_TOKENS: ConfigTokens = {
   // Typography base
   /** @deprecated Use preset tokens instead */
   '$font-size': '14px',

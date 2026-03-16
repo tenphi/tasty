@@ -1,4 +1,4 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
  * Component size values in pixels.
@@ -33,7 +33,7 @@ export const SIZE_NAME_TO_KEY: Record<SizeName, SizeKey> = {
  * Size tokens with $ prefix for CSS custom properties.
  * Creates tokens like `$size-xs`, `$size-sm`, etc.
  */
-export const SIZE_TOKENS: Styles = {
+export const SIZE_TOKENS: ConfigTokens = {
   '$size-xs': `${SIZES.XS}px`,
   '$size-sm': `${SIZES.SM}px`,
   '$size-md': `${SIZES.MD}px`,

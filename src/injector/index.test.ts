@@ -175,6 +175,75 @@ describe('Global Style Injector API', () => {
       expect(allCssText).toContain('--my-gap');
       expect(allCssText).toContain('8px');
     });
+
+    it('should inject color tokens with -color and -color-rgb properties', () => {
+      configure({
+        forceTextInjection: true,
+        tokens: {
+          '#primary': 'purple',
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      const styleElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(styleElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      expect(allCssText).toContain('--primary-color');
+      expect(allCssText).toContain('--primary-color-rgb');
+    });
+
+    it('should inject tokens with state maps', () => {
+      configure({
+        forceTextInjection: true,
+        states: {
+          '@dark': '@root(theme=dark)',
+        },
+        tokens: {
+          '$my-gap': {
+            '': '8px',
+            '@dark': '4px',
+          },
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      const styleElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(styleElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      expect(allCssText).toContain('--my-gap');
+      expect(allCssText).toContain('8px');
+      expect(allCssText).toContain('4px');
+      expect(allCssText).toContain('[data-theme="dark"]');
+    });
+
+    it('should handle same key in both tokens and replaceTokens without error', () => {
+      configure({
+        forceTextInjection: true,
+        tokens: {
+          '$gap': '8px',
+        },
+        replaceTokens: {
+          '$gap': '2x',
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      const styleElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(styleElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      // tokens still injects the :root custom property
+      expect(allCssText).toContain('--gap');
+      expect(allCssText).toContain('8px');
+    });
   });
 
   describe('inject', () => {

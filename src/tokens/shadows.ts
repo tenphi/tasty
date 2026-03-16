@@ -1,4 +1,4 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
  * Shadow tokens using tasty shorthand syntax.
@@ -10,7 +10,7 @@ import type { Styles } from '../styles/types';
  *
  * Keys use $ prefix for CSS custom properties.
  */
-export const SHADOW_TOKENS: Styles = {
+export const SHADOW_TOKENS: ConfigTokens = {
   /** Subtle shadow for list items */
   '$item-shadow': '0 1bw .375x #dark.15',
   /** Standard card shadow */

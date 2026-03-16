@@ -1,4 +1,4 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 // ============================================================================
 // Color Constants (OKHSL)
@@ -46,7 +46,7 @@ const okhsl = (h: number, s: number, l: number): string =>
  * The tasty system automatically generates {name}-color-rgb variants.
  * Colors are defined in OKHSL format for perceptually uniform color manipulation.
  */
-export const COLOR_TOKENS: Styles = {
+export const COLOR_TOKENS: ConfigTokens = {
   // Base colors - Pink
   '#pink': okhsl(PINK_HUE, 100, 67),
 

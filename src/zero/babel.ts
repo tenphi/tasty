@@ -22,8 +22,8 @@ import * as fs from 'fs';
 import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 
-import { configure, getGlobalTokenStyles } from '../config';
-import type { RecipeStyles, Styles } from '../styles/types';
+import { configure, getGlobalConfigTokens } from '../config';
+import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import type { StyleHandlerDefinition } from '../utils/styles';
@@ -116,13 +116,7 @@ export interface TastyZeroConfig {
    * Values are parsed through the Tasty DSL. Supports state maps.
    * @example { '$gap': '4px', '#primary': { '': '#purple', '@dark': '#light-purple' } }
    */
-  tokens?: Record<
-    `$${string}` | `#${string}`,
-    | string
-    | number
-    | boolean
-    | Record<string, string | number | boolean | undefined | null | '@inherit'>
-  >;
+  tokens?: ConfigTokens;
   /**
    * Predefined tokens replaced during style parsing (parse-time substitution).
    * Use `$name` for custom properties and `#name` for color tokens.
@@ -261,7 +255,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const cssWriter = new CSSWriter(outputPath, { devMode });
 
   // Emit configured tokens as :root CSS custom properties
-  const tokenStyles = getGlobalTokenStyles();
+  const tokenStyles = getGlobalConfigTokens();
   if (tokenStyles && Object.keys(tokenStyles).length > 0) {
     const result = extractStylesForSelector(':root', tokenStyles);
     if (result.css) {

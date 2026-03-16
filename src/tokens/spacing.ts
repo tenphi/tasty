@@ -1,4 +1,4 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
  * Spacing tokens using tasty multiplier syntax.
@@ -6,7 +6,7 @@ import type { Styles } from '../styles/types';
  *
  * Keys use $ prefix for CSS custom properties.
  */
-export const SPACE_TOKENS: Styles = {
+export const SPACE_TOKENS: ConfigTokens = {
   '$space-xs': '.5x',
   '$space-sm': '.75x',
   '$space-md': '1x',

@@ -385,7 +385,7 @@ configure({
 });
 ```
 
-Components use `$card-padding` instead of hardcoding `4x`. If the DS team decides to change card padding, the token is the single source of truth. Tokens support state maps for theme-aware values.
+Components use `$card-padding` instead of hardcoding `4x`. If the DS team decides to change card padding, the token is the single source of truth. Tokens support state maps for theme-aware values. Token values are parsed through the Tasty DSL, so you can use units (`4x`), color syntax (`#purple`), and other DSL features in token definitions.
 
 See [Configuration](configuration.md) for the full `configure()` API.
 

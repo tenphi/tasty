@@ -1,11 +1,11 @@
-import type { Styles } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 /**
  * Layout-related tokens for common UI dimensions.
  *
  * Keys use $ prefix for CSS custom properties.
  */
-export const LAYOUT_TOKENS: Styles = {
+export const LAYOUT_TOKENS: ConfigTokens = {
   /** Maximum width for main content areas */
   '$max-content-width': '1440px',
   /** Height of the top navigation bar */

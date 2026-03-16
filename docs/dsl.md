@@ -245,8 +245,6 @@ Media queries support dimension shorthands and custom unit expansion:
 |-----------|------------|
 | `w` | `width` |
 | `h` | `height` |
-| `is` | `inline-size` |
-| `bs` | `block-size` |
 
 ```jsx
 fill: {
@@ -272,7 +270,14 @@ In practice, define state aliases via `configure({ states })` and use `@mobile` 
 
 ### `@(...)` — Container Queries
 
-Container queries use the syntax `@(name, condition)` or `@(condition)` for unnamed containers. Dimension shorthands (`w`, `h`, `is`, `bs`) are expanded the same way as `@media`.
+Container queries use the syntax `@(name, condition)` for named containers or `@(condition)` for the nearest ancestor container. Dimension shorthands (`w`, `h`, `is`, `bs`) are expanded the same way as `@media`.
+
+| Shorthand | Expands to |
+|-----------|------------|
+| `w` | `width` |
+| `h` | `height` |
+| `is` | `inline-size` |
+| `bs` | `block-size` |
 
 ```jsx
 const Panel = tasty({

@@ -163,7 +163,7 @@
       "esbuild"
     ]
   },
-  "packageManager": "pnpm@10.29.3",
+  "packageManager": "pnpm@10.32.1",
   "size-limit": [
     {
       "name": "main (import *)",

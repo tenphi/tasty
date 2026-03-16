@@ -80,7 +80,6 @@ src/
   plugins/               Plugin system (OKHSL color support, etc.)
   keyframes/             @keyframes support
   properties/            CSS @property support
-  tokens/                Built-in design tokens (colors, spacing, sizes, etc.)
   ssr/                   Server-side rendering (collector, hydration, framework bindings)
   utils/                 Shared utilities
 ```

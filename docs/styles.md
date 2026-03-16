@@ -344,7 +344,7 @@ Box shadow. Supports multiple shadows comma-separated.
 
 | Value | Effect |
 |-------|--------|
-| `true` | Default shadow (from `$shadow` token) |
+| `true` | Default shadow (uses `var(--shadow)` — define a `$shadow` token in your design system) |
 | `"1x .5x .5x #dark.50"` | Custom shadow with Tasty units/colors |
 | `"0 1x 2x #dark.20"` | Standard shadow |
 | `"inset 0 1x 2x #dark.10"` | Inset shadow |
@@ -511,7 +511,7 @@ Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-c
 
 **Colors:** Up to 2 color values for thumb and track (optional), applied via `scrollbar-color`.
 
-**Defaults:** When no colors are specified, the thumb color comes from the `#scrollbar-thumb` token (`#text.5`) and the track color from the `#scrollbar-track` token (`#dark-bg`). These tokens are provided by the base token set. If the base tokens are not loaded, the track falls back to `transparent` via a CSS fallback, while the thumb has no CSS-level fallback — the browser treats the entire `scrollbar-color` declaration as invalid and reverts to the platform-default scrollbar appearance.
+**Defaults:** When no colors are specified, the thumb color comes from `var(--scrollbar-thumb-color)` and the track color from `var(--scrollbar-track-color, transparent)`. These are not built-in — your design system should define `#scrollbar-thumb` and `#scrollbar-track` tokens (e.g. `'#text.5'` and `'#dark-bg'`). If neither token is defined, the track falls back to `transparent` via a CSS fallback, while the thumb has no CSS-level fallback — the browser treats the entire `scrollbar-color` declaration as invalid and reverts to the platform-default scrollbar appearance.
 
 **Note:** `none` takes precedence over all other modifiers and colors. Combining `none` with other tokens (e.g., `"none always #red"`) produces a warning, and only `scrollbar-width: none` is applied.
 

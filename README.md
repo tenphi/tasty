@@ -573,6 +573,16 @@ Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Hi
   <img src="assets/tasty-vscode-highlight.png" width="512" alt="Tasty VS Code syntax highlighting example">
 </p>
 
+## Built with Tasty
+
+### [Cube Cloud](https://cube.dev/)
+
+Enterprise universal semantic layer platform by Cube Dev, Inc. Cube Cloud unifies data modeling, caching, access control, and APIs (REST, GraphQL, SQL, AI) for analytics at scale. Tasty has powered its frontend for over 5 years in production.
+
+### [Cube Cloud for Excel and Google Sheets](https://cube.dev/)
+
+A single spreadsheet add-in deployed to both [Microsoft Excel](https://marketplace.microsoft.com/en-us/product/office/WA200008486) and [Google Sheets](https://workspace.google.com/u/0/marketplace/app/cube_cloud_for_sheets/641460343379). Connects spreadsheets to any cloud data platform (BigQuery, Databricks, Snowflake, Redshift, and more) via Cube Cloud's universal semantic layer.
+
 ### [Cube UI Kit](https://github.com/cube-js/cube-ui-kit)
 
 Open-source React UI kit built on Tasty + React Aria. 100+ production components proving Tasty works at design-system scale. A reference implementation and a ready-to-use component library.

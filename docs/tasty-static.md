@@ -155,6 +155,9 @@ module.exports = {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `output` | `string` | `'tasty.css'` | Path for generated CSS file |
+| `configFile` | `string` | — | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack. |
+| `config` | `TastyZeroConfig \| () => TastyZeroConfig` | `{}` | Inline config object or factory function. Takes precedence over `configFile`. |
+| `configDeps` | `string[]` | `[]` | Absolute file paths that affect config (for cache invalidation) |
 | `config.states` | `Record<string, string>` | `{}` | Predefined state aliases |
 | `config.devMode` | `boolean` | `false` | Add source comments to CSS |
 | `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
@@ -197,21 +200,41 @@ const card = tastyStatic({
 
 ## Next.js Integration
 
-```javascript
-// next.config.js
-const { withTastyZero } = require('@tenphi/tasty/next');
+The `withTastyZero` wrapper configures both **webpack** and **Turbopack** automatically. No `--webpack` flag is needed — it works with whichever bundler Next.js uses.
 
-module.exports = withTastyZero({
+```typescript
+// next.config.ts
+import { withTastyZero } from '@tenphi/tasty/next';
+
+export default withTastyZero({
   output: 'public/tasty.css',
-  config: {
-    states: {
-      '@mobile': '@media(w < 768px)',
-    },
-    devMode: process.env.NODE_ENV === 'development',
-  },
+  configFile: './app/tasty-zero.config.ts',
+  configDeps: ['./app/theme.ts'],
 })({
   reactStrictMode: true,
 });
+```
+
+### `withTastyZero` Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `output` | `string` | `'public/tasty.css'` | Output path for CSS relative to project root |
+| `enabled` | `boolean` | `true` | Enable/disable the plugin |
+| `configFile` | `string` | — | Path to a TS/JS module that default-exports `TastyZeroConfig`. Recommended for Turbopack compatibility. |
+| `config` | `TastyZeroConfig` | — | Inline config object. For static configs that don't change during dev. |
+| `configDeps` | `string[]` | `[]` | Extra files the config depends on (for cache invalidation) |
+
+### Turbopack Support
+
+Starting with Next.js 16, Turbopack is the default bundler. `withTastyZero` supports it out of the box by injecting `turbopack.rules` with `babel-loader` and JSON-serializable options.
+
+The `configFile` option is key for Turbopack — it passes a file path (JSON-serializable) instead of a function, and the Babel plugin loads the config internally via jiti.
+
+**Requirements**: `babel-loader` must be installed in your project:
+
+```bash
+pnpm add babel-loader
 ```
 
 ### Including the CSS

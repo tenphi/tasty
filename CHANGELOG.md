@@ -1,5 +1,50 @@
 # @tenphi/tasty
 
+## 0.11.0
+
+### Minor Changes
+
+- [#36](https://github.com/tenphi/tasty/pull/36) [`39b2d4d`](https://github.com/tenphi/tasty/commit/39b2d4d721d7cd0bdf220e0da4838d37d6f93acf) Thanks [@tenphi](https://github.com/tenphi)! - Remove predefined design-system tokens (colors, sizes, spacing, shadows, layout, base) from the package. These tokens belong to consuming design systems (e.g. `@cube-dev/ui-kit`), not to the styling engine itself.
+
+  The `TypographyPreset` interface and `generateTypographyTokens()` utility remain available. Built-in CSS properties (`$gap`, `$radius`, `$border-width`, `$outline-width`, `$transition`, `$sharp-radius`, `$bold-font-weight`, `#white`, `#black`) in `INTERNAL_PROPERTIES` are unaffected.
+
+- [#36](https://github.com/tenphi/tasty/pull/36) [`ed929cc`](https://github.com/tenphi/tasty/commit/ed929cc48f14c6fce5d191c6480d30ab234adec3) Thanks [@tenphi](https://github.com/tenphi)! - Refactor token system: `configure({ tokens })` now injects CSS custom properties on `:root` with state map support
+
+  **Breaking changes:**
+  - `configure({ tokens })` no longer performs parse-time substitution. Instead, tokens are injected as CSS custom properties on `:root` when the first style is rendered. Token values are parsed through the Tasty DSL and support state maps for responsive/theme-aware values.
+  - The old parse-time substitution behavior is now available via `configure({ replaceTokens })`.
+  - `TYPOGRAPHY_PRESETS` has been removed. Use `generateTypographyTokens()` with your own presets instead.
+  - `generateTypographyTokens()` now requires a `presets` argument (no longer has a default).
+
+  **Migration guide:**
+
+  ```ts
+  // Before
+  configure({
+    tokens: { $spacing: '2x', '#accent': '#purple' },
+  });
+
+  // After — for parse-time substitution (same behavior as before)
+  configure({
+    replaceTokens: { $spacing: '2x', '#accent': '#purple' },
+  });
+
+  // After — for :root CSS custom properties (new recommended approach)
+  configure({
+    tokens: {
+      $gap: '8px',
+      '#primary': {
+        '': '#purple',
+        '@dark': '#light-purple',
+      },
+    },
+  });
+  ```
+
+### Patch Changes
+
+- [`6a7972a`](https://github.com/tenphi/tasty/commit/6a7972a9933127f824f9395ecc4483187bff6952) Thanks [@tenphi](https://github.com/tenphi)! - Move `jiti` from `dependencies` to optional `peerDependencies` since it is only needed by the Next.js zero-runtime wrapper (`@tenphi/tasty/next`). Document requirements for SSR and zero-runtime entry points.
+
 ## 0.10.1
 
 ### Patch Changes

@@ -226,10 +226,10 @@ describe('Global Style Injector API', () => {
       configure({
         forceTextInjection: true,
         tokens: {
-          '$gap': '8px',
+          $gap: '8px',
         },
         replaceTokens: {
-          '$gap': '2x',
+          $gap: '2x',
         },
       });
 

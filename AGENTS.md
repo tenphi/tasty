@@ -99,6 +99,9 @@ src/
 
 | File | Description |
 |---|---|
+| [`docs/getting-started.md`](docs/getting-started.md) | Getting started guide — prerequisites, installation, first component, configuration setup, ESLint plugin setup, editor tooling, rendering mode decision tree. Start here for initial setup. |
+| [`docs/methodology.md`](docs/methodology.md) | Methodology — the recommended patterns for structuring Tasty components: root + sub-elements model (vs BEM), `styleProps` as the public API, `tokens` prop, `styles` vs `style` props, wrapping/extension, how configuration simplifies components, and anti-patterns. |
+| [`docs/design-system.md`](docs/design-system.md) | Building a design system — practical how-to for DS teams: designing token vocabularies, defining state aliases, creating recipes, building layout primitives with `styleProps`, compound components with sub-elements, override contracts, and project structure. |
 | [`docs/usage.md`](docs/usage.md) | Comprehensive usage guide — creating components with `tasty()`, style props, sub-element styling, state-based styling (hover, media queries, container queries), responsive values, recipes, extending components, and React hooks API. Start here to understand the library. |
 | [`docs/configuration.md`](docs/configuration.md) | Global configuration via `configure()` — CSP nonce, custom state aliases, parser cache size, custom units, custom functions, design tokens, typography presets, recipes, and plugins. |
 | [`docs/styles.md`](docs/styles.md) | Style properties reference — documents all custom style handlers (`fill`, `padding`, `margin`, `border`, `radius`, `flow`, `preset`, `shadow`, `outline`, `display`, `width`/`height`, `gap`, `inset`, `fade`, `scrollbar`) with their enhanced syntax and modifiers. |

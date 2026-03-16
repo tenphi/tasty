@@ -58,9 +58,9 @@ configure({
 
 ## Predefined Tokens
 
-Define reusable tokens that are replaced during style parsing. Unlike component-level `tokens` prop (which renders as inline CSS custom properties), predefined tokens are baked into the generated CSS.
+Predefined tokens are **replaced with their literal values at parse time** — they are baked into the generated CSS, not resolved via CSS custom properties at runtime. This makes them ideal for value aliases and shorthand references that should be inlined during style generation.
 
-Use `$name` for custom property tokens and `#name` for color tokens:
+Use `$name` for value tokens and `#name` for color token aliases:
 
 ```jsx
 configure({
@@ -69,11 +69,14 @@ configure({
     '$card-padding': '4x',
     '$button-height': '40px',
     '#accent': '#purple',
-    '#surface': '#white',
     '#surface-hover': '#gray.05',
   },
 });
 ```
+
+When a component uses `padding: '$card-padding'`, the parser replaces it with `'4x'` before generating CSS. When a component uses `fill: '#accent'`, it is replaced with `'#purple'`, which in turn resolves to `var(--purple-color)`.
+
+> **Important:** Predefined tokens are for parse-time substitution. To define the actual CSS custom property values that color tokens and custom units resolve to at runtime (e.g. setting `--primary-color` or `--gap`), use `useGlobalStyles(':root', { '#primary': '...', '$gap': '8px' })`. See [Getting Started — Define design tokens and unit values](getting-started.md#define-design-tokens-and-unit-values) for the setup pattern.
 
 Once defined, tokens can be used in any component's styles — see [Using Predefined Tokens](usage.md#predefined-tokens) in the usage guide.
 

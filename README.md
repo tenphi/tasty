@@ -630,6 +630,9 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ## Documentation
 
+- **[Getting Started](docs/getting-started.md)** — Installation, first component, configuration, ESLint plugin setup, editor tooling, and rendering mode decision tree
+- **[Methodology](docs/methodology.md)** — The recommended patterns for structuring Tasty components: root + sub-elements, styleProps, tokens, styles vs style, wrapping and extension
+- **[Building a Design System](docs/design-system.md)** — Practical guide to building a DS layer: token vocabulary, state aliases, recipes, primitives, compound components, override contracts
 - **[Usage Guide](docs/usage.md)** — Runtime styling: component creation, state mappings, sub-elements, variants, and hooks
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations

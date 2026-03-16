@@ -322,4 +322,5 @@ Tasty is most compelling when the problem is not just "how do we write styles," 
 - [Style Properties](styles.md) — complete reference for all enhanced style properties
 - [Configuration](configuration.md) — tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Zero Runtime (tastyStatic)](tasty-static.md) — build-time static styling with Babel plugin
+- [Adoption Guide](adoption.md) — where Tasty sits in the stack, incremental adoption, and what changes for product engineers
 - [Server-Side Rendering](ssr.md) — SSR setup for Next.js, Astro, and generic frameworks

@@ -108,6 +108,7 @@ src/
 | [`docs/ssr.md`](docs/ssr.md) | Server-side rendering guide — zero-cost hydration, `ServerStyleCollector`, framework integrations (Next.js App Router, Astro), streaming compatibility. Requires React 19+. |
 | [`docs/ssr-spec.plan.md`](docs/ssr-spec.plan.md) | SSR implementation specification — detailed design document covering the problem statement, architecture decisions, cache transfer strategy, streaming support, and framework binding contracts. Internal planning doc. |
 | [`docs/comparison.md`](docs/comparison.md) | Comparison with other styling systems — Tailwind, Panda CSS, vanilla-extract, StyleX, Stitches, Emotion. Covers positioning, abstraction levels, trade-offs, and when Tasty fits vs. alternatives. |
+| [`docs/adoption.md`](docs/adoption.md) | Adoption guide — where Tasty sits in the stack, who should use it, what the DS team defines, incremental adoption phases, and what changes for product engineers. |
 
 ## Code Conventions
 

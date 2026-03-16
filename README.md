@@ -445,8 +445,8 @@ import { useStyles, useGlobalStyles, useRawCSS } from '@tenphi/tasty';
 
 function App() {
   const { className } = useStyles({ padding: '2x', fill: '#surface' });
-  useGlobalStyles(':root', { '#primary': 'purple', '$gap': '8px' });
-  useRawCSS('body { margin: 0; }');
+  useGlobalStyles('body', { margin: '0' });
+  useRawCSS('@font-face { font-family: "Custom"; src: url(...); }');
 
   return <main className={className}>...</main>;
 }

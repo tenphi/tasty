@@ -48,7 +48,8 @@ configure({
 | `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
 | `funcs` | `Record<string, Function>` | - | Custom parser functions (merged with existing) |
 | `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
-| `tokens` | `Record<string, string \| number>` | - | Predefined tokens replaced during parsing |
+| `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
+| `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
@@ -56,18 +57,47 @@ configure({
 
 ---
 
-## Predefined Tokens
+## Design Tokens
 
-Predefined tokens are **replaced with their literal values at parse time** — they are baked into the generated CSS, not resolved via CSS custom properties at runtime. This makes them ideal for value aliases and shorthand references that should be inlined during style generation.
+Design tokens define CSS custom properties on `:root`. They are injected automatically when the first style is rendered. Values are parsed through the Tasty DSL, so you can use units, color syntax, and other DSL features.
+
+Tokens support state maps for responsive or theme-aware values:
+
+```jsx
+configure({
+  tokens: {
+    '$gap': '4px',
+    '$radius': '6px',
+    '#primary': {
+      '': '#purple',
+      '@dark': '#light-purple',
+    },
+    '$font-size': {
+      '': '14px',
+      '@mobile': '12px',
+    },
+  },
+});
+```
+
+- `$name` keys become `--name` CSS custom properties
+- `#name` keys become `--name-color` and `--name-color-rgb` properties
+
+Tokens are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin).
+
+---
+
+## Replace Tokens (Parse-Time Substitution)
+
+Replace tokens are **substituted inline at parse time** — they are baked into the generated CSS, not resolved via CSS custom properties at runtime. This makes them ideal for value aliases and shorthand references.
 
 Use `$name` for value tokens and `#name` for color token aliases:
 
 ```jsx
 configure({
-  tokens: {
+  replaceTokens: {
     $spacing: '2x',
     '$card-padding': '4x',
-    '$button-height': '40px',
     '#accent': '#purple',
     '#surface-hover': '#gray.05',
   },
@@ -76,9 +106,7 @@ configure({
 
 When a component uses `padding: '$card-padding'`, the parser replaces it with `'4x'` before generating CSS. When a component uses `fill: '#accent'`, it is replaced with `'#purple'`, which in turn resolves to `var(--purple-color)`.
 
-> **Important:** Predefined tokens are for parse-time substitution. To define the actual CSS custom property values that color tokens and custom units resolve to at runtime (e.g. setting `--primary-color` or `--gap`), use `useGlobalStyles(':root', { '#primary': '...', '$gap': '8px' })`. See [Getting Started — Define design tokens and unit values](getting-started.md#define-design-tokens-and-unit-values) for the setup pattern.
-
-Once defined, tokens can be used in any component's styles — see [Predefined Tokens](dsl.md#predefined-tokens) in the Style DSL reference.
+See [Replace Tokens](dsl.md#replace-tokens) in the Style DSL reference.
 
 ---
 

@@ -28,8 +28,21 @@ export interface TastyPlugin {
    * ```
    */
   handlers?: Record<string, StyleHandlerDefinition>;
+  /**
+   * Design tokens injected as CSS custom properties on `:root`.
+   * Values are parsed through the Tasty DSL. Supports state maps.
+   * - `$name` → `--name` CSS custom property
+   * - `#name` → `--name-color` and `--name-color-rgb`
+   */
+  tokens?: Record<
+    `$${string}` | `#${string}`,
+    | string
+    | number
+    | boolean
+    | Record<string, string | number | boolean | undefined | null | '@inherit'>
+  >;
   /** Predefined tokens replaced during style parsing (`$name` or `#name`) */
-  tokens?: Record<`$${string}` | `#${string}`, string | number>;
+  replaceTokens?: Record<`$${string}` | `#${string}`, string | number>;
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys).

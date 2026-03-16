@@ -6,15 +6,15 @@
  *
  * Categories:
  * - Colors: Base color palette with -color and -color-rgb variants
- * - Typography: Font presets for headings, text, paragraphs, etc.
  * - Sizes: Component size values (XS, SM, MD, LG, XL)
  * - Spacing: Space tokens using gap multipliers
  * - Shadows: Shadow definitions for elevation
  * - Layout: Common layout dimensions
  * - Base: Core design system values
+ *
+ * Typography tokens are no longer included by default.
+ * Use `generateTypographyTokens()` with your own presets to create them.
  */
-
-import { generateTypographyTokens } from '../utils/typography';
 
 import { BASE_TOKENS } from './base';
 import { COLOR_TOKENS } from './colors';
@@ -29,7 +29,8 @@ import type { Styles } from '../styles/types';
  * All design tokens combined into a single Styles object.
  * Keys use $ prefix for CSS custom properties.
  *
- * Ready for use with useGlobalStyles('body', TOKENS).
+ * Ready for use with `configure({ tokens: TOKENS })` or
+ * `useGlobalStyles('body', TOKENS)`.
  *
  * Includes:
  * - Base tokens ($gap, $radius, etc.)
@@ -37,7 +38,6 @@ import type { Styles } from '../styles/types';
  * - Size tokens ($size-xs, $size-sm, etc.)
  * - Shadow tokens ($shadow, $item-shadow, etc.)
  * - Layout tokens ($max-content-width, $topbar-height, etc.)
- * - Typography tokens ($h1-font-size, $t3-line-height, etc.)
  * - Color tokens ($purple-color, $purple-color-rgb, etc.)
  */
 export const TOKENS: Styles = {
@@ -46,7 +46,6 @@ export const TOKENS: Styles = {
   ...SIZE_TOKENS,
   ...SHADOW_TOKENS,
   ...LAYOUT_TOKENS,
-  ...generateTypographyTokens(),
   ...COLOR_TOKENS,
 };
 
@@ -58,5 +57,4 @@ export { SPACE_TOKENS } from './spacing';
 export { SHADOW_TOKENS } from './shadows';
 export { LAYOUT_TOKENS } from './layout';
 export { BASE_TOKENS } from './base';
-export { TYPOGRAPHY_PRESETS } from './typography';
 export type { TypographyPreset } from './typography';

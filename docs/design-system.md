@@ -8,17 +8,17 @@ It assumes you have already decided to adopt Tasty. For evaluation criteria, aud
 
 ## Designing your token vocabulary
 
-Tokens are the foundation of a design system. In Tasty, tokens are defined via `configure()` and referenced in styles with `#name` (colors) or `$name` (values). See [Configuration — Predefined Tokens](configuration.md#predefined-tokens) for the API.
+Tokens are the foundation of a design system. In Tasty, tokens are defined via `configure({ tokens })` and referenced in styles with `#name` (colors) or `$name` (values). See [Configuration — Design Tokens](configuration.md#design-tokens) for the API.
 
 ### Color tokens
 
-Adopt a semantic naming convention that maps intent, not visual appearance. Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`), so define them on `:root` using `useGlobalStyles`:
+Adopt a semantic naming convention that maps intent, not visual appearance. Define tokens via `configure({ tokens })`:
 
 ```tsx
-import { useGlobalStyles } from '@tenphi/tasty';
+import { configure } from '@tenphi/tasty';
 
-function DesignTokens() {
-  useGlobalStyles(':root', {
+configure({
+  tokens: {
     // Surfaces
     '#surface': '#fff',
     '#surface-hover': '#f5f5f5',
@@ -47,25 +47,34 @@ function DesignTokens() {
     '$radius': '4px',
     '$border-width': '1px',
     '$outline-width': '2px',
-  });
-
-  return null;
-}
+  },
+});
 ```
 
-Render `<DesignTokens />` near the root of your app. All color tokens, unit values, and the components that reference them adjust from one place.
+Tokens are injected as CSS custom properties on `:root` when the first style is rendered. They support state maps for theme-aware values:
+
+```tsx
+configure({
+  tokens: {
+    '#primary': {
+      '': 'oklch(55% 0.25 265)',
+      '@dark': 'oklch(75% 0.2 265)',
+    },
+  },
+});
+```
 
 The `#on-*` convention names the text color that sits on top of a fill — `#on-primary` is the text color on a `#primary` background. This makes state maps self-documenting: `fill: '#primary'` and `color: '#on-primary'` clearly belong together.
 
 For OKHSL-based palette generation with automatic WCAG contrast solving, see [Glaze](https://github.com/tenphi/glaze).
 
-### Predefined tokens for value aliases
+### Replace tokens for value aliases
 
-`configure({ tokens })` is a separate mechanism — it replaces tokens with literal values at parse time, baking them into the generated CSS. Use it for value aliases that should be inlined during style generation, not for defining runtime CSS custom properties:
+`configure({ replaceTokens })` replaces tokens with literal values at parse time, baking them into the generated CSS. Use it for value aliases that should be inlined during style generation:
 
 ```tsx
 configure({
-  tokens: {
+  replaceTokens: {
     '$card-padding': '4x',
     '$input-height': '5x',
     '$sidebar-width': '280px',
@@ -75,22 +84,21 @@ configure({
 
 ### Typography presets
 
-Presets map names like `h1`, `t2` to font-size, line-height, letter-spacing, and weight via CSS custom properties:
+Use `generateTypographyTokens()` to create typography tokens from your own presets, then pass them to `configure({ tokens })`:
 
-```css
-:root {
-  /* Heading 1 */
-  --h1-font-size: 2rem;
-  --h1-line-height: 1.2;
-  --h1-letter-spacing: -0.02em;
-  --h1-font-weight: 700;
+```tsx
+import { configure, generateTypographyTokens } from '@tenphi/tasty';
 
-  /* Text 2 (body) */
-  --t2-font-size: 0.875rem;
-  --t2-line-height: 1.5;
-  --t2-letter-spacing: normal;
-  --t2-font-weight: 400;
-}
+const typographyTokens = generateTypographyTokens({
+  h1: { fontSize: '2rem', lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: 700 },
+  t2: { fontSize: '0.875rem', lineHeight: '1.5', letterSpacing: 'normal', fontWeight: 400 },
+});
+
+configure({
+  tokens: {
+    ...typographyTokens,
+  },
+});
 ```
 
 Then use `preset: 'h1'` or `preset: 't2'` in any component's styles.
@@ -373,8 +381,8 @@ ds/
     index.ts              # Recipe definitions (imported by config.ts)
   tokens/
     colors.ts             # Color token definitions
-    typography.css        # Typography preset CSS custom properties
-    spacing.css           # --gap, --radius, etc.
+    typography.ts         # Typography presets via generateTypographyTokens()
+    spacing.ts            # Spacing token definitions
   index.ts                # Public API: re-exports components + configure
 ```
 

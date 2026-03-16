@@ -85,9 +85,9 @@ You can register additional custom units via [`configure()`](configuration.md#op
 
 ---
 
-## Predefined Tokens
+## Replace Tokens
 
-Tokens defined via [`configure({ tokens })`](configuration.md#predefined-tokens) are replaced at parse time and baked into the generated CSS:
+Tokens defined via [`configure({ replaceTokens })`](configuration.md#replace-tokens-parse-time-substitution) are replaced at parse time and baked into the generated CSS:
 
 ```jsx
 const Card = tasty({

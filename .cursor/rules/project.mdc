@@ -104,7 +104,7 @@ src/
 
 - `tasty(options)` — create styled component
 - `tasty(BaseComponent, options)` — extend existing component
-- `configure(opts)` — set global configuration
+- `configure(opts)` — set global configuration (tokens, replaceTokens, units, states, plugins)
 - `useStyles(styles)` — generate className from styles
 - `useGlobalStyles(selector, styles)` — inject global styles
 - `useRawCSS(css)` — inject raw CSS

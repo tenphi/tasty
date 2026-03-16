@@ -12,12 +12,15 @@
 
 import {
   getGlobalProperties,
+  getGlobalTokenStyles,
   hasGlobalProperties,
   INTERNAL_PROPERTIES,
   INTERNAL_TOKENS,
 } from '../config';
+import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { formatPropertyCSS } from './format-property';
+import { formatGlobalRules } from './format-global-rules';
 import { formatRules } from './format-rules';
 
 /**
@@ -87,6 +90,18 @@ export class ServerStyleCollector {
         '__internal:root-tokens',
         `:root { ${declarations} }`,
       );
+    }
+
+    // Inject configured tokens as :root CSS custom properties
+    const tokenStyles = getGlobalTokenStyles();
+    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+      const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
+      if (tokenRules.length > 0) {
+        const css = formatGlobalRules(tokenRules);
+        if (css) {
+          this.collectGlobalStyles('__global:tokens', css);
+        }
+      }
     }
   }
 

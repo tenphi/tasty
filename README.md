@@ -243,6 +243,8 @@ Every rule is guarded by the negation of higher-priority rules. No two rules can
 
 By absorbing selector complexity, Tasty makes advanced CSS patterns practical again — nested container queries, multi-condition `@supports` gates, and combined root-state/media branches. You stay in pure CSS instead of relying on JavaScript workarounds, so the browser can optimize layout, painting, and transitions natively. Tasty doesn't limit CSS; it unlocks its full potential by removing the complexity that held teams back.
 
+[Try it in the Tasty Playground →](https://cube-ui-kit.vercel.app/?path=/story/getting-started-tasty-playground--playground)
+
 ## Capabilities
 
 ### Design Tokens and Custom Units
@@ -575,6 +577,10 @@ Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Hi
 
 ## Built with Tasty
 
+### [tasty.style](https://tasty.style) ([source](https://github.com/tenphi/tasty.style))
+
+The official Tasty documentation and landing page — itself built entirely with Tasty. A showcase for zero-runtime styling via `tastyStatic`, SSR with Next.js, and OKHSL color theming with Glaze.
+
 ### [Cube Cloud](https://cube.dev/)
 
 Enterprise universal semantic layer platform by Cube Dev, Inc. Cube Cloud unifies data modeling, caching, access control, and APIs (REST, GraphQL, SQL, AI) for analytics at scale. Tasty has powered its frontend for over 5 years in production.
@@ -583,7 +589,7 @@ Enterprise universal semantic layer platform by Cube Dev, Inc. Cube Cloud unifie
 
 A single spreadsheet add-in deployed to both [Microsoft Excel](https://marketplace.microsoft.com/en-us/product/office/WA200008486) and [Google Sheets](https://workspace.google.com/u/0/marketplace/app/cube_cloud_for_sheets/641460343379). Connects spreadsheets to any cloud data platform (BigQuery, Databricks, Snowflake, Redshift, and more) via Cube Cloud's universal semantic layer.
 
-### [Cube UI Kit](https://github.com/cube-js/cube-ui-kit)
+### [Cube UI Kit](https://github.com/cube-js/cube-ui-kit) ([storybook](https://cube-ui-kit.vercel.app/))
 
 Open-source React UI kit built on Tasty + React Aria. 100+ production components proving Tasty works at design-system scale. A reference implementation and a ready-to-use component library.
 

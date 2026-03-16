@@ -192,6 +192,15 @@ Traditional CSS has two structural problems.
 
 First, the **cascade** resolves conflicts by specificity and source order: when multiple selectors match, the one with the highest specificity wins, or — if specificity is equal — the last one in source order wins. That makes styles inherently fragile. Reordering imports, adding a media query, or composing components from different libraries can silently break styling.
 
+A small example makes this tangible. Two rules for a button's background:
+
+```css
+.btn:hover     { background: dodgerblue; }
+.btn[disabled] { background: gray; }
+```
+
+Both selectors have specificity `(0, 1, 1)`. When the button is hovered **and** disabled, both match — and the last rule in source order wins. Swap the two lines and a hovered disabled button silently turns blue instead of gray. This class of bug is invisible in code review because the logic is correct; only the ordering is wrong.
+
 Second, **authoring selectors that capture real-world state logic is fundamentally hard.** A single state like "dark mode" may depend on a root attribute, an OS preference, or both — each branch needing its own selector, proper negation of competing branches, and correct `@media` nesting. The example below shows the CSS you'd write by hand for just *one* property with *one* state. Scale that across dozens of properties, then add breakpoints and container queries, and the selector logic quickly becomes unmanageable.
 
 Tasty solves both problems at once: **every state mapping compiles into mutually exclusive selectors.**
@@ -211,7 +220,33 @@ const Text = tasty({
 });
 ```
 
-If `@dark` expands to `@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))`, Tasty generates:
+If `@dark` expands to `@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))`, try writing the CSS by hand. A first attempt might look like this:
+
+```css
+/* First attempt — the @media branch is too broad */
+.t0 { color: var(--text-color); }
+:root[data-schema="dark"] .t0 { color: var(--text-on-dark-color); }
+@media (prefers-color-scheme: dark) {
+  .t0 { color: var(--text-on-dark-color); }
+}
+```
+
+The `@media` branch fires even when `data-schema="light"` is explicitly set. Fix that:
+
+```css
+/* Second attempt — @media is scoped, but the default is still too broad */
+.t0 { color: var(--text-color); }
+:root[data-schema="dark"] .t0 { color: var(--text-on-dark-color); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-schema]) .t0 { color: var(--text-on-dark-color); }
+}
+```
+
+Better — but the bare `.t0` default still matches unconditionally. It matches in dark mode, it matches when `data-schema="dark"` is set, and it can beat the attribute selector by source order if another rule re-declares it later. There is no selector that says "apply this default only when none of the dark branches win."
+
+This is just *one* property with *one* state, and getting it right already takes multiple iterations. The correct selectors require negating every other branch — which is exactly what Tasty generates automatically:
+
+Tasty generates the correct version automatically:
 
 ```css
 /* Branch 1: Explicit dark schema */

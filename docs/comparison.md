@@ -60,6 +60,27 @@ This is especially relevant for components with intersecting states such as:
 - responsive conditions
 - parent or root-driven conditions
 
+Here is a minimal example. Two CSS rules for a button's background — one for `:hover`, one for `[disabled]`:
+
+```css
+.btn:hover    { background: dodgerblue; }
+.btn[disabled] { background: gray; }
+```
+
+When the button is both hovered **and** disabled, both selectors match with equal specificity. The last rule in source order wins. Swap the two lines and the visual behavior silently reverses — a hovered disabled button turns blue instead of gray.
+
+In Tasty, the same intent is declared as a state map:
+
+```tsx
+fill: {
+  '': '#primary',
+  ':hover': '#primary-hover',
+  'disabled': '#surface',
+}
+```
+
+Tasty compiles this into selectors where `disabled` is guarded by `:not(:hover)` negations (and vice versa), so exactly one rule matches regardless of source order. The outcome is defined by the state map, not by which line comes last.
+
 That makes Tasty less of a "better way to write CSS objects" and more of a **state-aware style compiler for design systems**.
 
 Beyond state resolution, Tasty includes several structural capabilities that most other tools do not offer:
@@ -98,6 +119,71 @@ So this is not mainly a comparison of syntax. It is a comparison of **governance
 - Tasty: design-system authors define the vocabulary product teams consume
 
 Tailwind is usually a stronger fit for fast product styling. Tasty is usually a stronger fit for governed design-system architecture.
+
+To make this concrete, consider a button with `hover`, `disabled`, and `theme=danger` states.
+
+**Plain CSS** — you need a selector for every intersection, and equal-specificity rules depend on source order:
+
+```css
+.btn { background: var(--primary); color: white; cursor: pointer; }
+.btn:hover { background: var(--primary-hover); }
+.btn:active { background: var(--primary-pressed); }
+.btn[disabled] { background: var(--surface); color: var(--text-40); cursor: not-allowed; }
+
+/* theme=danger overrides — must repeat disabled/hover/active */
+.btn[data-theme="danger"] { background: var(--danger); }
+.btn[data-theme="danger"]:hover { background: var(--danger-hover); }
+.btn[data-theme="danger"]:active { background: var(--danger-pressed); }
+.btn[data-theme="danger"][disabled] { background: var(--surface); }
+
+/* Bug: .btn:hover and .btn[disabled] have the same specificity.
+   A hovered disabled button gets :hover styles — unless source order saves you. */
+```
+
+Every new state doubles the selector count. Miss one intersection and you ship a visual bug.
+
+**Tailwind** — state intersections move into conditional className logic:
+
+```tsx
+<button className={cn(
+  'bg-primary text-white cursor-pointer',
+  'hover:bg-primary-hover active:bg-primary-pressed',
+  'disabled:bg-surface disabled:text-text-40 disabled:cursor-not-allowed',
+  theme === 'danger' && 'bg-danger hover:bg-danger-hover active:bg-danger-pressed',
+  theme === 'danger' && disabled && '!bg-surface',
+)}>
+```
+
+The `theme` branch is runtime JS, not CSS. Intersections like `disabled + hover` need manual `!important` or extra utilities to override correctly.
+
+**Tasty** — each property declares all its states in one map. The engine generates mutually exclusive selectors:
+
+```tsx
+const Button = tasty({
+  as: 'button',
+  styles: {
+    fill: {
+      '': '#primary',
+      ':hover': '#primary-hover',
+      ':active': '#primary-pressed',
+      'disabled': '#surface',
+      'theme=danger': '#danger',
+      'theme=danger & :hover': '#danger-hover',
+      'theme=danger & :active': '#danger-pressed',
+    },
+    color: {
+      '': '#on-primary',
+      'disabled': '#text.40',
+    },
+    cursor: {
+      '': 'pointer',
+      'disabled': 'not-allowed',
+    },
+  },
+});
+```
+
+`disabled` always wins over `:hover` because Tasty emits negation selectors — no source-order dependence, no manual intersection management, no `!important`.
 
 ---
 

@@ -80,6 +80,34 @@ configure({
 
 ...or an enterprise-scale system with dozens of tokens, multiple state aliases, typography presets, recipes, and custom units. The scope is yours to decide.
 
+Here is how the layers connect end-to-end. The DS team configures the engine, defines components, and product engineers consume them:
+
+```tsx
+// ds/config.ts — DS team defines the language
+configure({
+  tokens: { '#primary': 'oklch(55% 0.25 265)', '#surface': '#fff', '#text': '#111' },
+  states: { '@mobile': '@media(w < 768px)', '@dark': '@root(schema=dark)' },
+  recipes: { card: { padding: '4x', fill: '#surface', radius: '1r', border: true } },
+});
+
+// ds/components/Card.tsx — DS team builds components on top
+const Card = tasty({
+  styles: {
+    recipe: 'card',
+    Title: { preset: 'h3', color: '#primary' },
+    Body: { preset: 't2', color: '#text' },
+  },
+  elements: { Title: 'h2', Body: 'div' },
+  styleProps: ['padding', 'fill'],
+});
+
+// app/Dashboard.tsx — product engineer uses the component
+<Card padding={{ '': '4x', '@mobile': '2x' }}>
+  <Card.Title>Monthly Revenue</Card.Title>
+  <Card.Body>$1.2M — up 12% from last month</Card.Body>
+</Card>
+```
+
 See [Configuration](configuration.md) for the full `configure()` API.
 
 ---

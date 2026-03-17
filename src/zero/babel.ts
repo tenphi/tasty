@@ -18,9 +18,11 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
+import { createJiti } from 'jiti';
 
 import { configure, getGlobalConfigTokens } from '../config';
 import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
@@ -153,6 +155,20 @@ export interface TastyZeroBabelOptions {
    */
   config?: TastyZeroConfig | (() => TastyZeroConfig);
   /**
+   * Absolute path to a TypeScript/JavaScript module that default-exports
+   * a `TastyZeroConfig` object. The module is loaded via jiti on each
+   * plugin invocation, enabling hot reload when the file changes.
+   *
+   * This option is JSON-serializable and is the primary way Turbopack
+   * passes config to the Babel plugin (since Turbopack loader options
+   * must be plain primitives/objects/arrays).
+   *
+   * When both `config` and `configFile` are set, `config` takes precedence.
+   *
+   * @example '/absolute/path/to/tasty-zero.config.ts'
+   */
+  configFile?: string;
+  /**
    * Absolute file paths whose content affects the generated CSS.
    * When any of these files change, babel-loader invalidates its cache
    * and re-runs the plugin with fresh config values.
@@ -220,7 +236,10 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   api.assertVersion(7);
 
   const outputPath = options.output || 'tasty.css';
-  const configDeps = options.configDeps || [];
+  const configDeps = [
+    ...(options.configFile ? [options.configFile] : []),
+    ...(options.configDeps || []),
+  ];
 
   // Register external dependencies for babel-loader cache invalidation.
   // When any configDeps file changes, babel-loader discards the cached
@@ -229,16 +248,19 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     api.cache.using(() => configDeps.map(mtime).join(','));
 
     for (const dep of configDeps) {
-      (
-        api as unknown as { addExternalDependency(path: string): void }
-      ).addExternalDependency(dep);
+      try {
+        (
+          api as unknown as { addExternalDependency(path: string): void }
+        ).addExternalDependency(dep);
+      } catch {
+        // addExternalDependency may not be available in all environments
+      }
     }
   } else {
     api.cache.forever();
   }
 
-  // When configDeps are set, use jiti to load TypeScript config files.
-  // Clear the require cache first so we always get fresh values.
+  // When configDeps are set, clear the require cache so we get fresh values.
   if (configDeps.length > 0) {
     for (const dep of configDeps) {
       clearRequireCacheTree(dep);
@@ -246,8 +268,20 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   }
 
   const configOption = options.config;
-  const config: TastyZeroConfig =
-    typeof configOption === 'function' ? configOption() : configOption || {};
+  let config: TastyZeroConfig;
+
+  if (configOption) {
+    config = typeof configOption === 'function' ? configOption() : configOption;
+  } else if (options.configFile) {
+    const jiti = createJiti(path.dirname(options.configFile), {
+      moduleCache: false,
+    });
+
+    config = jiti(options.configFile) as TastyZeroConfig;
+  } else {
+    config = {};
+  }
+
   const devMode = config.devMode ?? false;
 
   configure(config);

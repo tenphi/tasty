@@ -167,8 +167,16 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
     const existingTurbopack = nextConfig.turbopack || {};
     const existingRules = existingTurbopack.rules || {};
 
+    const existingExperimental =
+      (nextConfig.experimental as Record<string, unknown>) || {};
+
     return {
       ...nextConfig,
+
+      experimental: {
+        ...existingExperimental,
+        turbopackUseBuiltinBabel: true,
+      },
 
       turbopack: {
         ...existingTurbopack,

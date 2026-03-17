@@ -81,10 +81,7 @@ const button = tastyStatic({
       const configPath = path.join(tempDir, 'tasty-zero.config.ts');
       const outputPath = path.join(tempDir, 'output.css');
 
-      fs.writeFileSync(
-        configPath,
-        `export default { devMode: true };`,
-      );
+      fs.writeFileSync(configPath, `export default { devMode: true };`);
 
       const code = `
 import { tastyStatic } from '@tenphi/tasty/static';
@@ -112,10 +109,7 @@ const button = tastyStatic({
       const outputPath1 = path.join(tempDir, 'output1.css');
       const outputPath2 = path.join(tempDir, 'output2.css');
 
-      fs.writeFileSync(
-        configPath,
-        `export default {};`,
-      );
+      fs.writeFileSync(configPath, `export default {};`);
 
       const code = `
 import { tastyStatic } from '@tenphi/tasty/static';
@@ -132,10 +126,7 @@ const button = tastyStatic({
 
       expect(result1).toContain('className');
 
-      fs.writeFileSync(
-        configPath,
-        `export default { devMode: true };`,
-      );
+      fs.writeFileSync(configPath, `export default { devMode: true };`);
 
       const result2 = transformCode(code, {
         output: outputPath2,
@@ -169,10 +160,7 @@ const button = tastyStatic({
       const configPath = path.join(tempDir, 'tasty-zero.config.ts');
       const outputPath = path.join(tempDir, 'output.css');
 
-      fs.writeFileSync(
-        configPath,
-        `export default { devMode: true };`,
-      );
+      fs.writeFileSync(configPath, `export default { devMode: true };`);
 
       const code = `
 import { tastyStatic } from '@tenphi/tasty/static';

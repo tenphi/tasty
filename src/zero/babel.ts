@@ -271,8 +271,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   let config: TastyZeroConfig;
 
   if (configOption) {
-    config =
-      typeof configOption === 'function' ? configOption() : configOption;
+    config = typeof configOption === 'function' ? configOption() : configOption;
   } else if (options.configFile) {
     const jiti = createJiti(path.dirname(options.configFile), {
       moduleCache: false,

@@ -1,5 +1,14 @@
 # @tenphi/tasty
 
+## 0.12.0
+
+### Minor Changes
+
+- [#37](https://github.com/tenphi/tasty/pull/37) [`c049bfd`](https://github.com/tenphi/tasty/commit/c049bfd7025ab8709b2296921f0fb802f597b0de) Thanks [@tenphi](https://github.com/tenphi)! - Add Turbopack support for zero-runtime CSS extraction
+  - Add `configFile` option to the Babel plugin (`@tenphi/tasty/babel-plugin`) so it can load config from a file path via jiti internally, without requiring a factory function from the Next.js wrapper. This makes the plugin compatible with Turbopack's requirement for JSON-serializable loader options.
+  - Update `withTastyZero` (`@tenphi/tasty/next`) to emit `turbopack.rules` alongside the existing `webpack()` hook, so both bundlers work automatically with no flags needed.
+  - Wrap `addExternalDependency` in a try/catch for environments where it is unavailable (e.g. Turbopack's loader runner).
+
 ## 0.11.0
 
 ### Minor Changes

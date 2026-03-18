@@ -340,7 +340,10 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     },
 
     visitor: {
-      ImportDeclaration(nodePath: NodePath<t.ImportDeclaration>) {
+      ImportDeclaration(
+        nodePath: NodePath<t.ImportDeclaration>,
+        state: PluginState,
+      ) {
         const source = nodePath.node.source.value;
 
         if (
@@ -348,8 +351,19 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
           source.endsWith('/tasty/static')
         ) {
           if (injectImport) {
+            let importPath = resolvedOutputPath;
+
+            if (state.filename) {
+              const sourceDir = path.dirname(state.filename);
+              importPath = path.relative(sourceDir, resolvedOutputPath);
+
+              if (!importPath.startsWith('.')) {
+                importPath = './' + importPath;
+              }
+            }
+
             nodePath.replaceWith(
-              t.importDeclaration([], t.stringLiteral(resolvedOutputPath)),
+              t.importDeclaration([], t.stringLiteral(importPath)),
             );
           } else {
             nodePath.remove();

@@ -8,6 +8,10 @@
  *   JSON-serializable options (`configFile` path instead of a function).
  *   The Babel plugin loads the config internally via jiti.
  *
+ * The generated CSS is injected automatically — `@tenphi/tasty/static`
+ * imports are replaced with an import of the output CSS file at build time.
+ * No manual CSS import in layout files is needed.
+ *
  * @example
  * ```javascript
  * // next.config.js
@@ -153,6 +157,7 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
           babelPluginPath,
           {
             output: absoluteOutput,
+            injectImport: true,
             ...(absoluteConfigFile
               ? { configFile: absoluteConfigFile }
               : tastyConfig
@@ -214,6 +219,7 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
 
         const babelPluginOptions: TastyZeroBabelOptions = {
           output: wpAbsoluteOutput,
+          injectImport: true,
         };
 
         if (wpAbsoluteConfigFile) {

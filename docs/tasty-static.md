@@ -237,14 +237,14 @@ The `configFile` option is key for Turbopack — it passes a file path (JSON-ser
 pnpm add babel-loader
 ```
 
-### Including the CSS
+### CSS Injection
 
-```tsx
-// app/layout.tsx (App Router)
-import '@/public/tasty.css';
+`withTastyZero` automatically injects the generated CSS into your app. Every file that imports from `@tenphi/tasty/static` gets its import replaced with an import of the output CSS file at build time. No manual CSS import is needed.
 
-// or pages/_app.tsx (Pages Router)
-import '../public/tasty.css';
+The generated CSS file (e.g. `public/tasty.css`) is created as an empty stub before the first build if it doesn't exist, so there's no chicken-and-egg problem with fresh clones or CI builds. Add it to `.gitignore`:
+
+```gitignore
+public/tasty.css
 ```
 
 ---
@@ -410,7 +410,6 @@ const card = tastyStatic({
 2. **Use selector mode** for global/body styles
 3. **Enable devMode** in development for easier debugging
 4. **Configure states** for consistent responsive breakpoints
-5. **Import generated CSS** early in your app entry point
 
 ---
 

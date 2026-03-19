@@ -32,6 +32,7 @@ export function renderStylesForChunk(
   styles: Styles,
   chunkName: string,
   styleKeys: string[],
+  pipelineCacheKey?: string,
 ): RenderResult {
   // Empty chunk - return empty result
   if (styleKeys.length === 0) {
@@ -40,7 +41,7 @@ export function renderStylesForChunk(
 
   // For subcomponents, we need to preserve the nested structure
   if (chunkName === CHUNK_NAMES.SUBCOMPONENTS) {
-    return renderSubcomponentsChunk(styles, styleKeys);
+    return renderSubcomponentsChunk(styles, styleKeys, pipelineCacheKey);
   }
 
   // Extract local predefined states from the full styles object
@@ -64,8 +65,7 @@ export function renderStylesForChunk(
     }
   }
 
-  // Delegate to existing renderStyles
-  return renderStyles(filteredStyles);
+  return renderStyles(filteredStyles, undefined, undefined, pipelineCacheKey);
 }
 
 /**
@@ -81,6 +81,7 @@ export function renderStylesForChunk(
 function renderSubcomponentsChunk(
   styles: Styles,
   selectorKeys: string[],
+  pipelineCacheKey?: string,
 ): RenderResult {
   // Extract local predefined states from the full styles object
   // These must be included for state resolution to work in nested styles
@@ -107,6 +108,5 @@ function renderSubcomponentsChunk(
     filteredStyles.$ = styles.$;
   }
 
-  // Delegate to existing renderStyles
-  return renderStyles(filteredStyles);
+  return renderStyles(filteredStyles, undefined, undefined, pipelineCacheKey);
 }

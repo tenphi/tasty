@@ -1146,9 +1146,14 @@ export function computeState(
 }
 
 const _innerCache = new WeakMap();
+const _topLevelCache = new WeakMap<object, string>();
 
 export function stringifyStyles(styles: unknown): string {
   if (styles == null || typeof styles !== 'object') return '';
+
+  const cached = _topLevelCache.get(styles as object);
+  if (cached !== undefined) return cached;
+
   const obj = styles as Record<string, unknown>;
   const keys = Object.keys(obj).sort();
   const parts: string[] = [];
@@ -1184,5 +1189,7 @@ export function stringifyStyles(styles: unknown): string {
     }
     parts.push(JSON.stringify(k) + ':' + sv);
   }
-  return '{' + parts.join(',') + '}';
+  const result = '{' + parts.join(',') + '}';
+  _topLevelCache.set(styles as object, result);
+  return result;
 }

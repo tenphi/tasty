@@ -512,6 +512,10 @@ function tastyElement<
     ...otherDefaultProps
   } = defaultProps ?? {};
 
+  const propsToCheck = styleProps
+    ? (styleProps as StyleList).concat(BASE_STYLES)
+    : BASE_STYLES;
+
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
@@ -537,18 +541,13 @@ function tastyElement<
 
     let styles = rawStyles;
 
-    // Optimize propStyles extraction - avoid creating empty objects
     let propStyles: Styles | null = null;
-    const propsToCheck = styleProps
-      ? (styleProps as StyleList).concat(BASE_STYLES)
-      : BASE_STYLES;
 
     for (const prop of propsToCheck) {
       const key = prop as unknown as string;
 
-      if (!propStyles) propStyles = {};
-
       if (key in otherProps) {
+        if (!propStyles) propStyles = {};
         (propStyles as any)[key] = (otherProps as any)[key];
         delete (otherProps as any)[key];
       }

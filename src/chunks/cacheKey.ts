@@ -66,13 +66,10 @@ export function generateChunkCacheKey(
   // Start with chunk name for namespace separation
   const parts: string[] = [chunkName];
 
-  // Sort keys for stable ordering
-  const sortedKeys = styleKeys.slice().sort();
-
-  // Build the chunk-specific styles string for predefined state detection
+  // styleKeys are already sorted by categorizeStyleKeys
   let chunkStylesStr = '';
 
-  for (const key of sortedKeys) {
+  for (const key of styleKeys) {
     const value = styles[key];
     if (value !== undefined) {
       // Use stable stringify for consistent serialization regardless of key order

@@ -107,13 +107,14 @@ const pipelineCache = new Lru<string, CSSRule[]>(5000);
 export function renderStylesPipeline(
   styles?: Styles,
   className?: string,
+  pipelineCacheKey?: string,
 ): PipelineResult {
   if (!styles) {
     return { rules: [], className };
   }
 
-  // Check cache
-  const cacheKey = stringifyStyles(styles);
+  // Use pre-computed cache key when available, falling back to stringifyStyles
+  const cacheKey = pipelineCacheKey || stringifyStyles(styles);
   let rules = pipelineCache.get(cacheKey);
 
   if (!rules) {
@@ -1156,7 +1157,12 @@ export interface RenderStylesOptions {
  * When called without classNameOrSelector, returns RenderResult with needsClassName=true.
  * When called with a selector/className string, returns StyleResult[] for direct injection.
  */
-export function renderStyles(styles?: Styles): RenderResult;
+export function renderStyles(
+  styles?: Styles,
+  classNameOrSelector?: undefined,
+  options?: undefined,
+  pipelineCacheKey?: string,
+): RenderResult;
 export function renderStyles(
   styles: Styles | undefined,
   classNameOrSelector: string,
@@ -1166,6 +1172,7 @@ export function renderStyles(
   styles?: Styles,
   classNameOrSelector?: string,
   options?: RenderStylesOptions,
+  pipelineCacheKey?: string,
 ): RenderResult | StyleResult[] {
   // Check if we have a direct selector/className
   const directSelector = !!classNameOrSelector;
@@ -1174,8 +1181,9 @@ export function renderStyles(
     return directSelector ? [] : { rules: [] };
   }
 
-  // Check cache
-  const cacheKey = stringifyStyles(styles);
+  // Use pre-computed cache key when available (from chunk path),
+  // falling back to stringifyStyles for direct renderStyles() calls
+  const cacheKey = pipelineCacheKey || stringifyStyles(styles);
   let rules = pipelineCache.get(cacheKey);
 
   if (!rules) {

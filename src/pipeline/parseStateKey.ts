@@ -832,11 +832,12 @@ export function parseStateKey(
     ctx && Object.keys(ctx.localPredefinedStates).length > 0
       ? JSON.stringify(ctx.localPredefinedStates)
       : '';
-  const cacheKey = JSON.stringify([
-    trimmed,
-    options.isSubElement,
-    localStatesKey,
-  ]);
+  const cacheKey =
+    trimmed +
+    '\0' +
+    (options.isSubElement ? '1' : '0') +
+    '\0' +
+    localStatesKey;
 
   // Check cache
   const cached = parseCache.get(cacheKey);

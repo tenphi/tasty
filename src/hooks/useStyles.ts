@@ -84,10 +84,15 @@ function processChunk(
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
-  const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
+  const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
+  const renderResult = renderStylesForChunk(
+    styles,
+    chunkName,
+    styleKeys,
+    cacheKey,
+  );
   if (renderResult.rules.length === 0) return null;
 
-  const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
   const { className } = allocateClassName(cacheKey);
 
   return { name: chunkName, styleKeys, cacheKey, renderResult, className };

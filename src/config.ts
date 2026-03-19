@@ -530,12 +530,14 @@ export function resetStylesGenerated(): void {
 // Global Keyframes Management
 // ============================================================================
 
+let _hasGlobalKeyframes = false;
+
 /**
  * Check if any global keyframes are configured.
- * Fast path: returns false if no keyframes were ever set.
+ * Uses a pre-computed flag to avoid Object.keys() allocation on every call.
  */
 export function hasGlobalKeyframes(): boolean {
-  return globalKeyframes !== null && Object.keys(globalKeyframes).length > 0;
+  return _hasGlobalKeyframes;
 }
 
 /**
@@ -560,6 +562,7 @@ function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
     return;
   }
   globalKeyframes = keyframes;
+  _hasGlobalKeyframes = Object.keys(keyframes).length > 0;
 }
 
 // ============================================================================
@@ -960,6 +963,7 @@ export function resetConfig(): void {
   stylesGenerated = false;
   currentConfig = null;
   globalKeyframes = null;
+  _hasGlobalKeyframes = false;
   globalProperties = null;
   globalRecipes = null;
   globalConfigTokens = null;

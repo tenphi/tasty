@@ -243,19 +243,28 @@ export function isPredefinedStateRef(stateKey: string): boolean {
   return /^@[A-Za-z][A-Za-z0-9-]*$/.test(stateKey);
 }
 
+const _localStatesCache = new WeakMap<object, Record<string, string>>();
+
 /**
  * Extract local predefined states from a styles object
  * Local predefined states are top-level keys starting with @ that have string values
  * and are valid predefined state names (not built-in like @media, @root, etc.)
+ *
+ * Results are cached by object identity via WeakMap since the same styles object
+ * is passed to this function multiple times per pipeline run (once per chunk
+ * in renderStylesForChunk and generateChunkCacheKey).
  */
 export function extractLocalPredefinedStates(
   styles: Styles,
 ): Record<string, string> {
-  const localStates: Record<string, string> = {};
-
   if (!styles || typeof styles !== 'object') {
-    return localStates;
+    return {};
   }
+
+  const cached = _localStatesCache.get(styles as object);
+  if (cached !== undefined) return cached;
+
+  const localStates: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(styles)) {
     // Check if it's a predefined state definition (starts with @, has string value)
@@ -295,6 +304,8 @@ export function extractLocalPredefinedStates(
       localStates[key] = value;
     }
   }
+
+  _localStatesCache.set(styles as object, localStates);
 
   return localStates;
 }

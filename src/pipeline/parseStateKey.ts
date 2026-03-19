@@ -833,11 +833,7 @@ export function parseStateKey(
       ? JSON.stringify(ctx.localPredefinedStates)
       : '';
   const cacheKey =
-    trimmed +
-    '\0' +
-    (options.isSubElement ? '1' : '0') +
-    '\0' +
-    localStatesKey;
+    trimmed + '\0' + (options.isSubElement ? '1' : '0') + '\0' + localStatesKey;
 
   // Check cache
   const cached = parseCache.get(cacheKey);

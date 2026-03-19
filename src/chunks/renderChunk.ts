@@ -15,10 +15,7 @@ import { CHUNK_NAMES } from './definitions';
 /**
  * Build a filtered styles object for a regular chunk.
  */
-function buildFilteredStyles(
-  styles: Styles,
-  styleKeys: string[],
-): Styles {
+function buildFilteredStyles(styles: Styles, styleKeys: string[]): Styles {
   const localPredefinedStates = extractLocalPredefinedStates(styles);
   const filteredStyles: Styles = {};
 

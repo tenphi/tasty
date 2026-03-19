@@ -1749,9 +1749,9 @@ function andToCSS(children: ConditionNode[]): CSSComponents {
  * After deduplication, variants that differ only in their base
  * modifier/pseudo conditions are merged into :is() groups.
  *
- * Note: OR exclusivity is handled at the pipeline level (expandOrConditions),
- * so here we just collect all variants. Any remaining ORs in the condition
- * tree (e.g., from De Morgan expansion) are handled as simple alternatives.
+ * OR branches are collected as independent variants. Variants that share
+ * the same context are later merged into :is() groups by
+ * mergeVariantsIntoSelectorGroups.
  */
 function orToCSS(children: ConditionNode[]): CSSComponents {
   const allVariants: SelectorVariant[] = [];

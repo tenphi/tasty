@@ -76,7 +76,7 @@ exports[`tasty() API > should optimize attribute selectors 2`] = `
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
 ".t23.t23[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t23.t23:is([data-selected]:not([data-size="large"]):not([data-size="medium"]), [data-size="medium"]) { padding: 16px 0px 0px; }
+.t23.t23:is([data-selected]:not([data-size="large"]), [data-size="medium"]) { padding: 16px 0px 0px; }
 .t23.t23:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 

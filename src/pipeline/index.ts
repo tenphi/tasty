@@ -36,7 +36,6 @@ import type { ExclusiveStyleEntry } from './exclusive';
 import {
   buildExclusiveConditions,
   expandExclusiveOrs,
-  expandOrConditions,
   isValueMapping,
   parseStyleEntries,
 } from './exclusive';
@@ -277,17 +276,12 @@ function processStyles(
           parseStateKey(stateKey, { context: parserContext }),
         );
 
-        // Expand OR conditions into exclusive branches
-        // This ensures OR branches like `A | B | C` become:
-        //   A, B & !A, C & !A & !B
-        const expanded = expandOrConditions(parsed);
-
         // Build exclusive conditions across all entries
-        const exclusive = buildExclusiveConditions(expanded);
+        const exclusive = buildExclusiveConditions(parsed);
 
-        // Expand ORs from De Morgan negation into exclusive branches
-        // This transforms: !A | !B  →  !A, (A & !B)
-        // Ensures each CSS rule has proper at-rule context
+        // Expand ORs that involve at-rules into exclusive branches.
+        // De Morgan negation can produce ORs like !A | !B where
+        // branches need different at-rule contexts (e.g. @supports, @media).
         const fullyExpanded = expandExclusiveOrs(exclusive);
         exclusiveByStyle.set(styleName, fullyExpanded);
       } else {

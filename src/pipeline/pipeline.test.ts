@@ -1166,9 +1166,44 @@ describe('renderStyles integration', () => {
     const result = renderStyles(styles, '.test');
 
     // Should have rules for:
-    // 1. hovered | focused → red
+    // 1. hovered | focused → red (combined with :is())
     // 2. !hovered & !focused → black (exclusive)
-    expect(result.length).toBeGreaterThanOrEqual(1);
+    expect(result.length).toBe(2);
+
+    const redRule = result.find((r) => r.declarations.includes('red'));
+    expect(redRule).toBeDefined();
+    // OR branches should be combined cleanly without intra-branch exclusivity
+    expect(redRule!.selector).toContain(':is(');
+    expect(redRule!.selector).not.toContain(':not(');
+  });
+
+  it('should produce clean :is() for OR with higher-priority exclusive state', () => {
+    clearPipelineCache();
+
+    const styles = {
+      color: {
+        '': 'white',
+        'pressed | focused': 'blue',
+        disabled: 'gray',
+      },
+    };
+
+    const result = renderStyles(styles, '.demo');
+
+    expect(result.length).toBe(3);
+
+    const blueRule = result.find((r) => r.declarations.includes('blue'));
+    expect(blueRule).toBeDefined();
+    // Should be :not([data-disabled]):is([data-focused], [data-pressed])
+    // NOT :not([data-disabled]):is([data-focused]:not([data-pressed]), [data-pressed])
+    expect(blueRule!.selector).toContain(':is(');
+    expect(blueRule!.selector).toContain('[data-focused]');
+    expect(blueRule!.selector).toContain('[data-pressed]');
+    expect(blueRule!.selector).toContain(':not([data-disabled])');
+    // No redundant :not([data-pressed]) inside the :is() group
+    expect(blueRule!.selector).not.toMatch(
+      /:is\([^)]*:not\(\[data-pressed\]\)[^)]*\)/,
+    );
   });
 
   it('should resolve local predefined states', () => {

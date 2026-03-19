@@ -163,6 +163,10 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
   // Deduplicate (by uniqueId)
   terms = deduplicateTerms(terms);
 
+  // Remove positive boolean terms subsumed by positive valued terms
+  // e.g., [data-schema] is redundant when [data-schema="dark"] is present
+  terms = removeSubsumedPositives(terms);
+
   // Try to merge numeric ranges
   terms = mergeRanges(terms);
 
@@ -717,6 +721,61 @@ function deduplicateTerms(terms: ConditionNode[]): ConditionNode[] {
 }
 
 // ============================================================================
+// Positive Subsumption
+// ============================================================================
+
+/**
+ * Check if condition `a` positively subsumes condition `b`.
+ *
+ * A valued attribute implies its boolean existence:
+ *   [data-schema="dark"]  implies  [data-schema]
+ *
+ * This extends to wrapper types (root, parent, own):
+ *   @root(schema=dark)  implies  @root(schema)
+ */
+function doesPositiveSubsume(a: ConditionNode, b: ConditionNode): boolean {
+  if (a.kind !== 'state' || b.kind !== 'state') return false;
+  if (a.negated || b.negated) return false;
+  if (a.type !== b.type) return false;
+
+  if (a.type === 'modifier' && b.type === 'modifier') {
+    if (a.attribute !== b.attribute) return false;
+    // Valued subsumes boolean (existence)
+    if (a.value !== undefined && b.value === undefined) {
+      return !a.operator || a.operator === '=';
+    }
+    return false;
+  }
+
+  if (
+    (a.type === 'root' || a.type === 'own') &&
+    (b.type === 'root' || b.type === 'own')
+  ) {
+    return doesPositiveSubsume(a.innerCondition, b.innerCondition);
+  }
+
+  if (a.type === 'parent' && b.type === 'parent') {
+    if (a.direct !== b.direct) return false;
+    return doesPositiveSubsume(a.innerCondition, b.innerCondition);
+  }
+
+  return false;
+}
+
+/**
+ * Remove positive boolean terms that are subsumed by a positive valued term.
+ *
+ * In an AND context: [data-schema="dark"] & [data-schema] → [data-schema="dark"]
+ * The boolean existence check is redundant when a specific value is already required.
+ */
+function removeSubsumedPositives(terms: ConditionNode[]): ConditionNode[] {
+  return terms.filter(
+    (term, i) =>
+      !terms.some((other, j) => i !== j && doesPositiveSubsume(other, term)),
+  );
+}
+
+// ============================================================================
 // Range Merging
 // ============================================================================
 
@@ -930,14 +989,20 @@ function sortTerms(terms: ConditionNode[]): ConditionNode[] {
  *
  * For AND context: A & (A | B) → A  (absorbs OR compounds)
  * For OR  context: A | (A & B) → A  (absorbs AND compounds)
+ *
+ * Also handles subsumption: A & (C | B) → A when A positively subsumes C.
+ * e.g., @root(schema=dark) & (@root(schema) | X) → @root(schema=dark)
+ * because [data-schema="dark"] implies [data-schema].
  */
 function applyAbsorption(
   terms: ConditionNode[],
   absorbedOperator: 'OR' | 'AND',
 ): ConditionNode[] {
+  const simpleTerms: ConditionNode[] = [];
   const simpleIds = new Set<string>();
   for (const term of terms) {
     if (term.kind !== 'compound') {
+      simpleTerms.push(term);
       simpleIds.add(getConditionUniqueId(term));
     }
   }
@@ -946,6 +1011,12 @@ function applyAbsorption(
     if (term.kind === 'compound' && term.operator === absorbedOperator) {
       for (const child of term.children) {
         if (simpleIds.has(getConditionUniqueId(child))) {
+          return false;
+        }
+        if (
+          absorbedOperator === 'OR' &&
+          simpleTerms.some((s) => doesPositiveSubsume(s, child))
+        ) {
           return false;
         }
       }

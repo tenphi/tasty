@@ -688,6 +688,21 @@ describe('Advanced State Mapping - CSS Output', () => {
         styles: {
           color: {
             '': '#dark',
+            '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))':
+              '#white',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+
+    it('should generate CSS with styles of mixed media and root OR groups', () => {
+      const Element = tasty({
+        styles: {
+          color: {
+            '': '#dark',
             '(@media(prefers-color-scheme: dark) & @root(prefers-schema=system)) | (@root(prefers-schema=dark) & @media(prefers-color-scheme: no-preference))':
               '#white',
           },

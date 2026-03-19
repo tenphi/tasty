@@ -832,12 +832,14 @@ describe('conditionToCSS()', () => {
     expect(css.variants[0].startingStyle).toBe(true);
   });
 
-  it('should set rootConditions for @root', () => {
+  it('should set rootGroups for @root', () => {
     const result = parseStateKey('@root(theme=dark)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].rootConditions).toHaveLength(1);
-    expect(css.variants[0].rootConditions[0]).toEqual({
+    expect(css.variants[0].rootGroups).toHaveLength(1);
+    expect(css.variants[0].rootGroups[0].negated).toBe(false);
+    expect(css.variants[0].rootGroups[0].branches).toHaveLength(1);
+    expect(css.variants[0].rootGroups[0].branches[0][0]).toEqual({
       attribute: 'data-theme',
       value: 'dark',
       operator: '=',
@@ -900,19 +902,23 @@ describe('conditionToCSS()', () => {
     expect(css.variants[0].parentGroups).toHaveLength(2);
   });
 
-  it('should produce two variants for @root with OR inside', () => {
+  it('should produce single variant with rootGroup for @root with OR inside', () => {
     const result = parseStateKey('@root(theme=dark | mode=compact)');
     const css = conditionToCSS(result);
-    expect(css.variants.length).toBe(2);
+    expect(css.variants.length).toBe(1);
 
-    const rootConditions = css.variants.map((v) => v.rootConditions[0]);
-    expect(rootConditions).toContainEqual({
+    const group = css.variants[0].rootGroups[0];
+    expect(group.branches).toHaveLength(2);
+    expect(group.negated).toBe(false);
+
+    const branchConditions = group.branches.map((b) => b[0]);
+    expect(branchConditions).toContainEqual({
       attribute: 'data-theme',
       value: 'dark',
       operator: '=',
       negated: false,
     });
-    expect(rootConditions).toContainEqual({
+    expect(branchConditions).toContainEqual({
       attribute: 'data-mode',
       value: 'compact',
       operator: '=',
@@ -1034,7 +1040,7 @@ describe('conditionToCSS()', () => {
 
     const rendered = parentGroupsToCSS(css.variants[0].parentGroups);
     expect(rendered).toBe(
-      ':is([data-hovered][data-pressed] *, [data-focused][data-active] *)',
+      ':is([data-active][data-focused] *, [data-hovered][data-pressed] *)',
     );
   });
 
@@ -1042,7 +1048,9 @@ describe('conditionToCSS()', () => {
     const result = parseStateKey('@root(theme=dark & mode=compact)');
     const css = conditionToCSS(result);
     expect(css.variants.length).toBe(1);
-    expect(css.variants[0].rootConditions).toHaveLength(2);
+    expect(css.variants[0].rootGroups).toHaveLength(1);
+    expect(css.variants[0].rootGroups[0].branches).toHaveLength(1);
+    expect(css.variants[0].rootGroups[0].branches[0]).toHaveLength(2);
   });
 
   it('should convert @supports feature query', () => {
@@ -1404,10 +1412,10 @@ describe('Complex OR conditions with mixed types', () => {
   it('should not produce redundant :not() when boolean root subsumes valued root', () => {
     clearPipelineCache();
 
-    // When we negate "@root(schema) | @root(schema=dark)", the default branch
-    // gets AND(!root(schema), !root(schema=dark)). The boolean negation
-    // :not([data-schema]) already implies :not([data-schema="dark"]), so the
-    // latter should be dropped.
+    // When we negate "@root(schema) | @root(schema=dark)", each @root()
+    // produces an independent negated rootGroup. optimizeGroups detects
+    // that :not([data-schema]) subsumes :not([data-schema="dark"]) and
+    // drops the latter.
     const styles = {
       color: {
         '': 'red',
@@ -1418,10 +1426,14 @@ describe('Complex OR conditions with mixed types', () => {
     const result = renderStyles(styles, '.test');
 
     const defaultRules = result.filter((r) => r.declarations.includes('red'));
-
+    expect(defaultRules.length).toBeGreaterThanOrEqual(1);
     for (const rule of defaultRules) {
-      if (rule.selector.includes(':not([data-schema])')) {
-        expect(rule.selector).not.toContain(':not([data-schema="dark"])');
+      const sel =
+        typeof rule.selector === 'string'
+          ? rule.selector
+          : rule.selector.join(', ');
+      if (sel.includes(':not([data-schema])')) {
+        expect(sel).not.toContain(':not([data-schema="dark"])');
       }
     }
   });
@@ -1477,8 +1489,9 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRules.length).toBeGreaterThanOrEqual(1);
 
     const allSelectors = blueRules.map((r) => r.selector).join(', ');
-    expect(allSelectors).toContain(':root[data-theme="dark"]');
-    expect(allSelectors).toContain(':root[data-mode="compact"]');
+    expect(allSelectors).toContain(
+      ':root:is([data-mode="compact"], [data-theme="dark"])',
+    );
   });
 
   it('should support OR inside @parent()', () => {
@@ -1496,7 +1509,7 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRules.length).toBeGreaterThanOrEqual(1);
 
     const allSelectors = blueRules.map((r) => r.selector).join(', ');
-    expect(allSelectors).toContain(':is([data-hovered] *, [data-focused] *)');
+    expect(allSelectors).toContain(':is([data-focused] *, [data-hovered] *)');
   });
 });
 

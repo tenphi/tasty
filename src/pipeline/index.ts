@@ -42,13 +42,14 @@ import {
 } from './exclusive';
 import type { CSSRule, SelectorVariant } from './materialize';
 import {
+  branchToCSS,
   buildAtRulesFromVariant,
   conditionToCSS,
-  modifierToCSS,
+  mergeVariantsIntoSelectorGroups,
+  optimizeGroups,
   parentGroupsToCSS,
-  pseudoToCSS,
-  rootConditionsToCSS,
-  selectorConditionToCSS,
+  rootGroupsToCSS,
+  selectorGroupToCSS,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
@@ -106,13 +107,14 @@ const pipelineCache = new Lru<string, CSSRule[]>(5000);
 export function renderStylesPipeline(
   styles?: Styles,
   className?: string,
+  pipelineCacheKey?: string,
 ): PipelineResult {
   if (!styles) {
     return { rules: [], className };
   }
 
-  // Check cache
-  const cacheKey = stringifyStyles(styles);
+  // Use pre-computed cache key when available, falling back to stringifyStyles
+  const cacheKey = pipelineCacheKey || stringifyStyles(styles);
   let rules = pipelineCache.get(cacheKey);
 
   if (!rules) {
@@ -161,6 +163,14 @@ export function renderStylesPipeline(
 }
 
 /**
+ * Check if a cache key exists in the pipeline cache.
+ * Used by renderStylesForChunk to avoid building filtered styles on cache hit.
+ */
+export function hasPipelineCacheEntry(cacheKey: string): boolean {
+  return pipelineCache.get(cacheKey) !== undefined;
+}
+
+/**
  * Clear the pipeline cache (for testing)
  */
 export function clearPipelineCache(): void {
@@ -184,7 +194,7 @@ function runPipeline(
   const seen = new Set<string>();
   const dedupedRules = allRules.filter((rule) => {
     // Include rootPrefix in dedup key - rules with different root prefixes are distinct
-    const key = `${rule.selector}|${rule.declarations}|${JSON.stringify(rule.atRules || [])}|${rule.rootPrefix || ''}`;
+    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1022,14 +1032,15 @@ function buildSelectorFromVariant(
 ): string {
   let selector = '';
 
-  // Add modifier selectors
-  for (const mod of variant.modifierConditions) {
-    selector += modifierToCSS(mod);
-  }
+  // Add flat modifier + pseudo selectors (sorted for canonical output)
+  selector += branchToCSS([
+    ...variant.modifierConditions,
+    ...variant.pseudoConditions,
+  ]);
 
-  // Add pseudo selectors
-  for (const pseudo of variant.pseudoConditions) {
-    selector += pseudoToCSS(pseudo);
+  // Add selector groups (:is()/:not() on element)
+  for (const group of variant.selectorGroups) {
+    selector += selectorGroupToCSS(group);
   }
 
   // Add parent selectors (before sub-element suffix)
@@ -1039,9 +1050,10 @@ function buildSelectorFromVariant(
 
   selector += selectorSuffix;
 
-  // Add own selectors (after sub-element)
-  for (const own of variant.ownConditions) {
-    selector += selectorConditionToCSS(own);
+  // Add own groups (:is()/:not() on sub-element)
+  const ownOptimized = optimizeGroups(variant.ownGroups);
+  for (const group of ownOptimized) {
+    selector += selectorGroupToCSS(group);
   }
 
   return selector;
@@ -1066,10 +1078,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
 
   // Helper to get root prefix key for grouping
   const getRootPrefixKey = (variant: SelectorVariant): string => {
-    return variant.rootConditions
-      .map((r) => selectorConditionToCSS(r))
-      .sort()
-      .join('|');
+    return rootGroupsToCSS(variant.rootGroups) || '';
   };
 
   // Group variants by their at-rules (variants with same at-rules can be combined with commas)
@@ -1089,7 +1098,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
       byAtRules.set(key, {
         variants: [variant],
         atRules,
-        rootPrefix: rootConditionsToCSS(variant.rootConditions),
+        rootPrefix: rootGroupsToCSS(variant.rootGroups),
       });
     }
   }
@@ -1097,8 +1106,12 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   // Generate one CSSRule per at-rules group
   const rules: CSSRule[] = [];
   for (const [, group] of byAtRules) {
+    // Merge variants that differ only in flat modifier/pseudo conditions
+    // into :is() groups before building selector strings
+    const mergedVariants = mergeVariantsIntoSelectorGroups(group.variants);
+
     // Build selector fragments for each variant (will be joined with className later)
-    const selectorFragments = group.variants.map((v) =>
+    const selectorFragments = mergedVariants.map((v) =>
       buildSelectorFromVariant(v, rule.selectorSuffix),
     );
 
@@ -1152,7 +1165,12 @@ export interface RenderStylesOptions {
  * When called without classNameOrSelector, returns RenderResult with needsClassName=true.
  * When called with a selector/className string, returns StyleResult[] for direct injection.
  */
-export function renderStyles(styles?: Styles): RenderResult;
+export function renderStyles(
+  styles?: Styles,
+  classNameOrSelector?: undefined,
+  options?: undefined,
+  pipelineCacheKey?: string,
+): RenderResult;
 export function renderStyles(
   styles: Styles | undefined,
   classNameOrSelector: string,
@@ -1162,26 +1180,33 @@ export function renderStyles(
   styles?: Styles,
   classNameOrSelector?: string,
   options?: RenderStylesOptions,
+  pipelineCacheKey?: string,
 ): RenderResult | StyleResult[] {
   // Check if we have a direct selector/className
   const directSelector = !!classNameOrSelector;
 
-  if (!styles) {
+  // Check cache first when a pre-computed key is available.
+  // This allows callers to skip building the styles object on cache hit.
+  let rules: CSSRule[] | undefined;
+  if (pipelineCacheKey) {
+    rules = pipelineCache.get(pipelineCacheKey);
+  }
+
+  if (!rules && !styles) {
     return directSelector ? [] : { rules: [] };
   }
 
-  // Check cache
-  const cacheKey = stringifyStyles(styles);
-  let rules = pipelineCache.get(cacheKey);
+  // Use pre-computed cache key when available (from chunk path),
+  // falling back to stringifyStyles for direct renderStyles() calls
+  const cacheKey = pipelineCacheKey || stringifyStyles(styles!);
+  if (!rules) {
+    rules = pipelineCache.get(cacheKey);
+  }
 
   if (!rules) {
-    // Create parser context
-    const parserContext = createStateParserContext(styles);
-
-    // Run pipeline
-    rules = runPipeline(styles, parserContext);
-
-    // Cache result
+    // styles is guaranteed non-null here: early return above handles (!rules && !styles)
+    const parserContext = createStateParserContext(styles!);
+    rules = runPipeline(styles!, parserContext);
     pipelineCache.set(cacheKey, rules);
   }
 

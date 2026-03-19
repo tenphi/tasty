@@ -1,12 +1,13 @@
+import { Lru } from '../parser/lru';
+
 /**
- * Create a function that caches the result up to the limit.
+ * Create a function that caches the result with LRU eviction.
  */
 export function cacheWrapper<A, B, R>(
   handler: (firstArg: A, secondArg?: B) => R,
   limit = 1000,
 ): (firstArg: A, secondArg?: B) => R {
-  const cache = new Map<string, R>();
-  let count = 0;
+  const cache = new Lru<string, R>(limit);
 
   return (firstArg: A, secondArg?: B) => {
     const key =
@@ -16,11 +17,6 @@ export function cacheWrapper<A, B, R>(
 
     let result = cache.get(key);
     if (result === undefined) {
-      if (count > limit) {
-        cache.clear();
-        count = 0;
-      }
-      count++;
       result =
         secondArg == null ? handler(firstArg) : handler(firstArg, secondArg);
       cache.set(key, result);

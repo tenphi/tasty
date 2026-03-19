@@ -6,7 +6,7 @@ import type {
   PropsWithoutRef,
   RefAttributes,
 } from 'react';
-import { createElement, forwardRef, useMemo } from 'react';
+import { createElement, forwardRef, useMemo, useRef } from 'react';
 import { useStyles } from './hooks/useStyles';
 import { BASE_STYLES } from './styles/list';
 import type { Styles, StylesInterface } from './styles/types';
@@ -22,6 +22,7 @@ import { getDisplayName } from './utils/get-display-name';
 import { isValidElementType } from './utils/is-valid-element-type';
 import { mergeStyles } from './utils/merge-styles';
 import { isSelector } from './pipeline';
+import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens, stringifyTokens } from './utils/process-tokens';
 
@@ -512,6 +513,10 @@ function tastyElement<
     ...otherDefaultProps
   } = defaultProps ?? {};
 
+  const propsToCheck = styleProps
+    ? (styleProps as StyleList).concat(BASE_STYLES)
+    : BASE_STYLES;
+
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
@@ -537,28 +542,32 @@ function tastyElement<
 
     let styles = rawStyles;
 
-    // Optimize propStyles extraction - avoid creating empty objects
     let propStyles: Styles | null = null;
-    const propsToCheck = styleProps
-      ? (styleProps as StyleList).concat(BASE_STYLES)
-      : BASE_STYLES;
+    let propStylesKey = '';
 
     for (const prop of propsToCheck) {
       const key = prop as unknown as string;
 
-      if (!propStyles) propStyles = {};
-
       if (key in otherProps) {
-        (propStyles as any)[key] = (otherProps as any)[key];
+        if (!propStyles) propStyles = {};
+        const value = (otherProps as any)[key];
+        (propStyles as any)[key] = value;
         delete (otherProps as any)[key];
+        propStylesKey += key + '\0' + value + '\0';
       }
     }
 
-    if (
-      !styles ||
-      (styles && Object.keys(styles as Record<string, unknown>).length === 0)
-    ) {
+    if (!styles || (styles && !hasKeys(styles as Record<string, unknown>))) {
       styles = undefined as unknown as Styles;
+    }
+
+    // Stabilize propStyles reference: only update when content actually changes
+    const propStylesRef = useRef<{ key: string; styles: Styles | null }>({
+      key: '',
+      styles: null,
+    });
+    if (propStylesRef.current.key !== propStylesKey) {
+      propStylesRef.current = { key: propStylesKey, styles: propStyles };
     }
 
     // Determine base styles: use variant styles if available, otherwise default styles
@@ -569,16 +578,21 @@ function tastyElement<
 
     // Merge base styles with instance styles and prop styles
     const allStyles = useMemo(() => {
-      const hasStyles =
-        styles && Object.keys(styles as Record<string, unknown>).length > 0;
-      const hasPropStyles = propStyles && Object.keys(propStyles).length > 0;
+      const currentPropStyles = propStylesRef.current.styles;
+      const hasStyleProps =
+        styles && hasKeys(styles as Record<string, unknown>);
+      const hasPropStyles = currentPropStyles && hasKeys(currentPropStyles);
 
-      if (!hasStyles && !hasPropStyles) {
+      if (!hasStyleProps && !hasPropStyles) {
         return baseStyles;
       }
 
-      return mergeStyles(baseStyles, styles as Styles, propStyles as Styles);
-    }, [baseStyles, styles, propStyles]);
+      return mergeStyles(
+        baseStyles,
+        styles as Styles,
+        currentPropStyles as Styles,
+      );
+    }, [baseStyles, styles, propStylesKey]);
 
     // Use the useStyles hook for style generation and injection
     const { className: stylesClassName } = useStyles(allStyles);

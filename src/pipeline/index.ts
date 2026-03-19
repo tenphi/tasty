@@ -42,13 +42,14 @@ import {
 } from './exclusive';
 import type { CSSRule, SelectorVariant } from './materialize';
 import {
+  branchToCSS,
   buildAtRulesFromVariant,
   conditionToCSS,
-  modifierToCSS,
+  mergeVariantsIntoSelectorGroups,
+  optimizeGroups,
   parentGroupsToCSS,
-  pseudoToCSS,
-  rootConditionsToCSS,
-  selectorConditionToCSS,
+  rootGroupsToCSS,
+  selectorGroupToCSS,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
@@ -1022,14 +1023,15 @@ function buildSelectorFromVariant(
 ): string {
   let selector = '';
 
-  // Add modifier selectors
-  for (const mod of variant.modifierConditions) {
-    selector += modifierToCSS(mod);
-  }
+  // Add flat modifier + pseudo selectors (sorted for canonical output)
+  selector += branchToCSS([
+    ...variant.modifierConditions,
+    ...variant.pseudoConditions,
+  ]);
 
-  // Add pseudo selectors
-  for (const pseudo of variant.pseudoConditions) {
-    selector += pseudoToCSS(pseudo);
+  // Add selector groups (:is()/:not() on element)
+  for (const group of variant.selectorGroups) {
+    selector += selectorGroupToCSS(group);
   }
 
   // Add parent selectors (before sub-element suffix)
@@ -1039,9 +1041,10 @@ function buildSelectorFromVariant(
 
   selector += selectorSuffix;
 
-  // Add own selectors (after sub-element)
-  for (const own of variant.ownConditions) {
-    selector += selectorConditionToCSS(own);
+  // Add own groups (:is()/:not() on sub-element)
+  const ownOptimized = optimizeGroups(variant.ownGroups);
+  for (const group of ownOptimized) {
+    selector += selectorGroupToCSS(group);
   }
 
   return selector;
@@ -1066,10 +1069,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
 
   // Helper to get root prefix key for grouping
   const getRootPrefixKey = (variant: SelectorVariant): string => {
-    return variant.rootConditions
-      .map((r) => selectorConditionToCSS(r))
-      .sort()
-      .join('|');
+    return rootGroupsToCSS(variant.rootGroups) || '';
   };
 
   // Group variants by their at-rules (variants with same at-rules can be combined with commas)
@@ -1089,7 +1089,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
       byAtRules.set(key, {
         variants: [variant],
         atRules,
-        rootPrefix: rootConditionsToCSS(variant.rootConditions),
+        rootPrefix: rootGroupsToCSS(variant.rootGroups),
       });
     }
   }
@@ -1097,8 +1097,12 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   // Generate one CSSRule per at-rules group
   const rules: CSSRule[] = [];
   for (const [, group] of byAtRules) {
+    // Merge variants that differ only in flat modifier/pseudo conditions
+    // into :is() groups before building selector strings
+    const mergedVariants = mergeVariantsIntoSelectorGroups(group.variants);
+
     // Build selector fragments for each variant (will be joined with className later)
-    const selectorFragments = group.variants.map((v) =>
+    const selectorFragments = mergedVariants.map((v) =>
       buildSelectorFromVariant(v, rule.selectorSuffix),
     );
 

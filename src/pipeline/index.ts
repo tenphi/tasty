@@ -163,6 +163,14 @@ export function renderStylesPipeline(
 }
 
 /**
+ * Check if a cache key exists in the pipeline cache.
+ * Used by renderStylesForChunk to avoid building filtered styles on cache hit.
+ */
+export function hasPipelineCacheEntry(cacheKey: string): boolean {
+  return pipelineCache.get(cacheKey) !== undefined;
+}
+
+/**
  * Clear the pipeline cache (for testing)
  */
 export function clearPipelineCache(): void {
@@ -186,7 +194,7 @@ function runPipeline(
   const seen = new Set<string>();
   const dedupedRules = allRules.filter((rule) => {
     // Include rootPrefix in dedup key - rules with different root prefixes are distinct
-    const key = `${rule.selector}|${rule.declarations}|${JSON.stringify(rule.atRules || [])}|${rule.rootPrefix || ''}`;
+    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1177,23 +1185,28 @@ export function renderStyles(
   // Check if we have a direct selector/className
   const directSelector = !!classNameOrSelector;
 
-  if (!styles) {
+  // Check cache first when a pre-computed key is available.
+  // This allows callers to skip building the styles object on cache hit.
+  let rules: CSSRule[] | undefined;
+  if (pipelineCacheKey) {
+    rules = pipelineCache.get(pipelineCacheKey);
+  }
+
+  if (!rules && !styles) {
     return directSelector ? [] : { rules: [] };
   }
 
   // Use pre-computed cache key when available (from chunk path),
   // falling back to stringifyStyles for direct renderStyles() calls
-  const cacheKey = pipelineCacheKey || stringifyStyles(styles);
-  let rules = pipelineCache.get(cacheKey);
+  const cacheKey = pipelineCacheKey || stringifyStyles(styles!);
+  if (!rules) {
+    rules = pipelineCache.get(cacheKey);
+  }
 
   if (!rules) {
-    // Create parser context
-    const parserContext = createStateParserContext(styles);
-
-    // Run pipeline
-    rules = runPipeline(styles, parserContext);
-
-    // Cache result
+    // styles is guaranteed non-null here: early return above handles (!rules && !styles)
+    const parserContext = createStateParserContext(styles!);
+    rules = runPipeline(styles!, parserContext);
     pipelineCache.set(cacheKey, rules);
   }
 

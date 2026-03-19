@@ -26,6 +26,7 @@ import { formatKeyframesCSS } from '../ssr/format-keyframes';
 import { formatPropertyCSS } from '../ssr/format-property';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
+import { hasKeys } from '../utils/has-keys';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import { stringifyStyles } from '../utils/styles';
 
@@ -262,7 +263,7 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
 
   // Compute style key - this is a primitive string that captures style content
   const styleKey = useMemo(() => {
-    if (!resolvedStyles || Object.keys(resolvedStyles).length === 0) {
+    if (!resolvedStyles || !hasKeys(resolvedStyles)) {
       return '';
     }
     return stringifyStyles(resolvedStyles);

@@ -15,9 +15,12 @@ import {
 } from '../states';
 import type { Styles } from '../styles/types';
 
+const _stableStringifyCache = new WeakMap<object, string>();
+
 /**
  * Recursively serialize a value with sorted keys for stable output.
  * This ensures that {a: 1, b: 2} and {b: 2, a: 1} produce the same string.
+ * Uses a WeakMap cache for object values to avoid re-serializing the same references.
  */
 function stableStringify(value: unknown): string {
   if (value === null) {
@@ -29,19 +32,27 @@ function stableStringify(value: unknown): string {
   if (typeof value !== 'object') {
     return JSON.stringify(value);
   }
+
+  const cached = _stableStringifyCache.get(value as object);
+  if (cached !== undefined) return cached;
+
+  let result: string;
   if (Array.isArray(value)) {
-    return '[' + value.map(stableStringify).join(',') + ']';
-  }
-  // Object: sort keys for stable order
-  const obj = value as Record<string, unknown>;
-  const sortedKeys = Object.keys(obj).sort();
-  const parts: string[] = [];
-  for (const key of sortedKeys) {
-    if (obj[key] !== undefined) {
-      parts.push(`${JSON.stringify(key)}:${stableStringify(obj[key])}`);
+    result = '[' + value.map(stableStringify).join(',') + ']';
+  } else {
+    const obj = value as Record<string, unknown>;
+    const sortedKeys = Object.keys(obj).sort();
+    const parts: string[] = [];
+    for (const key of sortedKeys) {
+      if (obj[key] !== undefined) {
+        parts.push(`${JSON.stringify(key)}:${stableStringify(obj[key])}`);
+      }
     }
+    result = '{' + parts.join(',') + '}';
   }
-  return '{' + parts.join(',') + '}';
+
+  _stableStringifyCache.set(value as object, result);
+  return result;
 }
 
 /**

@@ -188,6 +188,8 @@ Layout components can expose flow props. Buttons can expose positioning props. E
 
 This is the core idea that makes everything else possible.
 
+For the end-to-end architecture — parsing state keys, building exclusive conditions, merging by output, and materializing selectors and at-rules — see **[Style rendering pipeline](docs/PIPELINE.md)**.
+
 Traditional CSS has two structural problems.
 
 First, the **cascade** resolves conflicts by specificity and source order: when multiple selectors match, the one with the highest specificity wins, or — if specificity is equal — the last one in source order wins. That makes styles inherently fragile. Reordering imports, adding a media query, or composing components from different libraries can silently break styling.
@@ -654,6 +656,7 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ### Internals
 
+- **[Style rendering pipeline](docs/PIPELINE.md)** — How `Styles` become mutually exclusive CSS rules: parse → exclusives → combinations → handlers → merge → materialize (`src/pipeline/`)
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring
 

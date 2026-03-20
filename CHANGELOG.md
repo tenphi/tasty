@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 0.13.1
+
+### Patch Changes
+
+- [#40](https://github.com/tenphi/tasty/pull/40) [`cbe5db3`](https://github.com/tenphi/tasty/commit/cbe5db38718eba80437f6521cda86db801df8c94) Thanks [@tenphi](https://github.com/tenphi)! - Auto-inject generated CSS in zero-runtime mode
+
+  The Babel plugin now automatically replaces `@tenphi/tasty/static` imports with an import of the generated CSS file, eliminating the need to manually add `import '@/public/tasty.css'` in layout files. An empty CSS stub is created before the first build to avoid resolution errors on fresh clones. Controlled via the `injectImport` option (defaults to `true`).
+
+- [#42](https://github.com/tenphi/tasty/pull/42) [`75b5fa0`](https://github.com/tenphi/tasty/commit/75b5fa02d49d58ed85ebf6c71889d5a1efc20cfa) Thanks [@tenphi](https://github.com/tenphi)! - Optimize CSS selectors: merge OR branches into `:is()`/`:not()` groups for `@root`, `@own`, and base modifier/pseudo conditions; sort conditions for canonical output; unify `ParentGroup` with `SelectorGroup`.
+
 ## 0.13.0
 
 ### Minor Changes

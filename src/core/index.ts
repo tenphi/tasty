@@ -12,6 +12,7 @@ export {
   getGlobalRecipes,
 } from '../config';
 export type { TastyConfig } from '../config';
+export type { ColorSpace } from '../utils/color-space';
 
 // Plugins
 export { okhslPlugin, okhslFunc } from '../plugins';

@@ -480,20 +480,20 @@ Using `renderStyles(styles, '.t1')` (single class prefix; `renderStylesPipeline`
 .t1[data-hovered] {
   color: var(--highlight-color);
   --current-color: var(--highlight-color);
-  --current-color-rgb: var(--highlight-color-rgb);
+  --current-color-oklch: var(--highlight-color-oklch);
 }
 @media (prefers-color-scheme: dark) {
   .t1:not([data-hovered]) {
     color: var(--dark-color);
     --current-color: var(--dark-color);
-    --current-color-rgb: var(--dark-color-rgb);
+    --current-color-oklch: var(--dark-color-oklch);
   }
 }
 @media (not (prefers-color-scheme: dark)) {
   .t1:not([data-hovered]) {
     color: var(--white-color);
     --current-color: var(--white-color);
-    --current-color-rgb: var(--white-color-rgb);
+    --current-color-oklch: var(--white-color-oklch);
   }
 }
 ```

@@ -466,7 +466,7 @@ describe('tasty() API', () => {
     // Check token processing
     expect(style).toContain('--size: 16');
     expect(style).toContain('--accent-color:');
-    expect(style).toContain('--accent-color-rgb:');
+    expect(style).toContain('--accent-color-oklch:');
     // Check that explicit style prop is also applied
     expect(style).toContain('padding: 10px');
   });
@@ -758,8 +758,8 @@ describe('tokens prop', () => {
     expect(element.style.getPropertyValue('--accent-color')).toBe(
       'var(--purple-color)',
     );
-    expect(element.style.getPropertyValue('--accent-color-rgb')).toBe(
-      'var(--purple-color-rgb)',
+    expect(element.style.getPropertyValue('--accent-color-oklch')).toBe(
+      'var(--purple-color-oklch)',
     );
   });
 
@@ -866,7 +866,7 @@ describe('tokens prop', () => {
     // Should have color property
     expect(element.style.getPropertyValue('--custom-color')).toBeTruthy();
     // Should have RGB property
-    expect(element.style.getPropertyValue('--custom-color-rgb')).toBeTruthy();
+    expect(element.style.getPropertyValue('--custom-color-oklch')).toBeTruthy();
   });
 
   it('should convert boolean true to transparent for color tokens', () => {
@@ -880,7 +880,7 @@ describe('tokens prop', () => {
       'transparent',
     );
     // Should have RGB property (transparent yields 'transparent' as fallback)
-    expect(element.style.getPropertyValue('--overlay-color-rgb')).toBe(
+    expect(element.style.getPropertyValue('--overlay-color-oklch')).toBe(
       'transparent',
     );
   });

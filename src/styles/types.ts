@@ -597,7 +597,7 @@ export type ConfigTokenValue =
  * Keys must start with `$` (value tokens) or `#` (color tokens).
  *
  * - `$name` keys become `--name` CSS custom properties
- * - `#name` keys become `--name-color` and `--name-color-rgb` properties
+ * - `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties
  */
 export type ConfigTokens = Record<
   `$${string}` | `#${string}`,

@@ -1,6 +1,17 @@
+import { configure, resetConfig } from '../config';
+
 import { processTokens } from './process-tokens';
 
 describe('processTokens', () => {
+  beforeEach(() => {
+    resetConfig();
+    configure({ colorSpace: 'rgb' });
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
   describe('HSL color token processing', () => {
     // Expected values calculated using CSS Color 4 spec algorithm
     // Reference: https://en.wikipedia.org/wiki/HSL_and_HSV#HSL_to_RGB_alternative

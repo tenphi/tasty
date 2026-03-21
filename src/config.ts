@@ -19,6 +19,7 @@ import {
   registerHandler,
   resetHandlers,
 } from './styles/predefined';
+import { resetColorSpace, setColorSpace } from './utils/color-space';
 import { isDevEnv } from './utils/is-dev-env';
 import {
   CUSTOM_UNITS,
@@ -28,6 +29,8 @@ import {
   resetGlobalPredefinedTokens,
   setGlobalPredefinedTokens,
 } from './utils/styles';
+
+import type { ColorSpace } from './utils/color-space';
 
 import type { KeyframesSteps, PropertyDefinition } from './injector/types';
 import type { StyleDetails, UnitHandler } from './parser/types';
@@ -88,6 +91,17 @@ export interface TastyConfig {
    * @example { myFunc: (groups) => groups.map(g => g.output).join(' ') }
    */
   funcs?: Record<string, (groups: StyleDetails[]) => string>;
+  /**
+   * Color space used for decomposed color token companion variables.
+   * Controls the CSS function and suffix for alpha composition.
+   *
+   * - `'rgb'`   — suffix `-rgb`, e.g. `rgb(var(--name-color-rgb) / .5)`
+   * - `'hsl'`   — suffix `-hsl`, e.g. `hsl(var(--name-color-hsl) / .5)`
+   * - `'oklch'` — suffix `-oklch`, e.g. `oklch(var(--name-color-oklch) / .5)`
+   *
+   * @default 'oklch'
+   */
+  colorSpace?: ColorSpace;
   /**
    * Automatically infer and register CSS @property declarations
    * from custom property values found in styles, keyframes, and global config.
@@ -187,7 +201,7 @@ export interface TastyConfig {
    * for responsive/theme-aware tokens.
    *
    * - `$name` keys become `--name` CSS custom properties
-   * - `#name` keys become `--name-color` and `--name-color-rgb` properties
+   * - `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties
    *
    * Tokens are injected once when the first style is rendered.
    *
@@ -827,6 +841,9 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     }
   }
 
+  // Handle color space (must be set before any token processing)
+  setColorSpace(config.colorSpace ?? 'oklch');
+
   // Handle predefined states
   if (Object.keys(mergedStates).length > 0) {
     setGlobalPredefinedStates(mergedStates);
@@ -911,6 +928,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     tokens: _tokens,
     replaceTokens: _replaceTokens,
     recipes: _recipes,
+    colorSpace: _colorSpace,
     ...injectorConfig
   } = config;
 
@@ -969,6 +987,7 @@ export function resetConfig(): void {
   globalConfigTokens = null;
   resetGlobalPredefinedTokens();
   resetHandlers();
+  resetColorSpace();
   clearPipelineCache();
   emittedWarnings.clear();
 

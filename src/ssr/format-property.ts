@@ -6,7 +6,12 @@
  */
 
 import type { PropertyDefinition } from '../injector/types';
-import { colorInitialValueToRgb, getEffectiveDefinition } from '../properties';
+import { getEffectiveDefinition } from '../properties';
+import {
+  colorInitialValueToComponents,
+  getColorSpaceSuffix,
+  getComponentPropertySyntax,
+} from '../utils/color-space';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
@@ -15,7 +20,7 @@ import { parseStyle } from '../utils/styles';
  *
  * Returns the full `@property --name { ... }` text, or empty string
  * if the token is invalid. For color properties, also returns
- * the companion `-rgb` property.
+ * the companion component property.
  */
 export function formatPropertyCSS(
   token: string,
@@ -29,13 +34,16 @@ export function formatPropertyCSS(
   rules.push(buildPropertyRule(result.cssName, result.definition));
 
   if (result.isColor) {
-    const rgbCssName = `${result.cssName}-rgb`;
-    const rgbInitial = colorInitialValueToRgb(result.definition.initialValue);
+    const suffix = getColorSpaceSuffix();
+    const componentCssName = `${result.cssName}-${suffix}`;
+    const componentInitial = colorInitialValueToComponents(
+      result.definition.initialValue,
+    );
     rules.push(
-      buildPropertyRule(rgbCssName, {
-        syntax: '<number>+',
+      buildPropertyRule(componentCssName, {
+        syntax: getComponentPropertySyntax(),
         inherits: result.definition.inherits,
-        initialValue: rgbInitial,
+        initialValue: componentInitial,
       }),
     );
   }

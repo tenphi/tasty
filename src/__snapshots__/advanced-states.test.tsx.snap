@@ -199,50 +199,50 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should gen
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups 1`] = `
 "@media (prefers-color-scheme: light) {
-  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: light)) and (prefers-color-scheme: no-preference) {
-  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
-  :root[data-prefers-schema="light"][data-schema="system"] .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root[data-prefers-schema="light"][data-schema="system"] .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
-  :root:not([data-prefers-schema="light"]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root:not([data-prefers-schema="light"]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
-  :root:not([data-schema="system"]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root:not([data-schema="system"]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups in real world use case 1`] = `
-":root[data-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+":root[data-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-schema]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root:not([data-schema]) .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (not (prefers-color-scheme: dark)) {
-  :root:not([data-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root:not([data-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
-:root:not([data-schema="dark"])[data-schema] .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
+:root:not([data-schema="dark"])[data-schema] .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of mixed media and root OR groups 1`] = `
 "@media (prefers-color-scheme: dark) {
-  :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (prefers-color-scheme: no-preference) {
-  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
-  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: dark)) {
-  :root:not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root:not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: no-preference)) {
-  :root:not([data-prefers-schema="system"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root:not([data-prefers-schema="system"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
-:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
+:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle advanced states with multiple modifiers 1`] = `
@@ -340,21 +340,21 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should han
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should support complex predefined states 1`] = `
 "@media (prefers-color-scheme: dark) {
-  :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="system"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (prefers-color-scheme: no-preference) {
-  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-rgb: var(--white-color-rgb); }
+  :root[data-prefers-schema="dark"] .t0.t0 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 }
 @media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
-  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: dark)) {
-  :root:not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root:not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
 @media (not (prefers-color-scheme: no-preference)) {
-  :root:not([data-prefers-schema="system"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }
+  :root:not([data-prefers-schema="system"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
 }
-:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
+:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"]) .t0.t0 { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with complex style values 1`] = `
@@ -433,8 +433,8 @@ exports[`Advanced State Mapping - CSS Output > predefined states (local) > shoul
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply @own state to sub-element 1`] = `
 ".t0.t0 { background-color: var(--white-color); }
-.t1.t1 [data-element="Label"][data-hovered] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
-.t1.t1 [data-element="Label"]:not([data-hovered]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-rgb: var(--dark-color-rgb); }"
+.t1.t1 [data-element="Label"][data-hovered] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t1.t1 [data-element="Label"]:not([data-hovered]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply media queries to sub-element styles 1`] = `
@@ -469,9 +469,9 @@ exports[`Advanced State Mapping - CSS Output > sub-element advanced states > sho
 `;
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with parent modifiers 1`] = `
-".t0.t0:not([data-disabled]) [data-element="Icon"][data-hovered] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-rgb: var(--purple-color-rgb); }
-.t0.t0[data-disabled] [data-element="Icon"] { color: var(--light-gray-color); --current-color: var(--light-gray-color); --current-color-rgb: var(--light-gray-color-rgb); }
-.t0.t0:not([data-disabled]) [data-element="Icon"]:not([data-hovered]) { color: var(--gray-color); --current-color: var(--gray-color); --current-color-rgb: var(--gray-color-rgb); }"
+".t0.t0:not([data-disabled]) [data-element="Icon"][data-hovered] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t0.t0[data-disabled] [data-element="Icon"] { color: var(--light-gray-color); --current-color: var(--light-gray-color); --current-color-oklch: var(--light-gray-color-oklch); }
+.t0.t0:not([data-disabled]) [data-element="Icon"]:not([data-hovered]) { color: var(--gray-color); --current-color: var(--gray-color); --current-color-oklch: var(--gray-color-oklch); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should handle negated @own state 1`] = `

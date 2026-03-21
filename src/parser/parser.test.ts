@@ -45,9 +45,9 @@ describe('StyleProcessor', () => {
     );
     expect(result.groups[0].colors).toEqual([
       'var(--dark-color)',
-      'rgb(var(--purple-color-rgb) / 0)',
-      'rgb(var(--purple-color-rgb) / .5)',
-      'rgb(var(--purple-color-rgb) / .05)',
+      'oklch(var(--purple-color-oklch) / 0)',
+      'oklch(var(--purple-color-oklch) / .5)',
+      'oklch(var(--purple-color-oklch) / .05)',
       'rgb(10,20,30)',
       'hsl(10,20%,30%)',
     ]);
@@ -221,7 +221,7 @@ describe('StyleProcessor', () => {
     const dropShadow = 'drop-shadow(1x 2x 3x #dark.5)';
     const result = parser.process(dropShadow);
     expect(result.groups[0].values[0]).toEqual(
-      'drop-shadow(8px 16px 24px rgb(var(--dark-color-rgb) / .5))', // raw units calculated
+      'drop-shadow(8px 16px 24px oklch(var(--dark-color-oklch) / .5))', // raw units calculated
     );
   });
 
@@ -558,7 +558,7 @@ describe('StyleProcessor', () => {
     });
 
     const expr =
-      'blur(10px) drop-shadow(0 0 1px rgb(var(--dark-color-rgb) / 20%)';
+      'blur(10px) drop-shadow(0 0 1px oklch(var(--dark-color-oklch) / 20%)';
     const res = parser.process(expr);
 
     expect(res.groups[0].values).toEqual(['blur(10px)']);
@@ -807,8 +807,8 @@ describe('Predefined tokens', () => {
     });
 
     const result = parser.process('#primary');
-    // #primary = '#purple.5' -> rgb(var(--purple-color-rgb) / .5)
-    expect(result.output).toBe('rgb(var(--purple-color-rgb) / .5)');
+    // #primary = '#purple.5' -> oklch(var(--purple-color-oklch) / .5)
+    expect(result.output).toBe('oklch(var(--purple-color-oklch) / .5)');
   });
 
   test('opacity suffix works with predefined color tokens', () => {
@@ -818,7 +818,7 @@ describe('Predefined tokens', () => {
 
     // #accent.5 should resolve #accent to #purple, then apply .5 opacity
     const result = parser.process('#accent.5');
-    expect(result.output).toBe('rgb(var(--purple-color-rgb) / .5)');
+    expect(result.output).toBe('oklch(var(--purple-color-oklch) / .5)');
   });
 
   test('custom property opacity works with predefined color tokens', () => {
@@ -829,7 +829,7 @@ describe('Predefined tokens', () => {
     // #accent.$disabled should resolve #accent to #purple, then apply var(--disabled)
     const result = parser.process('#accent.$disabled');
     expect(result.output).toBe(
-      'rgb(var(--purple-color-rgb) / var(--disabled))',
+      'oklch(var(--purple-color-oklch) / var(--disabled))',
     );
   });
 
@@ -1115,8 +1115,8 @@ describe('Predefined tokens', () => {
     const directResult = parser.process('#purple.5');
 
     // Both should produce lowercase CSS custom property names
-    expect(tokenResult.output).toBe('rgb(var(--purple-color-rgb) / .5)');
-    expect(directResult.output).toBe('rgb(var(--purple-color-rgb) / .5)');
+    expect(tokenResult.output).toBe('oklch(var(--purple-color-oklch) / .5)');
+    expect(directResult.output).toBe('oklch(var(--purple-color-oklch) / .5)');
     expect(tokenResult.output).toBe(directResult.output);
   });
 });
@@ -1125,20 +1125,22 @@ describe('Custom property opacity syntax', () => {
   test('#color.$prop uses var() for alpha', () => {
     const result = parser.process('#purple.$disabled');
     expect(result.output).toBe(
-      'rgb(var(--purple-color-rgb) / var(--disabled))',
+      'oklch(var(--purple-color-oklch) / var(--disabled))',
     );
   });
 
   test('#color.$prop works with hyphenated names', () => {
     const result = parser.process('#dark-05.$my-opacity');
     expect(result.output).toBe(
-      'rgb(var(--dark-05-color-rgb) / var(--my-opacity))',
+      'oklch(var(--dark-05-color-oklch) / var(--my-opacity))',
     );
   });
 
   test('#color.$prop works with underscore names', () => {
     const result = parser.process('#blue.$_private');
-    expect(result.output).toBe('rgb(var(--blue-color-rgb) / var(--_private))');
+    expect(result.output).toBe(
+      'oklch(var(--blue-color-oklch) / var(--_private))',
+    );
   });
 });
 

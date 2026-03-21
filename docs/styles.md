@@ -252,7 +252,7 @@ Text color with design token support.
 | `"(#primary, #secondary)"` | Fallback: use `#primary`, fall back to `#secondary` |
 | `true` | `currentColor` |
 
-When set to a named color token, also sets `$current-color` and `$current-color-rgb` custom properties for downstream use.
+When set to a named color token, also sets `$current-color` and `$current-color-{colorSpace}` custom properties for downstream use (suffix depends on the configured `colorSpace`, default `oklch`).
 
 ### `svgFill`
 

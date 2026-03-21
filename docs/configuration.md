@@ -54,6 +54,27 @@ configure({
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
+| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
+
+---
+
+## Color Space
+
+Controls the CSS color space used for decomposed color token companion variables. When you define `#name` color tokens, tasty generates both `--name-color` (full color) and `--name-color-{suffix}` (decomposed components for alpha composition).
+
+```jsx
+configure({
+  colorSpace: 'oklch', // default
+});
+```
+
+| Color Space | Suffix | Components Format | Alpha Syntax |
+|---|---|---|---|
+| `rgb` | `-rgb` | `255 128 0` | `rgb(var(--name-color-rgb) / .5)` |
+| `hsl` | `-hsl` | `300 100% 25%` | `hsl(var(--name-color-hsl) / .5)` |
+| `oklch` | `-oklch` | `0.42 0.16 328` | `oklch(var(--name-color-oklch) / .5)` |
+
+The `oklch` color space is the default because it provides perceptually uniform color manipulation — alpha fading and color mixing produce more natural-looking results.
 
 ---
 
@@ -81,7 +102,7 @@ configure({
 ```
 
 - `$name` keys become `--name` CSS custom properties
-- `#name` keys become `--name-color` and `--name-color-rgb` properties
+- `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties (suffix depends on `colorSpace`, default `oklch`)
 
 Tokens are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin).
 

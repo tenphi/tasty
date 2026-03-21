@@ -1,15 +1,13 @@
+import { getColorSpaceSuffix } from '../utils/color-space';
 import { parseColor } from '../utils/styles';
 
-import { convertColorChainToRgbChain } from './createStyle';
+import { convertColorChainToComponentChain } from './createStyle';
 
 export function colorStyle({ color }: { color?: string | boolean }) {
   if (!color) return;
 
   if (color === true) color = 'currentColor';
 
-  // Handle color values that need parsing:
-  // - Simple color tokens: #placeholder
-  // - Color fallback syntax: (#placeholder, #dark-04)
   if (
     typeof color === 'string' &&
     (color.startsWith('#') || color.startsWith('(#'))
@@ -29,9 +27,10 @@ export function colorStyle({ color }: { color?: string | boolean }) {
   };
 
   if (name && name !== 'current') {
+    const suffix = getColorSpaceSuffix();
     Object.assign(styles, {
       '--current-color': color,
-      '--current-color-rgb': convertColorChainToRgbChain(color),
+      [`--current-color-${suffix}`]: convertColorChainToComponentChain(color),
     });
   }
 

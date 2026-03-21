@@ -105,9 +105,13 @@ describe('strToRgb', () => {
     expect(result).toMatch(/^rgba\(\d+, \d+, \d+, 0\.5\)$/);
   });
 
+  it('converts oklch to rgb', () => {
+    const result = strToRgb('oklch(50% 0.2 250)');
+    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
+  });
+
   it('returns null for unknown formats', () => {
     expect(strToRgb('unknown')).toBeNull();
-    expect(strToRgb('oklch(50% 0.2 250)')).toBeNull();
   });
 
   it('returns undefined for falsy input', () => {

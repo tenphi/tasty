@@ -165,7 +165,7 @@ describe('formatPropertyCSS', () => {
     expect(css).toContain('@property --accent-color');
     expect(css).toContain('syntax: "<color>"');
     expect(css).toContain('@property --accent-color-oklch');
-    expect(css).toContain('syntax: "*"');
+    expect(css).toContain('syntax: "<number>+"');
   });
 
   it('returns empty string for invalid token', () => {
@@ -329,7 +329,7 @@ describe('ServerStyleCollector', () => {
     configure({
       tokens: {
         '$my-gap': '8px',
-        '#primary': 'purple',
+        '#primary': '#800080',
       },
     });
 

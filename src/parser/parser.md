@@ -41,9 +41,9 @@ The parser operates in a single pass and never throws on malformed input.
 
 **Style System Integration:**
 
-When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallback)'`), the style system automatically generates both color and RGB variants:
+When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallback)'`), the style system automatically generates both a color variable and a companion components variable (suffix depends on the configured `colorSpace`, default `oklch`):
 - `--local-placeholder-color: var(--primary-color, var(--fallback-color))`
-- `--local-placeholder-color-rgb: var(--primary-color-rgb, var(--fallback-color-rgb))`
+- `--local-placeholder-color-oklch: var(--primary-color-oklch, var(--fallback-color-oklch))`
 
 This applies to all color fallback syntaxes, including nested fallbacks and literal values.
 

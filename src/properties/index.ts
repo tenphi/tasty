@@ -268,13 +268,7 @@ export function getEffectiveDefinition(
 // Color Utilities
 // ============================================================================
 
-/**
- * Convert a color initialValue to components in the configured color space.
- * Used by SSR to emit `@property --name-color-{suffix}`.
- *
- * @deprecated Use `colorInitialValueToComponents` from `utils/color-space` instead.
- */
-export { colorInitialValueToComponents as colorInitialValueToRgb } from '../utils/color-space';
+export { colorInitialValueToComponents } from '../utils/color-space';
 
 // ============================================================================
 // Value Type Inference

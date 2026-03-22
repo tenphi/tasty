@@ -346,12 +346,13 @@ function getDefaultComponents(): string {
 
 /**
  * Get the CSS @property syntax for the companion components variable.
- * For rgb it's `<number>+`, for hsl and oklch we use `*` since
- * the components include percentages or mixed types.
+ * RGB and OKLCH components are all plain numbers, so `<number>+` works.
+ * HSL includes percentages (`h s% l%`), so `*` is the only safe choice.
  */
 export function getComponentPropertySyntax(): string {
   switch (currentColorSpace) {
     case 'rgb':
+    case 'oklch':
       return '<number>+';
     default:
       return '*';

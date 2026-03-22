@@ -288,11 +288,11 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     if (!extractedColor) {
       // Rate-limited warning to avoid spam
       if (!ignoreError && devMode && colorWarningCount < MAX_COLOR_WARNINGS) {
-        console.warn('CubeUIKit: unable to parse color:', val);
+        console.warn('Tasty: unable to parse color:', val);
         colorWarningCount++;
         if (colorWarningCount === MAX_COLOR_WARNINGS) {
           console.warn(
-            'CubeUIKit: color parsing warnings will be suppressed from now on',
+            'Tasty: color parsing warnings will be suppressed from now on',
           );
         }
       }

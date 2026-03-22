@@ -51,7 +51,7 @@ function isValidTokenValue(
   if (typeof value === 'object') {
     if (devMode) {
       console.warn(
-        'CubeUIKit: Object values are not allowed in tokens prop. ' +
+        'Tasty: Object values are not allowed in tokens prop. ' +
           'Tokens do not support state-based styling. Use a primitive value instead.',
       );
     }

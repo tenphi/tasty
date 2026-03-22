@@ -581,7 +581,7 @@ export function srgbToOkhsl(rgb: Vec3): Vec3 {
 
 let _namedColorHex: Map<string, string> | null = null;
 
-function getNamedColorHex(): Map<string, string> {
+export function getNamedColorHex(): Map<string, string> {
   if (_namedColorHex) return _namedColorHex;
   _namedColorHex = new Map([
     ['aliceblue', '#f0f8ff'],

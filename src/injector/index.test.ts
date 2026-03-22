@@ -180,7 +180,7 @@ describe('Global Style Injector API', () => {
       configure({
         forceTextInjection: true,
         tokens: {
-          '#primary': '#800080',
+          '#primary': 'purple',
         },
       });
 

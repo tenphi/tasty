@@ -3,7 +3,14 @@ import { okhslFunc } from '../plugins/okhsl-plugin';
 
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
-export { getRgbValuesFromRgbaString, hexToRgb, strToRgb } from './color-math';
+import { getNamedColorHex } from './color-math';
+
+export {
+  getNamedColorHex,
+  getRgbValuesFromRgbaString,
+  hexToRgb,
+  strToRgb,
+} from './color-math';
 
 export type StyleValue<T = string> = T | boolean | number | null | undefined;
 
@@ -103,7 +110,7 @@ function isSimpleColorFast(val: string): boolean {
     case 116: // 't'
       return val === 'transparent';
     default:
-      return false;
+      return getNamedColorHex().has(val.toLowerCase());
   }
 }
 

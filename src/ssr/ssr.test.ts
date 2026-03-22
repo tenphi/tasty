@@ -329,7 +329,7 @@ describe('ServerStyleCollector', () => {
     configure({
       tokens: {
         '$my-gap': '8px',
-        '#primary': '#800080',
+        '#primary': 'purple',
       },
     });
 

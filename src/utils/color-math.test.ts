@@ -1,6 +1,7 @@
 import {
   getRgbValuesFromRgbaString,
   hexToRgb,
+  hexToRgbaValues,
   hexToRgbValues,
   hslStringToRgb,
   hslToRgbValues,
@@ -293,6 +294,35 @@ describe('hexToRgbValues', () => {
       expect(rgbStr).not.toBeNull();
       expect(rgbStr).toBe(`rgb(${values![0]} ${values![1]} ${values![2]})`);
     }
+  });
+});
+
+describe('hexToRgbaValues', () => {
+  it('returns alpha=1 for 3-digit hex', () => {
+    expect(hexToRgbaValues('#f00')).toEqual([255, 0, 0, 1]);
+  });
+
+  it('returns alpha=1 for 6-digit hex', () => {
+    expect(hexToRgbaValues('#ff0000')).toEqual([255, 0, 0, 1]);
+  });
+
+  it('parses alpha from 4-digit hex', () => {
+    expect(hexToRgbaValues('#f000')).toEqual([255, 0, 0, 0]);
+    expect(hexToRgbaValues('#f00f')).toEqual([255, 0, 0, 1]);
+  });
+
+  it('parses alpha from 8-digit hex', () => {
+    expect(hexToRgbaValues('#ff000000')).toEqual([255, 0, 0, 0]);
+    expect(hexToRgbaValues('#ff0000ff')).toEqual([255, 0, 0, 1]);
+    const result = hexToRgbaValues('#ff000080');
+    expect(result).not.toBeNull();
+    expect(result![0]).toBe(255);
+    expect(result![3]).toBeCloseTo(128 / 255, 4);
+  });
+
+  it('returns null for invalid input', () => {
+    expect(hexToRgbaValues('#xyz')).toBeNull();
+    expect(hexToRgbaValues('')).toBeNull();
   });
 });
 

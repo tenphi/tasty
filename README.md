@@ -86,7 +86,7 @@ const Card = tasty({
     gap: '2x',
     fill: 'okhsl(98% 0.02 255)',
     color: 'okhsl(28% 0.03 255)',
-    border: '1bw solid okhsl(88% 0.02 255)',
+    border: 'okhsl(88% 0.02 255)',
     radius: '1r',
   },
 });

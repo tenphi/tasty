@@ -1,5 +1,27 @@
 # @tenphi/tasty
 
+## 0.14.0
+
+### Minor Changes
+
+- [#43](https://github.com/tenphi/tasty/pull/43) [`2be334c`](https://github.com/tenphi/tasty/commit/2be334c5b60ab934496dab834e4a862e0ace2c3c) Thanks [@tenphi](https://github.com/tenphi)! - Add configurable color space for decomposed color token companion variables (`configure({ colorSpace })`) with `oklch` as the new default.
+
+  **Breaking:** The default companion variable suffix changed from `-rgb` to `-oklch`. Any external CSS referencing `--name-color-rgb` variables directly will need to either:
+  - Set `configure({ colorSpace: 'rgb' })` to restore the previous behavior, or
+  - Update references to use `--name-color-oklch` instead.
+
+  Also unifies color conversion with shared OKHSL/sRGB math, improves OKHSL plugin and token handling, and updates related docs.
+
+### Patch Changes
+
+- [#46](https://github.com/tenphi/tasty/pull/46) [`7b4917f`](https://github.com/tenphi/tasty/commit/7b4917fcb23b920bd2b77351112144ad954740af) Thanks [@tenphi](https://github.com/tenphi)! - Update runtime benchmark numbers and add practical performance summary to README.
+
+- [#45](https://github.com/tenphi/tasty/pull/45) [`c6809fd`](https://github.com/tenphi/tasty/commit/c6809fdf08e227de805a6fb6f78708e2d1290c79) Thanks [@tenphi](https://github.com/tenphi)! - Refactor tastyDebug: reduce API to 8 methods, log by default (use `{ raw: true }` to suppress), add rule counts to summary/inspect, add `{ source: true }` for original CSS inspection, simplify prettifyCSS.
+
+- [#43](https://github.com/tenphi/tasty/pull/43) [`e29d47e`](https://github.com/tenphi/tasty/commit/e29d47e7614673bb3b1b0c1b81ca4f0658ba95bf) Thanks [@tenphi](https://github.com/tenphi)! - Fix alpha channel being stripped during color space conversion, restoring transparent color tokens for fade masks and other styles.
+
+- [#43](https://github.com/tenphi/tasty/pull/43) [`5f1ce82`](https://github.com/tenphi/tasty/commit/5f1ce82d4b80e20f2f19460cebdab9605952c8a5) Thanks [@tenphi](https://github.com/tenphi)! - Support CSS named colors (e.g. `purple`, `coral`) as color token values without emitting parse warnings.
+
 ## 0.13.1
 
 ### Patch Changes

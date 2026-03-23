@@ -85,7 +85,7 @@ Converts each state key in a style value map (like `'hovered & !disabled'`, `'@m
    - `:hover` → `PseudoCondition`
    - `@media(w < 768px)` → `MediaCondition` (`subtype: 'dimension'`) with bounds
    - `@media(prefers-color-scheme: dark)` → `MediaCondition` (`subtype: 'feature'`, `feature` + `featureValue`)
-   - `@root(theme=dark)` → `RootCondition` wrapping the inner condition
+   - `@root(schema=dark)` → `RootCondition` wrapping the inner condition
    - `@parent(hovered)` → `ParentCondition` (optional `direct` for immediate parent)
    - `@own(hovered)` → `OwnCondition` wrapping the parsed inner condition
    - `@supports(display: grid)` → `SupportsCondition`

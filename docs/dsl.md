@@ -228,7 +228,7 @@ const SimpleButton = tasty(Button, {
 | `@media` | Media queries | `@media(w < 768px)` |
 | `@(...)` | Container queries | `@(panel, w >= 300px)` |
 | `@supports` | Feature/selector support | `@supports(display: grid)` |
-| `@root` | Root element states | `@root(theme=dark)` |
+| `@root` | Root element states | `@root(schema=dark)` |
 | `@parent` | Parent/ancestor element states | `@parent(hovered)` |
 | `@own` | Sub-element's own state | `@own(hovered)` |
 | `@starting` | Entry animation | `@starting` |
@@ -321,6 +321,8 @@ display: {
 ### `@root(...)` — Root Element States
 
 Root states generate selectors on the `:root` element. They are useful for theme modes, feature flags, and other page-level conditions:
+
+These docs use `data-schema` in examples. If your app standardizes on a different root attribute, keep the same pattern and swap the attribute name consistently in your aliases and selectors.
 
 ```jsx
 color: {

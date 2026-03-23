@@ -216,7 +216,7 @@ configure({
   nonce: 'csp-nonce',                // CSP nonce for security
   states: {                          // Global predefined states for advanced state mapping
     '@mobile': '@media(w < 768px)',
-    '@dark': '@root(theme=dark)',
+    '@dark': '@root(schema=dark)',
   },
 });
 ```

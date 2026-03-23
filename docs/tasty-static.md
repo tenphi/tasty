@@ -1,6 +1,6 @@
 # Zero Runtime Mode (tastyStatic)
 
-`tastyStatic` is a build-time utility for generating CSS with zero runtime overhead. It's designed for static sites, no-JS websites, and performance-critical applications where you want to eliminate all runtime styling code.
+`tastyStatic` is a build-time utility for generating CSS with zero runtime overhead. It's designed for static sites, no-JS websites, and performance-critical applications where you want to eliminate all runtime styling code. For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -130,6 +130,8 @@ module.exports = {
 };
 ```
 
+These examples use `data-schema="dark"` as the root-state convention. If your app already uses a different root attribute such as `data-theme`, keep the same alias pattern and swap the attribute name consistently in your zero-runtime config.
+
 ### With Configuration
 
 ```javascript
@@ -141,7 +143,7 @@ module.exports = {
         states: {
           '@mobile': '@media(w < 768px)',
           '@tablet': '@media(w < 1024px)',
-          '@dark': '@root(theme=dark)',
+          '@dark': '@root(schema=dark)',
         },
         devMode: true,
       },
@@ -413,8 +415,17 @@ const card = tastyStatic({
 
 ---
 
+## Common Issues
+
+- No CSS file is generated: make sure the Babel plugin actually runs for files importing `@tenphi/tasty/static`, and verify the `output` path is writable.
+- Styles stay dynamic by mistake: `tastyStatic()` only supports build-time-known values. Move runtime values to CSS variables or switch that component to runtime `tasty()`.
+- Turbopack config behaves inconsistently: prefer `configFile` over inline functions so the setup stays JSON-serializable.
+
+---
+
 ## Related
 
+- [Docs Hub](README.md) — Choose the right guide by task or rendering mode
 - [Style DSL](dsl.md) — State maps, tokens, units, extending semantics (shared by runtime and static)
 - [Runtime API](runtime.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, hooks
 - [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers

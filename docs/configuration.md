@@ -1,6 +1,6 @@
 # Configuration
 
-Configure the Tasty style system before your app renders using the `configure()` function. Configuration must be done **before any styles are generated** (before first render).
+Configure the Tasty style system before your app renders using the `configure()` function. Configuration must be done **before any styles are generated** (before first render). For a higher-level docs map, see the [Docs Hub](README.md).
 
 ```jsx
 import { configure } from '@tenphi/tasty';
@@ -13,7 +13,7 @@ configure({
   states: {
     '@mobile': '@media(w < 768px)',
     '@tablet': '@media(768px <= w < 1024px)',
-    '@dark': '@root(theme=dark)',
+    '@dark': '@root(schema=dark)',
   },
 
   // Parser configuration
@@ -35,6 +35,8 @@ configure({
   },
 });
 ```
+
+These docs use `data-schema="dark"` in examples. If your app already standardizes on a different attribute such as `data-theme`, keep the same pattern and swap the attribute name consistently everywhere you define root-state aliases.
 
 ---
 

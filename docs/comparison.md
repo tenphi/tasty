@@ -1,5 +1,7 @@
 # Comparison
 
+Use this guide when you are deciding whether Tasty is the right tool. If you have already decided to adopt it and need rollout guidance, use the [Adoption Guide](adoption.md) instead.
+
 Tasty is best understood not as a general-purpose CSS framework, but as a **styling engine for design systems**.
 
 Most styling tools focus on one of these layers:

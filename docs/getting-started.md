@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md).
+This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
 
 ---
 
@@ -62,6 +62,8 @@ configure({
   },
 });
 ```
+
+These examples use `data-schema="dark"` as the root-state convention. If your app already uses a different attribute such as `data-theme="dark"`, keep the pattern and swap the attribute name consistently across your config and components.
 
 Import this file at the top of your app entry point so it runs before any component renders:
 
@@ -142,7 +144,7 @@ export default [
 
 ### What `recommended` catches
 
-The recommended config enables 18 rules covering the most common issues:
+The `recommended` config enables 18 of the plugin's 27 total rules. It covers the most common issues without turning on the stricter governance rules:
 
 | Category | Rules | Examples |
 |----------|-------|---------|
@@ -193,9 +195,21 @@ All three share the same DSL, tokens, units, and state mappings.
 
 ## Next steps
 
+- **[Docs Hub](README.md)** — Pick the next guide by role, rendering mode, or task
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components: sub-elements, styleProps, tokens, extension
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
 - **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
 - **[Building a Design System](design-system.md)** — Practical guide to building a DS layer with Tasty: tokens, recipes, primitives, compound components
+- **[Adoption Guide](adoption.md)** — Roll out Tasty inside an existing design system or platform team
+- **[Comparison](comparison.md)** — Evaluate Tasty against other styling systems
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
+- **[Debug Utilities](debug.md)** — Inspect generated CSS and debug runtime behavior when styles do not look right
+
+---
+
+## Common issues
+
+- Styles are missing on first render: make sure the file that calls `configure()` is imported before any `tasty()` component renders.
+- Token or unit values are not what you expect: check your `configure({ tokens, units })` setup, then inspect the generated CSS variables with [Debug Utilities](debug.md).
+- You need zero-runtime or SSR instead of the default runtime path: use [Zero Runtime (tastyStatic)](tasty-static.md) or [Server-Side Rendering](ssr.md) rather than trying to retrofit the runtime setup later.

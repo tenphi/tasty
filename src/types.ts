@@ -69,7 +69,7 @@ export type TokenValue = string | number | boolean | undefined | null;
 /**
  * Tokens definition for inline CSS custom properties.
  * - `$name` keys become `--name` CSS properties
- * - `#name` keys become `--name-color` and `--name-color-rgb` CSS properties
+ * - `#name` keys become `--name-color` and `--name-color-{colorSpace}` CSS properties
  */
 export type Tokens = Record<`$${string}` | `#${string}`, TokenValue>;
 

@@ -1,3 +1,4 @@
+import { configure, resetConfig } from './config';
 import { borderStyle } from './styles/border';
 import { colorStyle } from './styles/color';
 import { createStyle } from './styles/createStyle';
@@ -12,6 +13,15 @@ import { presetStyle } from './styles/preset';
 import { radiusStyle } from './styles/radius';
 
 describe('Tasty style tests', () => {
+  beforeEach(() => {
+    resetConfig();
+    configure({ colorSpace: 'rgb' });
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
   it('should handle border styles', () => {
     expect(borderStyle({ border: '1px solid #000' })).toEqual({
       border: '1px solid var(--000-color, #000)',
@@ -351,7 +361,7 @@ describe('Tasty style tests', () => {
 
       expect(result).toEqual({
         '--background-color': 'var(--theme-color, rgb(255 0 0))',
-        '--background-color-rgb': 'var(--theme-color-rgb, rgb(255 0 0))',
+        '--background-color-rgb': 'var(--theme-color-rgb, 255 0 0)',
       });
     });
 

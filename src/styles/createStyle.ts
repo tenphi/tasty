@@ -1,10 +1,13 @@
+import {
+  getColorSpaceComponents,
+  getColorSpaceSuffix,
+  strToColorSpace,
+} from '../utils/color-space';
 import { toSnakeCase } from '../utils/string';
 import {
-  getRgbValuesFromRgbaString,
   normalizeColorTokenValue,
   parseColor,
   parseStyle,
-  strToRgb,
 } from '../utils/styles';
 import type {
   CSSMap,
@@ -16,18 +19,22 @@ import type {
 const CACHE: Record<string, StyleHandler> = {};
 
 /**
- * Convert color fallback chain to RGB fallback chain.
- * Example: var(--primary-color, var(--secondary-color)) → var(--primary-color-rgb, var(--secondary-color-rgb))
+ * Convert color fallback chain to component fallback chain.
+ * Example: var(--primary-color, var(--secondary-color))
+ *   → var(--primary-color-oklch, var(--secondary-color-oklch))
  */
-export function convertColorChainToRgbChain(colorValue: string): string {
-  // Handle rgb(var(--name-color-rgb) / alpha) pattern.
-  // When #name.opacity is parsed, the classifier produces rgb(var(--name-color-rgb) / .opacity).
-  // The RGB chain should be just the inner var() reference, without the rgb() wrapper and opacity.
-  const rgbVarMatch = colorValue.match(
-    /^rgba?\(\s*(var\(--[a-z0-9-]+-color-rgb\))\s*\//,
+export function convertColorChainToComponentChain(colorValue: string): string {
+  const suffix = getColorSpaceSuffix();
+
+  // Handle func(var(--name-color-{suffix}) / alpha) pattern.
+  // When #name.opacity is parsed, the classifier produces e.g.
+  // oklch(var(--name-color-oklch) / .opacity).
+  // The component chain should be just the inner var() reference.
+  const componentVarMatch = colorValue.match(
+    /^(?:rgb|hsl|oklch)a?\(\s*(var\(--[a-z0-9-]+-color-(?:rgb|hsl|oklch)\))\s*\//,
   );
-  if (rgbVarMatch) {
-    return rgbVarMatch[1];
+  if (componentVarMatch) {
+    return componentVarMatch[1];
   }
 
   // Match var(--name-color, ...) pattern
@@ -35,29 +42,20 @@ export function convertColorChainToRgbChain(colorValue: string): string {
   const match = colorValue.match(varPattern);
 
   if (!match) {
-    // Not a color variable, check if it's a color function or literal
-    if (colorValue.startsWith('rgb(') || colorValue.startsWith('rgba(')) {
-      return colorValue;
-    }
-    // Try to convert to RGB if possible
-    const rgba = strToRgb(colorValue);
-    if (rgba) {
-      const rgbValues = getRgbValuesFromRgbaString(rgba);
-      return rgbValues.join(' ');
-    }
+    // Not a color variable — try to convert to components
+    const components = getColorSpaceComponents(colorValue);
+    if (components !== colorValue) return components;
     return colorValue;
   }
 
   const [, name, fallback] = match;
 
   if (!fallback) {
-    // Simple var without fallback
-    return `var(--${name}-color-rgb)`;
+    return `var(--${name}-color-${suffix})`;
   }
 
-  // Recursively process the fallback
-  const processedFallback = convertColorChainToRgbChain(fallback.trim());
-  return `var(--${name}-color-rgb, ${processedFallback})`;
+  const processedFallback = convertColorChainToComponentChain(fallback.trim());
+  return `var(--${name}-color-${suffix}, ${processedFallback})`;
 }
 
 export function createStyle(
@@ -73,30 +71,24 @@ export function createStyle(
 
       if (styleValue == null || styleValue === false) return;
 
-      // Map style name to final CSS property.
-      // - "$foo" → "--foo"
-      // - "#name"        → "--name-color" (alternative color definition syntax)
       let finalCssStyle: string;
       const isColorToken =
         !cssStyle && typeof styleName === 'string' && styleName.startsWith('#');
 
       if (isColorToken) {
         const raw = styleName.slice(1);
-        // Convert camelCase to kebab and remove possible leading dash from uppercase start
         const name = toSnakeCase(raw).replace(/^-+/, '');
         finalCssStyle = `--${name}-color`;
       } else {
         finalCssStyle = cssStyle || toSnakeCase(styleName).replace(/^\$/, '--');
       }
 
-      // For color tokens, normalize boolean values (true → 'transparent', false → skip)
       if (isColorToken) {
         const normalized = normalizeColorTokenValue(styleValue);
-        if (normalized === null) return; // Skip false values
+        if (normalized === null) return;
         styleValue = normalized;
       }
 
-      // convert non-string values
       if (converter && typeof styleValue !== 'string') {
         styleValue = converter(styleValue as string | number | true);
 
@@ -109,35 +101,37 @@ export function createStyle(
         finalCssStyle.endsWith('-color')
       ) {
         styleValue = styleValue.trim();
+        const suffix = getColorSpaceSuffix();
 
-        const rgba = strToRgb(styleValue as string);
+        const colorSpaceStr = strToColorSpace(styleValue as string);
 
         const { color, name } = parseColor(styleValue as string);
 
-        if (name && rgba) {
+        if (name && colorSpaceStr) {
           return {
-            [finalCssStyle]: `var(--${name}-color, ${rgba})`,
-            [`${finalCssStyle}-rgb`]: `var(--${name}-color-rgb, ${getRgbValuesFromRgbaString(
-              rgba,
-            ).join(' ')})`,
+            [finalCssStyle]: `var(--${name}-color, ${colorSpaceStr})`,
+            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix}, ${getColorSpaceComponents(
+              colorSpaceStr,
+            )})`,
           };
         } else if (name) {
           if (color) {
             return {
               [finalCssStyle]: color,
-              [`${finalCssStyle}-rgb`]: convertColorChainToRgbChain(color),
+              [`${finalCssStyle}-${suffix}`]:
+                convertColorChainToComponentChain(color),
             };
           }
 
           return {
             [finalCssStyle]: `var(--${name}-color)`,
-            [`${finalCssStyle}-rgb`]: `var(--${name}-color-rgb)`,
+            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix})`,
           };
-        } else if (rgba) {
+        } else if (colorSpaceStr) {
           return {
-            [finalCssStyle]: rgba,
-            [`${finalCssStyle}-rgb`]:
-              getRgbValuesFromRgbaString(rgba).join(' '),
+            [finalCssStyle]: colorSpaceStr,
+            [`${finalCssStyle}-${suffix}`]:
+              getColorSpaceComponents(colorSpaceStr),
           };
         }
 

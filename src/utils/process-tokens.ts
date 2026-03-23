@@ -2,165 +2,38 @@ import type { Tokens, TokenValue } from '../types';
 
 import type { CSSProperties } from './css-types';
 
-import { okhslToRgb } from './okhsl-to-rgb';
-import {
-  getRgbValuesFromRgbaString,
-  hexToRgb,
-  normalizeColorTokenValue,
-  parseStyle,
-} from './styles';
+import { getColorSpaceComponents, getColorSpaceSuffix } from './color-space';
+import { normalizeColorTokenValue, parseStyle } from './styles';
+
+export { hslToRgbValues } from './color-math';
 
 const devMode = process.env.NODE_ENV !== 'production';
 
 /**
- * Parse HSL values from an hsl()/hsla() string.
- * Supports both comma-separated (legacy) and space-separated (modern) syntax:
- *   hsl(200, 40%, 50%)
- *   hsl(200 40% 50%)
- *   hsl(200 40% 50% / 0.5)
- *
- * Returns [h, s, l] where h is 0-360, s and l are 0-1, or null if parsing fails.
+ * Extract color components in the configured color space.
+ * Returns a CSS variable reference for token colors, or decomposed
+ * components as a space-separated string.
  */
-function parseHslValues(str: string): [number, number, number] | null {
-  const match = str.match(/hsla?\(([^)]+)\)/i);
-  if (!match) return null;
+function extractColorSpaceValue(
+  colorValue: string,
+  parsedOutput: string,
+): string {
+  const suffix = getColorSpaceSuffix();
 
-  const inner = match[1].trim();
-  // Split by slash first (for alpha), then handle color components
-  const [colorPart] = inner.split('/');
-  // Split by comma or whitespace
-  const parts = colorPart
-    .trim()
-    .split(/[,\s]+/)
-    .filter(Boolean);
-
-  if (parts.length < 3) return null;
-
-  // Parse hue (can be unitless degrees, deg, turn, rad, or grad)
-  let h = parseFloat(parts[0]);
-  const hueStr = parts[0].toLowerCase();
-  if (hueStr.endsWith('turn')) {
-    h = parseFloat(hueStr) * 360;
-  } else if (hueStr.endsWith('rad')) {
-    h = (parseFloat(hueStr) * 180) / Math.PI;
-  } else if (hueStr.endsWith('grad')) {
-    h = parseFloat(hueStr) * 0.9; // 400 grad = 360 deg
-  }
-  // deg or unitless are already in degrees
-
-  // Normalize hue to 0-360 range
-  h = h % 360;
-  if (h < 0) h += 360;
-
-  // Parse saturation and lightness (percentages)
-  const parsePercent = (val: string): number => {
-    const num = parseFloat(val);
-    return val.includes('%') ? num / 100 : num;
-  };
-
-  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
-  const l = Math.max(0, Math.min(1, parsePercent(parts[2])));
-
-  return [h, s, l];
-}
-
-/**
- * Convert HSL to RGB (sRGB).
- * Algorithm from: https://en.wikipedia.org/wiki/HSL_and_HSV#HSL_to_RGB_alternative
- * Same as used in CSS Color 4 spec.
- *
- * @param h - Hue in degrees (0-360)
- * @param s - Saturation (0-1)
- * @param l - Lightness (0-1)
- * @returns RGB values in 0-255 range (may have fractional values)
- */
-export function hslToRgbValues(
-  h: number,
-  s: number,
-  l: number,
-): [number, number, number] {
-  const a = s * Math.min(l, 1 - l);
-
-  const f = (n: number): number => {
-    const k = (n + h / 30) % 12;
-    return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-  };
-
-  // Convert 0-1 range to 0-255
-  return [f(0) * 255, f(8) * 255, f(4) * 255];
-}
-
-/**
- * Format a number to a string with up to 1 decimal place, removing trailing zeros.
- */
-function formatRgbComponent(n: number): string {
-  return parseFloat(n.toFixed(1)).toString();
-}
-
-/**
- * Extract RGB triplet from a color value.
- * Returns the RGB values as a space-separated string (e.g., "255 128 0")
- * or a CSS variable reference for token colors.
- */
-function extractRgbValue(colorValue: string, parsedOutput: string): string {
-  // If the parsed output references a color variable, use the -rgb variant
+  // If the parsed output references a color variable, use the companion variant
   const varMatch = parsedOutput.match(/var\(--([a-z0-9-]+)-color\)/);
   if (varMatch) {
-    return `var(--${varMatch[1]}-color-rgb)`;
+    return `var(--${varMatch[1]}-color-${suffix})`;
   }
 
-  // For rgb(...) values, extract the triplet
-  if (parsedOutput.startsWith('rgb(')) {
-    const rgbValues = getRgbValuesFromRgbaString(parsedOutput);
-    if (rgbValues && rgbValues.length >= 3) {
-      return rgbValues.join(' ');
-    }
-  }
+  // Try the original color value first, then parsed output
+  const components = getColorSpaceComponents(colorValue);
+  if (components !== colorValue) return components;
 
-  // For hsl(...) values, convert to RGB triplet
-  if (
-    parsedOutput.startsWith('hsl(') ||
-    parsedOutput.startsWith('hsla(') ||
-    colorValue.startsWith('hsl(') ||
-    colorValue.startsWith('hsla(')
-  ) {
-    // Try parsedOutput first, then original colorValue
-    const hslValues =
-      parseHslValues(parsedOutput) || parseHslValues(colorValue);
-    if (hslValues) {
-      const [r, g, b] = hslToRgbValues(
-        hslValues[0],
-        hslValues[1],
-        hslValues[2],
-      );
-      return `${formatRgbComponent(r)} ${formatRgbComponent(g)} ${formatRgbComponent(b)}`;
-    }
-  }
+  const componentsFromParsed = getColorSpaceComponents(parsedOutput);
+  if (componentsFromParsed !== parsedOutput) return componentsFromParsed;
 
-  // For okhsl(...) values, convert to RGB triplet
-  if (parsedOutput.startsWith('okhsl(') || colorValue.startsWith('okhsl(')) {
-    // Try parsedOutput first, then original colorValue
-    const rgbResult = okhslToRgb(parsedOutput) || okhslToRgb(colorValue);
-    if (rgbResult) {
-      const rgbValues = getRgbValuesFromRgbaString(rgbResult);
-      if (rgbValues && rgbValues.length >= 3) {
-        return rgbValues.join(' ');
-      }
-    }
-  }
-
-  // For hex values, convert to RGB triplet
-  if (colorValue.startsWith('#') && /^#[0-9a-fA-F]{3,8}$/.test(colorValue)) {
-    const rgbResult = hexToRgb(colorValue);
-    if (rgbResult) {
-      const rgbValues = getRgbValuesFromRgbaString(rgbResult);
-      if (rgbValues && rgbValues.length >= 3) {
-        return rgbValues.join(' ');
-      }
-    }
-  }
-
-  // Fallback: return the parsed output (may not be ideal but covers edge cases)
+  // Fallback: return the parsed output
   return parsedOutput;
 }
 
@@ -178,7 +51,7 @@ function isValidTokenValue(
   if (typeof value === 'object') {
     if (devMode) {
       console.warn(
-        'CubeUIKit: Object values are not allowed in tokens prop. ' +
+        'Tasty: Object values are not allowed in tokens prop. ' +
           'Tokens do not support state-based styling. Use a primitive value instead.',
       );
     }
@@ -210,7 +83,7 @@ function processTokenValue(value: string | number): string {
 /**
  * Process tokens object into inline style properties.
  * - $name -> --name with parsed value
- * - #name -> --name-color AND --name-color-rgb with parsed values
+ * - #name -> --name-color AND --name-color-{colorSpace} with parsed values
  *
  * @param tokens - The tokens object to process
  * @returns CSSProperties object or undefined if no tokens to process
@@ -247,8 +120,8 @@ export function processTokens(
       if (!result) result = {};
       result[propName] = processedValue;
     } else if (key.startsWith('#')) {
-      // Color token: #name -> --name-color and --name-color-rgb
       const colorName = key.slice(1);
+      const suffix = getColorSpaceSuffix();
 
       // Normalize color token value (true → 'transparent', false is already filtered by isValidTokenValue)
       const effectiveValue = normalizeColorTokenValue(value);
@@ -265,13 +138,12 @@ export function processTokens(
       if (!result) result = {};
       result[`--${colorName}-color`] = processedValue;
 
-      // Skip RGB generation for #current values (currentcolor is dynamic, cannot extract RGB)
-      // Match only #current or #current.opacity, not #current-theme or #currently-used
+      // Skip component generation for #current values (currentcolor is dynamic, cannot decompose)
       if (/^#current(?:\.|$)/i.test(lowerValue)) {
         continue;
       }
 
-      result[`--${colorName}-color-rgb`] = extractRgbValue(
+      result[`--${colorName}-color-${suffix}`] = extractColorSpaceValue(
         originalValue,
         processedValue,
       );

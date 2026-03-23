@@ -158,13 +158,13 @@ describe('formatPropertyCSS', () => {
     expect(css).toContain('initial-value: 0deg');
   });
 
-  it('formats a color property with companion -rgb', () => {
+  it('formats a color property with companion component property', () => {
     const css = formatPropertyCSS('#accent', {
       initialValue: 'rgb(128 0 255)',
     });
     expect(css).toContain('@property --accent-color');
     expect(css).toContain('syntax: "<color>"');
-    expect(css).toContain('@property --accent-color-rgb');
+    expect(css).toContain('@property --accent-color-oklch');
     expect(css).toContain('syntax: "<number>+"');
   });
 
@@ -298,7 +298,7 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('--border-color:');
     // Color properties get companion -rgb rules
     expect(css).toContain('@property --white-color');
-    expect(css).toContain('@property --white-color-rgb');
+    expect(css).toContain('@property --white-color-oklch');
   });
 
   it('collectInternals is idempotent', () => {

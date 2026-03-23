@@ -32,7 +32,7 @@ export interface TastyPlugin {
    * Design tokens injected as CSS custom properties on `:root`.
    * Values are parsed through the Tasty DSL. Supports state maps.
    * - `$name` → `--name` CSS custom property
-   * - `#name` → `--name-color` and `--name-color-rgb`
+   * - `#name` → `--name-color` and `--name-color-{colorSpace}`
    */
   tokens?: ConfigTokens;
   /** Predefined tokens replaced during style parsing (`$name` or `#name`) */

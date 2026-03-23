@@ -1,3 +1,4 @@
+import { getColorSpaceFunc, getColorSpaceSuffix } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 
 import {
@@ -324,7 +325,7 @@ export function classify(
       }
       return {
         bucket: Bucket.Color,
-        processed: `rgb(var(--${base}-color-rgb) / ${alpha})`,
+        processed: `${getColorSpaceFunc()}(var(--${base}-color-${getColorSpaceSuffix()}) / ${alpha})`,
       };
     }
 

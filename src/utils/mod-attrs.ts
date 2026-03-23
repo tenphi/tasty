@@ -32,7 +32,7 @@ function modAttrs(map: AllBaseProps['mods']): Record<string, string> | null {
             // Reject other types (objects, arrays, functions)
             if (process.env.NODE_ENV !== 'production') {
               console.warn(
-                `CubeUIKit: Invalid mod value for "${key}". Expected boolean, string, or number, got ${typeof value}`,
+                `Tasty: Invalid mod value for "${key}". Expected boolean, string, or number, got ${typeof value}`,
               );
             }
           }

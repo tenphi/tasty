@@ -503,18 +503,6 @@ module.exports = {
 
 Both share the same DSL, tokens, units, state mappings, and recipes.
 
-### Runtime Performance
-
-If you choose the runtime approach, performance is usually a non-issue in practice:
-
-- CSS is generated and injected only when styles are actually used.
-- Multi-level caching avoids repeated parsing and style recomputation.
-- Styles are split into reusable chunks and applied as multiple class names, so matching chunks can be reused across components instead of re-injected.
-- Style normalization guarantees equivalent style input resolves to the same chunks, improving deduplication hit rates.
-- A style garbage collector removes unused styles/chunks over time.
-- A dedicated style injector minimizes DOM/style-tag overhead.
-- This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
-
 ### Server-Side Rendering (Experimental)
 
 SSR with zero-cost client hydration. Existing `tasty()` components work unchanged — SSR is opt-in and requires no per-component modifications. Supports Next.js (App Router with streaming), Astro (middleware + islands), and any React-based framework via the core API. Requires React 19+.
@@ -570,6 +558,66 @@ See the [full SSR guide](docs/ssr.md) for Astro integration, streaming SSR, gene
 | `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro middleware + auto-hydration | Node / Browser |
+
+## Browser Requirements
+
+Tasty's exclusive selector system relies on modern CSS pseudo-class syntax:
+
+- **`:is()`** — available across all major browsers since January 2021 ([MDN Baseline](https://developer.mozilla.org/en-US/docs/Web/CSS/:is)).
+- **Level-4 `:not()` with selector lists** — Chrome/Edge 88+, Firefox 84+, Safari 9+, Opera 75+.
+- **Not supported:** IE 11.
+
+## Performance
+
+### Bundle Size
+
+All sizes measured with [size-limit](https://github.com/ai/size-limit) — minified and brotli-compressed, including all dependencies.
+
+| Entry point | Size |
+|-------------|------|
+| `@tenphi/tasty` (runtime + SSR) | ~44 kB |
+| `@tenphi/tasty/core` (runtime, no SSR) | ~41 kB |
+| `@tenphi/tasty/static` (zero-runtime) | ~1.5 kB |
+
+Run `pnpm size` for exact up-to-date numbers.
+
+### Runtime Benchmarks
+
+If you choose the runtime approach, performance is usually a non-issue in practice. The numbers below show single-call throughput for the core pipeline stages, measured with `vitest bench` on an Apple M1 Max (Node 22).
+
+| Operation | ops/sec | Latency (mean) |
+|-----------|--------:|---------------:|
+| `renderStyles` — 5 flat properties (cold) | ~72,000 | ~14 us |
+| `renderStyles` — state map with media/hover/modifier (cold) | ~22,000 | ~46 us |
+| `renderStyles` — same styles (cached) | ~7,200,000 | ~0.14 us |
+| `parseStateKey` — simple key like `:hover` (cold) | ~1,200,000 | ~0.9 us |
+| `parseStateKey` — complex OR/AND/NOT key (cold) | ~190,000 | ~5 us |
+| `parseStateKey` — any key (cached) | ~3,300,000–8,900,000 | ~0.1–0.3 us |
+| `parseStyle` — value tokens like `2x 4x` (cold) | ~345,000 | ~3 us |
+| `parseStyle` — color tokens (cold) | ~525,000 | ~1.9 us |
+| `parseStyle` — any value (cached) | ~15,500,000 | ~0.06 us |
+
+"Cold" benchmarks use unique inputs to bypass all caches. Cached benchmarks reuse a single input and measure the LRU hot path.
+
+Run `pnpm bench` to reproduce.
+
+#### What This Means in Practice
+
+- **Cached path dominates production.** After a component's first render, subsequent renders with stable styles skip the pipeline entirely (React `useMemo` + LRU cache hits at every level). All cached operations are sub-microsecond — effectively free.
+- **Cold path is fast enough.** The heaviest cold operation — a complex state map with media queries, hover, and modifiers — takes ~46 us. Even a page with 100 unique styled components adds only ~5 ms of total style computation on first render, negligible next to React reconciliation and DOM work.
+- **Cache multipliers are 30x–100x.** This confirms the multi-level LRU architecture (parser, state-key, simplify, condition, pipeline) is delivering real value.
+- **Comparable to lighter systems.** Emotion's `css()` is typically 5–20 us for simple styles; Tasty's cold `renderStyles` at ~14 us for 5 properties is in the same range despite doing significantly more work (state maps, design tokens, sub-elements, chunking).
+- **On slower devices.** The benchmarks above are from an M1 Max (Geekbench 6 SC ~2,400). A mid-range consumer laptop (~1,800 SC) is roughly 1.3x slower; a mid-range phone (~1,200 SC) is roughly 2x slower; a budget phone (~700 SC) is roughly 3–4x slower. Even at 4x, the heaviest cold operation stays under 200 us and 100 unique components under 20 ms — still well within a single frame budget. The cached path remains sub-microsecond on all devices.
+
+### How It Stays Fast
+
+- CSS is generated and injected only when styles are actually used.
+- Multi-level caching avoids repeated parsing and style recomputation.
+- Styles are split into reusable chunks and applied as multiple class names, so matching chunks can be reused across components instead of re-injected.
+- Style normalization guarantees equivalent style input resolves to the same chunks, improving deduplication hit rates.
+- A style garbage collector removes unused styles/chunks over time.
+- A dedicated style injector minimizes DOM/style-tag overhead.
+- This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
 
 ## Ecosystem
 

@@ -17,6 +17,8 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm lint:fix` | Lint and auto-fix |
 | `pnpm format` | Format with Prettier |
 | `pnpm format:check` | Check formatting |
+| `pnpm bench` | Run benchmarks (vitest bench) |
+| `pnpm size` | Check bundle sizes (size-limit) |
 | `pnpm hygiene` | Run lint + format check + typecheck together |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
 

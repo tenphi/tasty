@@ -199,7 +199,7 @@ slideIn.dispose();   // Immediate keyframes deletion from DOM
 
 ### `configure(config): void`
 
-Configures the Tasty style system. Must be called **before** any styles are generated (before first render).
+Configures the Tasty style system. `configure()` is optional, but if you use it, it must be called **before** any styles are generated (before first render).
 
 ```typescript
 import { configure } from '@tenphi/tasty';

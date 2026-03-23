@@ -27,7 +27,7 @@ That guarantee unlocks a concise, CSS-like DSL where design tokens, custom units
 - **AI-friendly by design** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, understand, and refactor even advanced state bindings as confidently as a human — because there's no hidden cascade logic or implicit ordering to second-guess.
 - **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
 - **CSS properties as normal component props** — `styleProps` lets you expose selected styles as typed React props. Use `<Button placeSelf="end">` or `<Space flow="row" gap="2x">` without extra wrappers, utility classes, or `styles` overrides. The same props also accept state maps, so responsive values work with the same API. See [CSS properties as props](#css-properties-as-props).
-- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts. See [Configuration](docs/configuration.md).
+- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts. Built-in units and standard color values work out of the box, and [Configuration](docs/configuration.md) lets teams define shared conventions on top.
 - **Near-complete modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, etc. Some features that don't fit Tasty's component model (such as `@layer` and `!important`) are intentionally omitted, but real-world use cases are covered almost completely.
 - **Runtime, zero-runtime, or SSR — your call** — Use `tasty()` for dynamic React components with runtime injection, `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction, or enable SSR with zero-cost client hydration for Next.js, Astro, or any React framework. Same DSL, same tokens, same output.
 - **Only generate what is used** — In runtime mode, Tasty injects CSS on demand for mounted components/variants, so your app avoids shipping style rules for UI states that are never rendered.
@@ -56,7 +56,7 @@ yarn add @tenphi/tasty
 
 ## Start Here
 
-- **[Getting Started](docs/getting-started.md)** — the canonical onboarding path: install, first component, `configure()`, ESLint, editor tooling, and rendering mode selection
+- **[Getting Started](docs/getting-started.md)** — the canonical onboarding path: install, first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection
 - **[Docs Hub](docs/README.md)** — choose docs by role and task: runtime, zero-runtime, SSR, design-system authoring, internals, and debugging
 - **[Methodology](docs/methodology.md)** — the recommended component model and public API conventions for design-system code
 
@@ -84,8 +84,9 @@ const Card = tasty({
     flow: 'column',
     padding: '4x',
     gap: '2x',
-    fill: '#surface',
-    border: '#border bottom',
+    fill: 'okhsl(98% 0.02 255)',
+    color: 'okhsl(28% 0.03 255)',
+    border: '1bw solid okhsl(88% 0.02 255)',
     radius: '1r',
   },
 });
@@ -94,9 +95,9 @@ const Card = tasty({
 <Card>Hello World</Card>
 ```
 
-Every value maps to CSS you'd recognize — but with tokens and units that keep your design system consistent by default.
+Every value maps to CSS you'd recognize. This example is intentionally config-free: built-in units work immediately, and standard color values such as `rgb(...)`, `hsl(...)`, named colors, and `okhsl(...)` are all valid without setup. `okhsl(...)` is the recommended choice when you want a design-system-friendly color authoring path from day one.
 
-The examples below assume you'll define your own tokens and shared state aliases with `configure()`. For a copy-paste setup that works end-to-end, follow [Getting Started](docs/getting-started.md).
+Use `configure()` when you want to define shared tokens, state aliases, recipes, or other conventions for your app or design system. For a fuller onboarding path, follow [Getting Started](docs/getting-started.md).
 
 ### Add state-driven styles
 
@@ -143,7 +144,7 @@ const DangerButton = tasty(Button, {
 
 Child styles merge with parent styles intelligently — state maps can extend or replace parent states per-property.
 
-### Configure once, use everywhere
+### Optional: configure shared conventions
 
 ```tsx
 import { configure } from '@tenphi/tasty';
@@ -160,7 +161,7 @@ configure({
 });
 ```
 
-Predefined states turn complex selector logic into single tokens. Use `@mobile` instead of writing media query expressions in every component.
+Use `configure()` once when your app or design system needs shared aliases, tokens, recipes, or parser extensions. Predefined states turn complex selector logic into single tokens, so teams can write `@mobile` instead of repeating media query expressions in every component.
 
 ### CSS properties as props
 
@@ -719,7 +720,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 
 ### Start here
 
-- **[Getting Started](docs/getting-started.md)** — Installation, first component, configuration, ESLint plugin setup, editor tooling, and rendering mode decision tree
+- **[Getting Started](docs/getting-started.md)** — Installation, first component, optional shared configuration, ESLint plugin setup, editor tooling, and rendering mode decision tree
 - **[Methodology](docs/methodology.md)** — The recommended patterns for structuring Tasty components: root + sub-elements, styleProps, tokens, styles vs style, wrapping and extension
 
 ### Guides

@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
+This guide walks you from zero to a working Tasty component, then through the optional shared configuration and tooling layers. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
 
 ---
 
@@ -47,9 +47,9 @@ export default function App() {
 
 ---
 
-## Add configuration
+## Optional: add shared configuration
 
-Call `configure()` once, before your app renders, to define state aliases and other conventions your components share:
+Use `configure()` once, before your app renders, when your app or design system needs shared state aliases, tokens, recipes, or parser extensions:
 
 ```tsx
 // src/tasty-config.ts
@@ -76,9 +76,9 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-### Define design tokens and unit values
+### Define shared tokens and override default unit values
 
-Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` also multiply CSS custom properties. Define them via `configure({ tokens })`:
+Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` already work without setup and multiply CSS custom properties by default. Use `configure({ tokens })` when you want to define shared token values or override the defaults your app uses:
 
 ```tsx
 // src/tasty-config.ts
@@ -110,7 +110,7 @@ configure({
 });
 ```
 
-Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered.
+Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered. You can also use standard CSS color values such as `rgb(...)`, `hsl(...)`, and named colors directly; `okhsl(...)` is the recommended choice when you want authored colors that stay aligned with Tasty's design-system-oriented workflow.
 
 > **Note:** `configure({ replaceTokens })` is a separate mechanism — it replaces tokens with literal values at parse time (baked into CSS). Use it for value aliases like `$card-padding: '4x'` that should be resolved during style generation, not for defining color or unit values. See [Configuration — Replace Tokens](configuration.md#replace-tokens-parse-time-substitution) for details.
 

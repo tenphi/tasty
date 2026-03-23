@@ -4,7 +4,7 @@ Use this page when you know what you want to do, but not which document to open 
 
 ## Start Here
 
-- **New to Tasty**: [Getting Started](getting-started.md) for installation, the first component, `configure()`, ESLint, editor tooling, and rendering mode selection.
+- **New to Tasty**: [Getting Started](getting-started.md) for installation, the first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection.
 - **Learning the component model**: [Methodology](methodology.md) for root + sub-elements, `styleProps`, tokens, extension, and recommended boundaries between `styles`, `style`, and wrappers.
 - **Evaluating fit**: [Comparison](comparison.md) for tool-selection context, then [Adoption Guide](adoption.md) for rollout strategy inside a design system.
 

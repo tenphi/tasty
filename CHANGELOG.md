@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.14.1
+
+### Patch Changes
+
+- [#47](https://github.com/tenphi/tasty/pull/47) [`f5c237f`](https://github.com/tenphi/tasty/commit/f5c237f8aca633db5fd364eab2364def3e083367) Thanks [@tenphi](https://github.com/tenphi)! - Improve color style types: extract reusable `ColorValue` type, add `hsl()`, `okhsl()`, `oklch()` autocomplete hints, remove deprecated `rgba()`, document double-color fill syntax.
+
 ## 0.14.0
 
 ### Minor Changes

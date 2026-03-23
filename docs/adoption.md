@@ -1,6 +1,6 @@
 # Adoption Guide
 
-Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**. That means adoption usually starts where styling has already become a composition problem, not with an all-at-once rewrite.
+Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**: what the comparison guide calls a house styling language. That means adoption usually starts where styling has already become a composition problem, not with an all-at-once rewrite.
 
 This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase. Use this document for rollout strategy and adoption sequencing; use the [Comparison guide](comparison.md) when the open question is whether Tasty is the right tool in the first place.
 

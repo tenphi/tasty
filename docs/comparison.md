@@ -4,6 +4,10 @@ Use this guide when you are deciding whether Tasty is the right tool. If you hav
 
 Tasty is best understood not as a general-purpose CSS framework, but as a **styling engine for design systems and shared component APIs**.
 
+It targets a different layer: helping design-system teams define a **house styling language** on top of CSS.
+
+That does not require a big upfront configuration step. Tasty's built-in units and normal CSS color values work out of the box, and `okhsl(...)` is available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
+
 Most styling tools focus on one of these layers:
 
 - direct app styling
@@ -12,9 +16,7 @@ Most styling tools focus on one of these layers:
 - utility composition
 - atomic CSS generation
 
-Tasty targets a different layer: it helps teams define a **house styling language** on top of CSS, including tokens, state semantics, style props, recipes, custom units, and sub-element rules.
-
-That does not mean a big upfront configuration step is required. Tasty's built-in units and normal CSS color values work out of the box, and `okhsl(...)` is available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
+Tasty's house styling language can include tokens, state semantics, style props, recipes, custom units, and sub-element rules.
 
 That is why syntax-level comparisons are often shallow. The more meaningful comparison is about:
 

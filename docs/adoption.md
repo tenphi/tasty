@@ -2,7 +2,7 @@
 
 Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**. That means the adoption path is not "rewrite your classes" but "reshape your styling architecture."
 
-This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase.
+This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase. Use this document for rollout strategy and adoption sequencing; use the [Comparison guide](comparison.md) when the open question is whether Tasty is the right tool in the first place.
 
 ---
 
@@ -74,7 +74,7 @@ The same engine can power a minimal design system with a handful of tokens:
 ```tsx
 configure({
   tokens: { '#bg': '#white', '#text': '#111' },
-  states: { '@dark': '@root(theme=dark)' },
+  states: { '@dark': '@root(schema=dark)' },
 });
 ```
 
@@ -269,6 +269,14 @@ const LoadingButton = tasty(Button, {
 ```
 
 **No cascade/specificity concerns.** Tasty's mutually exclusive selectors mean extending a component cannot accidentally break another. Import order, class name collisions, and specificity arithmetic are non-issues.
+
+---
+
+## Migration and Interop Notes
+
+- **From Tailwind**: keep utility-authored product surfaces as-is at first, and use Tasty to build or replace the design-system primitives underneath them instead of forcing an all-at-once markup rewrite.
+- **From CSS-in-JS libraries**: start with shared primitives such as `Box`, `Text`, and `Button`, preserve the external component API, and move state logic into Tasty state maps so behavior changes without product-code churn.
+- **From CSS Modules or plain CSS**: migrate token definitions and repeated patterns first, then wrap existing DOM structure with `tasty()` components gradually rather than converting every stylesheet at once.
 
 ---
 

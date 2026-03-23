@@ -78,6 +78,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "size": "size-limit",
+    "bench": "vitest bench",
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "version": "changeset version",

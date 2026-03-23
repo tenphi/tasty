@@ -1,6 +1,8 @@
 # Comparison
 
-Tasty is best understood not as a general-purpose CSS framework, but as a **styling engine for design systems**.
+Use this guide when you are deciding whether Tasty is the right tool. If you have already decided to adopt it and need rollout guidance, use the [Adoption Guide](adoption.md) instead.
+
+Tasty is best understood not as a general-purpose CSS framework, but as a **styling engine for design systems and shared component APIs**.
 
 Most styling tools focus on one of these layers:
 
@@ -10,7 +12,9 @@ Most styling tools focus on one of these layers:
 - utility composition
 - atomic CSS generation
 
-Tasty targets a different layer: it helps design-system authors define a **house styling language** on top of CSS, including tokens, state semantics, style props, recipes, custom units, and sub-element rules.
+Tasty targets a different layer: it helps teams define a **house styling language** on top of CSS, including tokens, state semantics, style props, recipes, custom units, and sub-element rules.
+
+That does not mean a big upfront configuration step is required. Tasty's built-in units and normal CSS color values work out of the box, and `okhsl(...)` is available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
 
 That is why syntax-level comparisons are often shallow. The more meaningful comparison is about:
 
@@ -25,7 +29,7 @@ That is why syntax-level comparisons are often shallow. The more meaningful comp
 
 | System | Best described as | Main authoring model | Conflict model | Best fit |
 |---|---|---|---|---|
-| **Tasty** | Design-system styling engine | Custom DSL with tokens, state maps, recipes, style props, sub-elements, custom units | **Mutually exclusive selector resolution** for stateful styles | DS/platform teams defining a house styling language |
+| **Tasty** | Design-system styling engine | Custom DSL with tokens, state maps, recipes, style props, sub-elements, custom units | **Mutually exclusive selector resolution** for stateful styles | Teams building shared component APIs or a house styling language |
 | **Tailwind CSS** | Utility-first styling framework | Utility classes in markup | Utility composition, variants, and framework-controlled ordering | Product teams optimizing for speed and direct authoring |
 | **Panda CSS** | Typed styling engine with atomic output | Typed style objects, recipes, generated primitives, style props | Atomic CSS with static analysis | Teams wanting a DS-friendly engine with typed primitives |
 | **vanilla-extract** | Zero-runtime TS-native stylesheet system | `.css.ts` files, theme contracts, style composition | Standard CSS semantics | Teams wanting static CSS and low-level control |
@@ -103,7 +107,7 @@ Its strength is speed: developers compose utilities directly where they use them
 
 Tasty solves a different problem.
 
-Tasty is more appropriate when styling should be exposed through a **design-system-owned API** rather than through raw utility composition. Instead of asking every product engineer to compose the styling vocabulary directly, Tasty makes more sense when a design-system team wants to define:
+Tasty is more appropriate when styling should be exposed through a **design-system-owned API** rather than through raw utility composition. You can start using Tasty immediately with its built-in DSL, but it becomes especially compelling when a team wants to define:
 
 - approved style props
 - semantic tokens
@@ -118,7 +122,7 @@ So this is not mainly a comparison of syntax. It is a comparison of **governance
 - Tailwind: developers author directly with framework vocabulary
 - Tasty: design-system authors define the vocabulary product teams consume
 
-Tailwind is usually a stronger fit for fast product styling. Tasty is usually a stronger fit for governed design-system architecture.
+Tailwind is usually a stronger fit for fast product styling with framework-owned vocabulary. Tasty is usually a stronger fit when teams want direct usability now, but also a path toward governed design-system architecture.
 
 To make this concrete, consider a button with `hover`, `disabled`, and `theme=danger` states.
 
@@ -356,6 +360,7 @@ That is why generic "feature matrix" comparisons often miss the point. Tasty is 
 Tasty makes the most sense when:
 
 - a real design system exists or is being built
+- a shared component API is emerging even if the design system is still lightweight
 - styling should be governed through a central platform team
 - component state logic is complex
 - the team wants a house styling language instead of raw CSS-shaped authoring
@@ -369,7 +374,7 @@ Tasty makes the most sense when:
 
 A different tool may be more appropriate when:
 
-- the main goal is styling app code directly with minimal setup
+- the main goal is styling app code directly with minimal setup and without defining shared styling conventions
 - the team prefers a shared framework vocabulary over a custom design-system language
 - the complexity of intersecting states is low
 - low ceremony matters more than central governance

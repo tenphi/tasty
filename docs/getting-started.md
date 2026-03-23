@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty setup with tooling. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md).
+This guide walks you from zero to a working Tasty component, then through the optional shared configuration and tooling layers. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
 
 ---
 
@@ -47,9 +47,9 @@ export default function App() {
 
 ---
 
-## Add configuration
+## Optional: add shared configuration
 
-Call `configure()` once, before your app renders, to define state aliases and other conventions your components share:
+Use `configure()` once, before your app renders, when your app or design system needs shared state aliases, tokens, recipes, or parser extensions:
 
 ```tsx
 // src/tasty-config.ts
@@ -63,6 +63,8 @@ configure({
 });
 ```
 
+These examples use `data-schema="dark"` as the root-state convention. If your app already uses a different attribute such as `data-theme="dark"`, keep the pattern and swap the attribute name consistently across your config and components.
+
 Import this file at the top of your app entry point so it runs before any component renders:
 
 ```tsx
@@ -74,9 +76,9 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-### Define design tokens and unit values
+### Define shared tokens and override default unit values
 
-Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` also multiply CSS custom properties. Define them via `configure({ tokens })`:
+Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` already work without setup and multiply CSS custom properties by default. Use `configure({ tokens })` when you want to define shared token values or override the defaults your app uses:
 
 ```tsx
 // src/tasty-config.ts
@@ -108,7 +110,7 @@ configure({
 });
 ```
 
-Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered.
+Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered. You can also use standard CSS color values such as `rgb(...)`, `hsl(...)`, and named colors directly; `okhsl(...)` is the recommended choice when you want authored colors that stay aligned with Tasty's design-system-oriented workflow.
 
 > **Note:** `configure({ replaceTokens })` is a separate mechanism — it replaces tokens with literal values at parse time (baked into CSS). Use it for value aliases like `$card-padding: '4x'` that should be resolved during style generation, not for defining color or unit values. See [Configuration — Replace Tokens](configuration.md#replace-tokens-parse-time-substitution) for details.
 
@@ -142,7 +144,7 @@ export default [
 
 ### What `recommended` catches
 
-The recommended config enables 18 rules covering the most common issues:
+The `recommended` config enables 18 of the plugin's 27 total rules. It covers the most common issues without turning on the stricter governance rules:
 
 | Category | Rules | Examples |
 |----------|-------|---------|
@@ -193,9 +195,21 @@ All three share the same DSL, tokens, units, and state mappings.
 
 ## Next steps
 
+- **[Docs Hub](README.md)** — Pick the next guide by role, rendering mode, or task
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components: sub-elements, styleProps, tokens, extension
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
 - **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
 - **[Building a Design System](design-system.md)** — Practical guide to building a DS layer with Tasty: tokens, recipes, primitives, compound components
+- **[Adoption Guide](adoption.md)** — Roll out Tasty inside an existing design system or platform team
+- **[Comparison](comparison.md)** — Evaluate Tasty against other styling systems
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
+- **[Debug Utilities](debug.md)** — Inspect generated CSS and debug runtime behavior when styles do not look right
+
+---
+
+## Common issues
+
+- Styles are missing on first render: make sure the file that calls `configure()` is imported before any `tasty()` component renders.
+- Token or unit values are not what you expect: check your `configure({ tokens, units })` setup, then inspect the generated CSS variables with [Debug Utilities](debug.md).
+- You need zero-runtime or SSR instead of the default runtime path: use [Zero Runtime (tastyStatic)](tasty-static.md) or [Server-Side Rendering](ssr.md) rather than trying to retrofit the runtime setup later.

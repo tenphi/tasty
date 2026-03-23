@@ -1,6 +1,6 @@
 # Runtime API
 
-The React-specific `tasty()` component factory, component props, and hooks. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md).
+The React-specific `tasty()` component factory, component props, and hooks. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -262,22 +262,71 @@ function GlobalReset() {
 }
 ```
 
-### useMergeStyles
+### useKeyframes
 
-Merge multiple style objects for compound component prop forwarding:
+Inject `@keyframes` rules and return the generated animation name:
 
 ```tsx
-import { useMergeStyles } from '@tenphi/tasty';
+import { useKeyframes } from '@tenphi/tasty';
 
-function MyTabs({ styles, tabListStyles, prefixStyles }) {
-  const mergedStyles = useMergeStyles(styles, {
-    TabList: tabListStyles,
-    Prefix: prefixStyles,
-  });
+function Spinner() {
+  const spin = useKeyframes(
+    {
+      from: { transform: 'rotate(0deg)' },
+      to: { transform: 'rotate(360deg)' },
+    },
+    { name: 'spin' }
+  );
 
-  return <TabsElement styles={mergedStyles} />;
+  return <div style={{ animation: `${spin} 1s linear infinite` }} />;
 }
 ```
+
+`useKeyframes()` also supports a factory function with dependencies:
+
+```tsx
+function Pulse({ scale }: { scale: number }) {
+  const pulse = useKeyframes(
+    () => ({
+      '0%': { transform: 'scale(1)' },
+      '100%': { transform: `scale(${scale})` },
+    }),
+    [scale]
+  );
+
+  return <div style={{ animation: `${pulse} 500ms ease-in-out alternate infinite` }} />;
+}
+```
+
+### useProperty
+
+Register a CSS `@property` rule so a custom property can animate smoothly:
+
+```tsx
+import { useProperty } from '@tenphi/tasty';
+
+function Spinner() {
+  useProperty('$rotation', {
+    syntax: '<angle>',
+    inherits: false,
+    initialValue: '0deg',
+  });
+
+  return <div style={{ transform: 'rotate(var(--rotation))' }} />;
+}
+```
+
+`useProperty()` accepts Tasty token syntax for the property name:
+
+- `$name` defines `--name`
+- `#name` defines `--name-color` and auto-infers `<color>`
+- `--name` is also supported for existing CSS variables
+
+### Troubleshooting
+
+- Styles are not updating: make sure `configure()` runs before first render, and verify the generated class name or global rule with [Debug Utilities](debug.md).
+- SSR output looks wrong: check the [SSR guide](ssr.md) because the hooks integrate with SSR collectors differently than the client-only runtime path.
+- Animation/custom property issues: prefer `useKeyframes()` and `useProperty()` over raw CSS when you want Tasty to manage injection and SSR collection for you.
 
 ---
 
@@ -289,3 +338,4 @@ function MyTabs({ styles, tabListStyles, prefixStyles }) {
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
 - **[Zero Runtime (tastyStatic)](tasty-static.md)** — Build-time static styling with Babel plugin
 - **[Server-Side Rendering](ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks
+- **[Debug Utilities](debug.md)** — Inspect injected CSS, cache state, and active styles at runtime

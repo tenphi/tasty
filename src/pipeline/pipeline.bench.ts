@@ -35,7 +35,7 @@ function makeComplexPool(n: number): Styles[] {
     fill: {
       '': '#surface',
       ':hover': `#primary-${i}`,
-      'disabled': `#muted-${i}`,
+      disabled: `#muted-${i}`,
     },
     color: {
       '': '#text',
@@ -57,7 +57,7 @@ const cachedComplexStyles: Styles = {
   fill: {
     '': '#surface',
     ':hover': '#primary',
-    'disabled': '#muted',
+    disabled: '#muted',
   },
   color: {
     '': '#text',

@@ -45,6 +45,13 @@ type PresetName = [PresetNameKey] extends [never] ? string : PresetNameKey;
 
 type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type OpaquePercentage = '' | `.${Digit}` | `.${Digit}${Digit}` | '.100';
+type ColorValue =
+  | `#${NamedColor}${OpaquePercentage}`
+  | `rgb(${string})`
+  | `hsl(${string})`
+  | `okhsl(${string})`
+  | `oklch(${string})`
+  | (string & {});
 export type NoType = false | null | undefined;
 
 export interface StylesInterface extends Omit<
@@ -79,18 +86,20 @@ export interface StylesInterface extends Omit<
   /**
    * Set the background color of the element. Shortcut for `background-color` with enhanced support for Tasty color tokens and syntaxes.
    *
+   * Supports double-color syntax: the second color is applied as a foreground overlay via a CSS custom property.
+   *
    * Examples:
    * - `fill="#purple.10"` // purple background with 10% opacity
    * - `fill="#danger"` // danger theme color
    * - `fill="rgb(255 128 0)"` // custom RGB color
+   * - `fill="rgb(255 128 0 / 0.5)"` // RGB with opacity
+   * - `fill="hsl(200 100% 50%)"` // HSL color
+   * - `fill="okhsl(200 100% 50%)"` // perceptually uniform OKHSL color
+   * - `fill="oklch(0.7 0.15 200)"` // OKLCH color
+   * - `fill="#primary #secondary"` // double color (second as foreground overlay)
    * - `fill={true}` // default fill color
    */
-  fill?:
-    | `#${NamedColor}${OpaquePercentage}`
-    | `rgb(${string})`
-    | `rgba(${string})`
-    | boolean
-    | (string & {});
+  fill?: ColorValue | boolean;
   /**
    * @deprecated Use `fill` instead.
    */
@@ -119,28 +128,26 @@ export interface StylesInterface extends Omit<
    * - `svgFill="#purple.10"` // purple fill with 10% opacity
    * - `svgFill="#danger"` // danger theme color
    * - `svgFill="rgb(255 128 0)"` // custom RGB color
+   * - `svgFill="hsl(200 100% 50%)"` // HSL color
+   * - `svgFill="okhsl(200 100% 50%)"` // OKHSL color
+   * - `svgFill="oklch(0.7 0.15 200)"` // OKLCH color
    * - `svgFill="currentColor"` // inherit from parent color
    */
-  svgFill?:
-    | `#${NamedColor}${OpaquePercentage}`
-    | `rgb(${string})`
-    | `rgba(${string})`
-    | (string & {});
+  svgFill?: ColorValue;
   /**
    * Set the text (current) color of the element. Shortcut for `color` with enhanced support for Tasty color tokens and syntaxes.
    *
    * Examples:
    * - `color="#purple"` // purple text color
    * - `color="#danger.6"` // danger color with 60% opacity
+   * - `color="rgb(255 128 0)"` // custom RGB color
+   * - `color="hsl(200 100% 50%)"` // HSL color
+   * - `color="okhsl(200 100% 50%)"` // OKHSL color
+   * - `color="oklch(0.7 0.15 200)"` // OKLCH color
    * - `color="red"` // CSS color name
    * - `color={true}` // currentColor
    */
-  color?:
-    | `#${NamedColor}${OpaquePercentage}`
-    | `rgb(${string})`
-    | `rgba(${string})`
-    | boolean
-    | string;
+  color?: ColorValue | boolean;
   /**
    * The fade style applies gradient-based fading masks to the edges of an element. Replaces complex CSS mask gradients with a simple, declarative API.
    *

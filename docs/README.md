@@ -1,6 +1,6 @@
 # Tasty Docs
 
-Tasty is a styling engine for design systems that turns component state into deterministic CSS by compiling state maps into mutually exclusive selectors. Use this hub to choose the right guide once you know whether you are evaluating the model, adopting it in a design system, or implementing with it day to day.
+Tasty is a styling engine for design systems that turns component state into deterministic CSS by compiling state maps into mutually exclusive selectors. Use this hub to choose the right guide once you know whether you are evaluating the model, adopting it in a design system, or implementing reusable, stateful components day to day.
 
 ## Start Here
 

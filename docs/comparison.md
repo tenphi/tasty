@@ -16,7 +16,7 @@ Most styling tools focus on one of these layers:
 - utility composition
 - atomic CSS generation
 
-Tasty's house styling language can include tokens, state semantics, style props, recipes, custom units, and sub-element rules.
+Tasty's house styling language can include tokens, state semantics, style props, recipes, custom units, and sub-element rules. In other words, it is a governed styling model, not just another syntax for writing CSS.
 
 That is why syntax-level comparisons are often shallow. The more meaningful comparison is about:
 

@@ -17,16 +17,27 @@
 
 ---
 
-Tasty is a styling engine for design systems that generates deterministic CSS for stateful components. It compiles state maps into **mutually exclusive selectors**, so each property resolves from declared state logic instead of selector competition.
+Tasty is a styling engine for design systems that generates deterministic CSS for stateful components.
 
-It fits best when a team is defining a house styling language for reusable components: tokens, style props, state aliases, recipes, and sub-element rules that need to stay predictable as the system grows.
+It compiles state maps into **mutually exclusive selectors**, so for a given property and component state, one branch wins by construction instead of competing through cascade and specificity.
+
+That is the core guarantee: component styling resolves from declared state logic, not from source-order accidents or specificity fights.
+
+Tasty fits best when you are building a design system or component library with intersecting states, variants, tokens, sub-elements, responsive rules, and extension semantics that need to stay predictable over time.
+
+On top of that foundation, Tasty gives teams a governed styling model: a CSS-like DSL, tokens, recipes, typed style props, sub-elements, and multiple rendering modes.
+
+- **New here?** Start with [Comparison](docs/comparison.md) if you are evaluating fit.
+- **Adopting Tasty?** Read the [Adoption Guide](docs/adoption.md).
+- **Want the mechanism first?** Jump to [How It Actually Works](#how-it-actually-works).
+- **Ready to build?** Go to [Getting Started](docs/getting-started.md).
 
 ## Why Tasty
 
-- **Deterministic composition, not cascade fights** — Tasty generates mutually exclusive selectors, so stateful styles resolve from the state map you declared rather than source order or specificity accidents. See [How It Actually Works](#how-it-actually-works).
-- **Built for design-system teams** — Best fit for teams building reusable components with intersecting states, variants, tokens, sub-elements, responsive rules, and extension semantics that must stay predictable over time.
-- **A governed styling model, not just syntax sugar** — Tasty is not just a syntax layer. It gives design-system teams a way to define the styling language product teams consume: tokens, units, recipes, style props, state aliases, and sub-element rules.
-- **DSL that still feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
+- **Deterministic composition, not cascade fights** — Stateful styles resolve from the state map you declared, not from selector competition. See [How It Actually Works](#how-it-actually-works).
+- **Built for design-system teams** — Best fit for reusable component systems with complex state interactions.
+- **A governed styling model, not just syntax sugar** — Design-system authors define the styling language product teams consume.
+- **DSL that still feels like CSS** — Familiar property names, less selector boilerplate. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
 
 ### Supporting capabilities
 
@@ -40,7 +51,7 @@ It fits best when a team is defining a house styling language for reusable compo
 
 Modern component styling becomes fragile when multiple selectors can still win for the same property. Hover, disabled, theme, breakpoint, parent state, and root state rules start competing through specificity and source order.
 
-Tasty replaces that competition with explicit state-map resolution. Each property compiles into mutually exclusive branches, so reusable component styling stays deterministic as systems grow. For the full mechanism, jump to [How It Actually Works](#how-it-actually-works).
+Tasty replaces that competition with explicit state-map resolution. Each property compiles into mutually exclusive branches, so component styling stays deterministic as systems grow. For the full mechanism, jump to [How It Actually Works](#how-it-actually-works).
 
 ## Installation
 
@@ -62,6 +73,8 @@ yarn add @tenphi/tasty
 ```
 
 ## Start Here
+
+For the fuller docs map beyond the quick routes above, start here:
 
 - **[Comparison](docs/comparison.md)** — read this first if you are evaluating whether Tasty fits your team's styling model
 - **[Adoption Guide](docs/adoption.md)** — understand who Tasty is for, where it fits, and how to introduce it incrementally
@@ -95,7 +108,9 @@ const Card = tasty({
 <Card>Hello World</Card>
 ```
 
-Every value maps to CSS you'd recognize. This example is intentionally plain and config-free. When you want a more design-system-shaped authoring model, Tasty also supports built-in units, tokens, recipes, state aliases, and color values such as `okhsl(...)` without extra runtime libraries.
+Every value maps to CSS you'd recognize. This example is intentionally a simple first contact, not a tour of the whole DSL.
+
+When you want a more design-system-shaped authoring model, Tasty also supports built-in units, tokens, recipes, state aliases, and color values such as `okhsl(...)` without extra runtime libraries.
 
 Use `configure()` when you want to define shared tokens, state aliases, recipes, or other conventions for your app or design system. For a fuller onboarding path, follow [Getting Started](docs/getting-started.md).
 
@@ -214,7 +229,7 @@ The same props also support state maps, so responsive values use the exact same 
 </Space>
 ```
 
-Layout components can expose flow props. Buttons can expose positioning props. Each component can offer only the style props that make sense for its role, while still keeping tokens, custom units, and state maps fully typed. This works in runtime `tasty()` components, not in `tastyStatic()`.
+Layout components can expose flow props. Buttons can expose positioning props. Each component can offer only the style props that make sense for its role while keeping tokens, custom units, and state maps fully typed. This works in runtime `tasty()` components, not in `tastyStatic()`.
 
 ## Choose a Styling Approach
 

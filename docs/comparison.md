@@ -87,9 +87,9 @@ Tasty compiles this into selectors where `disabled` is guarded by `:not(:hover)`
 
 That makes Tasty less of a "better way to write CSS objects" and more of a **state-aware style compiler for design systems**.
 
-Beyond state resolution, Tasty includes several structural capabilities that most other tools do not offer:
+Beyond state resolution, Tasty also provides several structural capabilities that reinforce the design-system layer:
 
-- **CSS properties as typed React props** — `styleProps` lets a component expose selected style properties as normal props (`<Button placeSelf="end">`), including state maps for responsive values. No other tool provides this as a first-class, typed, design-system-aware feature.
+- **CSS properties as typed React props** — `styleProps` lets a component expose selected style properties as normal props (`<Button placeSelf="end">`), including state maps for responsive values. This keeps layout and composition controls inside a governed component API instead of pushing teams back to ad hoc styling escapes.
 - **Sub-element styling** — Compound components declare inner parts via capitalized keys in `styles` and `data-element` attributes. States, tokens, and recipes apply across the entire element tree from a single definition. See [Runtime API — Sub-element Styling](runtime.md#sub-element-styling).
 - **Auto-inferred `@property`** — When a custom property is assigned a concrete value, Tasty infers the CSS `@property` syntax and registers it automatically, enabling smooth transitions on custom properties without manual declarations.
 - **AI-friendly style definitions** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, refactor, and generate Tasty styles as confidently as a human — no hidden cascade logic or implicit ordering to second-guess.
@@ -122,7 +122,7 @@ So this is not mainly a comparison of syntax. It is a comparison of **governance
 - Tailwind: developers author directly with framework vocabulary
 - Tasty: design-system authors define the vocabulary product teams consume
 
-Tailwind is usually a stronger fit for fast product styling with framework-owned vocabulary. Tasty is usually a stronger fit when teams want direct usability now, but also a path toward governed design-system architecture.
+Tailwind is a stronger fit for fast product styling with framework-owned vocabulary. Tasty is a stronger fit when styling should be exposed through a design-system-owned API and state resolution needs to stay deterministic as the component model grows.
 
 To make this concrete, consider a button with `hover`, `disabled`, and `theme=danger` states.
 
@@ -301,7 +301,7 @@ So while Stitches and Emotion are strong tools for building components, Tasty is
 
 That makes it narrower in audience, but deeper in architectural ambition.
 
-Tasty's runtime performance is also validated in enterprise-scale applications where styling overhead is not noticeable in normal UI flows — an important consideration for teams evaluating runtime CSS-in-JS at scale.
+For teams evaluating runtime styling at scale, Tasty also documents its runtime benchmarks and caching model in the main [README](../README.md#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
 
 ---
 

@@ -5,8 +5,8 @@
 <h1 align="center">Tasty</h1>
 
 <p align="center">
-  <strong>The styling engine built for design systems.</strong><br>
-  Deterministic CSS generation. State-aware DSL. Zero specificity conflicts. Ever.
+  <strong>Deterministic styling for stateful component systems.</strong><br>
+  A design-system styling engine that compiles component states into mutually exclusive selectors.
 </p>
 
 <p align="center">
@@ -17,23 +17,27 @@
 
 ---
 
-Most CSS-in-JS libraries emit rules that compete through cascade and specificity. Tasty emits **mutually exclusive CSS selectors** — for any component state combination, exactly one selector matches each property at a time. No cascade conflicts, no specificity wars, no `!important` escapes. Components compose and extend without breaking each other.
+Tasty is a styling engine for design systems that generates deterministic, conflict-free CSS by compiling component states into **mutually exclusive selectors**. For any component state combination, exactly one selector matches each property at a time, so styles compose predictably instead of competing through cascade and specificity.
 
-That guarantee unlocks a concise, CSS-like DSL where design tokens, custom units, responsive states, container queries, sub-element styling, and theming all compose without surprises — one coherent system that scales from a single component to an enterprise design system.
+That mechanism is why Tasty exists. The CSS-like DSL, tokens, style props, sub-elements, responsive states, rendering modes, and SSR story all sit on top of the same foundation: stateful component styling that resolves deterministically instead of cascade-driven guesswork.
 
 ## Why Tasty
 
-- **Deterministic at any scale** — Exclusive selector generation eliminates the entire class of cascade/specificity bugs. Every state combination resolves to exactly one CSS rule per property. Refactor freely. See [How It Actually Works](#how-it-actually-works).
-- **AI-friendly by design** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, understand, and refactor even advanced state bindings as confidently as a human — because there's no hidden cascade logic or implicit ordering to second-guess.
-- **DSL that feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
+- **Deterministic composition, not cascade fights** — Tasty generates mutually exclusive selectors, so stateful styles resolve from the state map you declared rather than source order or specificity accidents. See [How It Actually Works](#how-it-actually-works).
+- **Built for design-system teams** — Tasty fits best when you are building reusable components with intersecting states, variants, tokens, sub-elements, responsive rules, and extension semantics that need to stay predictable over time.
+- **A governed styling model, not just syntax sugar** — Tokens, custom units, recipes, `styleProps`, and sub-elements let design-system authors define the styling language product teams consume.
+- **DSL that still feels like CSS** — Property names you already know (`padding`, `color`, `display`) with syntax sugar that removes boilerplate. Learn the DSL in minutes, not days. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
 - **CSS properties as normal component props** — `styleProps` lets you expose selected styles as typed React props. Use `<Button placeSelf="end">` or `<Space flow="row" gap="2x">` without extra wrappers, utility classes, or `styles` overrides. The same props also accept state maps, so responsive values work with the same API. See [CSS properties as props](#css-properties-as-props).
-- **Design-system native** — Color tokens (`#primary`), spacing units (`2x`), typography presets (`h1`, `t2`), border radius (`1r`), and recipes are first-class primitives, not afterthoughts. Built-in units and standard color values work out of the box, and [Configuration](docs/configuration.md) lets teams define shared conventions on top.
-- **Near-complete modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, etc. Some features that don't fit Tasty's component model (such as `@layer` and `!important`) are intentionally omitted, but real-world use cases are covered almost completely.
-- **Runtime, zero-runtime, or SSR — your call** — Use `tasty()` for dynamic React components with runtime injection, `tastyStatic()` with the Babel plugin for zero-runtime CSS extraction, or enable SSR with zero-cost client hydration for Next.js, Astro, or any React framework. Same DSL, same tokens, same output.
-- **Only generate what is used** — In runtime mode, Tasty injects CSS on demand for mounted components/variants, so your app avoids shipping style rules for UI states that are never rendered.
-- **Runtime performance that holds at scale** — The runtime path is tested against enterprise-scale applications and tuned with multi-level caching, chunk-level style reuse, style garbage collection, and a dedicated injector.
-- **Composable and extensible by design** — Extend any component's styles with proper merge semantics, and evolve built-in behavior through configuration and plugins.
-- **TypeScript-first** — Full type definitions, module augmentation for custom properties, and autocomplete for tokens, presets, and themes. See [Configuration](docs/configuration.md).
+- **Runtime first, with optional SSR** — Use `tasty()` for runtime React components. If your framework can execute that runtime code during server rendering, add the SSR integrations to collect the same generated CSS on the server and hydrate the cache on the client. Use `tastyStatic()` only when you specifically want build-time extraction instead of runtime styling.
+- **Modern CSS coverage where it matters** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
+- **Performance that scales with real systems** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
+- **AI-friendly and TypeScript-first** — Style definitions are declarative, structurally consistent, and fully typed, which helps both humans and tooling understand advanced stateful styles without hidden cascade logic.
+
+## Why It Exists
+
+Modern component styling breaks down when multiple selectors can match the same property at once. Hover, disabled, theme, breakpoint, parent state, and root state rules start competing through specificity and source order, so composition becomes fragile even when the CSS looks correct.
+
+Tasty solves that by compiling each property's state map into mutually exclusive selectors. The outcome is deterministic component styling for reusable systems: variants extend safely, sub-elements stay in sync with root state, and refactors stop depending on invisible ordering rules. For the full mechanism, jump to [How It Actually Works](#how-it-actually-works).
 
 ## Installation
 
@@ -57,18 +61,22 @@ yarn add @tenphi/tasty
 ## Start Here
 
 - **[Getting Started](docs/getting-started.md)** — the canonical onboarding path: install, first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection
-- **[Docs Hub](docs/README.md)** — choose docs by role and task: runtime, zero-runtime, SSR, design-system authoring, internals, and debugging
+- **[Comparison](docs/comparison.md)** — read this first if you are evaluating whether Tasty fits your team's styling model
+- **[Adoption Guide](docs/adoption.md)** — understand who Tasty is for, where it fits, and how to introduce it incrementally
+- **[Style rendering pipeline](docs/PIPELINE.md)** — see the selector model behind deterministic style resolution
+- **[Docs Hub](docs/README.md)** — choose docs by role and task: runtime, zero-runtime, runtime SSR integration, design-system authoring, internals, and debugging
 - **[Methodology](docs/methodology.md)** — the recommended component model and public API conventions for design-system code
 
-## Choose a Rendering Mode
+## Choose a Styling Approach
 
-| Mode | Entry point | Best for | Trade-off |
-|------|-------------|----------|-----------|
-| **Runtime** | `@tenphi/tasty` | Interactive apps and design systems | Full feature set; CSS is generated on demand at runtime |
+Tasty has two styling approaches: runtime `tasty()` and zero-runtime `tastyStatic()`.
+
+| Approach | Entry point | Best for | Trade-off |
+|----------|-------------|----------|-----------|
+| **Runtime** | `@tenphi/tasty` | Interactive apps with reusable stateful components and design systems | Full feature set; CSS is generated on demand at runtime |
 | **Zero-runtime** | `@tenphi/tasty/static` | Static sites, SSG, landing pages | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
-| **SSR** | `@tenphi/tasty/ssr/*` | Next.js, Astro, and other streaming React SSR setups | Uses runtime `tasty()` with server-collected CSS and hydration cache transfer |
 
-All three share the same DSL, tokens, units, and state mappings. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
+If your framework can execute runtime React code on the server, you can also add **SSR on top of runtime** with `@tenphi/tasty/ssr/*`. This uses the same `tasty()` pipeline, but collects CSS during server rendering and hydrates the cache on the client. That is the model for Next.js, generic React SSR, and Astro islands. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
 
 ## Quick Start
 
@@ -533,7 +541,7 @@ module.exports = {
 | **Sub-elements** | Built-in (`<C.Title>`) | Manual (`data-element`) |
 | **Variants** | Built-in (`variants` option) | Separate static styles |
 | **Framework** | React | Any (requires Babel) |
-| **Best for** | Interactive apps, design systems | Static sites, SSG, landing pages |
+| **Best for** | Interactive apps with reusable stateful components, design systems | Static sites, SSG, landing pages |
 
 Both share the same DSL, tokens, units, state mappings, and recipes.
 
@@ -714,9 +722,9 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 ## Documentation
 
-Start from the docs hub if you want the shortest path to the right guide for your role or rendering mode.
+Start from the docs hub if you want the shortest path to the right guide for your role or styling approach.
 
-- **[Docs Hub](docs/README.md)** — audience-based navigation across onboarding, design-system authoring, runtime, zero-runtime, SSR, debugging, and internals
+- **[Docs Hub](docs/README.md)** — audience-based navigation across onboarding, design-system authoring, runtime, zero-runtime, runtime SSR integration, debugging, and internals
 
 ### Start here
 

@@ -2,7 +2,7 @@
 
 This guide walks through building a design-system styling layer on top of Tasty — defining tokens, state aliases, recipes, primitive components, and compound components with sub-elements.
 
-It assumes you have already decided to adopt Tasty. For evaluation criteria, audience fit, and incremental adoption phases, see the [Adoption Guide](adoption.md). For the recommended component patterns and mental model, see [Methodology](methodology.md).
+It assumes you have already decided to adopt Tasty. The goal is not just to centralize tokens, but to define a styling language whose component states resolve deterministically across variants, responsive rules, and sub-elements. For evaluation criteria, audience fit, and incremental adoption phases, see the [Adoption Guide](adoption.md). For the recommended component patterns and mental model, see [Methodology](methodology.md).
 
 ---
 

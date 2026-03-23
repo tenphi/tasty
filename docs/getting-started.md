@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty component, then through the optional shared configuration and tooling layers. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
+This guide walks you from zero to a working Tasty component, then through the optional shared configuration and tooling layers. It is the right starting point when you already want to try Tasty in code. If you are still deciding whether Tasty fits your team, start with [Comparison](comparison.md) and [Adoption Guide](adoption.md) first. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [Runtime API](runtime.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
 
 ---
 
@@ -9,6 +9,8 @@ This guide walks you from zero to a working Tasty component, then through the op
 - **Node.js** >= 20
 - **React** >= 18 (peer dependency)
 - **Package manager**: pnpm, npm, or yarn
+
+Tasty can be used immediately in a React app, but it is most compelling for teams building reusable components with intersecting states, variants, tokens, and design-system conventions.
 
 ---
 
@@ -177,25 +179,25 @@ export default [
 
 ## Choosing a rendering mode
 
-Tasty supports three rendering modes. Pick the one that fits your use case:
+Tasty has two styling approaches. Pick the one that fits your use case, then decide whether your runtime setup also needs server rendering support:
 
-| Mode | Entry point | Best for | Trade-off |
+| Approach | Entry point | Best for | Trade-off |
 |------|-------------|----------|-----------|
-| **Runtime** | `tasty()` from `@tenphi/tasty` | Interactive apps, design systems | CSS generated at runtime; full feature set (styleProps, sub-elements, variants) |
+| **Runtime** | `tasty()` from `@tenphi/tasty` | Interactive apps with reusable stateful components, design systems | CSS generated at runtime; full feature set (styleProps, sub-elements, variants) |
 | **Zero-runtime** | `tastyStatic()` from `@tenphi/tasty/static` | Static sites, landing pages, SSG | Zero JS overhead; requires Babel plugin; no dynamic props |
-| **SSR** | `@tenphi/tasty/ssr/next` or `@tenphi/tasty/ssr/astro` | Next.js, Astro, streaming SSR | Runtime `tasty()` with server-rendered CSS and zero-cost hydration |
 
-All three share the same DSL, tokens, units, and state mappings.
+Both share the same DSL, tokens, units, and state mappings.
 
 - Runtime is the default and requires no extra setup beyond `@tenphi/tasty`.
+- If your framework can execute runtime code during server rendering, add SSR support on top of runtime with `@tenphi/tasty/ssr/next`, `@tenphi/tasty/ssr/astro`, or the core SSR API. This still uses `tasty()`; it just collects CSS on the server and hydrates the cache on the client.
 - Zero-runtime requires the Babel plugin and additional peer dependencies. See [Zero Runtime (tastyStatic)](tasty-static.md).
-- SSR works with existing `tasty()` components — wrap your app with a registry or middleware. See [Server-Side Rendering](ssr.md).
+- SSR works with existing `tasty()` components — wrap your app with a registry, middleware, or collector. See [Server-Side Rendering](ssr.md).
 
 ---
 
 ## Next steps
 
-- **[Docs Hub](README.md)** — Pick the next guide by role, rendering mode, or task
+- **[Docs Hub](README.md)** — Pick the next guide by role, styling approach, or task
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components: sub-elements, styleProps, tokens, extension
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
 - **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
@@ -212,4 +214,4 @@ All three share the same DSL, tokens, units, and state mappings.
 
 - Styles are missing on first render: make sure the file that calls `configure()` is imported before any `tasty()` component renders.
 - Token or unit values are not what you expect: check your `configure({ tokens, units })` setup, then inspect the generated CSS variables with [Debug Utilities](debug.md).
-- You need zero-runtime or SSR instead of the default runtime path: use [Zero Runtime (tastyStatic)](tasty-static.md) or [Server-Side Rendering](ssr.md) rather than trying to retrofit the runtime setup later.
+- You need build-time extraction or server-rendered CSS delivery: use [Zero Runtime (tastyStatic)](tasty-static.md) for extraction, or add [Server-Side Rendering](ssr.md) on top of runtime `tasty()` when your framework renders on the server.

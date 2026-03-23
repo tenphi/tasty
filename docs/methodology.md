@@ -1,10 +1,12 @@
 # Methodology
 
-Tasty has opinions about how components should be structured. The patterns described here are not mandatory — Tasty works without them — but following them gets the most out of the engine: better state resolution, cleaner component APIs, simpler overrides, and fewer surprises as the system grows.
+Tasty has opinions about how components should be structured. The patterns described here are not mandatory — Tasty works without them — but following them gets the most out of the engine: deterministic state resolution, cleaner component APIs, simpler overrides, and fewer surprises as the system grows.
 
 ---
 
 ## Component architecture: root + sub-elements
+
+This model matters most for design-system authors and platform teams building reusable, stateful components. It turns Tasty's selector guarantees into a component architecture that stays predictable as states, variants, and compound parts accumulate.
 
 ### The model
 

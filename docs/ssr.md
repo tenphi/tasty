@@ -1,6 +1,6 @@
 # Server-Side Rendering (SSR)
 
-Tasty supports server-side rendering with zero-cost client hydration. Your existing `tasty()` components work unchanged -- SSR is opt-in and requires no per-component modifications. For the broader docs map, see the [Docs Hub](README.md).
+Tasty supports server-side rendering with zero-cost client hydration. This does **not** introduce a separate styling engine: SSR uses the same runtime `tasty()` pipeline you already use on the client, then adds server-side CSS collection and client-side cache hydration. Your existing `tasty()` components work unchanged, and SSR remains opt-in with no per-component modifications. For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -18,7 +18,7 @@ The Astro integration (`@tenphi/tasty/ssr/astro`) has no additional dependencies
 
 ## How It Works
 
-During server rendering, `useStyles()` detects a `ServerStyleCollector` and collects CSS into it instead of trying to access the DOM. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `useStyles()` skips the rendering pipeline entirely during hydration.
+When the environment can execute runtime React code during server rendering, the same `tasty()` and `useStyles()` calls can run there too. In Next.js, generic React SSR, and Astro islands, Tasty simply changes where that runtime-generated CSS goes: `useStyles()` detects a `ServerStyleCollector` and collects CSS into it instead of trying to access the DOM. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `useStyles()` skips the rendering pipeline entirely during hydration.
 
 ```
 Server                         Client

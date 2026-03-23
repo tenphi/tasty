@@ -1,6 +1,6 @@
 # Adoption Guide
 
-Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**. That means the adoption path is not "rewrite your classes" but "reshape your styling architecture."
+Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**. That means adoption usually starts where styling has already become a composition problem, not with an all-at-once rewrite.
 
 This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase. Use this document for rollout strategy and adoption sequencing; use the [Comparison guide](comparison.md) when the open question is whether Tasty is the right tool in the first place.
 
@@ -116,6 +116,8 @@ See [Configuration](configuration.md) for the full `configure()` API.
 
 You do not need to adopt everything at once. Tasty is designed to be introduced layer by layer.
 
+A practical way to start is with the components that already suffer from intersecting state and variant logic: buttons, inputs, menus, disclosures, dialogs, list items, interactive cards, and compound components. Those are the places where deterministic resolution pays off fastest.
+
 ### Phase 1 -- Tokens and units
 
 Start by defining your design tokens and custom units. This is the lowest-risk step: it only configures the parser and does not require rewriting any components.
@@ -161,7 +163,7 @@ configure({
 
 ### Phase 3 -- Migrate a few primitives
 
-Pick 2-3 simple, widely used components (Box, Text, Button) and rewrite them with `tasty()`. Keep the public API identical so product code does not need to change.
+Pick 2-3 widely used primitives (Box, Text, Button) and rewrite them with `tasty()`. Keep the public API identical so product code does not need to change.
 
 ```tsx
 const Box = tasty({
@@ -175,11 +177,11 @@ const Box = tasty({
 });
 ```
 
-At this point you can validate the DSL, token workflow, and component authoring experience before committing further.
+At this point you can validate the DSL, token workflow, and component authoring experience before expanding the rollout.
 
 ### Phase 4 -- Encode complex states
 
-Move components with intersecting states (buttons with hover + disabled + theme variants, inputs with focus + error + readonly) to Tasty's state map syntax. This is where mutually exclusive selectors start paying off.
+Move the components with the most painful intersecting states (buttons with hover + disabled + theme variants, inputs with focus + error + readonly) to Tasty's state map syntax. This is where mutually exclusive selectors start paying off.
 
 ```tsx
 const Button = tasty({

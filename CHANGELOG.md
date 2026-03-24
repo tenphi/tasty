@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.14.2
+
+### Patch Changes
+
+- [#49](https://github.com/tenphi/tasty/pull/49) [`63bb6ec`](https://github.com/tenphi/tasty/commit/63bb6ecc69031bc72a83d66e25786f90cc1398a8) Thanks [@tenphi](https://github.com/tenphi)! - Fix sub-element `$` selector affix for bare HTML tag names: `$: "h1"` now produces `{root} h1` instead of `{root} h1 [data-element="..."]`. Add support for the `*` universal selector in affix patterns.
+
 ## 0.14.1
 
 ### Patch Changes

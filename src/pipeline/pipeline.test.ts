@@ -2102,7 +2102,7 @@ describe('Sub-element selector affix ($) tests', () => {
   });
 
   describe('HTML tag selectors', () => {
-    it('should handle simple tag selector: a', () => {
+    it('should handle simple tag selector: a (no key injection)', () => {
       const styles = {
         Links: {
           $: 'a',
@@ -2112,12 +2112,11 @@ describe('Sub-element selector affix ($) tests', () => {
 
       const result = renderStyles(styles, '.nav');
       expect(result.length).toBe(1);
-      // Tag is descendant of root, key is descendant of tag
       expect(result[0].selector).toContain(' a');
-      expect(result[0].selector).toContain('[data-element="Links"]');
+      expect(result[0].selector).not.toContain('data-element');
     });
 
-    it('should handle direct child tag: >a', () => {
+    it('should handle direct child tag: >a (no key injection)', () => {
       const styles = {
         Link: {
           $: '>a',
@@ -2128,10 +2127,10 @@ describe('Sub-element selector affix ($) tests', () => {
       const result = renderStyles(styles, '.nav');
       expect(result.length).toBe(1);
       expect(result[0].selector).toContain('> a');
-      expect(result[0].selector).toContain('[data-element="Link"]');
+      expect(result[0].selector).not.toContain('data-element');
     });
 
-    it('should handle chained tags: >ul>li', () => {
+    it('should handle chained tags: >ul>li (no key injection)', () => {
       const styles = {
         Item: {
           $: '>ul>li',
@@ -2142,7 +2141,7 @@ describe('Sub-element selector affix ($) tests', () => {
       const result = renderStyles(styles, '.list');
       expect(result.length).toBe(1);
       expect(result[0].selector).toMatch(/> ul > li/);
-      expect(result[0].selector).toContain('[data-element="Item"]');
+      expect(result[0].selector).not.toContain('data-element');
     });
 
     it('should handle tag with trailing combinator: >li>', () => {
@@ -2158,7 +2157,7 @@ describe('Sub-element selector affix ($) tests', () => {
       expect(result[0].selector).toMatch(/> li > \[data-element="Content"\]/);
     });
 
-    it('should handle mixed tags and elements: >Body>span', () => {
+    it('should handle mixed tags and elements: >Body>span (no key injection for trailing tag)', () => {
       const styles = {
         Text: {
           $: '>Body>span',
@@ -2170,7 +2169,7 @@ describe('Sub-element selector affix ($) tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].selector).toContain('[data-element="Body"]');
       expect(result[0].selector).toContain('> span');
-      expect(result[0].selector).toContain('[data-element="Text"]');
+      expect(result[0].selector).not.toContain('[data-element="Text"]');
     });
 
     it('should handle tag with pseudo: a:hover (no key injection)', () => {
@@ -2216,7 +2215,7 @@ describe('Sub-element selector affix ($) tests', () => {
       expect(result[0].selector).toMatch(/> \[data-element="Label"\] > span/);
     });
 
-    it('should handle custom element tags: my-component', () => {
+    it('should handle custom element tags: my-component (no key injection)', () => {
       const styles = {
         Custom: {
           $: '>my-component',
@@ -2227,7 +2226,7 @@ describe('Sub-element selector affix ($) tests', () => {
       const result = renderStyles(styles, '.container');
       expect(result.length).toBe(1);
       expect(result[0].selector).toContain('> my-component');
-      expect(result[0].selector).toContain('[data-element="Custom"]');
+      expect(result[0].selector).not.toContain('data-element');
     });
 
     it('should handle tag with attribute: button[disabled] (no key injection)', () => {
@@ -2243,6 +2242,77 @@ describe('Sub-element selector affix ($) tests', () => {
       // Should be compound selector without space between tag and attribute
       expect(result[0].selector).toContain(' button[disabled]');
       // No key injection because pattern ends with attribute
+      expect(result[0].selector).not.toContain('data-element');
+    });
+
+    it('should handle h1 tag (no key injection)', () => {
+      const styles = {
+        Title: {
+          $: 'h1',
+          color: 'red',
+        },
+      };
+
+      const result = renderStyles(styles, '.card');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(' h1');
+      expect(result[0].selector).not.toContain('data-element');
+    });
+
+    it('should handle tag with trailing combinator: h1 > (key injection)', () => {
+      const styles = {
+        Title: {
+          $: 'h1 >',
+          color: 'red',
+        },
+      };
+
+      const result = renderStyles(styles, '.card');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toMatch(/h1 > \[data-element="Title"\]/);
+    });
+  });
+
+  describe('Universal selector (*)', () => {
+    it('should handle bare universal selector: *', () => {
+      const styles = {
+        All: {
+          $: '*',
+          boxSizing: 'border-box',
+        },
+      };
+
+      const result = renderStyles(styles, '.root');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(' *');
+      expect(result[0].selector).not.toContain('data-element');
+    });
+
+    it('should handle tag followed by universal: h1 *', () => {
+      const styles = {
+        Title: {
+          $: 'h1 *',
+          color: 'inherit',
+        },
+      };
+
+      const result = renderStyles(styles, '.card');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(' h1 *');
+      expect(result[0].selector).not.toContain('data-element');
+    });
+
+    it('should handle direct child universal: > *', () => {
+      const styles = {
+        Children: {
+          $: '> *',
+          margin: '0',
+        },
+      };
+
+      const result = renderStyles(styles, '.stack');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain('> *');
       expect(result[0].selector).not.toContain('data-element');
     });
   });

@@ -36,6 +36,46 @@ styles: { Title: { preset: 'h3' } }
 // Targets: <div data-element="Title">
 ```
 
+#### Selector Affix (`$`)
+
+Control how a sub-element selector attaches to the root selector using the `$` property inside the sub-element's styles:
+
+| Pattern | Result | Description |
+|---------|--------|-------------|
+| *(none)* | ` [el]` | Descendant (default) |
+| `>` | `> [el]` | Direct child |
+| `>Body>Row>` | `> [Body] > [Row] > [el]` | Chained elements |
+| `h1` | ` h1` | Tag selector (no key injection) |
+| `h1 >` | ` h1 > [el]` | Key is direct child of tag |
+| `h1 *` | ` h1 *` | Any descendant of tag |
+| `*` | ` *` | All descendants |
+| `::before` | `::before` | Root pseudo (no key) |
+| `@::before` | `[el]::before` | Pseudo on the sub-element |
+| `>@:hover` | `> [el]:hover` | Pseudo-class on the sub-element |
+| `>@.active` | `> [el].active` | Class on the sub-element |
+
+Rules for key injection (`[data-element="..."]`):
+
+- **Trailing combinator** (`>`, `+`, `~`) — key is injected after it
+- **Uppercase element name** (`Body`, `Row`) — key is injected as descendant
+- **HTML tag** (`h1`, `a`, `span`) — no key injection; the tag IS the selector
+- **Universal selector** (`*`) — no key injection
+- **Pseudo / class / attribute** — no key injection
+
+The `@` placeholder marks exactly where `[data-element="..."]` is injected, allowing you to attach pseudo-classes, pseudo-elements, or class selectors directly to the sub-element instead of the root:
+
+```jsx
+const List = tasty({
+  styles: {
+    Item: {
+      $: '>@:last-child',
+      border: 'none',
+    },
+  },
+});
+// → .t0 > [data-element="Item"]:last-child { border: none }
+```
+
 ### Color Token
 
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:

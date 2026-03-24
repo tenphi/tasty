@@ -146,37 +146,39 @@ Individual props `marginTop`, `marginRight`, `marginBottom`, `marginLeft`, `marg
 
 ### `width`
 
-Element width with min/max control.
+Element width with min/max control. One, two, or three values set `min-width`, `width`, and `max-width` together.
 
-**Syntax:** `[value]` | `[min max]` | `[min value max]` | `[modifier value]`
+**Positional syntax:**
 
-**Modifiers:** `min`, `max`, `fixed`
+| Value | min-width | width | max-width |
+|-------|-----------|-------|-----------|
+| `"10x"` | initial | `10x` | initial |
+| `"1x 10x"` | `1x` | auto | `10x` |
+| `"1x 5x 10x"` | `1x` | `5x` | `10x` |
+| `"0 100% 800px"` | `0` | `100%` | `800px` |
+| `"initial 100% 1400px"` | initial | `100%` | `1400px` |
+
+**Modifier syntax:**
+
+| Value | min-width | width | max-width |
+|-------|-----------|-------|-----------|
+| `"min 2x"` | `2x` | auto | initial |
+| `"max 100%"` | initial | auto | `100%` |
+| `"fixed 200px"` | `200px` | `200px` | `200px` |
 
 **Keywords:** `stretch`, `max-content`, `min-content`, `fit-content`
 
 | Value | Effect |
 |-------|--------|
-| `"10x"` | Width `10x`, min `initial`, max `initial` |
-| `"1x 10x"` | Width `auto`, min `1x`, max `10x` |
-| `"1x 5x 10x"` | Min `1x`, width `5x`, max `10x` |
-| `"min 2x"` | Min-width `2x`, width `auto`, max `initial` |
-| `"max 100%"` | Max-width `100%`, width `auto`, min `initial` |
-| `"fixed 200px"` | Min, width, and max all set to `200px` |
 | `"stretch"` | Fill available space (cross-browser) |
-| `true` | Width `auto`, min `initial`, max `initial` |
+| `true` | Reset to `auto` / `initial` / `initial` |
 | Number | Converted to `px` |
 
 Separate `minWidth` and `maxWidth` props are supported and override values from the `width` syntax.
 
 ### `height`
 
-Element height. Same syntax and modifiers as `width`.
-
-**Syntax:** `[value]` | `[min max]` | `[min value max]` | `[modifier value]`
-
-**Modifiers:** `min`, `max`, `fixed`
-
-**Keywords:** `max-content`, `min-content`, `fit-content`
+Element height. Same syntax, modifiers, and positional patterns as `width`.
 
 Separate `minHeight` and `maxHeight` props are supported and override values from the `height` syntax.
 

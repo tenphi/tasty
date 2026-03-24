@@ -400,214 +400,65 @@ fill: {
 
 ### Sub-Element Styling
 
-Style inner elements from the parent component definition. No extra components, no CSS leakage:
+Compound components can style inner parts from the parent definition with capitalized keys in `styles` and optional `elements` declarations, producing typed sub-components like `<Card.Title />` instead of separate wrapper components or ad hoc class naming.
 
-```tsx
-const Card = tasty({
-  styles: {
-    padding: '4x',
-    Title: { preset: 'h3', color: '#primary' },
-    Content: { color: '#text', preset: 't2' },
-  },
-  elements: { Title: 'h2', Content: 'div' },
-});
+Sub-elements share the root state context by default, so keys like `:hover`, modifiers, root states, and media queries resolve as one coordinated styling block. Use `@own(...)` when a sub-element should react to its own state, and use the `$` selector affix when you need precise descendant targeting.
 
-<Card>
-  <Card.Title>Heading</Card.Title>
-  <Card.Content>Body text</Card.Content>
-</Card>
-```
-
-Sub-elements use `data-element` attributes — no extra class names, no naming conventions.
-
-By default, sub-elements participate in the same state context as the root component. That means mappings like `:hover`, `theme=danger`, `[role="button"]`, and other keys are evaluated as one unified block, which keeps styling logic predictable across the whole markup tree.
-
-Use `@own(...)` when a sub-element should react to its own state instead of the root state context.
-
-Class selectors are also supported, but modifiers/pseudo-classes are usually the better default in design-system code.
-
-Use the sub-element selector `$` when you need precise descendant targeting to avoid leakage in deeply nested component trees.
+See [Runtime API - Sub-element Styling](docs/runtime.md#sub-element-styling), [Style DSL - Advanced States](docs/dsl.md#advanced-states--prefix), and [Methodology](docs/methodology.md#component-architecture-root--sub-elements).
 
 ### Variants
 
-Variants are designed to keep single-component CSS lean. Instead of generating dozens of static button classes up front, define all versions once and let runtime usage decide what CSS is actually emitted.
+Variants let one component expose named visual versions without pre-generating a separate class for every possible combination. In runtime mode, Tasty emits only the variant CSS that is actually used.
 
-```tsx
-const Button = tasty({
-  styles: { padding: '2x 4x', radius: '1r' },
-  variants: {
-    default: { fill: '#primary', color: '#on-primary' },
-    danger: { fill: '#danger', color: '#on-danger' },
-    outline: { fill: 'transparent', border: '1bw solid #primary' },
-  },
-});
-
-<Button variant="danger">Delete</Button>
-```
+See [Runtime API - Variants](docs/runtime.md#variants).
 
 ### Recipes
 
-Recipes are predefined style sets that work like composable styling classes for Tasty. They can be pre-applied or post-applied to current styles, which lets you add reusable state logic while still allowing local style overrides.
+Recipes are reusable style bundles defined in `configure({ recipes })` and applied with the `recipe` style property. They are useful when your design system wants shared state logic or visual presets without forcing every component to repeat the same style map.
 
-```tsx
-configure({
-  recipes: {
-    card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
-    elevated: { shadow: '0 2x 4x #shadow' },
-  },
-});
+Use `/` to post-apply recipes after local styles when recipe states should win the final merge order, and use `none` to skip base recipes entirely.
 
-const ProfileCard = tasty({
-  styles: {
-    recipe: 'card elevated',
-    color: '#text',
-  },
-});
-```
-
-Use `/` to post-apply recipes after local styles when you need recipe states/styles to win the final merge order. Use `none` to skip base recipes: `recipe: 'none / disabled'`.
+See [Style DSL - Recipes](docs/dsl.md#recipes) and [Configuration - recipes](docs/configuration.md#recipes).
 
 ### Auto-Inferred `@property`
 
-CSS custom properties do not animate smoothly by default because the browser does not know how to interpolate their values. The [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) at-rule fixes that by declaring a property's syntax, such as `<number>` or `<color>`.
+Tasty usually removes the need to hand-author CSS [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property) rules. When a custom property receives a concrete value, Tasty infers its syntax and registers the matching `@property` automatically, which makes transitions and animations on custom properties work without extra boilerplate.
 
-In Tasty, you usually do not need to declare `@property` manually. When a custom property is assigned a concrete value, Tasty infers the syntax and registers the matching `@property` for you:
+If you prefer explicit control, disable inference with `configure({ autoPropertyTypes: false })` or declare the properties yourself.
 
-```tsx
-const Pulse = tasty({
-  styles: {
-    animation: 'pulse 2s infinite',
-    transform: 'scale($pulse-scale)',
-    '@keyframes': {
-      pulse: {
-        '0%, 100%': { '$pulse-scale': 1 },
-        '50%': { '$pulse-scale': 1.05 },
-      },
-    },
-  },
-});
-```
-
-Here, `$pulse-scale: 1` is inferred as `<number>`, so Tasty injects `@property --pulse-scale` automatically before using it in the animation. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from the `#name` token convention.
-
-If you prefer full manual control, disable auto-inference globally with `configure({ autoPropertyTypes: false })`.
+See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
 ### Explicit `@properties`
 
-Declare `@properties` yourself only when you need to override the defaults, for example to set `inherits: false` or provide a custom `initialValue`:
+Use explicit `@properties` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
 
-```tsx
-'@properties': {
-  '$pulse-scale': { syntax: '<number>', inherits: false, initialValue: 1 },
-},
-```
+See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
 ### React Hooks
 
-For cases where you don't need a full component:
+When you do not need a full component wrapper, use the hooks directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes` and `useProperty` for animation and custom-property primitives.
 
-```tsx
-import { useStyles, useGlobalStyles, useRawCSS } from '@tenphi/tasty';
-
-function App() {
-  const { className } = useStyles({ padding: '2x', fill: '#surface' });
-  useGlobalStyles('body', { margin: '0' });
-  useRawCSS('@font-face { font-family: "Custom"; src: url(...); }');
-
-  return <main className={className}>...</main>;
-}
-```
+See [Runtime API - Hooks](docs/runtime.md#hooks).
 
 ### Zero-Runtime Mode
 
-Extract all CSS at build time. Zero JavaScript overhead in production:
+Use `tastyStatic` when you want the same DSL and state model, but with CSS extracted at build time and no styling runtime in the client bundle. It is a strong fit for static sites, landing pages, and other build-time-first setups.
 
-```tsx
-import { tastyStatic } from '@tenphi/tasty/static';
-
-const card = tastyStatic({
-  padding: '4x',
-  fill: '#surface',
-  radius: '1r',
-  color: { '': '#text', '@dark': '#text-on-dark' },
-});
-
-// card is a CSS class name string
-<div className={card}>Static styles, zero runtime</div>
-```
-
-Configure the Babel plugin:
-
-```js
-module.exports = {
-  plugins: [
-    ['@tenphi/tasty/babel-plugin', {
-      output: 'public/tasty.css',
-      config: {
-        states: { '@dark': '@root(schema=dark)' },
-      },
-    }],
-  ],
-};
-```
+See [Zero Runtime (tastyStatic)](docs/tasty-static.md) and [Getting Started - Choosing a rendering mode](docs/getting-started.md#choosing-a-rendering-mode).
 
 ### `tasty` vs `tastyStatic`
 
-| | `tasty` (runtime) | `tastyStatic` (zero-runtime) |
-|---|---|---|
-| **Output** | React component | CSS class name |
-| **CSS injection** | Runtime `<style>` tags | Build-time extraction |
-| **Runtime cost** | Style generation on mount | None |
-| **Generated CSS scope** | Only styles/variants used at runtime | All extracted static styles at build time |
-| **Dynamic values** | Fully supported | Via CSS custom properties |
-| **Sub-elements** | Built-in (`<C.Title>`) | Manual (`data-element`) |
-| **Variants** | Built-in (`variants` option) | Separate static styles |
-| **Framework** | React | Any (requires Babel) |
-| **Best for** | Interactive apps with reusable stateful components, design systems | Static sites, SSG, landing pages |
+`tasty()` returns React components and injects CSS on demand at runtime. `tastyStatic()` returns class names and extracts CSS during the build. Both share the same DSL, tokens, units, state mappings, and recipes, so the main choice is runtime flexibility versus build-time extraction.
 
-Both share the same DSL, tokens, units, state mappings, and recipes.
+See [Zero Runtime (tastyStatic)](docs/tasty-static.md), [Runtime API](docs/runtime.md), and [Comparison - Build-time vs runtime](docs/comparison.md#build-time-vs-runtime).
 
 ### Server-Side Rendering
 
-SSR with zero-cost client hydration. Existing `tasty()` components work unchanged — SSR is opt-in and requires no per-component modifications. Supports Next.js (App Router with streaming), Astro (middleware + islands), and any React-based framework via the core API. Requires React 18+.
+SSR layers on top of runtime `tasty()` rather than introducing a separate styling model. Existing components stay unchanged while Tasty collects CSS during server rendering and hydrates the cache on the client.
 
-**Next.js setup:**
+Use `@tenphi/tasty/ssr/next` for Next.js App Router, `@tenphi/tasty/ssr/astro` for Astro, or the core SSR API for other React SSR setups.
 
-```tsx
-// app/tasty-registry.tsx
-'use client';
-
-import { TastyRegistry } from '@tenphi/tasty/ssr/next';
-
-export default function TastyStyleRegistry({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <TastyRegistry>{children}</TastyRegistry>;
-}
-```
-
-```tsx
-// app/layout.tsx
-import TastyStyleRegistry from './tasty-registry';
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html>
-      <body>
-        <TastyStyleRegistry>{children}</TastyStyleRegistry>
-      </body>
-    </html>
-  );
-}
-```
-
-See the [full SSR guide](docs/ssr.md) for Astro integration, streaming SSR, generic framework usage, troubleshooting, and the current requirements.
+See the [full SSR guide](docs/ssr.md).
 
 ## Entry Points
 

@@ -153,3 +153,12 @@ jobs:
                 }
               }
             }
+
+      - name: Trigger website redeploy
+        if: steps.changesets.outputs.published == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: tenphi/tasty.style
+          event-type: tasty-release
+          client-payload: '{"version": "${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}"}'

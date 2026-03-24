@@ -178,31 +178,7 @@ const Card = tasty({
 
 ### Selector Affix (`$`)
 
-Control how a sub-element selector attaches to the root selector using the `$` property inside the sub-element's styles:
-
-| Pattern | Result | Description |
-|---------|--------|-------------|
-| *(none)* | ` [el]` | Descendant (default) |
-| `>` | `> [el]` | Direct child |
-| `>Body>Row>` | `> [Body] > [Row] > [el]` | Chained elements |
-| `::before` | `::before` | Root pseudo (no key) |
-| `@::before` | `[el]::before` | Pseudo on the sub-element |
-| `>@:hover` | `> [el]:hover` | Pseudo-class on the sub-element |
-| `>@.active` | `> [el].active` | Class on the sub-element |
-
-The `@` placeholder marks exactly where the `[data-element="..."]` selector is injected, allowing you to attach pseudo-classes, pseudo-elements, or class selectors directly to the sub-element instead of the root:
-
-```jsx
-const List = tasty({
-  styles: {
-    Item: {
-      $: '>@:last-child',
-      border: 'none',
-    },
-  },
-});
-// → .t0 > [data-element="Item"]:last-child { border: none }
-```
+The `$` property inside a sub-element's styles controls how its selector attaches to the root selector — combinators, HTML tags, pseudo-elements, the `@` placeholder, and more. For the full reference table and injection rules, see [DSL — Selector Affix](dsl.md#selector-affix-).
 
 For the mental model behind sub-elements — how they share root state context and how this differs from BEM — see [Methodology — Component architecture](methodology.md#component-architecture-root--sub-elements).
 

@@ -438,7 +438,8 @@ function getAllSelectors(key: string, styles?: Styles): string[] | null {
  * Supports:
  * - Direct child: '>'
  * - Chained elements: '>Body>Row>'
- * - HTML tags: 'a', '>ul>li', 'button:hover'
+ * - HTML tags (no key injection): 'h1', '>ul>li', 'button:hover'
+ * - Universal selector: '*', 'h1 *'
  * - Pseudo-elements on root: '::before'
  * - Pseudo on sub-element: '@::before', '>@:hover'
  * - Classes: '.active', '>@.active'
@@ -481,6 +482,7 @@ function processAffix(affix: string, key: string): AffixResult {
  */
 const VALID_TOKEN_PATTERNS = [
   /^[>+~]/, // Combinators: >, +, ~
+  /^\*/, // Universal selector (*)
   /^[A-Z][a-zA-Z0-9]*/, // Uppercase element names → [data-element="..."]
   /^@/, // @ placeholder for key injection position
   /^::?[a-z][a-z0-9-]*(?:\([^)]*\))?/, // Pseudo-elements/classes (:hover, ::before, :not(.x))
@@ -666,12 +668,13 @@ function processSinglePattern(pattern: string, key: string): string {
  * The tokenizer handles these token types in order:
  * 1. Whitespace (skipped)
  * 2. Combinators: >, +, ~ (add surrounding spaces)
- * 3. Uppercase names: Body, Row (convert to [data-element="..."])
- * 4. @ placeholder (keep for later replacement)
- * 5. Pseudo: :hover, ::before (attach to previous token)
- * 6. Tags: a, div, button (keep as-is with spacing)
- * 7. Classes: .active (attach to previous element/tag/placeholder)
- * 8. Attributes: [type="text"] (keep as-is)
+ * 3. Universal selector: * (keep as-is with spacing)
+ * 4. Uppercase names: Body, Row (convert to [data-element="..."])
+ * 5. @ placeholder (keep for later replacement)
+ * 6. Pseudo: :hover, ::before (attach to previous token)
+ * 7. Tags: a, div, button (keep as-is with spacing)
+ * 8. Classes: .active (attach to previous element/tag/placeholder)
+ * 9. Attributes: [type="text"] (keep as-is)
  *
  * @param pattern - The raw selector pattern to transform
  * @returns Transformed pattern with proper CSS selector syntax
@@ -702,6 +705,16 @@ function transformPattern(pattern: string): string {
       }
       result += char;
       lastCh = char;
+      i++;
+      continue;
+    }
+
+    if (char === '*') {
+      if (result && lastCh !== ' ') {
+        result += ' ';
+      }
+      result += '*';
+      lastCh = '*';
       i++;
       continue;
     }
@@ -812,7 +825,8 @@ function transformPattern(pattern: string): string {
  * |----------------|-------------|---------|--------|
  * | Combinator (>, +, ~) | Yes | `'>Body>'` | `> [data-element="Body"] > [el]` |
  * | Uppercase element | Yes | `'>Body>Row'` | `> [el1] > [el2] [key]` |
- * | Lowercase tag | Yes | `'>ul>li'` | `> ul > li [key]` |
+ * | Lowercase tag | No | `'h1'` | ` h1` |
+ * | Universal (*) | No | `'h1 *'` | ` h1 *` |
  * | Pseudo (:hover, ::before) | No | `'::before'` | `::before` |
  * | Class (.active) | No | `'.active'` | `.active` |
  * | Attribute ([type]) | No | `'[type="text"]'` | `[type="text"]` |
@@ -823,7 +837,8 @@ function transformPattern(pattern: string): string {
  * @example
  * shouldInjectKey('>')           // → true (trailing combinator)
  * shouldInjectKey('>Body>Row')   // → true (ends with element)
- * shouldInjectKey('>ul>li')      // → true (ends with tag)
+ * shouldInjectKey('h1')          // → false (ends with tag)
+ * shouldInjectKey('*')           // → false (universal selector)
  * shouldInjectKey('::before')    // → false (ends with pseudo)
  * shouldInjectKey('.active')     // → false (ends with class)
  * shouldInjectKey('a:hover')     // → false (ends with pseudo)
@@ -846,16 +861,7 @@ function shouldInjectKey(pattern: string): boolean {
     return true;
   }
 
-  // Rule 3: Ends with lowercase tag name → inject key as descendant
-  // The negative lookbehind (?<![:.]) ensures we don't match:
-  // - ':hover' (pseudo ending)
-  // - '.primary' (class ending)
-  // e.g., '>ul>li' → '> ul > li [data-element="Key"]'
-  if (/(?<![:.])(?:^|[\s>+~])[a-z][a-z0-9-]*$/.test(trimmed)) {
-    return true;
-  }
-
-  // Rule 4: Otherwise (pseudo, class, attribute) → no injection
+  // Otherwise (tags, universal *, pseudo, class, attribute) → no injection
   // The pattern is complete as-is, applying to root or a specific selector
   return false;
 }

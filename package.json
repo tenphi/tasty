@@ -57,6 +57,7 @@
   "files": [
     "dist",
     "docs",
+    "assets",
     "tasty.config.ts"
   ],
   "sideEffects": [

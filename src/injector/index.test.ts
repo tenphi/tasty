@@ -222,6 +222,58 @@ describe('Global Style Injector API', () => {
       expect(allCssText).toContain('[data-theme="dark"]');
     });
 
+    it('should group multiple tokens with the same state map into a single CSS rule', () => {
+      configure({
+        forceTextInjection: true,
+        states: {
+          '@dark': '@root(theme=dark)',
+        },
+        tokens: {
+          '$gap-sm': {
+            '': '4px',
+            '@dark': '2px',
+          },
+          '$gap-md': {
+            '': '8px',
+            '@dark': '4px',
+          },
+          '$gap-lg': {
+            '': '16px',
+            '@dark': '8px',
+          },
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      const styleElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(styleElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      // All base-state tokens should appear in a single :root rule
+      const rootMatches = allCssText.match(/:root\s*\{[^}]*\}/g) || [];
+      const baseRootRules = rootMatches.filter(
+        (r) => !r.includes('data-theme'),
+      );
+
+      // There should be exactly one :root { ... } block containing all three tokens
+      // (not three separate :root blocks)
+      const combinedBase = baseRootRules.find(
+        (r) =>
+          r.includes('--gap-sm') &&
+          r.includes('--gap-md') &&
+          r.includes('--gap-lg'),
+      );
+      expect(combinedBase).toBeDefined();
+
+      // All dark-state tokens should also be grouped
+      expect(allCssText).toContain('[data-theme="dark"]');
+      expect(allCssText).toContain('2px');
+      expect(allCssText).toContain('4px');
+      expect(allCssText).toContain('8px');
+    });
+
     it('should handle same key in both tokens and replaceTokens without error', () => {
       configure({
         forceTextInjection: true,

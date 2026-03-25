@@ -1145,6 +1145,39 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
 }
 
 // ============================================================================
+// StyleResult merging (group by selector + at-rules)
+// ============================================================================
+
+/**
+ * Merge StyleResult entries that share the same selector and at-rules,
+ * concatenating their declarations into a single rule.
+ *
+ * This reduces CSS output size when many style keys (e.g. design tokens)
+ * resolve to the same selector/state combination.
+ */
+function mergeStyleResults(results: StyleResult[]): StyleResult[] {
+  if (results.length <= 1) return results;
+
+  const groups = new Map<string, StyleResult>();
+
+  for (const result of results) {
+    const atKey = result.atRules?.join('|') ?? '';
+    const key = `${atKey}||${result.selector}`;
+
+    const existing = groups.get(key);
+    if (existing) {
+      existing.declarations = existing.declarations
+        ? `${existing.declarations} ${result.declarations}`
+        : result.declarations;
+    } else {
+      groups.set(key, { ...result });
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
+// ============================================================================
 // Public API: renderStyles (compatible with old API)
 // ============================================================================
 
@@ -1220,7 +1253,7 @@ export function renderStyles(
   if (directSelector) {
     const shouldDouble = options?.doubleSelector ?? false;
 
-    return rules.map((rule): StyleResult => {
+    const results = rules.map((rule): StyleResult => {
       // Handle selector as array (OR conditions) or string
       const selectorParts = Array.isArray(rule.selector)
         ? rule.selector
@@ -1264,6 +1297,8 @@ export function renderStyles(
 
       return result;
     });
+
+    return mergeStyleResults(results);
   }
 
   // No className mode: return RenderResult with needsClassName flag

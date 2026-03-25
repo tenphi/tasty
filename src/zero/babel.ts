@@ -24,7 +24,7 @@ import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 import { createJiti } from 'jiti';
 
-import { configure, getGlobalConfigTokens } from '../config';
+import { configure, getGlobalConfigTokens, resetConfig } from '../config';
 import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
@@ -239,6 +239,22 @@ function clearRequireCacheTree(filePath: string): void {
   delete require.cache[resolved];
 }
 
+// Shared CSSWriter cache keyed by resolved output path.
+// Persists across per-file Babel invocations (Turbopack model) so that
+// CSS from all files accumulates instead of being overwritten.
+interface WriterCacheEntry {
+  writer: CSSWriter;
+  configKey: string;
+  registry: StaticStyleRegistry;
+  config: TastyZeroConfig;
+}
+const writerCache = new Map<string, WriterCacheEntry>();
+
+/** Clear the shared CSSWriter cache. Exposed for testing. */
+export function clearWriterCache(): void {
+  writerCache.clear();
+}
+
 // @ts-expect-error PluginState vs PluginPass type mismatch in @babel/helper-plugin-utils
 export default declare<TastyZeroBabelOptions>((api, options) => {
   api.assertVersion(7);
@@ -267,11 +283,16 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     ...(options.configDeps || []),
   ];
 
+  // Fingerprint for config deps — used to detect config changes
+  // and invalidate the shared CSSWriter cache.
+  const configKey =
+    configDeps.length > 0 ? configDeps.map(mtime).join(',') : '';
+
   // Register external dependencies for babel-loader cache invalidation.
   // When any configDeps file changes, babel-loader discards the cached
   // transform result and re-runs the plugin, picking up fresh config.
   if (configDeps.length > 0) {
-    api.cache.using(() => configDeps.map(mtime).join(','));
+    api.cache.using(() => configKey);
 
     for (const dep of configDeps) {
       try {
@@ -293,38 +314,61 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     }
   }
 
-  const configOption = options.config;
-  let config: TastyZeroConfig;
+  // Look up or create the shared CSSWriter for this output path.
+  // When config deps change (different configKey), discard the old writer
+  // and reset pipeline state so configure() can run again.
+  const cached = writerCache.get(resolvedOutputPath);
+  const configChanged = !cached || cached.configKey !== configKey;
 
-  if (configOption) {
-    config = typeof configOption === 'function' ? configOption() : configOption;
-  } else if (options.configFile) {
-    const jiti = createJiti(path.dirname(options.configFile), {
-      moduleCache: false,
-    });
+  if (configChanged) {
+    const configOption = options.config;
+    let resolvedConfig: TastyZeroConfig;
 
-    config = jiti(options.configFile) as TastyZeroConfig;
-  } else {
-    config = {};
-  }
+    if (configOption) {
+      resolvedConfig =
+        typeof configOption === 'function' ? configOption() : configOption;
+    } else if (options.configFile) {
+      const jiti = createJiti(path.dirname(options.configFile), {
+        moduleCache: false,
+      });
 
-  const devMode = config.devMode ?? false;
-
-  configure(config);
-
-  const cssWriter = new CSSWriter(outputPath, { devMode });
-
-  // Emit configured tokens as :root CSS custom properties
-  const tokenStyles = getGlobalConfigTokens();
-  if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-    const result = extractStylesForSelector(':root', tokenStyles);
-    if (result.css) {
-      cssWriter.add(':root:tokens', result.css);
+      resolvedConfig = jiti(options.configFile) as TastyZeroConfig;
+    } else {
+      resolvedConfig = {};
     }
+
+    const devMode = resolvedConfig.devMode ?? false;
+
+    if (cached) {
+      resetConfig();
+    }
+
+    configure(resolvedConfig);
+
+    const newWriter = new CSSWriter(outputPath, { devMode });
+
+    // Emit configured tokens as :root CSS custom properties
+    const tokenStyles = getGlobalConfigTokens();
+    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+      const result = extractStylesForSelector(':root', tokenStyles);
+      if (result.css) {
+        newWriter.add(':root:tokens', result.css);
+      }
+    }
+
+    writerCache.set(resolvedOutputPath, {
+      writer: newWriter,
+      configKey,
+      registry: {},
+      config: resolvedConfig,
+    });
   }
 
-  // Global registry for cross-file references (same build)
-  const globalRegistry: StaticStyleRegistry = {};
+  const entry = writerCache.get(resolvedOutputPath)!;
+  const cssWriter = entry.writer;
+  const globalRegistry = entry.registry;
+  const config = entry.config;
+  const devMode = config.devMode ?? false;
 
   return {
     name: 'tasty-zero',

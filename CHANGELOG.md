@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 0.15.1
+
+### Patch Changes
+
+- [#55](https://github.com/tenphi/tasty/pull/55) [`24ae87b`](https://github.com/tenphi/tasty/commit/24ae87b4254a6abefa3bd39aa876fb1fc21d9529) Thanks [@tenphi](https://github.com/tenphi)! - Fix zero-runtime CSS loss in Turbopack by persisting CSSWriter across per-file Babel invocations.
+
+- [#53](https://github.com/tenphi/tasty/pull/53) [`107c1bc`](https://github.com/tenphi/tasty/commit/107c1bc060a6508e9dff686515d5c08dd91aed1f) Thanks [@tenphi](https://github.com/tenphi)! - Group design tokens with the same state map into a single CSS rule to reduce output size.
+
 ## 0.15.0
 
 ### Minor Changes

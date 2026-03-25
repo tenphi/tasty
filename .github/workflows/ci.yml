@@ -44,3 +44,11 @@ jobs:
 
       - name: Size limit
         run: pnpm size
+
+      - name: Trigger website redeploy
+        if: github.event_name == 'push'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: tenphi/tasty.style
+          event-type: tasty-update

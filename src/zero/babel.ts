@@ -203,6 +203,8 @@ interface PluginState extends PluginPass {
   staticStyleRegistry: StaticStyleRegistry;
   /** Current source file path (for devMode source comments) */
   sourceFile?: string;
+  /** Whether this file added CSS blocks to the writer (via tastyStatic calls) */
+  _fileAddedCSS?: boolean;
 }
 
 function mtime(filePath: string): number | null {
@@ -376,6 +378,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     pre(this: PluginState) {
       // Initialize per-file registry
       this.staticStyleRegistry = {};
+      this._fileAddedCSS = false;
       // Extract source filename for devMode comments
       if (devMode && this.filename) {
         // Get relative path or just filename
@@ -423,6 +426,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
         if (!t.isIdentifier(callee, { name: 'tastyStatic' })) {
           return;
         }
+
+        state._fileAddedCSS = true;
 
         const args = path.node.arguments;
 
@@ -500,9 +505,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       },
     },
 
-    post() {
-      // Write all collected CSS at the end of the build
-      if (cssWriter.size > 0) {
+    post(this: PluginState) {
+      // Only write when this file contributed CSS (had tastyStatic calls).
+      // In Turbopack, separate workers each have their own CSSWriter with
+      // only token CSS. Letting those workers write would overwrite the
+      // complete CSS produced by the worker that processed tastyStatic files.
+      if (this._fileAddedCSS && cssWriter.size > 0) {
         cssWriter.write();
       }
     },

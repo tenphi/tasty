@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.15.0
+
+### Minor Changes
+
+- [#51](https://github.com/tenphi/tasty/pull/51) [`d2dc330`](https://github.com/tenphi/tasty/commit/d2dc3307bc7c01e2d4e3e9a310facaf267b96d81) Thanks [@tenphi](https://github.com/tenphi)! - Add `modProps` option to `tasty()` for exposing modifier keys as typed component props. Supports array form and object form with type descriptors (`Boolean`, `String`, `Number`, enum arrays) for full TypeScript autocomplete. Mod props merge with `mods` (mod props take precedence).
+
 ## 0.14.2
 
 ### Patch Changes

@@ -1546,3 +1546,121 @@ describe('useGlobalStyles() hook', () => {
     expect(styleContent).toContain('border: 1px solid var(--dark-color)'); // raw unit: 1 * 1px = 1px
   });
 });
+
+describe('modProps', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('should support array form modProps', () => {
+    const Card = tasty({
+      modProps: ['isLoading'] as const,
+      styles: {
+        fill: { '': '#white', isLoading: '#grey' },
+      },
+    });
+
+    const { container } = render(<Card isLoading />);
+    const el = container.firstElementChild!;
+
+    expect(el.getAttribute('data-is-loading')).toBe('');
+  });
+
+  it('should support object form modProps with Boolean', () => {
+    const Card = tasty({
+      modProps: {
+        isLoading: Boolean,
+        isSelected: Boolean,
+      },
+      styles: {
+        fill: { '': '#white', isLoading: '#grey' },
+      },
+    });
+
+    const { container } = render(<Card isLoading isSelected={false} />);
+    const el = container.firstElementChild!;
+
+    expect(el.getAttribute('data-is-loading')).toBe('');
+    expect(el.hasAttribute('data-is-selected')).toBe(false);
+  });
+
+  it('should support object form modProps with String values', () => {
+    const Card = tasty({
+      modProps: {
+        size: String,
+      },
+    });
+
+    const { container } = render(<Card size="large" />);
+    const el = container.firstElementChild!;
+
+    expect(el.getAttribute('data-size')).toBe('large');
+  });
+
+  it('should support object form modProps with enum array', () => {
+    const Card = tasty({
+      modProps: {
+        tone: ['primary', 'secondary', 'danger'] as const,
+      },
+    });
+
+    const { container } = render(<Card tone="danger" />);
+    const el = container.firstElementChild!;
+
+    expect(el.getAttribute('data-tone')).toBe('danger');
+  });
+
+  it('should merge modProps with mods (modProps wins)', () => {
+    const Card = tasty({
+      modProps: ['isLoading'] as const,
+    });
+
+    const { container } = render(
+      <Card mods={{ isLoading: false, extra: true }} isLoading />,
+    );
+    const el = container.firstElementChild!;
+
+    // modProps override mods
+    expect(el.getAttribute('data-is-loading')).toBe('');
+    // mods still apply for non-overridden keys
+    expect(el.getAttribute('data-extra')).toBe('');
+  });
+
+  it('should strip modProps keys from DOM (no raw HTML attributes)', () => {
+    const Card = tasty({
+      modProps: ['customMod'] as const,
+    });
+
+    const { container } = render(<Card customMod />);
+    const el = container.firstElementChild!;
+
+    // Should be a data-* attribute, not the raw prop name
+    expect(el.getAttribute('data-custom-mod')).toBe('');
+    expect(el.hasAttribute('customMod')).toBe(false);
+    expect(el.hasAttribute('custommod')).toBe(false);
+  });
+
+  it('should work with style state maps via modProps', () => {
+    const Card = tasty({
+      modProps: ['isActive'] as const,
+      styles: {
+        fill: { '': '#white', isActive: '#purple' },
+      },
+    });
+
+    const { container } = render(<Card isActive />);
+    expect(container).toMatchTastySnapshot();
+  });
+
+  it('should not add data attributes for undefined modProps', () => {
+    const Card = tasty({
+      modProps: ['isLoading', 'isSelected'] as const,
+    });
+
+    const { container } = render(<Card isLoading />);
+    const el = container.firstElementChild!;
+
+    expect(el.getAttribute('data-is-loading')).toBe('');
+    expect(el.hasAttribute('data-is-selected')).toBe(false);
+  });
+});

@@ -163,6 +163,61 @@ Exposing every CSS property as a prop defeats the purpose of a design system. Th
 
 ---
 
+## modProps and mods
+
+`modProps` expose modifier keys as top-level component props — the modifier equivalent of `styleProps`. Use them when a component has a fixed set of known state modifiers.
+
+```tsx
+const Card = tasty({
+  modProps: {
+    isLoading: Boolean,
+    isSelected: Boolean,
+  },
+  styles: {
+    fill: { '': '#surface', isLoading: '#surface.5' },
+    border: { '': '1bw solid #outline', isSelected: '2bw solid #primary' },
+  },
+});
+
+// Clean prop API — no mods object needed
+<Card isLoading isSelected>Content</Card>
+```
+
+### When to use which
+
+| Pattern | Use when |
+|---|---|
+| `modProps` | The component has a fixed set of known boolean/string states that drive styles. Provides TypeScript autocomplete and a cleaner JSX API. |
+| `mods` prop | The component needs arbitrary or dynamic modifiers that aren't known at definition time. |
+| Both | Combine `modProps` for the known states and `mods` for ad-hoc overrides. Mod props take precedence. |
+| `styleProps` | Exposing CSS properties (layout, sizing) for customization — different from modifiers. |
+
+### Typed modProps vs array form
+
+The object form gives precise TypeScript types using JS constructors (`Boolean`, `String`, `Number`) or enum arrays:
+
+```tsx
+const Button = tasty({
+  modProps: {
+    isLoading: Boolean,
+    size: ['small', 'medium', 'large'] as const,
+  },
+  // ...
+});
+
+// TypeScript knows: isLoading?: boolean, size?: 'small' | 'medium' | 'large'
+```
+
+The array form is simpler but types all values as `ModValue`:
+
+```tsx
+modProps: ['isLoading', 'isSelected'] as const,
+```
+
+For the full API reference, see [Runtime — Mod Props](runtime.md#mod-props).
+
+---
+
 ## tokens prop for dynamic values
 
 Every Tasty component accepts a `tokens` prop that renders as inline CSS custom properties on the element. This is the mechanism for per-instance dynamic values.
@@ -402,8 +457,9 @@ See [Configuration](configuration.md) for the full `configure()` API.
 - **Use semantic transition names** (`transition: 'theme 0.3s'`) instead of listing CSS properties
 - **Use `elements` prop** to declare typed sub-components for compound components
 - **Use `styleProps`** to define what product engineers can customize
+- **Use `modProps`** to expose known modifier states as clean component props
 - **Use `tokens` prop** for per-instance dynamic values (progress, user color)
-- **Use modifiers** (`mods`) for state-driven style changes instead of runtime `styles` prop changes
+- **Use modifiers** (`mods` or `modProps`) for state-driven style changes instead of runtime `styles` prop changes
 
 ### Avoid
 
@@ -441,11 +497,19 @@ Tasty's enhanced properties provide concise syntax, better composability, and si
 // Bad: styles object changes every render
 <Card styles={{ padding: isCompact ? '2x' : '4x' }} />
 
-// Good: use modifiers
-<Card mods={{ compact: isCompact }} />
+// Good: use modifiers via modProps
+<Card isCompact={isCompact} />
+
+// Or via mods object
+<Card mods={{ isCompact }} />
 
 // In the component definition:
-padding: { '': '4x', compact: '2x' },
+const Card = tasty({
+  modProps: ['isCompact'] as const,
+  styles: {
+    padding: { '': '4x', isCompact: '2x' },
+  },
+});
 ```
 
 Modifiers are compiled into exclusive selectors once. Changing `styles` at runtime forces Tasty to regenerate and re-inject CSS.

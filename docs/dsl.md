@@ -93,6 +93,8 @@ mods={{ hovered: true, theme: 'danger' }}
 // → data-hovered="" data-theme="danger"
 ```
 
+Modifiers can also be exposed as top-level component props via `modProps` — see [Runtime — Mod Props](runtime.md#mod-props).
+
 ---
 
 ## Color Tokens & Opacity

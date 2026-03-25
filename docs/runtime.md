@@ -74,6 +74,86 @@ For predefined style prop lists (`FLOW_STYLES`, `POSITION_STYLES`, `DIMENSION_ST
 
 ---
 
+## Mod Props
+
+Use `modProps` to expose modifier keys as direct component props instead of requiring the `mods` object:
+
+```jsx
+// Before: mods object
+<Button mods={{ isLoading: true, size: 'large' }}>Submit</Button>
+
+// After: mod props
+<Button isLoading size="large">Submit</Button>
+```
+
+### Array form
+
+List modifier key names. Types default to `ModValue` (`boolean | string | number | undefined | null`):
+
+```jsx
+const Button = tasty({
+  modProps: ['isLoading', 'isSelected'] as const,
+  styles: {
+    fill: { '': '#surface', isLoading: '#surface.5' },
+    border: { '': '1bw solid #outline', isSelected: '2bw solid #primary' },
+  },
+});
+
+<Button isLoading isSelected>Submit</Button>
+// Renders: <button data-is-loading="" data-is-selected="">Submit</button>
+```
+
+### Object form (typed)
+
+Map modifier names to type descriptors for precise TypeScript types:
+
+```tsx
+const Button = tasty({
+  modProps: {
+    isLoading: Boolean,   // isLoading?: boolean
+    isSelected: Boolean,  // isSelected?: boolean
+    size: ['small', 'medium', 'large'] as const,  // size?: 'small' | 'medium' | 'large'
+  },
+  styles: {
+    padding: { '': '2x 4x', 'size=small': '1x 2x', 'size=large': '3x 6x' },
+    fill: { '': '#surface', isLoading: '#surface.5' },
+  },
+});
+
+<Button isLoading size="large">Submit</Button>
+// Renders: <button data-is-loading="" data-size="large">Submit</button>
+```
+
+Available type descriptors:
+
+| Descriptor | TypeScript type | Example |
+|---|---|---|
+| `Boolean` | `boolean` | `isLoading: Boolean` |
+| `String` | `string` | `label: String` |
+| `Number` | `number` | `count: Number` |
+| `['a', 'b'] as const` | `'a' \| 'b'` | `size: ['sm', 'md', 'lg'] as const` |
+
+### Merge with `mods`
+
+Mod props and the `mods` object can be used together. Mod props take precedence:
+
+```jsx
+<Button mods={{ isLoading: false, extra: true }} isLoading>
+// isLoading=true wins (from mod prop), extra=true preserved from mods
+```
+
+### When to use `modProps` vs `mods`
+
+| Use case | Recommendation |
+|---|---|
+| Component has a fixed set of known modifiers | `modProps` — cleaner API, better TypeScript autocomplete |
+| Component needs arbitrary/dynamic modifiers | `mods` — open-ended `Record<string, ModValue>` |
+| Both fixed and dynamic | Combine: `modProps` for known keys, `mods` for ad-hoc |
+
+For architecture guidance on when to use modifiers vs `styleProps`, see [Methodology — modProps and mods](methodology.md#modprops-and-mods).
+
+---
+
 ## Variants
 
 Define named style variations. Only CSS for variants actually used at runtime is injected:

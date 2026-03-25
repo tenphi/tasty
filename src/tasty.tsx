@@ -14,6 +14,7 @@ import type {
   AllBaseProps,
   BaseProps,
   BaseStyleProps,
+  ModValue,
   Mods,
   Props,
   Tokens,
@@ -99,9 +100,9 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
     };
 
     // Build mod attributes
-    let modProps: Record<string, unknown> | undefined;
+    let modDataAttrs: Record<string, unknown> | undefined;
     if (mods) {
-      modProps = modAttrs(mods as Mods) as Record<string, unknown>;
+      modDataAttrs = modAttrs(mods as Mods) as Record<string, unknown>;
     }
 
     // Process tokens into inline style properties
@@ -122,7 +123,7 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
       'data-element': elementName,
       'data-qa': qa ?? defaultQa,
       'data-qaval': qaVal ?? defaultQaVal,
-      ...(modProps || {}),
+      ...(modDataAttrs || {}),
       ...htmlProps,
       className,
       style: mergedStyle,
@@ -153,6 +154,46 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
 type StyleList = readonly (keyof {
   [key in keyof StylesInterface]: StylesInterface[key];
 })[];
+
+// ============================================================================
+// Mod props types — expose modifier keys as top-level component props
+// ============================================================================
+
+/** Type descriptor for a single mod prop: a JS constructor or an enum array. */
+export type ModPropDef =
+  | BooleanConstructor
+  | StringConstructor
+  | NumberConstructor
+  | readonly string[];
+
+/** Array form: list of mod key names (types default to ModValue). */
+type ModPropsList = readonly string[];
+
+/** Object form: map of mod key names to type descriptors. */
+type ModPropsMap = Readonly<Record<string, ModPropDef>>;
+
+/** Either array or object form accepted by `modProps` option. */
+export type ModPropsInput = ModPropsList | ModPropsMap;
+
+/** Resolve a single ModPropDef to its TypeScript type. */
+export type ResolveModPropDef<T> = T extends BooleanConstructor
+  ? boolean
+  : T extends StringConstructor
+    ? string
+    : T extends NumberConstructor
+      ? number
+      : T extends readonly (infer U)[]
+        ? U
+        : ModValue;
+
+/** Resolve an entire `modProps` definition to the component prop types it adds. */
+export type ResolveModProps<M extends ModPropsInput> =
+  M extends readonly (infer K)[]
+    ? Partial<Record<K & string, ModValue>>
+    : M extends Record<string, ModPropDef>
+      ? { [key in keyof M & string]?: ResolveModPropDef<M[key]> }
+      : // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+        {};
 
 export type PropsWithStyles = {
   styles?: Styles;
@@ -244,11 +285,14 @@ type TastyBaseProps<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
+  M extends ModPropsInput = readonly string[],
 > = {
   /** Default styles of the element. */
   styles?: Styles;
   /** The list of styles that can be provided by props */
   styleProps?: K;
+  /** Modifier keys exposed as top-level component props (array or typed object form). */
+  modProps?: M;
   element?: BaseProps['element'];
   variants?: V;
   /** Default tokens for inline CSS custom properties */
@@ -263,11 +307,14 @@ export type TastyProps<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   DefaultProps = Props,
-> = TastyBaseProps<K, V, E> & {
+  M extends ModPropsInput = readonly string[],
+> = TastyBaseProps<K, V, E, M> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: string | ComponentType<any>;
-} & Partial<Omit<DefaultProps, 'as' | 'styles' | 'styleProps' | 'tokens'>>;
+} & Partial<
+    Omit<DefaultProps, 'as' | 'styles' | 'styleProps' | 'modProps' | 'tokens'>
+  >;
 
 /**
  * TastyElementOptions is used for the element-creation overload of tasty().
@@ -282,17 +329,22 @@ export type TastyElementOptions<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
-> = TastyBaseProps<K, V, E> & {
+  M extends ModPropsInput = readonly string[],
+> = TastyBaseProps<K, V, E, M> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: Tag | ComponentType<any>;
 } & Record<string, unknown>;
 
-export type AllBasePropsWithMods<K extends StyleList> = AllBaseProps & {
+export type AllBasePropsWithMods<
+  K extends StyleList,
+  M extends ModPropsInput = readonly string[],
+> = AllBaseProps & {
   [key in K[number]]?:
     | StyleValue<StylesInterface[key]>
     | StyleValueStateMap<StylesInterface[key]>;
-} & BaseStyleProps;
+} & BaseStyleProps &
+  ResolveModProps<M>;
 
 /**
  * Keys from BasePropsWithoutChildren that should be omitted from HTML attributes.
@@ -330,7 +382,8 @@ export type TastyElementProps<
   K extends StyleList,
   V extends VariantMap,
   Tag extends keyof JSX.IntrinsicElements = 'div',
-> = AllBasePropsWithMods<K> &
+  M extends ModPropsInput = readonly string[],
+> = AllBasePropsWithMods<K, M> &
   WithVariant<V> &
   Omit<
     Omit<AllHTMLAttributes<HTMLElement>, keyof JSX.IntrinsicElements[Tag]> &
@@ -354,11 +407,12 @@ export function tasty<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
+  M extends ModPropsInput = readonly string[],
 >(
-  options: TastyElementOptions<K, V, E, Tag>,
+  options: TastyElementOptions<K, V, E, Tag, M>,
   secondArg?: never,
 ): ForwardRefExoticComponent<
-  PropsWithoutRef<TastyElementProps<K, V, Tag>> & RefAttributes<unknown>
+  PropsWithoutRef<TastyElementProps<K, V, Tag, M>> & RefAttributes<unknown>
 > &
   SubElementComponents<E>;
 export function tasty<
@@ -453,6 +507,7 @@ function tastyElement<
     element: defaultElement,
     styles: defaultStyles,
     styleProps,
+    modProps: modPropsDef,
     variants,
     tokens: defaultTokens,
     elements,
@@ -516,6 +571,12 @@ function tastyElement<
   const propsToCheck = styleProps
     ? (styleProps as StyleList).concat(BASE_STYLES)
     : BASE_STYLES;
+
+  const modPropsKeys: string[] | undefined = modPropsDef
+    ? ((Array.isArray(modPropsDef)
+        ? modPropsDef
+        : Object.keys(modPropsDef)) as string[])
+    : undefined;
 
   const _TastyComponent = forwardRef<
     unknown,
@@ -619,10 +680,29 @@ function tastyElement<
       return { ...processedTokenStyle, ...style };
     }, [processedTokenStyle, style]);
 
-    let modProps: Record<string, unknown> | undefined;
-    if (mods) {
-      const modsObject = mods as unknown as Record<string, unknown>;
-      modProps = modAttrs(modsObject as any) as Record<string, unknown>;
+    let propMods: Record<string, ModValue> | undefined;
+    if (modPropsKeys) {
+      for (const key of modPropsKeys) {
+        if (key in otherProps) {
+          if (!propMods) propMods = {};
+          propMods[key] = (otherProps as Record<string, unknown>)[
+            key
+          ] as ModValue;
+          delete (otherProps as Record<string, unknown>)[key];
+        }
+      }
+    }
+
+    const mergedMods = propMods
+      ? { ...(mods as Record<string, ModValue>), ...propMods }
+      : (mods as Record<string, ModValue> | undefined);
+
+    let modDataAttrs: Record<string, unknown> | undefined;
+    if (mergedMods) {
+      modDataAttrs = modAttrs(mergedMods as unknown as Mods) as Record<
+        string,
+        unknown
+      >;
     }
 
     // Merge user className with generated className
@@ -635,7 +715,7 @@ function tastyElement<
       'data-qa': (qa as string | undefined) || defaultQa,
       'data-qaval': (qaVal as string | undefined) || defaultQaVal,
       ...(otherDefaultProps as unknown as Record<string, unknown>),
-      ...(modProps || {}),
+      ...(modDataAttrs || {}),
       ...(otherProps as unknown as Record<string, unknown>),
       className: finalClassName,
       style: mergedStyle,

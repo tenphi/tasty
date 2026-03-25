@@ -41,7 +41,7 @@ On top of that foundation, Tasty gives teams a governed styling model: a CSS-lik
 
 ### Supporting capabilities
 
-- **Typed style props** — `styleProps` lets you expose selected styles as typed React props. Use `<Button placeSelf="end">` or `<Space flow="row" gap="2x">` without extra wrappers, utility classes, or `styles` overrides. The same props also accept state maps, so responsive values work with the same API. See [CSS properties as props](#css-properties-as-props).
+- **Typed style props and mod props** — `styleProps` exposes selected CSS properties as typed React props (`<Space flow="row" gap="2x">`); `modProps` does the same for modifier keys (`<Button isLoading size="large">`). Both support state maps and full TypeScript autocomplete. See [Style Props](#style-props) and [Mod Props](#mod-props).
 - **Runtime, SSR, and zero-runtime options** — Use `tasty()` for runtime React components, add SSR integrations when your framework renders that runtime on the server, or use `tastyStatic()` when you specifically want build-time extraction instead of runtime styling.
 - **Broad modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
 - **Performance and caching** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
@@ -178,58 +178,17 @@ configure({
 
 Use `configure()` once when your app or design system needs shared aliases, tokens, recipes, or parser extensions. Predefined states turn complex selector logic into single tokens, so teams can write `@mobile` instead of repeating media query expressions in every component.
 
-### CSS properties as props
+### Props as the public API
 
-Beyond state resolution, Tasty can also expose selected style controls as typed component props. That lets design systems keep layout and composition inside governed component APIs instead of pushing teams toward wrapper elements or ad hoc styling escapes.
-
-With `styleProps`, a component can expose the styles you choose as normal typed props. You can adjust layout, spacing, alignment, or positioning where the component is used while staying inside a typed, design-system-aware API.
-
-```tsx
-import { tasty, FLOW_STYLES, POSITION_STYLES } from '@tenphi/tasty';
-
-const Space = tasty({
-  styles: {
-    display: 'flex',
-    flow: 'column',
-    gap: '1x',
-  },
-  styleProps: FLOW_STYLES,
-});
-
-const Button = tasty({
-  as: 'button',
-  styles: {
-    padding: '1.5x 3x',
-    fill: '#primary',
-    color: '#primary-text',
-    radius: true,
-  },
-  styleProps: POSITION_STYLES,
-});
-```
-
-Now you can compose layout and tweak component positioning directly in JSX:
+`styleProps` exposes selected CSS properties as typed React props, and `modProps` does the same for modifier keys. Together they let design systems define a governed, typed component API without wrapper elements or `styles` overrides:
 
 ```tsx
 <Space flow="row" gap="2x" placeItems="center">
-  <Title>Dashboard</Title>
-  <Button placeSelf="end">Add Item</Button>
+  <Button isLoading size="large" placeSelf="end">Submit</Button>
 </Space>
 ```
 
-The same props also support state maps, so responsive values use the exact same API:
-
-```tsx
-<Space
-  flow={{ '': 'column', '@tablet': 'row' }}
-  gap={{ '': '2x', '@tablet': '4x' }}
->
-  <Sidebar />
-  <Content />
-</Space>
-```
-
-Layout components can expose flow props. Buttons can expose positioning props. Each component can offer only the style props that make sense for its role while keeping tokens, custom units, and state maps fully typed. This works in runtime `tasty()` components, not in `tastyStatic()`.
+See [Style Props](#style-props) and [Mod Props](#mod-props) below, or the full reference in [Runtime API](docs/runtime.md#style-props).
 
 ## Choose a Styling Approach
 
@@ -405,6 +364,40 @@ Compound components can style inner parts from the parent definition with capita
 Sub-elements share the root state context by default, so keys like `:hover`, modifiers, root states, and media queries resolve as one coordinated styling block. Use `@own(...)` when a sub-element should react to its own state, and use the `$` selector affix when you need precise descendant targeting.
 
 See [Runtime API - Sub-element Styling](docs/runtime.md#sub-element-styling), [Style DSL - Advanced States](docs/dsl.md#advanced-states--prefix), and [Methodology](docs/methodology.md#component-architecture-root--sub-elements).
+
+### Style Props
+
+`styleProps` exposes selected CSS properties as typed React props. Components control which properties to open up; consumers get layout and composition knobs without `styles` overrides. Supports state maps for responsive values.
+
+```tsx
+const Space = tasty({
+  styles: { display: 'flex', flow: 'column', gap: '1x' },
+  styleProps: FLOW_STYLES,
+});
+
+<Space flow="row" gap={{ '': '2x', '@tablet': '4x' }}>
+```
+
+See [Runtime API - Style Props](docs/runtime.md#style-props) and [Methodology - styleProps](docs/methodology.md#styleprops-as-the-public-api).
+
+### Mod Props
+
+`modProps` exposes modifier keys as typed React props — the modifier equivalent of `styleProps`. Accepts an array of key names or an object with type descriptors (`Boolean`, `String`, `Number`, or enum arrays) for full TypeScript autocomplete.
+
+```tsx
+const Button = tasty({
+  as: 'button',
+  modProps: { isLoading: Boolean, size: ['sm', 'md', 'lg'] as const },
+  styles: {
+    fill: { '': '#primary', isLoading: '#primary.5' },
+    padding: { '': '2x 4x', 'size=sm': '1x 2x' },
+  },
+});
+
+<Button isLoading size="lg">Submit</Button>
+```
+
+See [Runtime API - Mod Props](docs/runtime.md#mod-props) and [Methodology - modProps](docs/methodology.md#modprops-and-mods).
 
 ### Variants
 

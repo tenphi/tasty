@@ -333,13 +333,19 @@ A design system works best when the rules for customization are explicit. Tasty 
 <Space flow="row" gap="3x" padding="2x">
 ```
 
-2. **Pass tokens** — inject runtime values through the `tokens` prop for per-instance customization:
+2. **Use modProps** — control component states through typed props instead of `mods`:
+
+```tsx
+<Button isLoading size="large">Submit</Button>
+```
+
+3. **Pass tokens** — inject runtime values through the `tokens` prop for per-instance customization:
 
 ```tsx
 <ProgressBar tokens={{ '$progress': `${percent}%` }} />
 ```
 
-3. **Create styled wrappers** — extend a component's styles with `tasty(Base, { styles })`:
+4. **Create styled wrappers** — extend a component's styles with `tasty(Base, { styles })`:
 
 ```tsx
 const DangerButton = tasty(Button, {

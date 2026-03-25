@@ -285,7 +285,7 @@ type TastyBaseProps<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
-  M extends ModPropsInput = readonly string[],
+  M extends ModPropsInput = readonly never[],
 > = {
   /** Default styles of the element. */
   styles?: Styles;
@@ -307,7 +307,7 @@ export type TastyProps<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   DefaultProps = Props,
-  M extends ModPropsInput = readonly string[],
+  M extends ModPropsInput = readonly never[],
 > = TastyBaseProps<K, V, E, M> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -329,7 +329,7 @@ export type TastyElementOptions<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
-  M extends ModPropsInput = readonly string[],
+  M extends ModPropsInput = readonly never[],
 > = TastyBaseProps<K, V, E, M> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -338,7 +338,7 @@ export type TastyElementOptions<
 
 export type AllBasePropsWithMods<
   K extends StyleList,
-  M extends ModPropsInput = readonly string[],
+  M extends ModPropsInput = readonly never[],
 > = AllBaseProps & {
   [key in K[number]]?:
     | StyleValue<StylesInterface[key]>
@@ -375,15 +375,22 @@ type TastySpecificKeys =
  * - HTML attributes for flexibility (properly typed based on tag)
  * - Variant support
  *
- * Uses AllHTMLAttributes as base for common attributes (like disabled),
- * but overrides event handlers with tag-specific types from JSX.IntrinsicElements.
+ * AllBasePropsWithMods carries generic AllHTMLAttributes which can conflict
+ * with tag-specific types from JSX.IntrinsicElements (e.g. `src` is `string`
+ * in AllHTMLAttributes but `string | Blob` in ImgHTMLAttributes). To avoid
+ * intersection-narrowing, we Omit tag-specific keys from AllBasePropsWithMods
+ * (keeping TastySpecificKeys and style props) and let JSX.IntrinsicElements
+ * supply the authoritative HTML attribute types.
  */
 export type TastyElementProps<
   K extends StyleList,
   V extends VariantMap,
   Tag extends keyof JSX.IntrinsicElements = 'div',
-  M extends ModPropsInput = readonly string[],
-> = AllBasePropsWithMods<K, M> &
+  M extends ModPropsInput = readonly never[],
+> = Omit<
+  AllBasePropsWithMods<K, M>,
+  Exclude<keyof JSX.IntrinsicElements[Tag], TastySpecificKeys | K[number]>
+> &
   WithVariant<V> &
   Omit<
     Omit<AllHTMLAttributes<HTMLElement>, keyof JSX.IntrinsicElements[Tag]> &
@@ -407,7 +414,7 @@ export function tasty<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
-  M extends ModPropsInput = readonly string[],
+  M extends ModPropsInput = readonly never[],
 >(
   options: TastyElementOptions<K, V, E, Tag, M>,
   secondArg?: never,

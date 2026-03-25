@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 0.15.2
+
+### Patch Changes
+
+- [#56](https://github.com/tenphi/tasty/pull/56) [`955caa9`](https://github.com/tenphi/tasty/commit/955caa9e917f86880d462a29b16ac997b2be515c) Thanks [@tenphi](https://github.com/tenphi)! - Fix type error where JSX elements were not assignable as children of tasty components due to `ResolveModProps` producing a catch-all index signature and `AllHTMLAttributes` intersection narrowing tag-specific attribute types.
+
+- [#58](https://github.com/tenphi/tasty/pull/58) [`c89dc3e`](https://github.com/tenphi/tasty/commit/c89dc3e0e03ca8a21f89bb6b2cff331427c38ff0) Thanks [@tenphi](https://github.com/tenphi)! - Fix zero-runtime CSS loss in Turbopack: prevent non-contributing files from overwriting `tasty.css` with tokens-only content.
+
 ## 0.15.1
 
 ### Patch Changes

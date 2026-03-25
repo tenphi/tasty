@@ -37,6 +37,10 @@ export type {
   SubElementProps,
   WithVariant,
   VariantMap,
+  ModPropDef,
+  ModPropsInput,
+  ResolveModProps,
+  ResolveModPropDef,
 } from './tasty';
 export type {
   AllBaseProps,

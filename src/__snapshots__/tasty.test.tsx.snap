@@ -1,5 +1,10 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`modProps > should work with style state maps via modProps 1`] = `
+".t1.t1[data-is-active] { background-color: var(--purple-color); }
+.t1.t1:not([data-is-active]) { background-color: var(--white-color); }"
+`;
+
 exports[`tasty() API > should allow multiple wrapping 1`] = `
 ".t16.t16 { border: var(--border-width) solid var(--black-color); color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
 .t17.t17 { padding: 16px 0px 0px; }

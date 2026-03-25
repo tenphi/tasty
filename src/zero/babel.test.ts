@@ -4,7 +4,9 @@ import * as path from 'path';
 
 import { transformSync } from '@babel/core';
 
-import babelPlugin from './babel';
+import { resetConfig } from '../config';
+
+import babelPlugin, { clearWriterCache } from './babel';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'tasty-babel-test-'));
@@ -36,6 +38,8 @@ describe('babel plugin', () => {
     });
 
     afterEach(() => {
+      clearWriterCache();
+      resetConfig();
       fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
@@ -179,6 +183,99 @@ const button = tastyStatic({
 
       const css = fs.readFileSync(outputPath, 'utf-8');
       expect(css).toContain('/* from:');
+    });
+
+    it('should accumulate CSS from multiple files compiled to the same output', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const fileA = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('body', {
+  margin: 0,
+  padding: 0,
+});
+`;
+
+      const fileB = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const card = tastyStatic({
+  display: 'flex',
+  gap: '8px',
+});
+`;
+
+      const fileC = `
+// A file with no tastyStatic calls
+export const x = 1;
+`;
+
+      transformCode(fileA, { output: outputPath });
+      transformCode(fileB, { output: outputPath });
+      transformCode(fileC, { output: outputPath });
+
+      expect(fs.existsSync(outputPath)).toBe(true);
+      const css = fs.readFileSync(outputPath, 'utf-8');
+
+      // CSS from file A (selector mode)
+      expect(css).toContain('body');
+      expect(css).toContain('margin');
+      expect(css).toContain('padding');
+
+      // CSS from file B (styles mode)
+      expect(css).toContain('display');
+      expect(css).toContain('flex');
+      expect(css).toContain('gap');
+    });
+
+    it('should reset writer when config changes', () => {
+      const configPath = path.join(tempDir, 'tasty-zero.config.ts');
+      const outputPath = path.join(tempDir, 'output.css');
+
+      fs.writeFileSync(configPath, `export default {};`);
+
+      const codeA = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('body', { display: 'block' });
+`;
+
+      transformCode(codeA, {
+        output: outputPath,
+        configFile: configPath,
+      });
+
+      const css1 = fs.readFileSync(outputPath, 'utf-8');
+      expect(css1).toContain('display');
+
+      // Simulate config change by touching the file
+      const now = new Date();
+      fs.utimesSync(configPath, now, now);
+
+      fs.writeFileSync(
+        configPath,
+        `export default { tokens: { '$gap': '16px' } };`,
+      );
+
+      const codeB = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('html', { margin: 0 });
+`;
+
+      transformCode(codeB, {
+        output: outputPath,
+        configFile: configPath,
+      });
+
+      const css2 = fs.readFileSync(outputPath, 'utf-8');
+      // After config change, old CSS from file A is gone (writer was reset)
+      expect(css2).not.toContain('display');
+      // New file B CSS is present
+      expect(css2).toContain('margin');
+      // New token from updated config is present
+      expect(css2).toContain('--gap');
     });
   });
 });

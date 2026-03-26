@@ -1,6 +1,7 @@
-import { resetConfig } from '../config';
+import { configure, resetConfig } from '../config';
 
 import {
+  getColorSpace,
   getColorSpaceComponents,
   resetColorSpace,
   setColorSpace,
@@ -104,5 +105,28 @@ describe('getColorSpaceComponents — ignores alpha', () => {
 
   it('returns components for opaque colors', () => {
     expect(getColorSpaceComponents('rgb(255, 128, 0)')).toBe('255 128 0');
+  });
+});
+
+describe('configure() colorSpace merge semantics', () => {
+  it('does not reset colorSpace when a subsequent configure() omits it', () => {
+    configure({ colorSpace: 'rgb' });
+    expect(getColorSpace()).toBe('rgb');
+
+    configure({ states: { '@mobile': '@media(w < 920px)' } });
+    expect(getColorSpace()).toBe('rgb');
+  });
+
+  it('overrides colorSpace when explicitly provided in a subsequent call', () => {
+    configure({ colorSpace: 'rgb' });
+    expect(getColorSpace()).toBe('rgb');
+
+    configure({ colorSpace: 'hsl' });
+    expect(getColorSpace()).toBe('hsl');
+  });
+
+  it('defaults to oklch when no configure() call sets colorSpace', () => {
+    configure({});
+    expect(getColorSpace()).toBe('oklch');
   });
 });

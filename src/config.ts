@@ -842,9 +842,11 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   }
 
   // Handle color space (must be set before any token processing)
-  setColorSpace(config.colorSpace ?? 'oklch');
-  // Color space affects parser output (e.g. #name.5 → oklch(...) vs rgb(...))
-  getGlobalParser().clearCache();
+  if (config.colorSpace) {
+    setColorSpace(config.colorSpace);
+    // Color space affects parser output (e.g. #name.5 → oklch(...) vs rgb(...))
+    getGlobalParser().clearCache();
+  }
 
   // Handle predefined states
   if (Object.keys(mergedStates).length > 0) {

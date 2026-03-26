@@ -398,9 +398,9 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
  * Keys are raw CSS custom property names (--name).
  */
 export const INTERNAL_TOKENS: Record<string, string> = {
-  '--font':
+  '--font-sans':
     'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif',
-  '--monospace-font':
+  '--font-mono':
     'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   // Default border color to the element's current text color
   '--border-color': 'currentColor',

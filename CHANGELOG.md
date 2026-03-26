@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.15.3
+
+### Patch Changes
+
+- [`a68b132`](https://github.com/tenphi/tasty/commit/a68b1320db8a1523d7c6a388f9700217bcc4c6ee) Thanks [@tenphi](https://github.com/tenphi)! - Fix `configure()` unconditionally resetting `colorSpace` to `'oklch'` on every call, even when `colorSpace` is not provided. Now `colorSpace` follows the same merge semantics as other config options — it is only changed when explicitly passed.
+
 ## 0.15.2
 
 ### Patch Changes

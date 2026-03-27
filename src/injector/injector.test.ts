@@ -815,4 +815,95 @@ describe('StyleInjector', () => {
       expect(injector.isPropertyDefined('--scale')).toBe(true);
     });
   });
+
+  describe('fontFace', () => {
+    it('should inject a @font-face rule', () => {
+      injector.fontFace('Brand Sans', {
+        src: 'url("/fonts/brand.woff2") format("woff2")',
+        fontDisplay: 'swap',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@font-face');
+      expect(cssText).toContain('Brand Sans');
+    });
+
+    it('should deduplicate identical font-face rules', () => {
+      const desc = {
+        src: 'url("/fonts/brand.woff2") format("woff2")',
+        fontWeight: 400 as const,
+      };
+
+      injector.fontFace('Brand Sans', desc);
+      injector.fontFace('Brand Sans', desc);
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@font-face/g);
+      expect(matches?.length).toBe(1);
+    });
+
+    it('should allow different font-face rules for same family', () => {
+      injector.fontFace('Brand Sans', {
+        src: 'url("/fonts/regular.woff2") format("woff2")',
+        fontWeight: 400 as const,
+      });
+      injector.fontFace('Brand Sans', {
+        src: 'url("/fonts/bold.woff2") format("woff2")',
+        fontWeight: 700 as const,
+      });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@font-face/g);
+      expect(matches?.length).toBe(2);
+    });
+  });
+
+  describe('counterStyle', () => {
+    it('should inject a @counter-style rule', () => {
+      injector.counterStyle('thumbs', {
+        system: 'cyclic',
+        symbols: '"👍"',
+        suffix: '" "',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@counter-style');
+      expect(cssText).toContain('thumbs');
+    });
+
+    it('should deduplicate by name (first wins)', () => {
+      injector.counterStyle('thumbs', {
+        system: 'cyclic',
+        symbols: '"👍"',
+        suffix: '" "',
+      });
+      injector.counterStyle('thumbs', {
+        system: 'cyclic',
+        symbols: '"★"',
+        suffix: '" "',
+      });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@counter-style/g);
+      expect(matches?.length).toBe(1);
+      expect(cssText).toContain('"👍"');
+    });
+
+    it('should allow different counter-style names', () => {
+      injector.counterStyle('thumbs', {
+        system: 'cyclic',
+        symbols: '"👍"',
+        suffix: '" "',
+      });
+      injector.counterStyle('stars', {
+        system: 'cyclic',
+        symbols: '"★"',
+        suffix: '" "',
+      });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@counter-style/g);
+      expect(matches?.length).toBe(2);
+    });
+  });
 });

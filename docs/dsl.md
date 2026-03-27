@@ -569,6 +569,97 @@ Use explicit `@properties` when you need non-default settings like `inherits: fa
 
 ---
 
+## Font Face (`@fontFace`)
+
+Register custom fonts directly inside a `styles` object. Keys are font-family names, values are descriptor objects (or arrays of them for multiple weights/styles).
+
+```ts
+const Heading = tasty({
+  styles: {
+    '@fontFace': {
+      'Brand Sans': {
+        src: 'url("/fonts/brand-sans.woff2") format("woff2")',
+        fontDisplay: 'swap',
+      },
+    },
+    fontFamily: '"Brand Sans", sans-serif',
+  },
+});
+```
+
+### Multiple weights
+
+Supply an array to register several variants of the same family:
+
+```ts
+'@fontFace': {
+  'Brand Sans': [
+    { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
+    { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+  ],
+}
+```
+
+### Supported descriptors
+
+| Descriptor | CSS property | Type |
+|---|---|---|
+| `src` (required) | `src` | `string` |
+| `fontWeight` | `font-weight` | `string \| number` |
+| `fontStyle` | `font-style` | `string` |
+| `fontStretch` | `font-stretch` | `string` |
+| `fontDisplay` | `font-display` | `'auto' \| 'block' \| 'swap' \| 'fallback' \| 'optional'` |
+| `unicodeRange` | `unicode-range` | `string` |
+| `ascentOverride` | `ascent-override` | `string` |
+| `descentOverride` | `descent-override` | `string` |
+| `lineGapOverride` | `line-gap-override` | `string` |
+| `sizeAdjust` | `size-adjust` | `string` |
+| `fontFeatureSettings` | `font-feature-settings` | `string` |
+| `fontVariationSettings` | `font-variation-settings` | `string` |
+
+> Font-face rules are permanent — they are injected once and never cleaned up, matching how browsers handle `@font-face`.
+
+---
+
+## Counter Style (`@counterStyle`)
+
+Define custom list markers via the CSS `@counter-style` at-rule. Keys are counter-style names, values are descriptor objects.
+
+```ts
+const EmojiList = tasty({
+  tag: 'ol',
+  styles: {
+    '@counterStyle': {
+      thumbs: {
+        system: 'cyclic',
+        symbols: '"👍"',
+        suffix: '" "',
+      },
+    },
+    listStyleType: 'thumbs',
+  },
+});
+```
+
+### Supported descriptors
+
+| Descriptor | CSS property | Type |
+|---|---|---|
+| `system` (required) | `system` | `'cyclic' \| 'numeric' \| 'alphabetic' \| 'symbolic' \| 'additive' \| 'fixed' \| string` |
+| `symbols` | `symbols` | `string` |
+| `additiveSymbols` | `additive-symbols` | `string` |
+| `prefix` | `prefix` | `string` |
+| `suffix` | `suffix` | `string` |
+| `negative` | `negative` | `string` |
+| `range` | `range` | `string` |
+| `pad` | `pad` | `string` |
+| `fallback` | `fallback` | `string` |
+| `speakAs` | `speak-as` | `string` |
+
+> Counter-style rules are permanent — they are injected once and never cleaned up, matching how browsers handle `@counter-style`.
+
+---
+
 ## Style Properties
 
 For a complete reference of all enhanced style properties — syntax, values, modifiers, and recommendations — see **[Style Properties Reference](styles.md)**.

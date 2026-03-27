@@ -317,6 +317,8 @@ Server-safe style collector. One instance per request.
 | `collectChunk(cacheKey, className, rules)` | Record CSS rules for a chunk. Deduplicated by `cacheKey`. |
 | `collectKeyframes(name, css)` | Record a `@keyframes` rule. Deduplicated by name. |
 | `collectProperty(name, css)` | Record a `@property` rule. Deduplicated by name. |
+| `collectFontFace(key, css)` | Record a `@font-face` rule. Deduplicated by content hash. |
+| `collectCounterStyle(name, css)` | Record a `@counter-style` rule. Deduplicated by name. |
 | `getCSS()` | Get all collected CSS as a single string. For non-streaming SSR. |
 | `flushCSS()` | Get only CSS collected since the last flush. For streaming SSR. |
 | `getCacheState()` | Serialize `{ entries: Record<cacheKey, className>, classCounter }` for client hydration. |

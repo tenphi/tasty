@@ -8,6 +8,8 @@ export {
   isTestEnvironment,
   hasGlobalKeyframes,
   getGlobalKeyframes,
+  getGlobalFontFace,
+  getGlobalCounterStyle,
   hasGlobalRecipes,
   getGlobalRecipes,
 } from '../config';

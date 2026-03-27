@@ -1,17 +1,9 @@
 import { useContext, useInsertionEffect, useMemo } from 'react';
 
 import { getGlobalInjector } from '../config';
-import type { ServerStyleCollector } from '../ssr/collector';
+import { resolveSSRCollector } from './resolve-ssr-collector';
 import { TastySSRContext } from '../ssr/context';
 import { formatPropertyCSS } from '../ssr/format-property';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
-
-function resolveSSRCollector(
-  reactContext: ServerStyleCollector | null,
-): ServerStyleCollector | null {
-  if (reactContext) return reactContext;
-  return getRegisteredSSRCollector();
-}
 
 export interface UsePropertyOptions {
   /**

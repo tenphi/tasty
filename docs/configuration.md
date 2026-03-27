@@ -54,6 +54,8 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
+| `fontFace` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
+| `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
@@ -130,6 +132,65 @@ configure({
 When a component uses `padding: '$card-padding'`, the parser replaces it with `'4x'` before generating CSS. When a component uses `fill: '#accent'`, it is replaced with `'#purple'`, which in turn resolves to `var(--purple-color)`.
 
 See [Replace Tokens](dsl.md#replace-tokens) in the Style DSL reference.
+
+---
+
+## Font Face
+
+Register custom fonts globally so every component can reference them by family name. Values are descriptor objects or arrays (for multiple weights/styles). Rules are injected eagerly when styles are first generated.
+
+```ts
+configure({
+  fontFace: {
+    'Brand Sans': [
+      {
+        src: 'url("/fonts/brand-regular.woff2") format("woff2")',
+        fontWeight: 400,
+        fontDisplay: 'swap',
+      },
+      {
+        src: 'url("/fonts/brand-bold.woff2") format("woff2")',
+        fontWeight: 700,
+        fontDisplay: 'swap',
+      },
+    ],
+    Icons: {
+      src: 'url("/fonts/icons.woff2") format("woff2")',
+      fontDisplay: 'block',
+    },
+  },
+});
+```
+
+Now any component can use `fontFamily: '"Brand Sans", sans-serif'` and the browser will already have the `@font-face` rules in the stylesheet.
+
+See [Font Face (`@fontFace`)](dsl.md#font-face-fontface) for inline usage inside component styles and the full list of supported descriptors.
+
+---
+
+## Counter Style
+
+Define custom list-marker algorithms globally. Rules are injected eagerly when styles are first generated.
+
+```ts
+configure({
+  counterStyle: {
+    thumbs: {
+      system: 'cyclic',
+      symbols: '"👍"',
+      suffix: '" "',
+    },
+    'lower-roman-parens': {
+      system: 'extends lower-roman',
+      suffix: '") "',
+    },
+  },
+});
+```
+
+Components can then reference `listStyleType: 'thumbs'` directly.
+
+See [Counter Style (`@counterStyle`)](dsl.md#counter-style-counterstyle) for inline usage inside component styles and the full list of supported descriptors.
 
 ---
 

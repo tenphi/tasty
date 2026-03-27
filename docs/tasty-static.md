@@ -163,6 +163,8 @@ module.exports = {
 | `config.states` | `Record<string, string>` | `{}` | Predefined state aliases |
 | `config.devMode` | `boolean` | `false` | Add source comments to CSS |
 | `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
+| `config.fontFace` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
+| `config.counterStyle` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
 
 ---
 

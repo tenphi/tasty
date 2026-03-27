@@ -13,8 +13,12 @@ import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
 import { SheetManager } from './sheet-manager';
+import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
+import { formatCounterStyleDeclarations } from '../counter-style';
 import type {
   CacheMetrics,
+  CounterStyleDescriptors,
+  FontFaceDescriptors,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
@@ -588,6 +592,78 @@ export class StyleInjector {
     }
 
     return registry.injectedProperties.has(effectiveResult.cssName);
+  }
+
+  /**
+   * Inject a CSS @font-face rule.
+   *
+   * Permanent and global — no dispose or ref-counting.
+   * Deduplicates by content hash (family + descriptors).
+   */
+  fontFace(
+    family: string,
+    descriptors: FontFaceDescriptors,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    const hash = fontFaceContentHash(family, descriptors);
+
+    if (registry.injectedFontFaces.has(hash)) {
+      return;
+    }
+
+    const rule: StyleRule = {
+      selector: '@font-face',
+      declarations: formatFontFaceDeclarations(family, descriptors),
+    } as StyleRule;
+
+    const info = this.sheetManager.insertGlobalRule(
+      registry,
+      [rule],
+      `fontface:${hash}`,
+      root,
+    );
+
+    if (info) {
+      registry.injectedFontFaces.add(hash);
+    }
+  }
+
+  /**
+   * Inject a CSS @counter-style rule.
+   *
+   * Permanent and global — no dispose or ref-counting.
+   * Deduplicates by name (first definition wins).
+   */
+  counterStyle(
+    name: string,
+    descriptors: CounterStyleDescriptors,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    if (registry.injectedCounterStyles.has(name)) {
+      return;
+    }
+
+    const rule: StyleRule = {
+      selector: `@counter-style ${name}`,
+      declarations: formatCounterStyleDeclarations(descriptors),
+    } as StyleRule;
+
+    const info = this.sheetManager.insertGlobalRule(
+      registry,
+      [rule],
+      `counterstyle:${name}`,
+      root,
+    );
+
+    if (info) {
+      registry.injectedCounterStyles.add(name);
+    }
   }
 
   /**

@@ -17,7 +17,6 @@ import {
   getGlobalConfigTokens,
   hasGlobalProperties,
   INTERNAL_PROPERTIES,
-  INTERNAL_TOKENS,
 } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
@@ -88,17 +87,6 @@ export class ServerStyleCollector {
           }
         }
       }
-    }
-
-    const tokenEntries = Object.entries(INTERNAL_TOKENS);
-    if (tokenEntries.length > 0) {
-      const declarations = tokenEntries
-        .map(([name, value]) => `${name}: ${value}`)
-        .join('; ');
-      this.collectProperty(
-        '__internal:root-tokens',
-        `:root { ${declarations} }`,
-      );
     }
 
     // Inject configured tokens as :root CSS custom properties

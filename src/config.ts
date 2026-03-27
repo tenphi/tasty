@@ -432,22 +432,19 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: '700',
   },
-};
-
-/**
- * Internal token defaults that cannot be expressed as CSS @property initial values
- * (e.g. font stacks, keyword colors). These are injected as :root CSS variables.
- * Consuming projects override them by setting their own tokens on :root.
- *
- * Keys are raw CSS custom property names (--name).
- */
-export const INTERNAL_TOKENS: Record<string, string> = {
-  '--font-sans':
-    'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif',
-  '--font-mono':
-    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-  // Default border color to the element's current text color
-  '--border-color': 'currentColor',
+  // Used by preset.ts as fallback font stacks
+  '$font-sans-fallback': {
+    syntax: '*',
+    inherits: true,
+    initialValue:
+      'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif',
+  },
+  '$font-mono-fallback': {
+    syntax: '*',
+    inherits: true,
+    initialValue:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  },
 };
 
 // Global injector instance key
@@ -536,17 +533,6 @@ export function markStylesGenerated(): void {
   // Inject internal properties required by tasty core features
   for (const [token, definition] of Object.entries(INTERNAL_PROPERTIES)) {
     injector.property(token, definition);
-  }
-
-  // Inject internal token defaults as :root CSS variables.
-  // Use injectGlobal (not injectRawCSS) so the rule goes through the same
-  // injection path as all other tasty styles (consistent in both DOM and text/test mode).
-  const internalTokenEntries = Object.entries(INTERNAL_TOKENS);
-  if (internalTokenEntries.length > 0) {
-    const declarations = internalTokenEntries
-      .map(([name, value]) => `${name}: ${value}`)
-      .join('; ');
-    injector.injectGlobal([{ selector: ':root', declarations }]);
   }
 
   // Inject global properties if any were configured

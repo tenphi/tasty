@@ -23,20 +23,22 @@ function setCSSValue(
   styles: Styles,
   styleName: string,
   presetName: string,
-  isPropOnly = false,
+  { varOnly, cssOnly }: { varOnly?: boolean; cssOnly?: boolean } = {},
 ) {
-  styles[`--${styleName}`] = (() => {
+  const value = (() => {
     if (presetName === 'inherit') {
       return 'inherit';
     }
 
     const defaultValue = `var(--default-${styleName}${
       styleName === 'font-family'
-        ? ', var(--font-sans, NonexistentFontName)'
+        ? ', var(--font-sans, var(--font-sans-fallback))'
         : ''
     })`;
     const fontSuffix =
-      styleName === 'font-family' ? ', var(--font-sans, sans-serif)' : '';
+      styleName === 'font-family'
+        ? ', var(--font-sans, var(--font-sans-fallback))'
+        : '';
 
     if (presetName === 'default') {
       return `${defaultValue}${fontSuffix}`;
@@ -45,8 +47,12 @@ function setCSSValue(
     }
   })();
 
-  if (!isPropOnly) {
-    styles[styleName] = styles[`--${styleName}`];
+  if (!cssOnly) {
+    styles[`--${styleName}`] = value;
+  }
+
+  if (!varOnly) {
+    styles[styleName] = value;
   }
 }
 
@@ -66,18 +72,18 @@ interface PresetStyleProps {
 /**
  * Resolve font/fontFamily value to CSS font-family string.
  *
- * - `font="monospace"` → var(--font-mono)
- * - `font={true}` → var(--font-sans)
- * - `font="CustomFont"` → CustomFont, var(--font-sans)
+ * - `font="monospace"` → var(--font-mono, var(--font-mono-fallback))
+ * - `font={true}` → var(--font-sans, var(--font-sans-fallback))
+ * - `font="CustomFont"` → CustomFont, var(--font-sans, var(--font-sans-fallback))
  * - `fontFamily="Arial"` → Arial (direct, no fallback)
  */
 function resolveFontFamily(
   font: string | boolean | undefined,
   fontFamily: string | undefined,
-): { value: string; setVar: boolean } | null {
+): string | null {
   // fontFamily takes precedence as a direct value
   if (fontFamily) {
-    return { value: fontFamily, setVar: false };
+    return fontFamily;
   }
 
   if (font == null || font === false) {
@@ -85,14 +91,14 @@ function resolveFontFamily(
   }
 
   if (font === 'monospace') {
-    return { value: 'var(--font-mono)', setVar: true };
+    return 'var(--font-mono, var(--font-mono-fallback))';
   }
 
   if (font === true) {
-    return { value: 'var(--font-sans)', setVar: true };
+    return 'var(--font-sans, var(--font-sans-fallback))';
   }
 
-  return { value: `${font}, var(--font-sans)`, setVar: true };
+  return `${font}, var(--font-sans, var(--font-sans-fallback))`;
 }
 
 /**
@@ -155,23 +161,23 @@ export function presetStyle({
       setCSSValue(styles, 'line-height', name);
     }
     if (letterSpacing == null) {
-      setCSSValue(styles, 'letter-spacing', name);
+      setCSSValue(styles, 'letter-spacing', name, { cssOnly: true });
     }
     if (fontWeight == null) {
-      setCSSValue(styles, 'font-weight', name);
+      setCSSValue(styles, 'font-weight', name, { cssOnly: true });
     }
     if (fontStyle == null) {
       setCSSValue(styles, 'font-style', name);
     }
     if (textTransform == null) {
-      setCSSValue(styles, 'text-transform', name);
+      setCSSValue(styles, 'text-transform', name, { cssOnly: true });
     }
     if (fontFamily == null && font == null) {
-      setCSSValue(styles, 'font-family', name);
+      setCSSValue(styles, 'font-family', name, { cssOnly: true });
     }
 
-    setCSSValue(styles, 'bold-font-weight', name, true);
-    setCSSValue(styles, 'icon-size', name, true);
+    setCSSValue(styles, 'bold-font-weight', name, { varOnly: true });
+    setCSSValue(styles, 'icon-size', name, { varOnly: true });
 
     if (isStrong) {
       styles['font-weight'] = 'var(--bold-font-weight)';
@@ -226,12 +232,9 @@ export function presetStyle({
   }
 
   // Handle font/fontFamily (font has special handling, fontFamily is direct)
-  const fontResult = resolveFontFamily(font, fontFamily);
-  if (fontResult) {
-    styles['font-family'] = fontResult.value;
-    if (fontResult.setVar) {
-      styles['--font-family'] = fontResult.value;
-    }
+  const fontFamily_ = resolveFontFamily(font, fontFamily);
+  if (fontFamily_) {
+    styles['font-family'] = fontFamily_;
   }
 
   // Return undefined if no styles to apply

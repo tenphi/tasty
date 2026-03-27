@@ -272,17 +272,10 @@ describe('Tasty style tests', () => {
     ).toEqual({
       '--font-size': 'var(--t3-font-size, var(--default-font-size))',
       '--font-style': 'var(--t3-font-style, var(--default-font-style))',
-      '--font-weight': 'var(--t3-font-weight, var(--default-font-weight))',
-      '--letter-spacing':
-        'var(--t3-letter-spacing, var(--default-letter-spacing))',
       '--line-height': 'var(--t3-line-height, var(--default-line-height))',
       '--bold-font-weight':
         'var(--t3-bold-font-weight, var(--default-bold-font-weight))',
-      '--font-family':
-        'var(--t3-font-family, var(--default-font-family, var(--font-sans, NonexistentFontName))), var(--font-sans, sans-serif)',
       '--icon-size': 'var(--t3-icon-size, var(--default-icon-size))',
-      '--text-transform':
-        'var(--t3-text-transform, var(--default-text-transform))',
       'font-size': 'var(--t3-font-size, var(--default-font-size))',
       'font-style': 'var(--t3-font-style, var(--default-font-style))',
       'font-weight': 'var(--t3-font-weight, var(--default-font-weight))',
@@ -290,7 +283,7 @@ describe('Tasty style tests', () => {
         'var(--t3-letter-spacing, var(--default-letter-spacing))',
       'line-height': 'var(--t3-line-height, var(--default-line-height))',
       'font-family':
-        'var(--t3-font-family, var(--default-font-family, var(--font-sans, NonexistentFontName))), var(--font-sans, sans-serif)',
+        'var(--t3-font-family, var(--default-font-family, var(--font-sans, var(--font-sans-fallback)))), var(--font-sans, var(--font-sans-fallback))',
       'text-transform':
         'var(--t3-text-transform, var(--default-text-transform))',
     });

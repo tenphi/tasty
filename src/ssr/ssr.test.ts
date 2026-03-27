@@ -283,19 +283,17 @@ describe('ServerStyleCollector', () => {
     expect(flush2).not.toContain('display: flex');
   });
 
-  it('collectInternals includes @property and :root token rules', () => {
+  it('collectInternals includes @property rules', () => {
     const collector = new ServerStyleCollector();
     collector.collectInternals();
 
     const css = collector.getCSS();
-    // INTERNAL_PROPERTIES: gap, radius, border-width, etc.
+    // INTERNAL_PROPERTIES: gap, radius, border-width, font fallbacks, etc.
     expect(css).toContain('@property --gap');
     expect(css).toContain('@property --radius');
     expect(css).toContain('@property --border-width');
-    // INTERNAL_TOKENS: font stacks, border-color
-    expect(css).toContain(':root');
-    expect(css).toContain('--font-sans:');
-    expect(css).toContain('--border-color:');
+    expect(css).toContain('@property --font-sans-fallback');
+    expect(css).toContain('@property --font-mono-fallback');
     // Color properties get companion -rgb rules
     expect(css).toContain('@property --white-color');
     expect(css).toContain('@property --white-color-oklch');

@@ -42,7 +42,7 @@ function processGroup(group: GroupData): {
 
   const width = values[0] || 'var(--border-width)';
   const style = typeMods[0] || 'solid';
-  const color = colors?.[0] || 'var(--border-color)';
+  const color = colors?.[0] || 'var(--border-color, currentColor)';
 
   return {
     directions,
@@ -172,7 +172,7 @@ export function borderStyle({
       const fallback = allDirectionsValue || {
         width: '0',
         style: 'solid',
-        color: 'var(--border-color)',
+        color: 'var(--border-color, currentColor)',
       };
       result[`border-${dir}`] = `0 ${fallback.style} ${fallback.color}`;
     }

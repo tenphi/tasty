@@ -41,7 +41,7 @@ exports[`tasty() API > should create element styles 1`] = `
 .t13.t13:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
-exports[`tasty() API > should define style props 1`] = `".t15.t15 { border: 1px solid var(--border-color); }"`;
+exports[`tasty() API > should define style props 1`] = `".t15.t15 { border: 1px solid var(--border-color, currentColor); }"`;
 
 exports[`tasty() API > should fallback to default variant 1`] = `".t9.t9 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }"`;
 

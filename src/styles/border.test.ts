@@ -12,7 +12,7 @@ describe('borderStyle', () => {
     // 1bw is converted to 1px by tasty parser
     expect(result.border).toContain('1px');
     expect(result.border).toContain('solid');
-    expect(result.border).toContain('var(--border-color)');
+    expect(result.border).toContain('var(--border-color, currentColor)');
   });
 
   it('handles simple border value', () => {

@@ -359,7 +359,7 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should sup
 
 exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with complex style values 1`] = `
 "@media (width < 600px) {
-  .t0.t0 { border: var(--border-width) none var(--border-color); }
+  .t0.t0 { border: var(--border-width) none var(--border-color, currentColor); }
 }
 @media (not (width < 600px)) {
   :root[data-theme="dark"] .t0.t0 { border: 1px solid var(--dark-05-color); }

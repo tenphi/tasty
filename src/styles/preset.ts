@@ -32,12 +32,12 @@ function setCSSValue(
 
     const defaultValue = `var(--default-${styleName}${
       styleName === 'font-family'
-        ? ', var(--font-sans, var(--font-sans-fallback, NonexistentFontName))'
+        ? ', var(--font-sans, var(--font-sans-fallback))'
         : ''
     })`;
     const fontSuffix =
       styleName === 'font-family'
-        ? ', var(--font-sans, var(--font-sans-fallback, sans-serif))'
+        ? ', var(--font-sans, var(--font-sans-fallback))'
         : '';
 
     if (presetName === 'default') {

@@ -32,6 +32,8 @@ import type { StyleHandlerDefinition } from '../utils/styles';
 
 import { CSSWriter } from './css-writer';
 import {
+  extractCounterStyleFromStyles,
+  extractFontFaceFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
   extractStylesForSelector,
@@ -39,7 +41,11 @@ import {
 } from './extractor';
 
 import type { NodePath, PluginPass } from '@babel/core';
-import type { KeyframesSteps } from '../injector/types';
+import type {
+  CounterStyleDescriptors,
+  FontFaceInput,
+  KeyframesSteps,
+} from '../injector/types';
 import type { StyleDetails, UnitHandler } from '../parser/types';
 import type { TastyPlugin } from '../plugins/types';
 
@@ -99,6 +105,16 @@ export interface TastyZeroConfig {
    * @example { fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } } }
    */
   keyframes?: Record<string, KeyframesSteps>;
+  /**
+   * Global @font-face definitions for static extraction.
+   * Keys are font-family names, values are descriptors or arrays of descriptors.
+   */
+  fontFace?: Record<string, FontFaceInput>;
+  /**
+   * Global @counter-style definitions for static extraction.
+   * Keys are counter-style names, values are descriptor objects.
+   */
+  counterStyle?: Record<string, CounterStyleDescriptors>;
   /**
    * Custom style handlers that transform style properties into CSS declarations.
    * Handlers replace built-in handlers for the same style name.
@@ -448,6 +464,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state.sourceFile,
             config.keyframes,
             config.autoPropertyTypes,
+            config.fontFace,
+            config.counterStyle,
           );
         } else if (t.isObjectExpression(firstArg)) {
           // Styles mode: tastyStatic(styles)
@@ -459,6 +477,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             globalRegistry,
             config.keyframes,
             config.autoPropertyTypes,
+            config.fontFace,
+            config.counterStyle,
           );
         } else if (t.isIdentifier(firstArg)) {
           // Extension mode: tastyStatic(base, styles)
@@ -470,6 +490,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             globalRegistry,
             config.keyframes,
             config.autoPropertyTypes,
+            config.fontFace,
+            config.counterStyle,
           );
         } else {
           throw path.buildCodeFrameError(
@@ -579,6 +601,8 @@ function handleStylesMode(
   globalRegistry: StaticStyleRegistry,
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
+  globalFontFace?: Record<string, FontFaceInput>,
+  globalCounterStyle?: Record<string, CounterStyleDescriptors>,
 ): void {
   const stylesArg = args[0];
 
@@ -609,6 +633,16 @@ function handleStylesMode(
   const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
   for (const prop of properties) {
     cssWriter.add(prop.css, prop.css, state.sourceFile);
+  }
+
+  // Extract and add @font-face rules
+  for (const ff of extractFontFaceFromStyles(styles, globalFontFace)) {
+    cssWriter.add(ff.css, ff.css, state.sourceFile);
+  }
+
+  // Extract and add @counter-style rules
+  for (const cs of extractCounterStyleFromStyles(styles, globalCounterStyle)) {
+    cssWriter.add(cs.css, cs.css, state.sourceFile);
   }
 
   // Extract styles with chunking
@@ -646,6 +680,8 @@ function handleExtensionMode(
   globalRegistry: StaticStyleRegistry,
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
+  globalFontFace?: Record<string, FontFaceInput>,
+  globalCounterStyle?: Record<string, CounterStyleDescriptors>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -708,6 +744,19 @@ function handleExtensionMode(
     cssWriter.add(prop.css, prop.css, state.sourceFile);
   }
 
+  // Extract and add @font-face rules
+  for (const ff of extractFontFaceFromStyles(mergedStyles, globalFontFace)) {
+    cssWriter.add(ff.css, ff.css, state.sourceFile);
+  }
+
+  // Extract and add @counter-style rules
+  for (const cs of extractCounterStyleFromStyles(
+    mergedStyles,
+    globalCounterStyle,
+  )) {
+    cssWriter.add(cs.css, cs.css, state.sourceFile);
+  }
+
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(mergedStyles);
 
@@ -748,6 +797,8 @@ function handleSelectorMode(
   sourceFile?: string,
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
+  globalFontFace?: Record<string, FontFaceInput>,
+  globalCounterStyle?: Record<string, CounterStyleDescriptors>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -791,6 +842,16 @@ function handleSelectorMode(
   const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
   for (const prop of properties) {
     cssWriter.add(prop.css, prop.css, sourceFile);
+  }
+
+  // Extract and add @font-face rules
+  for (const ff of extractFontFaceFromStyles(styles, globalFontFace)) {
+    cssWriter.add(ff.css, ff.css, sourceFile);
+  }
+
+  // Extract and add @counter-style rules
+  for (const cs of extractCounterStyleFromStyles(styles, globalCounterStyle)) {
+    cssWriter.add(cs.css, cs.css, sourceFile);
   }
 
   // Extract styles for selector

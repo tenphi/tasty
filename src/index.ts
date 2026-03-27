@@ -16,6 +16,8 @@ export {
   useRawCSS,
   useProperty,
   useKeyframes,
+  useFontFace,
+  useCounterStyle,
 } from './hooks';
 export type {
   UseStylesOptions,

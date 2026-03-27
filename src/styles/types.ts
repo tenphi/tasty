@@ -1,4 +1,9 @@
-import type { KeyframesSteps, PropertyDefinition } from '../injector/types';
+import type {
+  CounterStyleDescriptors,
+  FontFaceInput,
+  KeyframesSteps,
+  PropertyDefinition,
+} from '../injector/types';
 import type { CSSProperties } from '../utils/css-types';
 import type { StyleValue, StyleValueStateMap } from '../utils/styles';
 
@@ -479,6 +484,24 @@ export interface StylesInterface extends Omit<
    */
   '@properties'?: Record<string, PropertyDefinition>;
   /**
+   * Local @font-face definitions for this component.
+   * Keys are font-family names, values are descriptors or arrays of descriptors
+   * (for multiple weights/styles of the same family).
+   *
+   * Examples:
+   * - `'@fontFace': { Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' } }`
+   * - `'@fontFace': { 'Brand Sans': [{ src: '...', fontWeight: 400 }, { src: '...', fontWeight: 700 }] }`
+   */
+  '@fontFace'?: Record<string, FontFaceInput>;
+  /**
+   * Local @counter-style definitions for this component.
+   * Keys are counter-style names, values are descriptor objects.
+   *
+   * Examples:
+   * - `'@counterStyle': { thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' } }`
+   */
+  '@counterStyle'?: Record<string, CounterStyleDescriptors>;
+  /**
    * Apply one or more predefined style recipes by name.
    * Recipes are defined globally via `configure({ recipes: { ... } })`.
    * Multiple recipes are space-separated. Use `/` to separate base recipes
@@ -528,7 +551,12 @@ export type Selector = `${SuffixForSelector}${string}`;
 export type NotSelector = Exclude<string, Selector | keyof StylesInterface>;
 
 /** Special style keys that should not be wrapped in StyleValue/StyleValueStateMap */
-type SpecialStyleKeys = '@keyframes' | '@properties' | 'recipe';
+type SpecialStyleKeys =
+  | '@keyframes'
+  | '@properties'
+  | '@fontFace'
+  | '@counterStyle'
+  | 'recipe';
 
 export type StylesWithoutSelectors = {
   [key in keyof StylesInterface as key extends SpecialStyleKeys
@@ -560,12 +588,16 @@ export type RecipeStyles = StylesWithoutSelectors &
   RecipeIndexSignature & {
     '@keyframes'?: StylesInterface['@keyframes'];
     '@properties'?: StylesInterface['@properties'];
+    '@fontFace'?: StylesInterface['@fontFace'];
+    '@counterStyle'?: StylesInterface['@counterStyle'];
   };
 
 /** Special properties that are not regular style values */
 export interface SpecialStyleProperties {
   '@keyframes'?: StylesInterface['@keyframes'];
   '@properties'?: StylesInterface['@properties'];
+  '@fontFace'?: StylesInterface['@fontFace'];
+  '@counterStyle'?: StylesInterface['@counterStyle'];
   recipe?: StylesInterface['recipe'];
 }
 
@@ -577,7 +609,9 @@ export interface StylesIndexSignature {
     | Styles
     | false // Removes all styles for this sub-element when extending
     | StylesInterface['@keyframes']
-    | StylesInterface['@properties'];
+    | StylesInterface['@properties']
+    | StylesInterface['@fontFace']
+    | StylesInterface['@counterStyle'];
   /**
    * Selector combinator: `undefined` (descendant, default), `'>'` (child), `'+'` (adjacent), `'~'` (sibling).
    * Can chain with capitalized names: `'> Body > Row >'`. Spaces required around combinators.

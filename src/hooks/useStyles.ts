@@ -7,8 +7,26 @@ import {
   renderStylesForChunk,
 } from '../chunks';
 import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from '../config';
-import { allocateClassName, inject, keyframes, property } from '../injector';
-import type { KeyframesSteps } from '../injector/types';
+import {
+  allocateClassName,
+  counterStyle,
+  fontFace,
+  inject,
+  keyframes,
+  property,
+} from '../injector';
+import type { FontFaceDescriptors, KeyframesSteps } from '../injector/types';
+import {
+  extractLocalCounterStyle,
+  formatCounterStyleRule,
+  hasLocalCounterStyle,
+} from '../counter-style';
+import {
+  extractLocalFontFace,
+  fontFaceContentHash,
+  formatFontFaceRule,
+  hasLocalFontFace,
+} from '../font-face';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -21,10 +39,10 @@ import type { RenderResult } from '../pipeline';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
 import { collectAutoInferredProperties } from '../ssr/collect-auto-properties';
 import type { ServerStyleCollector } from '../ssr/collector';
+import { resolveSSRCollector } from './resolve-ssr-collector';
 import { TastySSRContext } from '../ssr/context';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
 import { formatPropertyCSS } from '../ssr/format-property';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
 import { hasKeys } from '../utils/has-keys';
 import { resolveRecipes } from '../utils/resolve-recipes';
@@ -161,21 +179,6 @@ function getUsedKeyframes(
 
   // Filter to only used keyframes
   return filterUsedKeyframes(allKeyframes, usedNames);
-}
-
-/**
- * Resolve the SSR collector from React context or AsyncLocalStorage.
- * Returns null on the client (no collector available).
- */
-function resolveSSRCollector(
-  reactContext: ServerStyleCollector | null,
-): ServerStyleCollector | null {
-  if (reactContext) return reactContext;
-
-  const alsCollector = getRegisteredSSRCollector();
-  if (alsCollector) return alsCollector;
-
-  return null;
 }
 
 /**
@@ -333,6 +336,34 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
         }
       }
 
+      // Collect @font-face rules on the server
+      if (hasLocalFontFace(currentStyles)) {
+        const localFontFace = extractLocalFontFace(currentStyles);
+        if (localFontFace) {
+          for (const [family, input] of Object.entries(localFontFace)) {
+            const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+              ? input
+              : [input];
+            for (const desc of descriptors) {
+              const hash = fontFaceContentHash(family, desc);
+              const css = formatFontFaceRule(family, desc);
+              ssrCollector.collectFontFace(hash, css);
+            }
+          }
+        }
+      }
+
+      // Collect @counter-style rules on the server
+      if (hasLocalCounterStyle(currentStyles)) {
+        const localCounterStyle = extractLocalCounterStyle(currentStyles);
+        if (localCounterStyle) {
+          for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+            const css = formatCounterStyleRule(name, descriptors);
+            ssrCollector.collectCounterStyle(name, css);
+          }
+        }
+      }
+
       // Auto-infer @property types from rendered declarations (SSR).
       // On the client this happens inside StyleInjector.inject(), which
       // runs in useInsertionEffect and therefore never executes on the server.
@@ -376,6 +407,31 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
       if (localProperties) {
         for (const [token, definition] of Object.entries(localProperties)) {
           property(token, definition);
+        }
+      }
+    }
+
+    // Inject @font-face rules (permanent, no cleanup needed)
+    if (currentStyles && hasLocalFontFace(currentStyles)) {
+      const localFontFace = extractLocalFontFace(currentStyles);
+      if (localFontFace) {
+        for (const [family, input] of Object.entries(localFontFace)) {
+          const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+            ? input
+            : [input];
+          for (const desc of descriptors) {
+            fontFace(family, desc);
+          }
+        }
+      }
+    }
+
+    // Inject @counter-style rules (permanent, no cleanup needed)
+    if (currentStyles && hasLocalCounterStyle(currentStyles)) {
+      const localCounterStyle = extractLocalCounterStyle(currentStyles);
+      if (localCounterStyle) {
+        for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+          counterStyle(name, descriptors);
         }
       }
     }

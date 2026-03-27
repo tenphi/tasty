@@ -8,6 +8,8 @@ import type { StyleResult } from '../pipeline';
 
 import { StyleInjector } from './injector';
 import type {
+  CounterStyleDescriptors,
+  FontFaceDescriptors,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
@@ -168,6 +170,34 @@ export function isPropertyDefined(
 }
 
 /**
+ * Inject a CSS @font-face rule.
+ *
+ * Permanent and global — no dispose or ref-counting.
+ * Deduplicates by content hash (family + descriptors).
+ */
+export function fontFace(
+  family: string,
+  descriptors: FontFaceDescriptors,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  return getGlobalInjector().fontFace(family, descriptors, options);
+}
+
+/**
+ * Inject a CSS @counter-style rule.
+ *
+ * Permanent and global — no dispose or ref-counting.
+ * Deduplicates by name (first definition wins).
+ */
+export function counterStyle(
+  name: string,
+  descriptors: CounterStyleDescriptors,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  return getGlobalInjector().counterStyle(name, descriptors, options);
+}
+
+/**
  * Get CSS text from all sheets (for SSR)
  */
 export function getCssText(options?: { root?: Document | ShadowRoot }): string {
@@ -270,6 +300,9 @@ export type {
   CacheMetrics,
   RawCSSResult,
   PropertyDefinition,
+  FontFaceDescriptors,
+  FontFaceInput,
+  CounterStyleDescriptors,
 } from './types';
 
 export { StyleInjector } from './injector';

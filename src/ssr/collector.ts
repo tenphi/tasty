@@ -11,12 +11,16 @@
  */
 
 import {
+  getGlobalCounterStyle,
+  getGlobalFontFace,
   getGlobalProperties,
   getGlobalConfigTokens,
   hasGlobalProperties,
   INTERNAL_PROPERTIES,
   INTERNAL_TOKENS,
 } from '../config';
+import { formatCounterStyleRule } from '../counter-style';
+import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { formatPropertyCSS } from './format-property';
@@ -50,7 +54,12 @@ export class ServerStyleCollector {
   private flushedGlobalKeys = new Set<string>();
   private rawCSS = new Map<string, string>();
   private flushedRawKeys = new Set<string>();
+  private fontFaceRules = new Map<string, string>();
+  private flushedFontFaceKeys = new Set<string>();
+  private counterStyleRules = new Map<string, string>();
+  private flushedCounterStyleKeys = new Set<string>();
   private keyframesCounter = 0;
+  private counterStyleCounter = 0;
   private internalsCollected = false;
 
   /**
@@ -101,6 +110,28 @@ export class ServerStyleCollector {
         if (css) {
           this.collectGlobalStyles('__global:tokens', css);
         }
+      }
+    }
+
+    // Inject global @font-face rules (mirrors markStylesGenerated)
+    const globalFF = getGlobalFontFace();
+    if (globalFF) {
+      for (const [family, input] of Object.entries(globalFF)) {
+        const descriptors = Array.isArray(input) ? input : [input];
+        for (const desc of descriptors) {
+          const hash = fontFaceContentHash(family, desc);
+          const css = formatFontFaceRule(family, desc);
+          this.collectFontFace(hash, css);
+        }
+      }
+    }
+
+    // Inject global @counter-style rules (mirrors markStylesGenerated)
+    const globalCS = getGlobalCounterStyle();
+    if (globalCS) {
+      for (const [name, descriptors] of Object.entries(globalCS)) {
+        const css = formatCounterStyleRule(name, descriptors);
+        this.collectCounterStyle(name, css);
       }
     }
   }
@@ -166,6 +197,31 @@ export class ServerStyleCollector {
   }
 
   /**
+   * Record a @font-face rule. Deduplicated by key (content hash).
+   */
+  collectFontFace(key: string, css: string): void {
+    if (!this.fontFaceRules.has(key)) {
+      this.fontFaceRules.set(key, css);
+    }
+  }
+
+  /**
+   * Record a @counter-style rule. Deduplicated by name.
+   */
+  collectCounterStyle(name: string, css: string): void {
+    if (!this.counterStyleRules.has(name)) {
+      this.counterStyleRules.set(name, css);
+    }
+  }
+
+  /**
+   * Allocate a counter-style name for SSR. Uses provided name or generates one.
+   */
+  allocateCounterStyleName(providedName?: string): string {
+    return providedName ?? `cs${this.counterStyleCounter++}`;
+  }
+
+  /**
    * Record global styles (from useGlobalStyles). Deduplicated by key.
    */
   collectGlobalStyles(key: string, css: string): void {
@@ -192,6 +248,14 @@ export class ServerStyleCollector {
     const parts: string[] = [];
 
     for (const css of this.propertyRules.values()) {
+      parts.push(css);
+    }
+
+    for (const css of this.fontFaceRules.values()) {
+      parts.push(css);
+    }
+
+    for (const css of this.counterStyleRules.values()) {
       parts.push(css);
     }
 
@@ -225,6 +289,20 @@ export class ServerStyleCollector {
       if (!this.flushedPropertyKeys.has(name)) {
         parts.push(css);
         this.flushedPropertyKeys.add(name);
+      }
+    }
+
+    for (const [key, css] of this.fontFaceRules) {
+      if (!this.flushedFontFaceKeys.has(key)) {
+        parts.push(css);
+        this.flushedFontFaceKeys.add(key);
+      }
+    }
+
+    for (const [key, css] of this.counterStyleRules) {
+      if (!this.flushedCounterStyleKeys.has(key)) {
+        parts.push(css);
+        this.flushedCounterStyleKeys.add(key);
       }
     }
 

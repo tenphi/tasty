@@ -5,7 +5,22 @@ import {
   generateChunkCacheKey,
   renderStylesForChunk,
 } from '../chunks';
-import type { KeyframesSteps } from '../injector/types';
+import type {
+  CounterStyleDescriptors,
+  FontFaceDescriptors,
+  FontFaceInput,
+  KeyframesSteps,
+} from '../injector/types';
+import {
+  extractLocalCounterStyle,
+  formatCounterStyleRule,
+  hasLocalCounterStyle,
+} from '../counter-style';
+import {
+  extractLocalFontFace,
+  formatFontFaceRule,
+  hasLocalFontFace,
+} from '../font-face';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -422,4 +437,106 @@ function scanKeyframeSteps(
       );
     }
   }
+}
+
+// ============================================================================
+// Font Face Extraction (zero-runtime)
+// ============================================================================
+
+export interface ExtractedFontFace {
+  css: string;
+}
+
+/**
+ * Extract @font-face rules from styles, merging with global config.
+ * Deduplicates by content hash.
+ */
+export function extractFontFaceFromStyles(
+  styles: Styles,
+  globalFontFace?: Record<string, FontFaceInput> | null,
+): ExtractedFontFace[] {
+  const results: ExtractedFontFace[] = [];
+  const seenHashes = new Set<string>();
+
+  function addFontFace(family: string, input: FontFaceInput) {
+    const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+      ? input
+      : [input];
+    for (const desc of descriptors) {
+      const hash = createHash('md5')
+        .update(JSON.stringify({ family, ...desc }))
+        .digest('hex')
+        .slice(0, 8);
+      if (!seenHashes.has(hash)) {
+        seenHashes.add(hash);
+        results.push({ css: formatFontFaceRule(family, desc) });
+      }
+    }
+  }
+
+  // Global font faces first
+  if (globalFontFace) {
+    for (const [family, input] of Object.entries(globalFontFace)) {
+      addFontFace(family, input);
+    }
+  }
+
+  // Local font faces (override globals with same hash)
+  if (hasLocalFontFace(styles)) {
+    const local = extractLocalFontFace(styles);
+    if (local) {
+      for (const [family, input] of Object.entries(local)) {
+        addFontFace(family, input);
+      }
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
+// Counter Style Extraction (zero-runtime)
+// ============================================================================
+
+export interface ExtractedCounterStyle {
+  name: string;
+  css: string;
+}
+
+/**
+ * Extract @counter-style rules from styles, merging with global config.
+ * Deduplicates by name (first definition wins).
+ */
+export function extractCounterStyleFromStyles(
+  styles: Styles,
+  globalCounterStyle?: Record<string, CounterStyleDescriptors> | null,
+): ExtractedCounterStyle[] {
+  const results: ExtractedCounterStyle[] = [];
+  const seenNames = new Set<string>();
+
+  function addCounterStyle(name: string, descriptors: CounterStyleDescriptors) {
+    if (!seenNames.has(name)) {
+      seenNames.add(name);
+      results.push({ name, css: formatCounterStyleRule(name, descriptors) });
+    }
+  }
+
+  // Global counter styles first
+  if (globalCounterStyle) {
+    for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
+      addCounterStyle(name, descriptors);
+    }
+  }
+
+  // Local counter styles (override globals with same name)
+  if (hasLocalCounterStyle(styles)) {
+    const local = extractLocalCounterStyle(styles);
+    if (local) {
+      for (const [name, descriptors] of Object.entries(local)) {
+        addCounterStyle(name, descriptors);
+      }
+    }
+  }
+
+  return results;
 }

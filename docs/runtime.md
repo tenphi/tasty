@@ -378,6 +378,94 @@ function Spinner() {
 - `#name` defines `--name-color` and auto-infers `<color>`
 - `--name` is also supported for existing CSS variables
 
+### useFontFace
+
+Inject `@font-face` rules for custom fonts. Permanent — no cleanup on unmount. Deduplicates by content.
+
+```tsx
+import { useFontFace } from '@tenphi/tasty';
+
+function App() {
+  useFontFace('Brand Sans', {
+    src: 'url("/fonts/brand-sans.woff2") format("woff2")',
+    fontWeight: '400 700',
+    fontDisplay: 'swap',
+  });
+
+  return <div style={{ fontFamily: '"Brand Sans", sans-serif' }}>Hello</div>;
+}
+```
+
+For multiple weights/styles, pass an array:
+
+```tsx
+useFontFace('Brand Sans', [
+  { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
+  { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+]);
+```
+
+Signature:
+
+```ts
+function useFontFace(family: string, input: FontFaceInput): void;
+```
+
+### useCounterStyle
+
+Inject a `@counter-style` rule and get back the counter style name. Permanent — no cleanup on unmount. Deduplicates by name.
+
+```tsx
+import { useCounterStyle } from '@tenphi/tasty';
+
+function EmojiList() {
+  const styleName = useCounterStyle({
+    system: 'cyclic',
+    symbols: '"👍"',
+    suffix: '" "',
+  }, { name: 'thumbs' });
+
+  return (
+    <ol style={{ listStyleType: styleName }}>
+      <li>First</li>
+      <li>Second</li>
+    </ol>
+  );
+}
+```
+
+Factory form with dependencies:
+
+```tsx
+function DynamicList({ marker }: { marker: string }) {
+  const styleName = useCounterStyle(
+    () => ({
+      system: 'cyclic',
+      symbols: `"${marker}"`,
+      suffix: '" "',
+    }),
+    [marker],
+  );
+
+  return <ol style={{ listStyleType: styleName }}>...</ol>;
+}
+```
+
+Signatures:
+
+```ts
+function useCounterStyle(
+  descriptors: CounterStyleDescriptors,
+  options?: { name?: string; root?: Document | ShadowRoot },
+): string;
+
+function useCounterStyle(
+  factory: () => CounterStyleDescriptors,
+  deps: readonly unknown[],
+  options?: { name?: string; root?: Document | ShadowRoot },
+): string;
+```
+
 ### Troubleshooting
 
 - Styles are not updating: make sure `configure()` runs before first render, and verify the generated class name or global rule with [Debug Utilities](debug.md).

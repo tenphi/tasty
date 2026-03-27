@@ -294,7 +294,7 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('@property --border-width');
     // INTERNAL_TOKENS: font stacks, border-color
     expect(css).toContain(':root');
-    expect(css).toContain('--font:');
+    expect(css).toContain('--font-sans:');
     expect(css).toContain('--border-color:');
     // Color properties get companion -rgb rules
     expect(css).toContain('@property --white-color');

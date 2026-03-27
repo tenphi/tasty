@@ -103,6 +103,23 @@ configure({
 
 Then use `preset: 'h1'` or `preset: 't2'` in any component's styles.
 
+### Registering brand fonts
+
+Register your design system's custom fonts via `configure({ fontFace })` so every component can reference them:
+
+```ts
+configure({
+  fontFace: {
+    'Brand Sans': [
+      { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
+      { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+    ],
+  },
+});
+```
+
+See [Font Face](configuration.md#font-face) for the full configuration reference.
+
 ---
 
 ## Defining state aliases

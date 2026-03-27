@@ -279,7 +279,7 @@ describe('Tasty style tests', () => {
       '--bold-font-weight':
         'var(--t3-bold-font-weight, var(--default-bold-font-weight))',
       '--font-family':
-        'var(--t3-font-family, var(--default-font-family, var(--font, NonexistentFontName))), var(--font, sans-serif)',
+        'var(--t3-font-family, var(--default-font-family, var(--font-sans, NonexistentFontName))), var(--font-sans, sans-serif)',
       '--icon-size': 'var(--t3-icon-size, var(--default-icon-size))',
       '--text-transform':
         'var(--t3-text-transform, var(--default-text-transform))',
@@ -290,7 +290,7 @@ describe('Tasty style tests', () => {
         'var(--t3-letter-spacing, var(--default-letter-spacing))',
       'line-height': 'var(--t3-line-height, var(--default-line-height))',
       'font-family':
-        'var(--t3-font-family, var(--default-font-family, var(--font, NonexistentFontName))), var(--font, sans-serif)',
+        'var(--t3-font-family, var(--default-font-family, var(--font-sans, NonexistentFontName))), var(--font-sans, sans-serif)',
       'text-transform':
         'var(--t3-text-transform, var(--default-text-transform))',
     });

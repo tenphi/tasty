@@ -32,7 +32,12 @@ import {
 
 import type { ColorSpace } from './utils/color-space';
 
-import type { KeyframesSteps, PropertyDefinition } from './injector/types';
+import type {
+  CounterStyleDescriptors,
+  FontFaceInput,
+  KeyframesSteps,
+  PropertyDefinition,
+} from './injector/types';
 import type { StyleDetails, UnitHandler } from './parser/types';
 import type { StyleResult } from './pipeline';
 import type { TastyPlugin } from './plugins/types';
@@ -166,6 +171,39 @@ export interface TastyConfig {
    * ```
    */
   properties?: Record<string, PropertyDefinition>;
+  /**
+   * Global @font-face definitions.
+   * Keys are font-family names, values are descriptors or arrays of descriptors
+   * (for multiple weights/styles of the same family).
+   * Injected eagerly when styles are first generated.
+   * @example
+   * ```ts
+   * configure({
+   *   fontFace: {
+   *     'Brand Sans': [
+   *       { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
+   *       { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+   *     ],
+   *     Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' },
+   *   },
+   * });
+   * ```
+   */
+  fontFace?: Record<string, FontFaceInput>;
+  /**
+   * Global @counter-style definitions.
+   * Keys are counter-style names, values are descriptor objects.
+   * Injected eagerly when styles are first generated.
+   * @example
+   * ```ts
+   * configure({
+   *   counterStyle: {
+   *     thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' },
+   *   },
+   * });
+   * ```
+   */
+  counterStyle?: Record<string, CounterStyleDescriptors>;
   /**
    * Custom style handlers that transform style properties into CSS declarations.
    * Handlers replace built-in handlers for the same style name.
@@ -309,6 +347,12 @@ let currentConfig: TastyConfig | null = null;
 // Global keyframes storage (null = no keyframes configured, empty object checked via hasGlobalKeyframes)
 let globalKeyframes: Record<string, KeyframesSteps> | null = null;
 
+// Global font-face storage (null = no font faces configured)
+let globalFontFace: Record<string, FontFaceInput> | null = null;
+
+// Global counter-style storage (null = no counter styles configured)
+let globalCounterStyle: Record<string, CounterStyleDescriptors> | null = null;
+
 // Global properties storage (null = no properties configured)
 let globalProperties: Record<string, PropertyDefinition> | null = null;
 
@@ -398,9 +442,9 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
  * Keys are raw CSS custom property names (--name).
  */
 export const INTERNAL_TOKENS: Record<string, string> = {
-  '--font':
+  '--font-sans':
     'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif',
-  '--monospace-font':
+  '--font-mono':
     'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   // Default border color to the element's current text color
   '--border-color': 'currentColor',
@@ -513,6 +557,23 @@ export function markStylesGenerated(): void {
     }
   }
 
+  // Inject global @font-face rules (eagerly — fonts should be available before render)
+  if (globalFontFace && Object.keys(globalFontFace).length > 0) {
+    for (const [family, input] of Object.entries(globalFontFace)) {
+      const descriptors = Array.isArray(input) ? input : [input];
+      for (const desc of descriptors) {
+        injector.fontFace(family, desc);
+      }
+    }
+  }
+
+  // Inject global @counter-style rules (eagerly)
+  if (globalCounterStyle && Object.keys(globalCounterStyle).length > 0) {
+    for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
+      injector.counterStyle(name, descriptors);
+    }
+  }
+
   // Inject configured tokens as :root CSS custom properties
   if (globalConfigTokens && Object.keys(globalConfigTokens).length > 0) {
     const tokenRules = renderStyles(
@@ -618,6 +679,67 @@ function setGlobalProperties(
     return;
   }
   globalProperties = properties;
+}
+
+// ============================================================================
+// Global Font Face Management
+// ============================================================================
+
+/**
+ * Get global font-face configuration.
+ * Returns null if no font faces configured.
+ */
+export function getGlobalFontFace(): Record<string, FontFaceInput> | null {
+  return globalFontFace;
+}
+
+/**
+ * Set global font faces (called from configure).
+ * Internal use only.
+ */
+function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
+  if (stylesGenerated) {
+    warnOnce(
+      'fontface-after-styles',
+      `[Tasty] Cannot update fontFace after styles have been generated.\n` +
+        `The new font faces will be ignored.`,
+    );
+    return;
+  }
+  globalFontFace = fontFace;
+}
+
+// ============================================================================
+// Global Counter Style Management
+// ============================================================================
+
+/**
+ * Get global counter-style configuration.
+ * Returns null if no counter styles configured.
+ */
+export function getGlobalCounterStyle(): Record<
+  string,
+  CounterStyleDescriptors
+> | null {
+  return globalCounterStyle;
+}
+
+/**
+ * Set global counter styles (called from configure).
+ * Internal use only.
+ */
+function setGlobalCounterStyle(
+  counterStyle: Record<string, CounterStyleDescriptors>,
+): void {
+  if (stylesGenerated) {
+    warnOnce(
+      'counterstyle-after-styles',
+      `[Tasty] Cannot update counterStyle after styles have been generated.\n` +
+        `The new counter styles will be ignored.`,
+    );
+    return;
+  }
+  globalCounterStyle = counterStyle;
 }
 
 // ============================================================================
@@ -885,6 +1007,16 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalProperties(config.properties);
   }
 
+  // Handle font faces
+  if (config.fontFace) {
+    setGlobalFontFace(config.fontFace);
+  }
+
+  // Handle counter styles
+  if (config.counterStyle) {
+    setGlobalCounterStyle(config.counterStyle);
+  }
+
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
@@ -928,6 +1060,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     plugins: _plugins,
     keyframes: _keyframes,
     properties: _properties,
+    fontFace: _fontFace,
+    counterStyle: _counterStyle,
     handlers: _handlers,
     tokens: _tokens,
     replaceTokens: _replaceTokens,
@@ -987,6 +1121,8 @@ export function resetConfig(): void {
   globalKeyframes = null;
   _hasGlobalKeyframes = false;
   globalProperties = null;
+  globalFontFace = null;
+  globalCounterStyle = null;
   globalRecipes = null;
   globalConfigTokens = null;
   resetGlobalPredefinedTokens();

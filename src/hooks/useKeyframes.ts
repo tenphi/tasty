@@ -2,21 +2,13 @@ import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import { keyframes } from '../injector';
 import type { KeyframesResult, KeyframesSteps } from '../injector/types';
-import type { ServerStyleCollector } from '../ssr/collector';
+import { resolveSSRCollector } from './resolve-ssr-collector';
 import { TastySSRContext } from '../ssr/context';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseKeyframesOptions {
   name?: string;
   root?: Document | ShadowRoot;
-}
-
-function resolveSSRCollector(
-  reactContext: ServerStyleCollector | null,
-): ServerStyleCollector | null {
-  if (reactContext) return reactContext;
-  return getRegisteredSSRCollector();
 }
 
 /**

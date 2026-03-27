@@ -1,19 +1,11 @@
 import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectRawCSS } from '../injector';
-import type { ServerStyleCollector } from '../ssr/collector';
+import { resolveSSRCollector } from './resolve-ssr-collector';
 import { TastySSRContext } from '../ssr/context';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseRawCSSOptions {
   root?: Document | ShadowRoot;
-}
-
-function resolveSSRCollector(
-  reactContext: ServerStyleCollector | null,
-): ServerStyleCollector | null {
-  if (reactContext) return reactContext;
-  return getRegisteredSSRCollector();
 }
 
 /**

@@ -31,10 +31,12 @@ function setCSSValue(
     }
 
     const defaultValue = `var(--default-${styleName}${
-      styleName === 'font-family' ? ', var(--font, NonexistentFontName)' : ''
+      styleName === 'font-family'
+        ? ', var(--font-sans, NonexistentFontName)'
+        : ''
     })`;
     const fontSuffix =
-      styleName === 'font-family' ? ', var(--font, sans-serif)' : '';
+      styleName === 'font-family' ? ', var(--font-sans, sans-serif)' : '';
 
     if (presetName === 'default') {
       return `${defaultValue}${fontSuffix}`;
@@ -64,9 +66,9 @@ interface PresetStyleProps {
 /**
  * Resolve font/fontFamily value to CSS font-family string.
  *
- * - `font="monospace"` → var(--monospace-font)
- * - `font={true}` → var(--font)
- * - `font="CustomFont"` → CustomFont, var(--font)
+ * - `font="monospace"` → var(--font-mono)
+ * - `font={true}` → var(--font-sans)
+ * - `font="CustomFont"` → CustomFont, var(--font-sans)
  * - `fontFamily="Arial"` → Arial (direct, no fallback)
  */
 function resolveFontFamily(
@@ -83,14 +85,14 @@ function resolveFontFamily(
   }
 
   if (font === 'monospace') {
-    return { value: 'var(--monospace-font)', setVar: true };
+    return { value: 'var(--font-mono)', setVar: true };
   }
 
   if (font === true) {
-    return { value: 'var(--font)', setVar: true };
+    return { value: 'var(--font-sans)', setVar: true };
   }
 
-  return { value: `${font}, var(--font)`, setVar: true };
+  return { value: `${font}, var(--font-sans)`, setVar: true };
 }
 
 /**

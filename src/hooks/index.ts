@@ -9,3 +9,7 @@ export { useKeyframes } from './useKeyframes';
 
 export { useProperty } from './useProperty';
 export type { UsePropertyOptions } from './useProperty';
+
+export { useFontFace } from './useFontFace';
+
+export { useCounterStyle } from './useCounterStyle';

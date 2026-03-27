@@ -112,6 +112,10 @@ export interface RootRegistry {
   keyframesCounter: number;
   /** Map of injected @property names to their normalized declarations for tracking */
   injectedProperties: Map<string, string>; // propertyName -> normalized declaration
+  /** Content hashes of injected @font-face rules for deduplication */
+  injectedFontFaces: Set<string>;
+  /** Names of injected @counter-style rules for deduplication */
+  injectedCounterStyles: Set<string>;
   /** Global rules tracking for index adjustment */
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
@@ -154,6 +158,72 @@ export interface PropertyDefinition {
   inherits?: boolean;
   /** Initial value for the property */
   initialValue?: string | number;
+}
+
+/**
+ * Descriptors for a CSS @font-face at-rule.
+ */
+export interface FontFaceDescriptors {
+  /** Required. URL(s) to the font file(s). */
+  src: string;
+  /** Font weight or range. Default: 'normal'. */
+  fontWeight?: string | number;
+  /** Font style. Default: 'normal'. */
+  fontStyle?: 'normal' | 'italic' | 'oblique' | (string & {});
+  /** Font stretch. Default: 'normal'. */
+  fontStretch?: string;
+  /** Loading behavior. Default: 'auto'. */
+  fontDisplay?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
+  /** Unicode range to cover. */
+  unicodeRange?: string;
+  /** Ascent metric override. */
+  ascentOverride?: string;
+  /** Descent metric override. */
+  descentOverride?: string;
+  /** Line gap metric override. */
+  lineGapOverride?: string;
+  /** Size adjustment factor. */
+  sizeAdjust?: string;
+  /** OpenType feature settings. */
+  fontFeatureSettings?: string;
+  /** Font variation axis settings. */
+  fontVariationSettings?: string;
+}
+
+/** Single descriptor or array of descriptors for multiple weights/styles. */
+export type FontFaceInput = FontFaceDescriptors | FontFaceDescriptors[];
+
+/**
+ * Descriptors for a CSS @counter-style at-rule.
+ */
+export interface CounterStyleDescriptors {
+  /** Required. Numbering algorithm. */
+  system:
+    | 'cyclic'
+    | 'numeric'
+    | 'alphabetic'
+    | 'symbolic'
+    | 'additive'
+    | 'fixed'
+    | (string & {});
+  /** Symbols for non-additive systems. */
+  symbols?: string;
+  /** Symbol-value pairs for additive system. */
+  additiveSymbols?: string;
+  /** String prepended to the marker. Default: "". */
+  prefix?: string;
+  /** String appended to the marker. Default: ". ". */
+  suffix?: string;
+  /** Negative-value wrapping (e.g., '"(" ")"'). */
+  negative?: string;
+  /** Counter range (e.g., 'infinite infinite'). */
+  range?: string;
+  /** Minimum marker width and pad symbol (e.g., '3 "0"'). */
+  pad?: string;
+  /** Fallback counter style name. */
+  fallback?: string;
+  /** Speech synthesis hint. */
+  speakAs?: string;
 }
 
 export interface RawCSSInfo {

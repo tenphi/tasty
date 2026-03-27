@@ -70,6 +70,8 @@ export class SheetManager {
         keyframesNameToContent: new Map(),
         keyframesCounter: 0,
         injectedProperties: new Map<string, string>(),
+        injectedFontFaces: new Set<string>(),
+        injectedCounterStyles: new Set<string>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
       } as unknown as RootRegistry;

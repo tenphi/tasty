@@ -270,8 +270,6 @@ describe('Tasty style tests', () => {
         preset: 't3',
       }),
     ).toEqual({
-      '--font-style': 'var(--t3-font-style, var(--default-font-style))',
-      '--line-height': 'var(--t3-line-height, var(--default-line-height))',
       '--bold-font-weight':
         'var(--t3-bold-font-weight, var(--default-bold-font-weight))',
       '--icon-size': 'var(--t3-icon-size, var(--default-icon-size))',

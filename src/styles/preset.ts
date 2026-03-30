@@ -158,7 +158,7 @@ export function presetStyle({
       setCSSValue(styles, 'font-size', name, { cssOnly: true });
     }
     if (lineHeight == null) {
-      setCSSValue(styles, 'line-height', name);
+      setCSSValue(styles, 'line-height', name, { cssOnly: true });
     }
     if (letterSpacing == null) {
       setCSSValue(styles, 'letter-spacing', name, { cssOnly: true });
@@ -167,7 +167,7 @@ export function presetStyle({
       setCSSValue(styles, 'font-weight', name, { cssOnly: true });
     }
     if (fontStyle == null) {
-      setCSSValue(styles, 'font-style', name);
+      setCSSValue(styles, 'font-style', name, { cssOnly: true });
     }
     if (textTransform == null) {
       setCSSValue(styles, 'text-transform', name, { cssOnly: true });

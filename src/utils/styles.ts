@@ -124,7 +124,6 @@ export const CUSTOM_UNITS = {
   bw: '1px',
   ow: '3px',
   x: '8px',
-  lh: 'var(--line-height)',
   sf: function sf(num: number) {
     return `minmax(0, ${num}fr)`;
   },

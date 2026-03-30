@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 0.17.0
+
+### Minor Changes
+
+- [#66](https://github.com/tenphi/tasty/pull/66) [`2b8620a`](https://github.com/tenphi/tasty/commit/2b8620ab70ffd76f8e0f3ac809ce9408b4c2f5e2) Thanks [@tenphi](https://github.com/tenphi)! - Remove `--line-height` CSS custom property from presets and drop the `lh` custom unit in favor of the native CSS `lh` unit.
+
+### Patch Changes
+
+- [#66](https://github.com/tenphi/tasty/pull/66) [`4dbcdea`](https://github.com/tenphi/tasty/commit/4dbcdea94955e0b1358c0b44e7d63bb0486fcc6f) Thanks [@tenphi](https://github.com/tenphi)! - Remove unused `--font-style` CSS custom property from preset style output.
+
 ## 0.16.1
 
 ### Patch Changes

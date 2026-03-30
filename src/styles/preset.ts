@@ -158,7 +158,7 @@ export function presetStyle({
       setCSSValue(styles, 'font-size', name, { cssOnly: true });
     }
     if (lineHeight == null) {
-      setCSSValue(styles, 'line-height', name);
+      setCSSValue(styles, 'line-height', name, { cssOnly: true });
     }
     if (letterSpacing == null) {
       setCSSValue(styles, 'letter-spacing', name, { cssOnly: true });

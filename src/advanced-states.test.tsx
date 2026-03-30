@@ -1011,6 +1011,25 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
         .join(' ');
       expect(startingDeclarations).toContain('opacity: 0');
     });
+
+    it('should emit @starting-style rules after normal rules', () => {
+      const { rules } = renderStyles({
+        opacity: {
+          '': '1',
+          '@starting': '0',
+        },
+      });
+
+      const lastNormalIndex = rules.reduce(
+        (max: number, r: any, i: number) => (!r.startingStyle ? i : max),
+        -1,
+      );
+      const firstStartingIndex = rules.findIndex(
+        (r: any) => r.startingStyle === true,
+      );
+
+      expect(firstStartingIndex).toBeGreaterThan(lastNormalIndex);
+    });
   });
 
   describe('@container query tests', () => {

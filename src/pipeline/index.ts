@@ -201,7 +201,22 @@ function runPipeline(
     return true;
   });
 
-  return dedupedRules;
+  // @starting-style rules must come AFTER normal rules for the same selector.
+  // They share the same specificity, so source order decides the cascade.
+  // If a @starting-style rule appears before its normal counterpart,
+  // the later normal rule overrides the starting value.
+  const normal: CSSRule[] = [];
+  const starting: CSSRule[] = [];
+
+  for (const rule of dedupedRules) {
+    if (rule.startingStyle) {
+      starting.push(rule);
+    } else {
+      normal.push(rule);
+    }
+  }
+
+  return normal.concat(starting);
 }
 
 /**

@@ -206,6 +206,8 @@ export interface CSSRule {
   declarations: string;
   atRules?: string[];
   rootPrefix?: string;
+  /** When true, declarations are wrapped in @starting-style { ... } inside the selector rule */
+  startingStyle?: boolean;
 }
 
 // ============================================================================
@@ -2003,11 +2005,6 @@ export function buildAtRulesFromVariant(variant: SelectorVariant): string[] {
       }
     });
     atRules.push(`@supports ${conditionParts.join(' and ')}`);
-  }
-
-  // Add starting-style
-  if (variant.startingStyle) {
-    atRules.push('@starting-style');
   }
 
   return atRules;

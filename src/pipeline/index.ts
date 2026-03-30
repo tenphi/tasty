@@ -68,6 +68,8 @@ export interface StyleResult {
   atRules?: string[];
   needsClassName?: boolean;
   rootPrefix?: string;
+  /** When true, declarations are wrapped in @starting-style { ... } inside the selector rule */
+  startingStyle?: boolean;
 }
 
 /**
@@ -193,14 +195,28 @@ function runPipeline(
   // Deduplicate rules
   const seen = new Set<string>();
   const dedupedRules = allRules.filter((rule) => {
-    // Include rootPrefix in dedup key - rules with different root prefixes are distinct
-    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}`;
+    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}|${rule.startingStyle ? '1' : '0'}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
-  return dedupedRules;
+  // @starting-style rules must come AFTER normal rules for the same selector.
+  // They share the same specificity, so source order decides the cascade.
+  // If a @starting-style rule appears before its normal counterpart,
+  // the later normal rule overrides the starting value.
+  const normal: CSSRule[] = [];
+  const starting: CSSRule[] = [];
+
+  for (const rule of dedupedRules) {
+    if (rule.startingStyle) {
+      starting.push(rule);
+    } else {
+      normal.push(rule);
+    }
+  }
+
+  return normal.concat(starting);
 }
 
 /**
@@ -1087,15 +1103,26 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
     return rootGroupsToCSS(variant.rootGroups) || '';
   };
 
-  // Group variants by their at-rules (variants with same at-rules can be combined with commas)
+  // Group variants by their at-rules + startingStyle (variants with same context can be combined with commas)
   const byAtRules = new Map<
     string,
-    { variants: SelectorVariant[]; atRules: string[]; rootPrefix?: string }
+    {
+      variants: SelectorVariant[];
+      atRules: string[];
+      rootPrefix?: string;
+      startingStyle?: boolean;
+    }
   >();
 
   for (const variant of components.variants) {
     const atRules = buildAtRulesFromVariant(variant);
-    const key = atRules.sort().join('|||') + '###' + getRootPrefixKey(variant);
+    const startingStyle = variant.startingStyle;
+    const key =
+      atRules.sort().join('|||') +
+      '###' +
+      getRootPrefixKey(variant) +
+      '###' +
+      (startingStyle ? '1' : '0');
 
     const group = byAtRules.get(key);
     if (group) {
@@ -1105,6 +1132,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
         variants: [variant],
         atRules,
         rootPrefix: rootGroupsToCSS(variant.rootGroups),
+        startingStyle: startingStyle || undefined,
       });
     }
   }
@@ -1138,6 +1166,10 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
       cssRule.rootPrefix = group.rootPrefix;
     }
 
+    if (group.startingStyle) {
+      cssRule.startingStyle = true;
+    }
+
     rules.push(cssRule);
   }
 
@@ -1162,7 +1194,7 @@ function mergeStyleResults(results: StyleResult[]): StyleResult[] {
 
   for (const result of results) {
     const atKey = result.atRules?.join('|') ?? '';
-    const key = `${atKey}||${result.selector}`;
+    const key = `${atKey}||${result.selector}||${result.startingStyle ? '1' : '0'}`;
 
     const existing = groups.get(key);
     if (existing) {
@@ -1295,6 +1327,10 @@ export function renderStyles(
         result.atRules = rule.atRules;
       }
 
+      if (rule.startingStyle) {
+        result.startingStyle = true;
+      }
+
       return result;
     });
 
@@ -1313,6 +1349,7 @@ export function renderStyles(
         atRules: r.atRules,
         needsClassName: true,
         rootPrefix: r.rootPrefix,
+        startingStyle: r.startingStyle,
       }),
     ),
   };

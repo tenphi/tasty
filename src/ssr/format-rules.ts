@@ -34,23 +34,25 @@ function resolveSelector(rule: StyleResult, className: string): string {
   return selector;
 }
 
+interface GroupedRule {
+  selector: string;
+  declarations: string;
+  atRules?: string[];
+  startingStyle?: boolean;
+}
+
 /**
- * Group rules by selector + at-rules and merge their declarations.
+ * Group rules by selector + at-rules + startingStyle and merge their declarations.
  * Mirrors the grouping logic in SheetManager.insertRule().
  */
-function groupRules(
-  rules: { selector: string; declarations: string; atRules?: string[] }[],
-): { selector: string; declarations: string; atRules?: string[] }[] {
-  const groupMap = new Map<
-    string,
-    { selector: string; atRules?: string[]; declarations: string }
-  >();
+function groupRules(rules: GroupedRule[]): GroupedRule[] {
+  const groupMap = new Map<string, GroupedRule>();
   const order: string[] = [];
 
   const atKey = (at?: string[]) => (at && at.length ? at.join('|') : '');
 
   for (const r of rules) {
-    const key = `${atKey(r.atRules)}||${r.selector}`;
+    const key = `${atKey(r.atRules)}||${r.selector}||${r.startingStyle ? '1' : '0'}`;
     const existing = groupMap.get(key);
     if (existing) {
       existing.declarations = existing.declarations
@@ -60,6 +62,7 @@ function groupRules(
       groupMap.set(key, {
         selector: r.selector,
         atRules: r.atRules,
+        startingStyle: r.startingStyle,
         declarations: r.declarations,
       });
       order.push(key);
@@ -85,13 +88,17 @@ export function formatRules(rules: StyleResult[], className: string): string {
     selector: resolveSelector(rule, className),
     declarations: rule.declarations,
     atRules: rule.atRules,
+    startingStyle: rule.startingStyle,
   }));
 
   const grouped = groupRules(resolvedRules);
   const cssRules: string[] = [];
 
   for (const rule of grouped) {
-    const baseRule = `${rule.selector} { ${rule.declarations} }`;
+    const innerContent = rule.startingStyle
+      ? `@starting-style { ${rule.declarations} }`
+      : rule.declarations;
+    const baseRule = `${rule.selector} { ${innerContent} }`;
 
     let fullRule = baseRule;
     if (rule.atRules && rule.atRules.length > 0) {

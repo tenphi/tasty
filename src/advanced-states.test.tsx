@@ -967,7 +967,7 @@ describe('Advanced State Mapping - CSS Output', () => {
 // Direct renderStyles tests for features that jsdom doesn't support
 describe('Advanced State Mapping - renderStyles direct tests', () => {
   describe('@starting-style tests', () => {
-    it('should generate @starting-style at-rule for entry animations', () => {
+    it('should generate startingStyle flag for entry animations', () => {
       const { rules } = renderStyles({
         opacity: {
           '': '1',
@@ -975,15 +975,16 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
         },
       });
 
-      // Find the starting style rule
-      const startingRule = rules.find((r: any) =>
-        r.atRules?.includes('@starting-style'),
-      );
+      // Find the starting style rule (nested inside selector, not as at-rule)
+      const startingRule = rules.find((r: any) => r.startingStyle === true);
       expect(startingRule).toBeDefined();
       expect(startingRule.declarations).toContain('opacity: 0');
+      expect(startingRule.atRules || []).not.toContain('@starting-style');
 
       // Find the default rule
-      const defaultRule = rules.find((r: any) => !r.atRules?.length);
+      const defaultRule = rules.find(
+        (r: any) => !r.atRules?.length && !r.startingStyle,
+      );
       expect(defaultRule).toBeDefined();
       expect(defaultRule.declarations).toContain('opacity: 1');
     });
@@ -1001,9 +1002,7 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       });
 
       // Find starting style rules
-      const startingRules = rules.filter((r: any) =>
-        r.atRules?.includes('@starting-style'),
-      );
+      const startingRules = rules.filter((r: any) => r.startingStyle === true);
       expect(startingRules.length).toBeGreaterThan(0);
 
       // Check declarations include opacity
@@ -1011,6 +1010,25 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
         .map((r: any) => r.declarations)
         .join(' ');
       expect(startingDeclarations).toContain('opacity: 0');
+    });
+
+    it('should emit @starting-style rules after normal rules', () => {
+      const { rules } = renderStyles({
+        opacity: {
+          '': '1',
+          '@starting': '0',
+        },
+      });
+
+      const lastNormalIndex = rules.reduce(
+        (max: number, r: any, i: number) => (!r.startingStyle ? i : max),
+        -1,
+      );
+      const firstStartingIndex = rules.findIndex(
+        (r: any) => r.startingStyle === true,
+      );
+
+      expect(firstStartingIndex).toBeGreaterThan(lastNormalIndex);
     });
   });
 

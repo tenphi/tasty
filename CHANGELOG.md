@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.16.1
+
+### Patch Changes
+
+- [#64](https://github.com/tenphi/tasty/pull/64) [`1372f31`](https://github.com/tenphi/tasty/commit/1372f31f038e9e06b6ff562aad9473386dba3dc7) Thanks [@tenphi](https://github.com/tenphi)! - Nest `@starting-style` inside selector rules instead of wrapping as an outer at-rule. Fixes complex styles not applying `@starting-style` correctly.
+
 ## 0.16.0
 
 ### Minor Changes

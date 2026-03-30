@@ -1,5 +1,19 @@
 # @tenphi/tasty
 
+## 0.16.0
+
+### Minor Changes
+
+- [#59](https://github.com/tenphi/tasty/pull/59) [`55eadac`](https://github.com/tenphi/tasty/commit/55eadac85a885138c10aa876697c51e79fbf4eab) Thanks [@tenphi](https://github.com/tenphi)! - Rename default font CSS custom properties: `--font` → `--font-sans`, `--monospace-font` → `--font-mono` to align with Tailwind/Next.js conventions.
+
+- [#59](https://github.com/tenphi/tasty/pull/59) [`6ceb4cf`](https://github.com/tenphi/tasty/commit/6ceb4cf2495d0aa02ef01b7d5452af6024db3c06) Thanks [@tenphi](https://github.com/tenphi)! - Add @font-face and @counter-style at-rule support via `useFontFace` / `useCounterStyle` hooks, global `configure()` options, injector methods, SSR collection, and zero-runtime extraction.
+
+### Patch Changes
+
+- [#63](https://github.com/tenphi/tasty/pull/63) [`beaf6ce`](https://github.com/tenphi/tasty/commit/beaf6ce89148b8efdba415123337d3cac9a76c2d) Thanks [@tenphi](https://github.com/tenphi)! - Remove custom `fs` unit and `--font-size` CSS variable from preset output. Use native CSS `em` unit instead.
+
+- [#62](https://github.com/tenphi/tasty/pull/62) [`a27dede`](https://github.com/tenphi/tasty/commit/a27dedeb1b619d8f0843756c2808c3533152282c) Thanks [@tenphi](https://github.com/tenphi)! - Replace INTERNAL_TOKENS `:root` injection with `@property` font-stack fallbacks and CSS `var()` defaults
+
 ## 0.15.3
 
 ### Patch Changes

@@ -155,7 +155,7 @@ export function presetStyle({
 
     // Set preset values for properties not explicitly overridden
     if (fontSize == null) {
-      setCSSValue(styles, 'font-size', name);
+      setCSSValue(styles, 'font-size', name, { cssOnly: true });
     }
     if (lineHeight == null) {
       setCSSValue(styles, 'line-height', name);
@@ -190,7 +190,7 @@ export function presetStyle({
       styles['line-height'] = 'var(--icon-size)';
     }
     if (isTight) {
-      styles['line-height'] = 'var(--font-size)';
+      styles['line-height'] = '1em';
     }
   }
 

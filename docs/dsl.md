@@ -119,7 +119,6 @@ color: '(#primary, #secondary)',  // Fallback syntax
 | `cr` | Card border radius | `1cr` | `var(--card-radius)` |
 | `bw` | Border width | `2bw` | `calc(var(--border-width) * 2)` |
 | `ow` | Outline width | `1ow` | `var(--outline-width)` |
-| `fs` | Font size | `1fs` | `var(--font-size)` |
 | `lh` | Line height | `1lh` | `var(--line-height)` |
 | `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
 

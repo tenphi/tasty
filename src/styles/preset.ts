@@ -167,7 +167,7 @@ export function presetStyle({
       setCSSValue(styles, 'font-weight', name, { cssOnly: true });
     }
     if (fontStyle == null) {
-      setCSSValue(styles, 'font-style', name);
+      setCSSValue(styles, 'font-style', name, { cssOnly: true });
     }
     if (textTransform == null) {
       setCSSValue(styles, 'text-transform', name, { cssOnly: true });

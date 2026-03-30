@@ -2,7 +2,6 @@ import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
 
 import {
   categorizeStyleKeys,
-  CHUNK_NAMES,
   generateChunkCacheKey,
   renderStylesForChunk,
 } from '../chunks';
@@ -47,18 +46,6 @@ import type { Styles } from '../styles/types';
 import { hasKeys } from '../utils/has-keys';
 import { resolveRecipes } from '../utils/resolve-recipes';
 import { stringifyStyles } from '../utils/styles';
-
-/**
- * Check if styles contain @starting-style rules.
- *
- * @starting-style CSS cannot be applied via multiple class names because
- * of cascade - later rules override earlier ones. When @starting is detected,
- * we combine top-level styles into a single chunk but keep sub-element styles
- * in their own chunk for better caching.
- */
-function containsStartingStyle(styleKey: string): boolean {
-  return styleKey.includes('@starting');
-}
 
 /**
  * Tasty styles object to generate CSS classes for.
@@ -115,40 +102,6 @@ function processChunk(
   const { className } = allocateClassName(cacheKey);
 
   return { name: chunkName, styleKeys, cacheKey, renderResult, className };
-}
-
-/**
- * Merge chunk map entries for @starting-style partial chunking.
- *
- * All non-subcomponent chunks are merged into a single COMBINED entry,
- * while SUBCOMPONENTS stays separate. This preserves CSS cascade for
- * @starting-style while still allowing sub-element styles to cache independently.
- */
-function mergeChunksForStartingStyle(
-  chunkMap: Map<string, string[]>,
-): Map<string, string[]> {
-  const merged = new Map<string, string[]>();
-  const combinedKeys: string[] = [];
-
-  for (const [chunkName, keys] of chunkMap) {
-    if (chunkName === CHUNK_NAMES.SUBCOMPONENTS) {
-      merged.set(CHUNK_NAMES.SUBCOMPONENTS, keys);
-    } else {
-      combinedKeys.push(...keys);
-    }
-  }
-
-  if (combinedKeys.length > 0) {
-    // Insert COMBINED first so it appears before SUBCOMPONENTS
-    const result = new Map<string, string[]>();
-    result.set(CHUNK_NAMES.COMBINED, combinedKeys);
-    for (const [k, v] of merged) {
-      result.set(k, v);
-    }
-    return result;
-  }
-
-  return merged;
 }
 
 /**
@@ -286,16 +239,9 @@ export function useStyles(styles: UseStylesOptions): UseStylesResult {
     }
 
     // Categorize style keys into chunks
-    let chunkMap = categorizeStyleKeys(
+    const chunkMap = categorizeStyleKeys(
       currentStyles as Record<string, unknown>,
     );
-
-    // Partial chunking for styles containing @starting-style rules.
-    // @starting-style CSS cannot work with multiple class names due to cascade,
-    // so we merge all top-level chunks into one but keep sub-element styles separate.
-    if (containsStartingStyle(styleKey)) {
-      chunkMap = mergeChunksForStartingStyle(chunkMap);
-    }
 
     const chunks: ProcessedChunk[] = [];
 

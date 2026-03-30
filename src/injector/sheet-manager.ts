@@ -151,7 +151,7 @@ export class SheetManager {
     const sheetIndex = registry.sheets.indexOf(targetSheet);
 
     try {
-      // Group rules by selector and at-rules to combine declarations
+      // Group rules by selector, at-rules, and startingStyle to combine declarations
       const groupedRules: StyleRule[] = [];
       const groupMap = new Map<
         string,
@@ -159,6 +159,7 @@ export class SheetManager {
           idx: number;
           selector: string;
           atRules?: string[];
+          startingStyle?: boolean;
           declarations: string;
         }
       >();
@@ -166,7 +167,7 @@ export class SheetManager {
       const atKey = (at?: string[]) => (at && at.length ? at.join('|') : '');
 
       flattenedRules.forEach((r) => {
-        const key = `${atKey(r.atRules)}||${r.selector}`;
+        const key = `${atKey(r.atRules)}||${r.selector}||${r.startingStyle ? '1' : '0'}`;
         const existing = groupMap.get(key);
         if (existing) {
           // Append declarations, preserving order
@@ -178,6 +179,7 @@ export class SheetManager {
             idx: groupedRules.length,
             selector: r.selector,
             atRules: r.atRules,
+            startingStyle: r.startingStyle,
             declarations: r.declarations,
           });
           groupedRules.push({ ...r });
@@ -189,6 +191,7 @@ export class SheetManager {
         groupedRules[val.idx] = {
           selector: val.selector,
           atRules: val.atRules,
+          startingStyle: val.startingStyle,
           declarations: val.declarations,
         } as StyleRule;
       });
@@ -203,7 +206,10 @@ export class SheetManager {
 
       for (const rule of groupedRules) {
         const declarations = rule.declarations;
-        const baseRule = `${rule.selector} { ${declarations} }`;
+        const innerContent = rule.startingStyle
+          ? `@starting-style { ${declarations} }`
+          : declarations;
+        const baseRule = `${rule.selector} { ${innerContent} }`;
 
         // Wrap with at-rules if present
         let fullRule = baseRule;

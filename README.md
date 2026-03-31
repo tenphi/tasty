@@ -301,7 +301,7 @@ Every rule is guarded by the negation of higher-priority rules. No two rules can
 
 By absorbing selector complexity, Tasty makes advanced CSS patterns practical again — nested container queries, multi-condition `@supports` gates, and combined root-state/media branches. You stay in pure CSS instead of relying on JavaScript workarounds, so the browser can optimize layout, painting, and transitions natively. Tasty keeps the solution in CSS while removing much of the selector bookkeeping that is hard to maintain by hand.
 
-[Try it in the Cube UI Kit Storybook playground →](https://cube-ui-kit.vercel.app/?path=/story/getting-started-tasty-playground--playground)
+[Try it in the playground →](https://tasty.style/playground)
 
 ## Capabilities
 

@@ -597,6 +597,35 @@ describe('StyleProcessor', () => {
     ]);
   });
 
+  test('preserves canonical casing for CSS function names', () => {
+    expect(parser.process('translateX(10px)').output).toBe('translateX(10px)');
+    expect(parser.process('translateY(20%)').output).toBe('translateY(20%)');
+    expect(parser.process('translateZ(5px)').output).toBe('translateZ(5px)');
+    expect(parser.process('scaleX(1.5)').output).toBe('scaleX(1.5)');
+    expect(parser.process('scaleY(2)').output).toBe('scaleY(2)');
+    expect(parser.process('scaleZ(0.5)').output).toBe('scaleZ(0.5)');
+    expect(parser.process('rotateX(45deg)').output).toBe('rotateX(45deg)');
+    expect(parser.process('rotateY(90deg)').output).toBe('rotateY(90deg)');
+    expect(parser.process('rotateZ(180deg)').output).toBe('rotateZ(180deg)');
+    expect(parser.process('skewX(10deg)').output).toBe('skewX(10deg)');
+    expect(parser.process('skewY(20deg)').output).toBe('skewY(20deg)');
+  });
+
+  test('lowercase CSS functions remain unaffected', () => {
+    expect(parser.process('calc(100% - 10px)').output).toBe(
+      'calc(100% - 10px)',
+    );
+    expect(parser.process('min(1x, 100px)').output).toBe('min(8px, 100px)');
+    expect(parser.process('clamp(10px, 50%, 200px)').output).toBe(
+      'clamp(10px, 50%, 200px)',
+    );
+  });
+
+  test('canonical casing works inside nested functions', () => {
+    const result = parser.process('drop-shadow(0 0 10px translateX(5px))');
+    expect(result.output).toBe('drop-shadow(0 0 10px translateX(5px))');
+  });
+
   test('provides input property with original unparsed string for each group', () => {
     // Single group
     const result1 = parser.process('1x 2x #purple');

@@ -8,6 +8,7 @@ import {
   RE_RAW_UNIT,
   RE_UNIT_NUM,
   VALUE_KEYWORDS,
+  canonicalFuncName,
 } from './const';
 import { StyleParser } from './parser';
 import type { ParserOptions, ProcessedStyle } from './types';
@@ -352,7 +353,10 @@ export function classify(
     if (COLOR_FUNCS.has(fname)) {
       // Process inner to expand nested colors or units.
       const argProcessed = recurse(inner).output.replace(/,\s+/g, ','); // color funcs expect no spaces after commas
-      return { bucket: Bucket.Color, processed: `${fname}(${argProcessed})` };
+      return {
+        bucket: Bucket.Color,
+        processed: `${canonicalFuncName(fname)}(${argProcessed})`,
+      };
     }
 
     // user function (provided via opts)
@@ -367,7 +371,10 @@ export function classify(
 
     // generic: process inner and rebuild
     const argProcessed = recurse(inner).output;
-    return { bucket: Bucket.Value, processed: `${fname}(${argProcessed})` };
+    return {
+      bucket: Bucket.Value,
+      processed: `${canonicalFuncName(fname)}(${argProcessed})`,
+    };
   }
 
   // 6. Color fallback syntax: (#name, fallback)

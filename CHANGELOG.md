@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.0.0
+
+### Major Changes
+
+- [`a25af0b`](https://github.com/tenphi/tasty/commit/a25af0bd75b08c85fbda9f25a948dbc8356a82fc) Thanks [@tenphi](https://github.com/tenphi)! - Promote to stable 1.0.0 release.
+
 ## 0.17.1
 
 ### Patch Changes

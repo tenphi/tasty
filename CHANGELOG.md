@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 0.17.1
+
+### Patch Changes
+
+- [#68](https://github.com/tenphi/tasty/pull/68) [`9dd1e81`](https://github.com/tenphi/tasty/commit/9dd1e81afd6fdca6f36e9fe52da85a49c0fd9879) Thanks [@tenphi](https://github.com/tenphi)! - Preserve canonical casing for CSS transform function names (e.g. `translateX`, `scaleY`) in parser output instead of lowercasing them.
+
 ## 0.17.0
 
 ### Minor Changes

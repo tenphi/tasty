@@ -426,7 +426,7 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: '0px',
   },
-  // Used by preset.ts for `preset="... strong"`
+  // Used by preset.ts for `preset="name / strong"`
   '$bold-font-weight': {
     syntax: '<number>',
     inherits: true,

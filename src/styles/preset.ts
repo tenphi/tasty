@@ -1,7 +1,8 @@
-import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
 import type { Styles } from './types';
+
+const PRESET_MODIFIERS = new Set(['strong', 'bold', 'italic', 'icon', 'tight']);
 
 /**
  * Convert a value to CSS, handling numbers as pixels for numeric properties
@@ -104,6 +105,11 @@ function resolveFontFamily(
 /**
  * Handles typography preset and individual font properties.
  *
+ * Preset syntax uses `/` to separate name from modifier:
+ * - `preset="h1"` — name only
+ * - `preset="h2 / strong"` — name + modifier
+ * - `preset="bold"` — modifier-only shorthand (name defaults to `inherit`)
+ *
  * When `preset` is defined, it sets up CSS custom properties for typography.
  * Individual font props can be used with or without `preset`:
  * - With `preset`: overrides the preset value for that property
@@ -135,23 +141,24 @@ export function presetStyle({
     const presetValue = preset === true ? '' : String(preset);
 
     const processed = parseStyle(presetValue);
-    let { mods } = processed.groups[0] ?? makeEmptyDetails();
+    const group = processed.groups[0];
+    const { parts } = group ?? { parts: [] };
 
-    const isStrong = mods.includes('strong');
-    const isItalic = mods.includes('italic');
-    const isIcon = mods.includes('icon');
-    const isTight = mods.includes('tight');
+    // parts[0] = preset name (or a modifier for shorthand like preset="bold")
+    // parts[1] = optional modifier after slash (e.g. "t3 / bold")
+    const namePart = parts[0];
+    const modPart = parts[1];
 
-    mods = mods.filter(
-      (mod) =>
-        mod !== 'strong' &&
-        mod !== 'bold' &&
-        mod !== 'italic' &&
-        mod !== 'icon' &&
-        mod !== 'tight',
-    );
+    const nameToken = namePart?.mods[0] ?? '';
+    const isModOnly = PRESET_MODIFIERS.has(nameToken);
 
-    const name = mods[0] || 'inherit';
+    const name = isModOnly ? 'inherit' : nameToken || 'inherit';
+    const modifier = isModOnly ? nameToken : (modPart?.mods[0] ?? '');
+
+    const isStrong = modifier === 'strong' || modifier === 'bold';
+    const isItalic = modifier === 'italic';
+    const isIcon = modifier === 'icon';
+    const isTight = modifier === 'tight';
 
     // Set preset values for properties not explicitly overridden
     if (fontSize == null) {

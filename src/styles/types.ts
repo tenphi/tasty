@@ -399,11 +399,13 @@ export interface StylesInterface extends Omit<
   /**
    * The preset style sets base text settings according to named presets. Affects `font-size`, `line-height`, `letter-spacing`, `font-weight`, and `text-transform`.
    *
+   * Syntax: `name`, `name / modifier`, or `modifier` (shorthand, name defaults to `inherit`).
    * Preset names are project-specific. Augment `TastyPresetNames` to register them for autocomplete.
    *
    * Examples:
    * - `preset="h1"` // heading 1 typography
-   * - `preset="h2 strong"` // bold heading 2
+   * - `preset="h2 / strong"` // bold heading 2
+   * - `preset="bold"` // inherit with bold (shorthand)
    * - `preset="t3"` // text size 3
    */
   preset?: PresetName | (string & {});

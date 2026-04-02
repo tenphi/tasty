@@ -262,6 +262,21 @@ describe('Tasty style tests', () => {
     expect(radiusStyle({ radius: '50%' })).toEqual({
       'border-radius': '50%',
     });
+
+    expect(radiusStyle({ radius: 'inherit' })).toEqual({
+      'border-radius': 'inherit',
+    });
+
+    expect(radiusStyle({ radius: 'inherit right' })).toEqual({
+      'border-top-right-radius': 'inherit',
+      'border-bottom-right-radius': 'inherit',
+    });
+
+    expect(radiusStyle({ radius: 'inherit top right' })).toEqual({
+      'border-top-left-radius': 'inherit',
+      'border-top-right-radius': 'inherit',
+      'border-bottom-right-radius': 'inherit',
+    });
   });
 
   it('should handle preset styles', () => {

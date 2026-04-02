@@ -306,6 +306,7 @@ Border radius with shape presets and directional modifiers.
 | `"ellipse"` | Circular (`50%`) |
 | `"leaf"` | Asymmetric: sharp, round, sharp, round |
 | `"backleaf"` | Asymmetric: round, sharp, round, sharp |
+| `"inherit"` | Inherit border-radius from parent |
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left` — rounds only the specified corners.
 
@@ -317,6 +318,8 @@ Border radius with shape presets and directional modifiers.
 | `"1r top"` | Top-left and top-right `1r`, bottom-left and bottom-right `0` |
 | `"leaf"` | Alternating sharp/round corners (top-left `0`, top-right `1r`, bottom-right `0`, bottom-left `1r`) |
 | `"backleaf"` | Inverse leaf (top-left `1r`, top-right `0`, bottom-right `1r`, bottom-left `0`) |
+| `"inherit"` | All corners inherit from parent (`border-radius: inherit`) |
+| `"inherit right"` | Right corners inherit from parent (uses longhand properties) |
 
 ### `outline`
 

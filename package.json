@@ -17,6 +17,11 @@
       "import": "./dist/static/index.js",
       "default": "./dist/static/index.js"
     },
+    "./static/inject": {
+      "types": "./dist/static/inject.d.ts",
+      "import": "./dist/static/inject.js",
+      "default": "./dist/static/inject.js"
+    },
     "./babel-plugin": {
       "types": "./dist/zero/babel.d.ts",
       "import": "./dist/zero/babel.js",
@@ -204,7 +209,7 @@
         "path",
         "crypto"
       ],
-      "limit": "40 kB"
+      "limit": "41 kB"
     }
   ]
 }

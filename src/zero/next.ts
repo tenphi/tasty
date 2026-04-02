@@ -110,6 +110,19 @@ export interface TastyZeroNextOptions {
    * @example ['./app/theme.ts']
    */
   configDeps?: string[];
+
+  /**
+   * Output mode for extracted CSS.
+   *
+   * - `'file'` (default): CSS is written to a single output file.
+   * - `'inject'`: CSS is embedded inline in JS and injected at runtime.
+   *   No CSS file is written. Best for reusable components and extensions.
+   *
+   * When `mode` is `'inject'`, `output` is ignored.
+   *
+   * @default 'file'
+   */
+  mode?: 'file' | 'inject';
 }
 
 /**
@@ -123,6 +136,7 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
     config: tastyConfig,
     configFile,
     configDeps = [],
+    mode,
   } = options;
 
   return (nextConfig: NextConfig = {}): NextConfig => {
@@ -158,6 +172,7 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
           {
             output: absoluteOutput,
             injectImport: true,
+            ...(mode ? { mode } : {}),
             ...(absoluteConfigFile
               ? { configFile: absoluteConfigFile }
               : tastyConfig
@@ -220,6 +235,7 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
         const babelPluginOptions: TastyZeroBabelOptions = {
           output: wpAbsoluteOutput,
           injectImport: true,
+          ...(mode ? { mode } : {}),
         };
 
         if (wpAbsoluteConfigFile) {

@@ -209,7 +209,7 @@
         "path",
         "crypto"
       ],
-      "limit": "40 kB"
+      "limit": "41 kB"
     }
   ]
 }

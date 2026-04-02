@@ -136,7 +136,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
-    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.29.8",
     "@eslint/js": "^10.0.1",
     "@size-limit/esbuild": "^12.0.0",

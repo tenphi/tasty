@@ -4,6 +4,13 @@ import { DIRECTIONS, parseStyle } from '../utils/styles';
 const PROP = 'var(--radius)';
 const SHARP = 'var(--sharp-radius)';
 
+const RADIUS_LONGHANDS = [
+  'border-top-left-radius',
+  'border-top-right-radius',
+  'border-bottom-right-radius',
+  'border-bottom-left-radius',
+];
+
 export function radiusStyle({
   radius,
 }: {
@@ -20,6 +27,29 @@ export function radiusStyle({
   const processed = parseStyle(radius);
   const { mods } = processed.groups[0] ?? makeEmptyDetails();
   let { values } = processed.groups[0] ?? makeEmptyDetails();
+
+  if (mods.includes('inherit')) {
+    const dirMods = mods.filter((m) => DIRECTIONS.includes(m));
+
+    if (!dirMods.length) {
+      return { 'border-radius': 'inherit' };
+    }
+
+    const result: Record<string, string> = {};
+    const corners = new Set<number>();
+
+    dirMods.forEach((dir) => {
+      const i = DIRECTIONS.indexOf(dir);
+      corners.add(i);
+      corners.add((i + 1) % 4);
+    });
+
+    corners.forEach((i) => {
+      result[RADIUS_LONGHANDS[i]] = 'inherit';
+    });
+
+    return result;
+  }
 
   if (mods.includes('round')) {
     values = ['9999rem'];

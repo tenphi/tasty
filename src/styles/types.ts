@@ -310,7 +310,7 @@ export interface StylesInterface extends Omit<
    *
    * Syntax: `[value] [modifiers]` | `[shape]` | `true`
    *
-   * Shapes: `round` (fully rounded), `ellipse` (50%), `leaf`, `backleaf` (asymmetric)
+   * Shapes: `round` (fully rounded), `ellipse` (50%), `leaf`, `backleaf` (asymmetric), `inherit` (inherit from parent)
    * Directional modifiers: `top`, `right`, `bottom`, `left`
    *
    * Examples:
@@ -319,8 +319,17 @@ export interface StylesInterface extends Omit<
    * - `radius="round"` // fully rounded (9999rem)
    * - `radius="leaf"` // asymmetric leaf shape
    * - `radius="1r top"` // round only top corners
+   * - `radius="inherit"` // inherit border-radius from parent
+   * - `radius="inherit right"` // inherit only right corners (uses longhand properties)
    */
-  radius?: 'round' | 'ellipse' | 'leaf' | 'backleaf' | string | true;
+  radius?:
+    | 'round'
+    | 'ellipse'
+    | 'leaf'
+    | 'backleaf'
+    | 'inherit'
+    | string
+    | true;
   /**
    * The flow style is a unified shorthand for controlling layout direction and wrapping in both flex and grid containers. Replaces `flexDirection` and `gridAutoFlow`.
    *

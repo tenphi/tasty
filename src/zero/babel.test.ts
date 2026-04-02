@@ -30,6 +30,180 @@ function transformCode(
 }
 
 describe('babel plugin', () => {
+  describe('inject mode', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = createTempDir();
+    });
+
+    afterEach(() => {
+      clearWriterCache();
+      resetConfig();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should rewrite import to @tenphi/tasty/static/inject', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  display: 'block',
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(result).toContain('@tenphi/tasty/static/inject');
+      expect(result).toContain('injectCSS as _$i');
+      expect(result).not.toContain("'@tenphi/tasty/static'");
+    });
+
+    it('should embed CSS inline for styles mode', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  display: 'block',
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(result).toContain('_$i(');
+      expect(result).toContain('display');
+      expect(result).toContain('block');
+      expect(result).toContain('className');
+      // Should not write CSS file
+      expect(fs.existsSync(outputPath)).toBe(false);
+    });
+
+    it('should handle selector mode with inject call', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('body', {
+  margin: 0,
+  padding: 0,
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(result).toContain('_$i(');
+      expect(result).toContain('"body"');
+      expect(result).toContain('margin');
+      expect(result).toContain('padding');
+      expect(result).not.toContain('tastyStatic');
+    });
+
+    it('should handle extension mode with inject call', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const base = tastyStatic({
+  display: 'flex',
+});
+
+const extended = tastyStatic(base, {
+  gap: '8px',
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(result).toContain('_$i(');
+      expect(result).toContain('className');
+      expect(result).toContain('display');
+      expect(result).toContain('flex');
+      expect(result).toContain('gap');
+      expect(result).not.toContain('tastyStatic');
+    });
+
+    it('should inject token CSS when tokens are configured', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  display: 'block',
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+        config: {
+          tokens: {
+            $gap: '16px',
+          },
+        },
+      });
+
+      expect(result).toContain('_$i(":root"');
+      expect(result).toContain('--gap');
+    });
+
+    it('should not inject token CSS when no tokens configured', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  display: 'block',
+});
+`;
+
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(result).not.toContain('":root"');
+    });
+
+    it('should not write CSS file in inject mode', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  display: 'block',
+});
+`;
+
+      transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+      });
+
+      expect(fs.existsSync(outputPath)).toBe(false);
+    });
+  });
+
   describe('configFile option', () => {
     let tempDir: string;
 

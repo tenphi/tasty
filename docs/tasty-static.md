@@ -157,6 +157,7 @@ module.exports = {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `output` | `string` | `'tasty.css'` | Path for generated CSS file |
+| `mode` | `'file' \| 'inject'` | `'file'` | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS (see [Inject Mode](#inject-mode)) |
 | `configFile` | `string` | — | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack. |
 | `config` | `TastyZeroConfig \| () => TastyZeroConfig` | `{}` | Inline config object or factory function. Takes precedence over `configFile`. |
 | `configDeps` | `string[]` | `[]` | Absolute file paths that affect config (for cache invalidation) |
@@ -224,6 +225,7 @@ export default withTastyZero({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `output` | `string` | `'public/tasty.css'` | Output path for CSS relative to project root |
+| `mode` | `'file' \| 'inject'` | `'file'` | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS |
 | `enabled` | `boolean` | `true` | Enable/disable the plugin |
 | `configFile` | `string` | — | Path to a TS/JS module that default-exports `TastyZeroConfig`. Recommended for Turbopack compatibility. |
 | `config` | `TastyZeroConfig` | — | Inline config object. For static configs that don't change during dev. |
@@ -330,6 +332,91 @@ export const Button = () => <button className={button}>Click</button>;
   line-height: 1.2;
 }
 ```
+
+---
+
+## Inject Mode
+
+By default the Babel plugin writes CSS to a file (`mode: 'file'`). **Inject mode** (`mode: 'inject'`) embeds CSS inline in your JavaScript and injects it at runtime via a tiny injector. No CSS file is produced.
+
+This is ideal for **reusable components**, **extensions**, and **libraries** where consumers shouldn't need to manage an external CSS file.
+
+### How It Works
+
+1. The Babel plugin extracts CSS at build time (same pipeline as file mode).
+2. Instead of writing to a `.css` file, the CSS is embedded as string literals in the JS output.
+3. The `@tenphi/tasty/static` import is rewritten to `@tenphi/tasty/static/inject`.
+4. Each `tastyStatic` call becomes a self-contained expression that injects its CSS and evaluates to a `StaticStyle` object.
+
+### Configuration
+
+```javascript
+// babel.config.js
+module.exports = {
+  plugins: [
+    ['@tenphi/tasty/babel-plugin', {
+      mode: 'inject',
+      config: {
+        states: { '@mobile': '@media(w < 768px)' },
+      },
+    }]
+  ]
+};
+```
+
+With Next.js:
+
+```typescript
+// next.config.ts
+import { withTastyZero } from '@tenphi/tasty/next';
+
+export default withTastyZero({
+  mode: 'inject',
+  configFile: './app/tasty-zero.config.ts',
+})({
+  reactStrictMode: true,
+});
+```
+
+When `mode` is `'inject'`, the `output` and `injectImport` options are ignored.
+
+### Build Transformation (inject mode)
+
+**Before:**
+
+```tsx
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const button = tastyStatic({
+  padding: '2x 4x',
+  fill: '#purple',
+});
+
+tastyStatic('.heading', { preset: 'h1' });
+```
+
+**After:**
+
+```tsx
+import { injectCSS as _$i } from '@tenphi/tasty/static/inject';
+
+const button = (_$i("ts3f2a1b ts8c4d2e", ".ts3f2a1b.ts3f2a1b{padding:16px 32px}\n.ts8c4d2e.ts8c4d2e{background:#9370db}"), {
+  className: 'ts3f2a1b ts8c4d2e',
+  styles: { padding: '2x 4x', fill: '#purple' },
+  toString() { return this.className; }
+});
+
+_$i(".heading", ".heading{font-size:2.5rem;font-weight:700;line-height:1.2}");
+```
+
+### Dev Mode / HMR
+
+Class names are content-hashed (`ts` + MD5). When styles change, a new hash produces a new `_$i` call that injects fresh CSS. The injector deduplicates by id, so unchanged styles are skipped. Old CSS stays in the DOM but is harmless since no elements reference those class names.
+
+### Limitations (inject mode)
+
+- **Client-side only** — Styles are injected via the DOM, so they are not available during SSR. For server-rendered apps, use `mode: 'file'` or the runtime `tasty()`.
+- **Larger JS bundle** — CSS is embedded in JavaScript, increasing bundle size. Best suited for components and extensions, not full-app styling.
 
 ---
 

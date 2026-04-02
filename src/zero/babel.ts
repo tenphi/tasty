@@ -39,6 +39,13 @@ import {
   extractStylesForSelector,
   extractStylesWithChunks,
 } from './extractor';
+import type {
+  ExtractedChunk,
+  ExtractedCounterStyle,
+  ExtractedFontFace,
+  ExtractedKeyframes,
+  ExtractedProperty,
+} from './extractor';
 
 import type { NodePath, PluginPass } from '@babel/core';
 import type {
@@ -201,6 +208,21 @@ export interface TastyZeroBabelOptions {
    * @default true
    */
   injectImport?: boolean;
+  /**
+   * Output mode for extracted CSS.
+   *
+   * - `'file'` (default): CSS is written to a single output file and
+   *   the `@tenphi/tasty/static` import is rewritten to import that file.
+   * - `'inject'`: CSS is embedded inline in the JS output and injected
+   *   at runtime via a tiny injector from `@tenphi/tasty/static/inject`.
+   *   No CSS file is written. Each `tastyStatic` call becomes
+   *   self-contained. Best for reusable components and extensions.
+   *
+   * When `mode` is `'inject'`, `output` and `injectImport` are ignored.
+   *
+   * @default 'file'
+   */
+  mode?: 'file' | 'inject';
 }
 
 /**
@@ -277,11 +299,12 @@ export function clearWriterCache(): void {
 export default declare<TastyZeroBabelOptions>((api, options) => {
   api.assertVersion(7);
 
+  const mode = options.mode ?? 'file';
   const outputPath = options.output || 'tasty.css';
   const resolvedOutputPath = path.resolve(outputPath);
   const injectImport = options.injectImport ?? true;
 
-  if (injectImport) {
+  if (mode === 'file' && injectImport) {
     const dir = path.dirname(resolvedOutputPath);
 
     if (!fs.existsSync(dir)) {
@@ -365,12 +388,15 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     const newWriter = new CSSWriter(outputPath, { devMode });
 
-    // Emit configured tokens as :root CSS custom properties
-    const tokenStyles = getGlobalConfigTokens();
-    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-      const result = extractStylesForSelector(':root', tokenStyles);
-      if (result.css) {
-        newWriter.add(':root:tokens', result.css);
+    // Emit configured tokens as :root CSS custom properties (file mode only;
+    // inject mode handles token injection per-file in the post hook).
+    if (mode !== 'inject') {
+      const tokenStyles = getGlobalConfigTokens();
+      if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+        const result = extractStylesForSelector(':root', tokenStyles);
+        if (result.css) {
+          newWriter.add(':root:tokens', result.css);
+        }
       }
     }
 
@@ -387,6 +413,18 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const globalRegistry = entry.registry;
   const config = entry.config;
   const devMode = config.devMode ?? false;
+
+  // Precompute token CSS for inject mode
+  let tokenCSS: string | undefined;
+  if (mode === 'inject') {
+    const tokenStyles = getGlobalConfigTokens();
+    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+      const result = extractStylesForSelector(':root', tokenStyles);
+      if (result.css) {
+        tokenCSS = result.css;
+      }
+    }
+  }
 
   return {
     name: 'tasty-zero',
@@ -413,7 +451,19 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
           source === '@tenphi/tasty/static' ||
           source.endsWith('/tasty/static')
         ) {
-          if (injectImport) {
+          if (mode === 'inject') {
+            nodePath.replaceWith(
+              t.importDeclaration(
+                [
+                  t.importSpecifier(
+                    t.identifier('_$i'),
+                    t.identifier('injectCSS'),
+                  ),
+                ],
+                t.stringLiteral('@tenphi/tasty/static/inject'),
+              ),
+            );
+          } else if (injectImport) {
             let importPath = resolvedOutputPath;
 
             if (state.filename) {
@@ -461,6 +511,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             path,
             args,
             cssWriter,
+            mode,
             state.sourceFile,
             config.keyframes,
             config.autoPropertyTypes,
@@ -475,6 +526,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             cssWriter,
             state,
             globalRegistry,
+            mode,
             config.keyframes,
             config.autoPropertyTypes,
             config.fontFace,
@@ -488,6 +540,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             cssWriter,
             state,
             globalRegistry,
+            mode,
             config.keyframes,
             config.autoPropertyTypes,
             config.fontFace,
@@ -528,6 +581,30 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     },
 
     post(this: PluginState) {
+      if (mode === 'inject') {
+        // In inject mode, inject token CSS as a top-level statement
+        // when this file had tastyStatic calls and tokens are configured.
+        if (this._fileAddedCSS && tokenCSS) {
+          const program = this.file.ast.program;
+          const injectCall = createInjectCallAST(':root', tokenCSS);
+
+          // Find the position after the inject import to insert the token call
+          let insertIndex = 0;
+          for (let i = 0; i < program.body.length; i++) {
+            if (t.isImportDeclaration(program.body[i])) {
+              insertIndex = i + 1;
+            }
+          }
+
+          program.body.splice(
+            insertIndex,
+            0,
+            t.expressionStatement(injectCall),
+          );
+        }
+        return;
+      }
+
       // Only write when this file contributed CSS (had tastyStatic calls).
       // In Turbopack, separate workers each have their own CSSWriter with
       // only token CSS. Letting those workers write would overwrite the
@@ -599,6 +676,7 @@ function handleStylesMode(
   cssWriter: CSSWriter,
   state: PluginState,
   globalRegistry: StaticStyleRegistry,
+  mode: 'file' | 'inject',
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
   globalFontFace?: Record<string, FontFaceInput>,
@@ -624,48 +702,51 @@ function handleStylesMode(
     globalKeyframes,
   );
 
-  // Add keyframes CSS
-  for (const kf of keyframes) {
-    cssWriter.add(kf.css, kf.css, state.sourceFile);
-  }
-
   // Extract and add auto-inferred @property rules
   const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
-  for (const prop of properties) {
-    cssWriter.add(prop.css, prop.css, state.sourceFile);
-  }
 
-  // Extract and add @font-face rules
-  for (const ff of extractFontFaceFromStyles(styles, globalFontFace)) {
-    cssWriter.add(ff.css, ff.css, state.sourceFile);
-  }
+  // Extract @font-face rules
+  const fontFaces = extractFontFaceFromStyles(styles, globalFontFace);
 
-  // Extract and add @counter-style rules
-  for (const cs of extractCounterStyleFromStyles(styles, globalCounterStyle)) {
-    cssWriter.add(cs.css, cs.css, state.sourceFile);
-  }
+  // Extract @counter-style rules
+  const counterStyles = extractCounterStyleFromStyles(
+    styles,
+    globalCounterStyle,
+  );
 
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(styles);
 
-  // Add CSS to writer, replacing animation names if needed
-  for (const chunk of chunks) {
-    const css =
-      nameMap.size > 0
-        ? replaceAnimationNamesInCSS(chunk.css, nameMap)
-        : chunk.css;
-    cssWriter.add(chunk.className, css, state.sourceFile);
-  }
-
-  // Generate className
   const className =
     chunks.length > 0 ? chunks.map((c) => c.className).join(' ') : '';
-
-  // Replace call with StaticStyle object
   const staticStyleObject = createStaticStyleAST(className, styles);
-  path.replaceWith(staticStyleObject);
 
-  // Register if this is being assigned to a variable
+  if (mode === 'inject') {
+    const allCSS = collectAllCSS(
+      keyframes,
+      properties,
+      fontFaces,
+      counterStyles,
+      chunks,
+      nameMap,
+    );
+    const injectCall = createInjectCallAST(className, allCSS);
+
+    path.replaceWith(t.sequenceExpression([injectCall, staticStyleObject]));
+  } else {
+    writeCSSToWriter(
+      cssWriter,
+      keyframes,
+      properties,
+      fontFaces,
+      counterStyles,
+      chunks,
+      nameMap,
+      state.sourceFile,
+    );
+    path.replaceWith(staticStyleObject);
+  }
+
   registerIfVariableDeclaration(path, className, styles, state, globalRegistry);
 }
 
@@ -678,6 +759,7 @@ function handleExtensionMode(
   cssWriter: CSSWriter,
   state: PluginState,
   globalRegistry: StaticStyleRegistry,
+  mode: 'file' | 'inject',
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
   globalFontFace?: Record<string, FontFaceInput>,
@@ -731,53 +813,53 @@ function handleExtensionMode(
     globalKeyframes,
   );
 
-  // Add keyframes CSS
-  for (const kf of keyframes) {
-    cssWriter.add(kf.css, kf.css, state.sourceFile);
-  }
-
-  // Extract and add auto-inferred @property rules
+  // Extract auto-inferred @property rules
   const properties = extractPropertiesFromStyles(mergedStyles, {
     autoPropertyTypes,
   });
-  for (const prop of properties) {
-    cssWriter.add(prop.css, prop.css, state.sourceFile);
-  }
 
-  // Extract and add @font-face rules
-  for (const ff of extractFontFaceFromStyles(mergedStyles, globalFontFace)) {
-    cssWriter.add(ff.css, ff.css, state.sourceFile);
-  }
+  // Extract @font-face rules
+  const fontFaces = extractFontFaceFromStyles(mergedStyles, globalFontFace);
 
-  // Extract and add @counter-style rules
-  for (const cs of extractCounterStyleFromStyles(
+  // Extract @counter-style rules
+  const counterStyles = extractCounterStyleFromStyles(
     mergedStyles,
     globalCounterStyle,
-  )) {
-    cssWriter.add(cs.css, cs.css, state.sourceFile);
-  }
+  );
 
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(mergedStyles);
 
-  // Add CSS to writer, replacing animation names if needed
-  for (const chunk of chunks) {
-    const css =
-      nameMap.size > 0
-        ? replaceAnimationNamesInCSS(chunk.css, nameMap)
-        : chunk.css;
-    cssWriter.add(chunk.className, css, state.sourceFile);
-  }
-
-  // Generate className
   const className =
     chunks.length > 0 ? chunks.map((c) => c.className).join(' ') : '';
-
-  // Replace call with StaticStyle object
   const staticStyleObject = createStaticStyleAST(className, mergedStyles);
-  path.replaceWith(staticStyleObject);
 
-  // Register if this is being assigned to a variable
+  if (mode === 'inject') {
+    const allCSS = collectAllCSS(
+      keyframes,
+      properties,
+      fontFaces,
+      counterStyles,
+      chunks,
+      nameMap,
+    );
+    const injectCall = createInjectCallAST(className, allCSS);
+
+    path.replaceWith(t.sequenceExpression([injectCall, staticStyleObject]));
+  } else {
+    writeCSSToWriter(
+      cssWriter,
+      keyframes,
+      properties,
+      fontFaces,
+      counterStyles,
+      chunks,
+      nameMap,
+      state.sourceFile,
+    );
+    path.replaceWith(staticStyleObject);
+  }
+
   registerIfVariableDeclaration(
     path,
     className,
@@ -794,6 +876,7 @@ function handleSelectorMode(
   path: NodePath<t.CallExpression>,
   args: t.CallExpression['arguments'],
   cssWriter: CSSWriter,
+  mode: 'file' | 'inject',
   sourceFile?: string,
   globalKeyframes?: Record<string, KeyframesSteps>,
   autoPropertyTypes?: boolean,
@@ -833,46 +916,137 @@ function handleSelectorMode(
     globalKeyframes,
   );
 
-  // Add keyframes CSS
-  for (const kf of keyframes) {
-    cssWriter.add(kf.css, kf.css, sourceFile);
-  }
-
-  // Extract and add auto-inferred @property rules
+  // Extract auto-inferred @property rules
   const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
-  for (const prop of properties) {
-    cssWriter.add(prop.css, prop.css, sourceFile);
-  }
 
-  // Extract and add @font-face rules
-  for (const ff of extractFontFaceFromStyles(styles, globalFontFace)) {
-    cssWriter.add(ff.css, ff.css, sourceFile);
-  }
+  // Extract @font-face rules
+  const fontFaces = extractFontFaceFromStyles(styles, globalFontFace);
 
-  // Extract and add @counter-style rules
-  for (const cs of extractCounterStyleFromStyles(styles, globalCounterStyle)) {
-    cssWriter.add(cs.css, cs.css, sourceFile);
-  }
+  // Extract @counter-style rules
+  const counterStyles = extractCounterStyleFromStyles(
+    styles,
+    globalCounterStyle,
+  );
 
   // Extract styles for selector
   const result = extractStylesForSelector(selector, styles);
 
-  // Replace animation names if needed and add CSS
-  const css =
+  const selectorCSS =
     nameMap.size > 0
       ? replaceAnimationNamesInCSS(result.css, nameMap)
       : result.css;
-  cssWriter.add(selector, css, sourceFile);
 
-  // Remove the entire statement
-  const parent = path.parentPath;
-  if (parent && t.isExpressionStatement(parent.node)) {
-    parent.remove();
+  if (mode === 'inject') {
+    const cssParts: string[] = [];
+
+    for (const kf of keyframes) cssParts.push(kf.css);
+    for (const prop of properties) cssParts.push(prop.css);
+    for (const ff of fontFaces) cssParts.push(ff.css);
+    for (const cs of counterStyles) cssParts.push(cs.css);
+    cssParts.push(selectorCSS);
+
+    const injectCall = createInjectCallAST(selector, cssParts.join('\n'));
+
+    const parent = path.parentPath;
+    if (parent && t.isExpressionStatement(parent.node)) {
+      parent.replaceWith(t.expressionStatement(injectCall));
+    } else {
+      path.replaceWith(injectCall);
+    }
   } else {
-    // If used in an expression context (which would be incorrect usage),
-    // replace with undefined
-    path.replaceWith(t.identifier('undefined'));
+    writeCSSToWriter(
+      cssWriter,
+      keyframes,
+      properties,
+      fontFaces,
+      counterStyles,
+      [],
+      nameMap,
+      sourceFile,
+    );
+    cssWriter.add(selector, selectorCSS, sourceFile);
+
+    const parent = path.parentPath;
+    if (parent && t.isExpressionStatement(parent.node)) {
+      parent.remove();
+    } else {
+      path.replaceWith(t.identifier('undefined'));
+    }
   }
+}
+
+/**
+ * Collect all extracted CSS parts into a single string (for inject mode).
+ */
+function collectAllCSS(
+  keyframes: ExtractedKeyframes[],
+  properties: ExtractedProperty[],
+  fontFaces: ExtractedFontFace[],
+  counterStyles: ExtractedCounterStyle[],
+  chunks: ExtractedChunk[],
+  nameMap: Map<string, string>,
+): string {
+  const parts: string[] = [];
+
+  for (const kf of keyframes) parts.push(kf.css);
+  for (const prop of properties) parts.push(prop.css);
+  for (const ff of fontFaces) parts.push(ff.css);
+  for (const cs of counterStyles) parts.push(cs.css);
+
+  for (const chunk of chunks) {
+    parts.push(
+      nameMap.size > 0
+        ? replaceAnimationNamesInCSS(chunk.css, nameMap)
+        : chunk.css,
+    );
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Write all extracted CSS parts to a CSSWriter (for file mode).
+ */
+function writeCSSToWriter(
+  cssWriter: CSSWriter,
+  keyframes: ExtractedKeyframes[],
+  properties: ExtractedProperty[],
+  fontFaces: ExtractedFontFace[],
+  counterStyles: ExtractedCounterStyle[],
+  chunks: ExtractedChunk[],
+  nameMap: Map<string, string>,
+  sourceFile?: string,
+): void {
+  for (const kf of keyframes) {
+    cssWriter.add(kf.css, kf.css, sourceFile);
+  }
+  for (const prop of properties) {
+    cssWriter.add(prop.css, prop.css, sourceFile);
+  }
+  for (const ff of fontFaces) {
+    cssWriter.add(ff.css, ff.css, sourceFile);
+  }
+  for (const cs of counterStyles) {
+    cssWriter.add(cs.css, cs.css, sourceFile);
+  }
+
+  for (const chunk of chunks) {
+    const css =
+      nameMap.size > 0
+        ? replaceAnimationNamesInCSS(chunk.css, nameMap)
+        : chunk.css;
+    cssWriter.add(chunk.className, css, sourceFile);
+  }
+}
+
+/**
+ * Create an `_$i(id, css)` call expression AST node for inject mode.
+ */
+function createInjectCallAST(id: string, css: string): t.CallExpression {
+  return t.callExpression(t.identifier('_$i'), [
+    t.stringLiteral(id),
+    t.stringLiteral(css),
+  ]);
 }
 
 /**

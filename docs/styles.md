@@ -361,24 +361,27 @@ Multiple shadows: `shadow="1x 1x 2x #dark.20, inset 0 0 4x #dark.10"`
 
 Typography preset that sets font-size, line-height, letter-spacing, font-weight, font-style, and text-transform from named design tokens.
 
-**Syntax:** `[name] [modifiers...]`
+**Syntax:** `name`, `name / modifier`, or `modifier` (shorthand)
 
 Preset names are project-specific (e.g. `h1`–`h6`, `t1`–`t4`, `p1`–`p4`). Register them for autocomplete by augmenting `TastyPresetNames`.
+
+Use `/` to separate the preset name from a modifier. When a modifier is used alone (without a name), the preset name defaults to `inherit`.
 
 **Modifiers:**
 
 | Modifier | Effect |
 |----------|--------|
-| `strong` | Sets `font-weight` to bold (from `$bold-font-weight` token) |
+| `strong` (or `bold`) | Sets `font-weight` to bold (from `$bold-font-weight` token) |
 | `italic` | Sets `font-style: italic` |
 | `icon` | Sets font-size and line-height to icon size |
 | `tight` | Sets line-height equal to font-size |
 
 ```jsx
-preset="h1"           // heading 1
-preset="h2 strong"    // bold heading 2
-preset="t3 italic"    // italic text 3
-preset="t2 tight"     // text 2 with tight line-height
+preset="h1"              // heading 1
+preset="h2 / strong"     // bold heading 2
+preset="t3 / italic"     // italic text 3
+preset="t2 / tight"      // text 2 with tight line-height
+preset="bold"             // inherit preset with bold (shorthand for "inherit / bold")
 ```
 
 Individual typography props (`fontSize`, `lineHeight`, `letterSpacing`, `fontWeight`, `fontStyle`, `textTransform`) can be used alongside `preset` to override specific values, but using `preset` alone is recommended.

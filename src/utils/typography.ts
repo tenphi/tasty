@@ -1,5 +1,13 @@
 import type { ConfigTokens } from '../styles/types';
 
+const RESERVED_PRESET_NAMES = new Set([
+  'strong',
+  'bold',
+  'italic',
+  'icon',
+  'tight',
+]);
+
 /**
  * Typography preset configuration.
  * Each preset defines font properties that get expanded into CSS custom properties.
@@ -47,6 +55,12 @@ export function generateTypographyTokens(
   const tokens: Record<`$${string}`, string | number> = {};
 
   for (const [name, preset] of Object.entries(presets)) {
+    if (RESERVED_PRESET_NAMES.has(name)) {
+      throw new Error(
+        `Invalid typography preset name "${name}". This name is reserved as a preset modifier.`,
+      );
+    }
+
     tokens[`$${name}-font-size`] = preset.fontSize;
     tokens[`$${name}-line-height`] = preset.lineHeight;
     tokens[`$${name}-letter-spacing`] = preset.letterSpacing ?? '0';

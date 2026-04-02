@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.1.0
+
+### Minor Changes
+
+- [#71](https://github.com/tenphi/tasty/pull/71) [`daa6704`](https://github.com/tenphi/tasty/commit/daa6704c869e5edf961cf42cf1e9c49fed365f2b) Thanks [@tenphi](https://github.com/tenphi)! - Switch preset modifier syntax from space-separated (`h2 strong`) to slash-separated (`h2 / strong`). Mod-only shorthand like `preset="bold"` is supported (equivalent to `inherit / bold`).
+
 ## 1.0.0
 
 ### Major Changes

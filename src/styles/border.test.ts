@@ -70,6 +70,48 @@ describe('borderStyle', () => {
     });
   });
 
+  describe('longhand modifier', () => {
+    it('expands single value to 4 individual border-* properties', () => {
+      const result = borderStyle({ border: '1bw longhand' });
+      expect(result['border-top']).toContain('1px');
+      expect(result['border-top']).toContain('solid');
+      expect(result['border-right']).toContain('1px');
+      expect(result['border-bottom']).toContain('1px');
+      expect(result['border-left']).toContain('1px');
+      expect(result).not.toHaveProperty('border');
+    });
+
+    it('expands border with style and color to longhands', () => {
+      const result = borderStyle({ border: '2bw dashed #purple longhand' });
+      expect(result['border-top']).toContain('2px');
+      expect(result['border-top']).toContain('dashed');
+      expect(result['border-top']).toContain('var(--purple-color)');
+      expect(result['border-right']).toEqual(result['border-top']);
+      expect(result['border-bottom']).toEqual(result['border-top']);
+      expect(result['border-left']).toEqual(result['border-top']);
+      expect(result).not.toHaveProperty('border');
+    });
+
+    it('expands CSS-wide keyword with longhand', () => {
+      const result = borderStyle({ border: 'inherit longhand' });
+      expect(result).toEqual({
+        'border-top': 'inherit',
+        'border-right': 'inherit',
+        'border-bottom': 'inherit',
+        'border-left': 'inherit',
+      });
+    });
+
+    it('expands multi-group with longhand to longhands', () => {
+      const result = borderStyle({ border: '1bw longhand, 2bw top' });
+      expect(result['border-top']).toContain('2px');
+      expect(result['border-right']).toContain('1px');
+      expect(result['border-bottom']).toContain('1px');
+      expect(result['border-left']).toContain('1px');
+      expect(result).not.toHaveProperty('border');
+    });
+  });
+
   // Multi-group support tests
   describe('multi-group support', () => {
     it('handles multiple groups with base and direction override', () => {

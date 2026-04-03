@@ -275,6 +275,75 @@ describe('paddingStyle', () => {
     });
   });
 
+  describe('longhand modifier', () => {
+    it('expands single value to 4 individual properties', () => {
+      expect(paddingStyle({ padding: '2x longhand' })).toEqual({
+        'padding-top': '16px',
+        'padding-right': '16px',
+        'padding-bottom': '16px',
+        'padding-left': '16px',
+      });
+    });
+
+    it('expands two-value string to 4 individual properties', () => {
+      expect(paddingStyle({ padding: '1x 2x longhand' })).toEqual({
+        'padding-top': '8px',
+        'padding-right': '16px',
+        'padding-bottom': '8px',
+        'padding-left': '16px',
+      });
+    });
+
+    it('expands directional value with longhand', () => {
+      expect(paddingStyle({ padding: '2x top longhand' })).toEqual({
+        'padding-top': '16px',
+        'padding-right': '0',
+        'padding-bottom': '0',
+        'padding-left': '0',
+      });
+    });
+
+    it('respects individual direction overrides with longhand', () => {
+      expect(
+        paddingStyle({ padding: '1x longhand', paddingTop: '3x' }),
+      ).toEqual({
+        'padding-top': '24px',
+        'padding-right': '8px',
+        'padding-bottom': '8px',
+        'padding-left': '8px',
+      });
+    });
+
+    it('respects paddingBlock/Inline overrides with longhand', () => {
+      expect(
+        paddingStyle({ padding: '1x longhand', paddingBlock: '2x' }),
+      ).toEqual({
+        'padding-top': '16px',
+        'padding-right': '8px',
+        'padding-bottom': '16px',
+        'padding-left': '8px',
+      });
+    });
+
+    it('expands CSS-wide keyword with longhand', () => {
+      expect(paddingStyle({ padding: 'inherit longhand' })).toEqual({
+        'padding-top': 'inherit',
+        'padding-right': 'inherit',
+        'padding-bottom': 'inherit',
+        'padding-left': 'inherit',
+      });
+    });
+
+    it('expands multi-group with longhand', () => {
+      expect(paddingStyle({ padding: '1x longhand, 2x top' })).toEqual({
+        'padding-top': '16px',
+        'padding-right': '8px',
+        'padding-bottom': '8px',
+        'padding-left': '8px',
+      });
+    });
+  });
+
   describe('output optimization', () => {
     it('outputs single value when all sides are equal', () => {
       expect(paddingStyle({ padding: '2x' })).toEqual({

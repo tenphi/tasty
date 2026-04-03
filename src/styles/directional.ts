@@ -172,6 +172,8 @@ export function processDirectionalStyle(
     left: defaultInit,
   };
 
+  let useLonghand = false;
+
   if (main != null) {
     if (typeof main === 'number') {
       const v = `${main}px`;
@@ -189,6 +191,10 @@ export function processDirectionalStyle(
           const groups = processed.groups ?? [];
 
           for (const group of groups) {
+            if (group.mods.includes('longhand')) {
+              useLonghand = true;
+            }
+
             const kw = extractCSSWideKeyword(group);
 
             if (kw) {
@@ -241,6 +247,15 @@ export function processDirectionalStyle(
   if (left != null) {
     const val = parseSingleValue(left, defaultValue, trueValue);
     if (val) dirs.left = val;
+  }
+
+  if (useLonghand) {
+    return {
+      [dirProp('top')]: dirs.top,
+      [dirProp('right')]: dirs.right,
+      [dirProp('bottom')]: dirs.bottom,
+      [dirProp('left')]: dirs.left,
+    };
   }
 
   return optimizeShorthand(property, dirs);

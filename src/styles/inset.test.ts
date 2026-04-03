@@ -88,6 +88,44 @@ describe('insetStyle', () => {
     });
   });
 
+  describe('longhand modifier', () => {
+    it('expands inset to individual top/right/bottom/left properties', () => {
+      expect(insetStyle({ inset: '0 longhand' })).toEqual({
+        top: '0',
+        right: '0',
+        bottom: '0',
+        left: '0',
+      });
+    });
+
+    it('expands inset with value to individual properties', () => {
+      expect(insetStyle({ inset: '1x longhand' })).toEqual({
+        top: '8px',
+        right: '8px',
+        bottom: '8px',
+        left: '8px',
+      });
+    });
+
+    it('expands directional inset with longhand', () => {
+      expect(insetStyle({ inset: '2x top longhand' })).toEqual({
+        top: '16px',
+        right: 'auto',
+        bottom: 'auto',
+        left: 'auto',
+      });
+    });
+
+    it('expands CSS-wide keyword with longhand', () => {
+      expect(insetStyle({ inset: 'inherit longhand' })).toEqual({
+        top: 'inherit',
+        right: 'inherit',
+        bottom: 'inherit',
+        left: 'inherit',
+      });
+    });
+  });
+
   describe('multi-group (comma-separated)', () => {
     it('base value with directional override', () => {
       expect(insetStyle({ inset: '0, 2x top' })).toEqual({

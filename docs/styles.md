@@ -104,6 +104,8 @@ Element padding with directional modifiers and multi-group support. Use **comma-
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
+**Output modifier:** `longhand` — forces output as individual CSS longhand properties (`padding-top`, `padding-right`, `padding-bottom`, `padding-left`) instead of the `padding` shorthand. Useful when children need to selectively inherit individual directions.
+
 | Value | Effect |
 |-------|--------|
 | `"2x"` | All sides `2x` |
@@ -112,6 +114,7 @@ Element padding with directional modifiers and multi-group support. Use **comma-
 | `"1x left right"` | Left and right `1x`, top/bottom `0` |
 | `"1x, 2x top"` | All sides `1x`, then top overridden to `2x` |
 | `"1x, 2x top bottom"` | Left/right `1x`, top/bottom `2x` |
+| `"2x longhand"` | All sides `2x`, output as 4 individual `padding-*` properties |
 | `true` | All sides `1x` |
 | Number | Converted to `px` |
 
@@ -128,6 +131,8 @@ Element margin. Same syntax, modifiers, and multi-group support as `padding`.
 **Syntax:** `[value]` | `[top right]` | `[top right bottom left]` | `[value directions...]` — comma-separated for multiple groups
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
+
+**Output modifier:** `longhand` — forces output as individual CSS longhand properties (`margin-top`, etc.) instead of the `margin` shorthand.
 
 | Value | Effect |
 |-------|--------|
@@ -190,12 +195,15 @@ Positioning offsets with directional modifiers and multi-group support. Same dir
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
+**Output modifier:** `longhand` — forces output as individual CSS properties (`top`, `right`, `bottom`, `left`) instead of the `inset` shorthand.
+
 | Value | Effect |
 |-------|--------|
 | `"0"` | All sides `0` |
 | `"2x top"` | Top `2x`, right/bottom/left `auto` |
 | `"1x left right"` | Left and right `1x`, top/bottom `auto` |
 | `"0, 2x top"` | All sides `0`, then top overridden to `2x` |
+| `"0 longhand"` | All sides `0`, output as individual `top`/`right`/`bottom`/`left` |
 | `true` | All sides `0` |
 
 Later comma-separated groups override earlier groups for conflicting directions.
@@ -281,12 +289,15 @@ Border shorthand with directional and multi-group support. Use **comma-separated
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
+**Output modifier:** `longhand` — forces output as individual CSS properties (`border-top`, `border-right`, `border-bottom`, `border-left`) instead of the `border` shorthand. Useful when children need to selectively inherit individual sides.
+
 | Value | Effect |
 |-------|--------|
 | `true` | Default border (`1bw solid #border`) on all sides |
 | `"2bw dashed #purple"` | All sides: 2bw dashed purple |
 | `"2bw top"` | Top only: 2bw solid `#border`, others: 0 |
 | `"dotted #danger left right"` | Left/right: 1bw dotted `#danger`, others: 0 |
+| `"1bw longhand"` | All sides: 1bw solid `#border`, output as 4 individual `border-*` properties |
 | `"1bw #red, 2bw #blue top"` | All sides: 1bw solid `#red`, top overridden to 2bw solid `#blue` |
 | `"1bw, dashed top bottom, #purple left right"` | Base: 1bw solid `#border`, top/bottom: 1bw dashed `#border`, left/right: 1bw solid `#purple` |
 
@@ -310,6 +321,8 @@ Border radius with shape presets and directional modifiers.
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left` — rounds only the specified corners.
 
+**Output modifier:** `longhand` — forces output as individual CSS longhand properties (`border-top-left-radius`, `border-top-right-radius`, `border-bottom-right-radius`, `border-bottom-left-radius`) instead of the `border-radius` shorthand. Useful when children need to selectively inherit individual corners via `radius: 'inherit left'`.
+
 | Value | Effect |
 |-------|--------|
 | `"2r"` | All corners `2r` |
@@ -318,6 +331,7 @@ Border radius with shape presets and directional modifiers.
 | `"1r top"` | Top-left and top-right `1r`, bottom-left and bottom-right `0` |
 | `"leaf"` | Alternating sharp/round corners (top-left `0`, top-right `1r`, bottom-right `0`, bottom-left `1r`) |
 | `"backleaf"` | Inverse leaf (top-left `1r`, top-right `0`, bottom-right `1r`, bottom-left `0`) |
+| `"1r longhand"` | All corners `1r`, output as 4 individual `border-*-radius` properties |
 | `"inherit"` | All corners inherit from parent (`border-radius: inherit`) |
 | `"inherit right"` | Right corners inherit from parent (uses longhand properties) |
 

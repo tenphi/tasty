@@ -1,6 +1,7 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
 import { BORDER_STYLES } from './const';
+import { extractCSSWideKeyword } from './shared';
 
 type Direction = (typeof DIRECTIONS)[number];
 
@@ -75,21 +76,42 @@ export function borderStyle({
   }
 
   const processed = parseStyle(strBorder);
-  const groups: GroupData[] = processed.groups ?? [];
+  const groups = processed.groups ?? [];
 
   if (!groups.length) return null;
 
+  const useLonghand = groups.some((g) => (g.mods ?? []).includes('longhand'));
+
   // Single group - use original logic for backward compatibility
   if (groups.length === 1) {
+    const group = groups[0];
+    const keyword = extractCSSWideKeyword(group);
+
+    if (keyword) {
+      if (useLonghand) {
+        return Object.fromEntries(
+          DIRECTIONS.map((dir) => [`border-${dir}`, keyword]),
+        );
+      }
+
+      return { border: keyword };
+    }
+
     const { directions, borderValue } = processGroup({
-      values: groups[0].values ?? [],
-      mods: groups[0].mods ?? [],
-      colors: groups[0].colors ?? [],
+      values: group.values ?? [],
+      mods: group.mods ?? [],
+      colors: group.colors ?? [],
     });
 
     const styleValue = formatBorderValue(borderValue);
 
     if (!directions.length) {
+      if (useLonghand) {
+        return Object.fromEntries(
+          DIRECTIONS.map((dir) => [`border-${dir}`, styleValue]),
+        );
+      }
+
       return { border: styleValue };
     }
 
@@ -149,9 +171,17 @@ export function borderStyle({
   }
 
   // If no group specified any directions and we have an all-directions value,
-  // return the simple `border` shorthand
+  // return the simple `border` shorthand (or longhands if requested)
   if (!hasAnyDirections && allDirectionsValue) {
-    return { border: formatBorderValue(allDirectionsValue) };
+    const formatted = formatBorderValue(allDirectionsValue);
+
+    if (useLonghand) {
+      return Object.fromEntries(
+        DIRECTIONS.map((dir) => [`border-${dir}`, formatted]),
+      );
+    }
+
+    return { border: formatted };
   }
 
   // Otherwise, output individual border-* properties

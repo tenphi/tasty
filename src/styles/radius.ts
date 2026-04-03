@@ -32,10 +32,18 @@ export function radiusStyle({
 
   const keyword = extractCSSWideKeyword(group);
 
+  const useLonghand = mods.includes('longhand');
+
   if (keyword) {
     const dirMods = mods.filter((m) => DIRECTIONS.includes(m));
 
     if (!dirMods.length) {
+      if (useLonghand) {
+        return Object.fromEntries(
+          RADIUS_LONGHANDS.map((prop) => [prop, keyword]),
+        );
+      }
+
       return { 'border-radius': keyword };
     }
 
@@ -94,6 +102,15 @@ export function radiusStyle({
     if (flag) {
       values = arr;
     }
+  }
+
+  if (useLonghand) {
+    return {
+      [RADIUS_LONGHANDS[0]]: values[0],
+      [RADIUS_LONGHANDS[1]]: values[1] || values[0],
+      [RADIUS_LONGHANDS[2]]: values[2] || values[0],
+      [RADIUS_LONGHANDS[3]]: values[3] || values[1] || values[0],
+    };
   }
 
   return {

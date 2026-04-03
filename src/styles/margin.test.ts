@@ -261,6 +261,53 @@ describe('marginStyle', () => {
     });
   });
 
+  describe('longhand modifier', () => {
+    it('expands single value to 4 individual properties', () => {
+      expect(marginStyle({ margin: '2x longhand' })).toEqual({
+        'margin-top': '16px',
+        'margin-right': '16px',
+        'margin-bottom': '16px',
+        'margin-left': '16px',
+      });
+    });
+
+    it('expands two-value string to 4 individual properties', () => {
+      expect(marginStyle({ margin: '1x 2x longhand' })).toEqual({
+        'margin-top': '8px',
+        'margin-right': '16px',
+        'margin-bottom': '8px',
+        'margin-left': '16px',
+      });
+    });
+
+    it('expands directional value with longhand', () => {
+      expect(marginStyle({ margin: '2x top longhand' })).toEqual({
+        'margin-top': '16px',
+        'margin-right': '0',
+        'margin-bottom': '0',
+        'margin-left': '0',
+      });
+    });
+
+    it('respects individual direction overrides with longhand', () => {
+      expect(marginStyle({ margin: '1x longhand', marginTop: '3x' })).toEqual({
+        'margin-top': '24px',
+        'margin-right': '8px',
+        'margin-bottom': '8px',
+        'margin-left': '8px',
+      });
+    });
+
+    it('expands CSS-wide keyword with longhand', () => {
+      expect(marginStyle({ margin: 'inherit longhand' })).toEqual({
+        'margin-top': 'inherit',
+        'margin-right': 'inherit',
+        'margin-bottom': 'inherit',
+        'margin-left': 'inherit',
+      });
+    });
+  });
+
   describe('auto values', () => {
     it('handles auto values for centering', () => {
       const result = marginStyle({

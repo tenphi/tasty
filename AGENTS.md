@@ -29,10 +29,9 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 1. **Typecheck** — Run `pnpm typecheck`. If it fails, stop and fix errors before formatting or committing.
 2. **Lint** — Run `pnpm lint`. If it fails, stop and fix errors before formatting or committing.
 3. **Format** — Run `pnpm format` so committed code matches Prettier output.
-4. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short.
-5. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
-
-**Changesets:** When a change should trigger an npm release, add a changeset as described in `submit-changes.md` and include it in the same commit. When a change does not need a version bump (for example documentation or repo-only churn), skip the changeset but still run typecheck, lint, and format.
+4. **Changeset** — If the change affects published package behavior (features, fixes, refactors, perf), create a changeset file in `.changeset/` as described in `submit-changes.md` and include it in the commit. Use `patch` for fixes/small changes, `minor` for new features/non-breaking API changes, `major` for breaking changes. Skip the changeset only when the change is purely internal (docs, CI, repo-only churn, tests with no behavior change).
+5. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short. Include the changeset file in the same commit.
+6. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
 
 ## Stack
 

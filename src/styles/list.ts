@@ -20,6 +20,7 @@ export const POSITION_STYLES = [
   'margin',
   'inset',
   'position',
+  'scrollMargin',
 ] as const;
 
 export const BLOCK_INNER_STYLES = [
@@ -62,6 +63,7 @@ export const DIMENSION_STYLES = [
 
 export const FLOW_STYLES = [
   'flow',
+  'place',
   'placeItems',
   'placeContent',
   'alignItems',

@@ -3,14 +3,23 @@
 import { fadeStyle } from './fade';
 
 describe('fadeStyle', () => {
-  it('returns undefined when fade is not defined', () => {
-    expect(fadeStyle({})).toBeUndefined();
+  it('returns null when fade is not defined', () => {
+    expect(fadeStyle({})).toBeNull();
   });
 
-  it('returns undefined for falsy values', () => {
-    expect(fadeStyle({ fade: '' })).toBeUndefined();
-    expect(fadeStyle({ fade: null })).toBeUndefined();
-    expect(fadeStyle({ fade: undefined })).toBeUndefined();
+  it('returns null for falsy values', () => {
+    expect(fadeStyle({ fade: '' })).toBeNull();
+    expect(fadeStyle({ fade: null })).toBeNull();
+    expect(fadeStyle({ fade: undefined })).toBeNull();
+  });
+
+  describe('CSS-wide keywords', () => {
+    it('passes through fade: inherit on mask and mask-composite', () => {
+      expect(fadeStyle({ fade: 'inherit' })).toEqual({
+        mask: 'inherit',
+        'mask-composite': 'inherit',
+      });
+    });
   });
 
   it('applies default fade to all edges with default width', () => {

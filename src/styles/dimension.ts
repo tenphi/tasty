@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
@@ -38,10 +39,27 @@ export function dimensionStyle(name: 'width' | 'height') {
   const maxStyle = `max-${name}`;
 
   return ({ value, min, max }: DimensionProps) => {
-    // If nothing is defined, return undefined
-    if (value == null && min == null && max == null) return;
+    if (value == null && min == null && max == null) return null;
 
-    // Handle boolean true on main value - reset all to initial
+    if (
+      value != null &&
+      typeof value === 'string' &&
+      CSS_WIDE_KEYWORDS.has(value)
+    ) {
+      const styles: Record<string, string> = {
+        [name]: value,
+        [minStyle]: value,
+        [maxStyle]: value,
+      };
+
+      const minVal = parseDimensionValue(min);
+      const maxVal = parseDimensionValue(max);
+      if (minVal) styles[minStyle] = minVal;
+      if (maxVal) styles[maxStyle] = maxVal;
+
+      return styles;
+    }
+
     if (value === true) {
       const styles: Record<string, string | string[]> = {
         [name]: 'auto',

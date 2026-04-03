@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
@@ -11,9 +12,13 @@ function toBoxShadow(shadow: string): string {
 }
 
 export function shadowStyle({ shadow }: { shadow?: string | boolean }) {
-  if (!shadow) return;
+  if (!shadow) return null;
 
   if (shadow === true) shadow = 'var(--shadow)';
+
+  if (CSS_WIDE_KEYWORDS.has(shadow)) {
+    return { 'box-shadow': shadow };
+  }
 
   return {
     'box-shadow': shadow.split(',').map(toBoxShadow).join(','),

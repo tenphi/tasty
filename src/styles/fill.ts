@@ -86,7 +86,7 @@ export function fillStyle({
     result['background-clip'] = backgroundClip;
   }
 
-  if (Object.keys(result).length === 0) return;
+  if (Object.keys(result).length === 0) return null;
   return result;
 }
 
@@ -105,7 +105,7 @@ fillStyle.__lookupStyles = [
 ];
 
 export function svgFillStyle({ svgFill }: { svgFill?: string }) {
-  if (!svgFill) return;
+  if (!svgFill) return null;
 
   const processed = parseStyle(svgFill);
   svgFill = processed.groups[0]?.colors[0] || svgFill;

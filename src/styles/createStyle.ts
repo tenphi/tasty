@@ -66,10 +66,10 @@ export function createStyle(
   const key = `${styleName}.${cssStyle ?? ''}`;
 
   if (!CACHE[key]) {
-    const styleHandler = (styleMap: StyleValueStateMap): CSSMap | void => {
+    const styleHandler = (styleMap: StyleValueStateMap): CSSMap | null => {
       let styleValue = styleMap[styleName];
 
-      if (styleValue == null || styleValue === false) return;
+      if (styleValue == null || styleValue === false) return null;
 
       let finalCssStyle: string;
       const isColorToken =
@@ -85,14 +85,14 @@ export function createStyle(
 
       if (isColorToken) {
         const normalized = normalizeColorTokenValue(styleValue);
-        if (normalized === null) return;
+        if (normalized === null) return null;
         styleValue = normalized;
       }
 
       if (converter && typeof styleValue !== 'string') {
         styleValue = converter(styleValue as string | number | true);
 
-        if (!styleValue) return;
+        if (!styleValue) return null;
       }
 
       if (

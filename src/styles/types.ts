@@ -75,6 +75,13 @@ export interface StylesInterface extends Omit<
   | 'transition'
   | 'placeContent'
   | 'placeItems'
+  | 'scrollMargin'
+  | 'scrollMarginTop'
+  | 'scrollMarginRight'
+  | 'scrollMarginBottom'
+  | 'scrollMarginLeft'
+  | 'scrollMarginBlock'
+  | 'scrollMarginInline'
 > {
   /**
    * @deprecated Use `flow` style instead.
@@ -437,12 +444,12 @@ export interface StylesInterface extends Omit<
    */
   justify?: CSSProperties['justifyItems'] | CSSProperties['justifyContent'];
   /**
-   * Shorthand for `place-items` and `place-content`. Sets both properties for unified alignment of both axes in grid/flex layouts.
+   * Shorthand for all placement properties. Sets all 4 longhands: align-items, justify-items, align-content, justify-content.
    *
    * Examples:
-   * - `place="center"` // place-items: center; place-content: center
-   * - `place="start end"` // place-items: start; place-content: end
-   * - `place="stretch"` // place both to stretch
+   * - `place="center"` // all 4 longhands: center
+   * - `place="start end"` // align-*: start; justify-*: end
+   * - `place="stretch"` // all 4 longhands: stretch
    */
   place?: CSSProperties['placeItems'] | CSSProperties['placeContent'] | string;
   /**
@@ -461,6 +468,21 @@ export interface StylesInterface extends Omit<
    * - `placeItems="start end"` // start on block axis, end on inline axis
    */
   placeItems?: CSSProperties['placeItems'];
+  /**
+   * Shorthand for scroll-margin on all sides. Supports custom units and directional modifiers.
+   *
+   * Examples:
+   * - `scrollMargin="2x"` // scroll-margin on all sides: 2x
+   * - `scrollMargin="2x top"` // only top scroll-margin: 2x
+   * - `scrollMargin={true}` // default scroll-margin on all sides
+   */
+  scrollMargin?: CSSProperties['scrollMargin'] | string | boolean;
+  scrollMarginTop?: string | number | boolean;
+  scrollMarginRight?: string | number | boolean;
+  scrollMarginBottom?: string | number | boolean;
+  scrollMarginLeft?: string | number | boolean;
+  scrollMarginBlock?: string | number | boolean;
+  scrollMarginInline?: string | number | boolean;
   /**
    * Shorthand for `top`, `right`, `bottom`, and `left` offsets. Supports custom units, directional modifiers, and positioning.
    *

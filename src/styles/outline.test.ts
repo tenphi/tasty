@@ -4,8 +4,8 @@ import { outlineStyle } from './outline';
 
 describe('outlineStyle', () => {
   describe('basic outline', () => {
-    it('returns undefined when outline is not defined', () => {
-      expect(outlineStyle({})).toBeUndefined();
+    it('returns null when outline is not defined', () => {
+      expect(outlineStyle({})).toBeNull();
     });
 
     it('handles boolean true value as default (uses raw 1ow = 3px)', () => {
@@ -64,6 +64,14 @@ describe('outlineStyle', () => {
       const result = outlineStyle({ outline: 'none' });
       expect(result).toEqual({
         outline: 'var(--outline-width) none var(--outline-color)',
+      });
+    });
+  });
+
+  describe('CSS-wide keywords', () => {
+    it('passes through outline: inherit', () => {
+      expect(outlineStyle({ outline: 'inherit' })).toEqual({
+        outline: 'inherit',
       });
     });
   });

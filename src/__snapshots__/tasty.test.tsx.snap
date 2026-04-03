@@ -34,7 +34,7 @@ exports[`tasty() API > should apply extend-mode base styles on top of variant 2`
 .t11.t11 { padding: 16px; }"
 `;
 
-exports[`tasty() API > should be able to override styles 1`] = `".t7.t7 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch) / .1); --current-color-oklch: var(--black-color-oklch); }"`;
+exports[`tasty() API > should be able to override styles 1`] = `".t7.t7 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch)/.1); --current-color-oklch: var(--black-color-oklch); }"`;
 
 exports[`tasty() API > should create element styles 1`] = `
 ".t13.t13[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
@@ -45,7 +45,7 @@ exports[`tasty() API > should define style props 1`] = `".t15.t15 { border: 1px 
 
 exports[`tasty() API > should fallback to default variant 1`] = `".t9.t9 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }"`;
 
-exports[`tasty() API > should handle color fallback syntax 1`] = `".t0.t0 { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color, var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch, var(--dark-04-color-oklch)); }"`;
+exports[`tasty() API > should handle color fallback syntax 1`] = `".t0.t0 { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color,var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch,var(--dark-04-color-oklch)); }"`;
 
 exports[`tasty() API > should handle fill fallback syntax 1`] = `".t1.t1 { background-color: var(--surface-color, var(--white-color)); }"`;
 
@@ -85,7 +85,7 @@ exports[`tasty() API > should optimize attribute selectors 3`] = `
 .t23.t23:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
-exports[`tasty() API > should pass styles from tasty 1`] = `".t2.t2 { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch) / .1); --current-color-oklch: var(--clear-color-oklch); }"`;
+exports[`tasty() API > should pass styles from tasty 1`] = `".t2.t2 { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch)/.1); --current-color-oklch: var(--clear-color-oklch); }"`;
 
 exports[`tasty() API > should support camelCase modifiers 1`] = `
 ".t5.t5[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }

@@ -22,6 +22,18 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm hygiene` | Run lint + format check + typecheck together |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
 
+## Before pushing changes
+
+Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/commands/submit-changes.md) for the full release-oriented workflow. Before you push **any** branch, at minimum:
+
+1. **Typecheck** — Run `pnpm typecheck`. If it fails, stop and fix errors before formatting or committing.
+2. **Lint** — Run `pnpm lint`. If it fails, stop and fix errors before formatting or committing.
+3. **Format** — Run `pnpm format` so committed code matches Prettier output.
+4. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short.
+5. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
+
+**Changesets:** When a change should trigger an npm release, add a changeset as described in `submit-changes.md` and include it in the same commit. When a change does not need a version bump (for example documentation or repo-only churn), skip the changeset but still run typecheck, lint, and format.
+
 ## Stack
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)

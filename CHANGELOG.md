@@ -1,5 +1,25 @@
 # @tenphi/tasty
 
+## 1.2.0
+
+### Minor Changes
+
+- [#94](https://github.com/tenphi/tasty/pull/94) [`ef3adef`](https://github.com/tenphi/tasty/commit/ef3adefee0ec4d87cc1d936f9ea5d7ce237ffe53) Thanks [@tenphi](https://github.com/tenphi)! - Add `longhand` modifier to force longhand CSS output for radius, padding, margin, scroll-margin, inset, and border style handlers.
+
+- [#92](https://github.com/tenphi/tasty/pull/92) [`f1bf654`](https://github.com/tenphi/tasty/commit/f1bf6544c0f2881326ba804c6e49d1bdd01e9cc8) Thanks [@tenphi](https://github.com/tenphi)! - Overhaul style handler system with CSS-wide keyword support, directional factory, unified placement, and new scrollMargin style.
+  - All style handlers now accept CSS-wide keywords (`initial`, `inherit`, `revert`, `unset`, `revert-layer`) where semantically valid
+  - New `scrollMargin` style with full directional, block/inline, and priority support
+  - Unified `placementStyle` handler replaces separate `align`, `justify`, and `place` with hierarchical priority (longhands override shorthands)
+  - Shared directional factory eliminates code duplication across `padding`, `margin`, `inset`, and `scrollMargin`
+  - Standardized handler return types to `null` for no-output
+  - Fixed `preset` fontStyle handling for non-inherit CSS-wide keywords
+
+- [#88](https://github.com/tenphi/tasty/pull/88) [`a0b1a05`](https://github.com/tenphi/tasty/commit/a0b1a05cda077823cbd40fced85477b986340c95) Thanks [@tenphi](https://github.com/tenphi)! - Add `mode: 'inject'` option to the Babel plugin. In inject mode, CSS is embedded inline in JS and injected at runtime via a tiny injector (`@tenphi/tasty/static/inject`), making `tastyStatic` calls self-contained. Ideal for reusable components and extensions.
+
+### Patch Changes
+
+- [#90](https://github.com/tenphi/tasty/pull/90) [`270ab75`](https://github.com/tenphi/tasty/commit/270ab75185b24233930b2e77b26235fd93f3bf70) Thanks [@tenphi](https://github.com/tenphi)! - Add `inherit` support for the `radius` style property. Standalone `radius="inherit"` outputs `border-radius: inherit`. With directional modifiers (e.g. `radius="inherit right"`), longhand properties are used since CSS-wide keywords cannot be mixed with other values.
+
 ## 1.1.0
 
 ### Minor Changes

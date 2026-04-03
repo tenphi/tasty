@@ -1,17 +1,6 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { filterMods, parseStyle } from '../utils/styles';
-
-const BORDER_STYLES = [
-  'none',
-  'hidden',
-  'dotted',
-  'dashed',
-  'solid',
-  'double',
-  'groove',
-  'ridge',
-  'inset',
-  'outset',
-];
+import { BORDER_STYLES } from './const';
 
 interface OutlineStyleProps {
   outline?: string | boolean | number;
@@ -37,29 +26,35 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
 
   // Handle outline (0 is valid - means no outline)
   if (outline != null && outline !== false) {
-    let outlineValue: string | boolean | number = outline;
-    if (outline === true) outlineValue = '1ow';
-    if (outline === 0) outlineValue = '0';
+    if (typeof outline === 'string' && CSS_WIDE_KEYWORDS.has(outline)) {
+      result['outline'] = outline;
+    } else {
+      let outlineValue: string | boolean | number = outline;
+      if (outline === true) outlineValue = '1ow';
+      if (outline === 0) outlineValue = '0';
 
-    const processed = parseStyle(String(outlineValue));
-    const group = processed.groups[0];
+      const processed = parseStyle(String(outlineValue));
+      const group = processed.groups[0];
 
-    if (group) {
-      const { parts } = group;
-      const outlinePart = parts[0] ?? { values: [], mods: [], colors: [] };
-      const offsetPart = parts[1];
+      if (group) {
+        const { parts } = group;
+        const outlinePart = parts[0] ?? { values: [], mods: [], colors: [] };
+        const offsetPart = parts[1];
 
-      const typeMods = filterMods(outlinePart.mods, BORDER_STYLES);
+        const typeMods = filterMods(
+          outlinePart.mods,
+          BORDER_STYLES as unknown as string[],
+        );
 
-      const value = outlinePart.values[0] || 'var(--outline-width)';
-      const type = typeMods[0] || 'solid';
-      const outlineColor = outlinePart.colors[0] || 'var(--outline-color)';
+        const value = outlinePart.values[0] || 'var(--outline-width)';
+        const type = typeMods[0] || 'solid';
+        const outlineColor = outlinePart.colors[0] || 'var(--outline-color)';
 
-      result['outline'] = [value, type, outlineColor].join(' ');
+        result['outline'] = [value, type, outlineColor].join(' ');
 
-      // Check for offset in second part (after /) - takes precedence
-      if (offsetPart?.values[0]) {
-        result['outline-offset'] = offsetPart.values[0];
+        if (offsetPart?.values[0]) {
+          result['outline-offset'] = offsetPart.values[0];
+        }
       }
     }
   }
@@ -72,9 +67,8 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
     result['outline-offset'] = processed.groups[0]?.values[0] || offsetValue;
   }
 
-  // Return undefined if no styles to apply
   if (Object.keys(result).length === 0) {
-    return;
+    return null;
   }
 
   return result;

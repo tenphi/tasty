@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
 
 const SECOND_FILL_COLOR_PROPERTY = '--tasty-second-fill-color';
@@ -105,7 +106,11 @@ type TransitionEntry = [
 ];
 
 export function transitionStyle({ transition }: { transition?: string }) {
-  if (!transition) return;
+  if (!transition) return null;
+
+  if (CSS_WIDE_KEYWORDS.has(transition)) {
+    return { transition };
+  }
 
   const processed = parseStyle(transition);
   const tokens: string[] = [];
@@ -114,7 +119,7 @@ export function transitionStyle({ transition }: { transition?: string }) {
     if (idx < processed.groups.length - 1) tokens.push(',');
   });
 
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) return null;
 
   let tempTransition: string[] = [];
   const transitions: string[][] = [];

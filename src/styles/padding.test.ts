@@ -2,8 +2,8 @@ import { paddingStyle } from './padding';
 
 describe('paddingStyle', () => {
   describe('basic functionality', () => {
-    it('returns empty object when no padding properties are provided', () => {
-      expect(paddingStyle({})).toEqual({});
+    it('returns null when no padding properties are provided', () => {
+      expect(paddingStyle({})).toBeNull();
     });
 
     it('handles boolean true value', () => {
@@ -38,6 +38,30 @@ describe('paddingStyle', () => {
       const result = paddingStyle({ padding: '1x 2x 3x 4x' });
       expect(result).toEqual({
         padding: '8px 16px 24px 32px', // raw units
+      });
+    });
+  });
+
+  describe('CSS-wide keywords', () => {
+    it('passes through padding: inherit', () => {
+      expect(paddingStyle({ padding: 'inherit' })).toEqual({
+        padding: 'inherit',
+      });
+    });
+
+    it('passes through padding: revert', () => {
+      expect(paddingStyle({ padding: 'revert' })).toEqual({
+        padding: 'revert',
+      });
+    });
+
+    it('keeps padding inherit on other sides when paddingTop overrides top', () => {
+      const result = paddingStyle({
+        padding: 'inherit',
+        paddingTop: '2x',
+      });
+      expect(result).toEqual({
+        padding: '16px inherit inherit inherit', // raw unit: 2 * 8px
       });
     });
   });
@@ -182,7 +206,7 @@ describe('paddingStyle', () => {
         paddingBlock: undefined,
         paddingTop: undefined,
       });
-      expect(result).toEqual({});
+      expect(result).toBeNull();
     });
 
     it('handles empty string values', () => {

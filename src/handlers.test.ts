@@ -162,9 +162,9 @@ describe('Style Handlers Configuration', () => {
       expect(result).toEqual({ 'background-color': 'var(--red-color)' });
     });
 
-    it('should return void for falsy values', () => {
+    it('should return null for falsy values', () => {
       const result = styleHandlers.fill({ fill: '' });
-      expect(result).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 

@@ -5,6 +5,18 @@ export const VALUE_KEYWORDS = new Set([
   'fit-content',
   'stretch',
   'initial',
+  'inherit',
+  'revert',
+  'unset',
+  'revert-layer',
+]);
+
+export const CSS_WIDE_KEYWORDS = new Set([
+  'initial',
+  'inherit',
+  'revert',
+  'unset',
+  'revert-layer',
 ]);
 
 export const COLOR_FUNCS = new Set([

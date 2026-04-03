@@ -164,9 +164,9 @@ export const LAYOUT_CHUNK_STYLES = [
   'alignContent',
   'justifyItems',
   'justifyContent',
-  'align', // alignStyle (independent)
-  'justify', // justifyStyle (independent)
-  'place', // placeStyle (independent)
+  'align', // placementStyle
+  'justify', // placementStyle
+  'place', // placementStyle
   'columnGap',
   'rowGap',
   // Grid template styles

@@ -1,5 +1,6 @@
 import { makeEmptyDetails } from '../parser/types';
 import { DIRECTIONS, parseStyle } from '../utils/styles';
+import { extractCSSWideKeyword } from './shared';
 
 const PROP = 'var(--radius)';
 const SHARP = 'var(--sharp-radius)';
@@ -20,19 +21,22 @@ export function radiusStyle({
     radius = `${radius}px`;
   }
 
-  if (!radius) return;
+  if (!radius) return null;
 
   if (radius === true) radius = '1r';
 
   const processed = parseStyle(radius);
-  const { mods } = processed.groups[0] ?? makeEmptyDetails();
-  let { values } = processed.groups[0] ?? makeEmptyDetails();
+  const group = processed.groups[0] ?? makeEmptyDetails();
+  const { mods } = group;
+  let { values } = group;
 
-  if (mods.includes('inherit')) {
+  const keyword = extractCSSWideKeyword(group);
+
+  if (keyword) {
     const dirMods = mods.filter((m) => DIRECTIONS.includes(m));
 
     if (!dirMods.length) {
-      return { 'border-radius': 'inherit' };
+      return { 'border-radius': keyword };
     }
 
     const result: Record<string, string> = {};
@@ -45,7 +49,7 @@ export function radiusStyle({
     });
 
     corners.forEach((i) => {
-      result[RADIUS_LONGHANDS[i]] = 'inherit';
+      result[RADIUS_LONGHANDS[i]] = keyword;
     });
 
     return result;

@@ -198,7 +198,7 @@
         "path",
         "crypto"
       ],
-      "limit": "28 kB"
+      "limit": "28.5 kB"
     },
     {
       "name": "babel-plugin",

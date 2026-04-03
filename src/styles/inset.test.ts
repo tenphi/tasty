@@ -2,8 +2,8 @@ import { insetStyle } from './inset';
 
 describe('insetStyle', () => {
   describe('basic functionality', () => {
-    it('returns empty object when no props are provided', () => {
-      expect(insetStyle({})).toEqual({});
+    it('returns null when no props are provided', () => {
+      expect(insetStyle({})).toBeNull();
     });
 
     it('handles boolean true for inset', () => {

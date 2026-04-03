@@ -51,7 +51,7 @@ export type CSSMap = { $?: string | string[] } & Record<
   string | string[]
 >;
 
-export type StyleHandlerResult = CSSMap | CSSMap[] | void;
+export type StyleHandlerResult = CSSMap | CSSMap[] | null | void;
 
 export type RawStyleHandler = (value: StyleValueStateMap) => StyleHandlerResult;
 

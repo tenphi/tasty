@@ -5,7 +5,6 @@ import type {
   StyleHandlerDefinition,
 } from '../utils/styles';
 
-import { alignStyle } from './align';
 import { borderStyle } from './border';
 import { colorStyle } from './color';
 import { createStyle } from './createStyle';
@@ -13,17 +12,16 @@ import { displayStyle } from './display';
 import { fadeStyle } from './fade';
 import { fillStyle, svgFillStyle } from './fill';
 import { flowStyle } from './flow';
-// Note: fontStyle (font.ts) and fontStyleStyle (fontStyle.ts) removed
-// Both font and fontStyle props are now handled by presetStyle
 import { gapStyle } from './gap';
 import { heightStyle } from './height';
 import { insetStyle } from './inset';
-import { justifyStyle } from './justify';
 import { marginStyle } from './margin';
 import { outlineStyle } from './outline';
 import { paddingStyle } from './padding';
+import { placementStyle } from './placement';
 import { presetStyle } from './preset';
 import { radiusStyle } from './radius';
+import { scrollMarginStyle } from './scrollMargin';
 import { scrollbarStyle } from './scrollbar';
 import { shadowStyle } from './shadow';
 import { transitionStyle } from './transition';
@@ -173,9 +171,9 @@ export function predefine() {
     borderStyle,
     shadowStyle,
     paddingStyle,
-    alignStyle,
-    justifyStyle,
+    placementStyle,
     presetStyle,
+    scrollMarginStyle,
     outlineStyle,
     scrollbarStyle,
     fadeStyle,
@@ -267,7 +265,7 @@ function validateHandler(
   if (typeof handler !== 'function') {
     console.warn(
       `[Tasty] Handler "${name}" is not a function. ` +
-        'Handlers must be functions that return CSSMap, CSSMap[], or void.',
+        'Handlers must be functions that return CSSMap, CSSMap[], or null.',
     );
   }
 
@@ -295,7 +293,7 @@ export function validateHandlerResult(name: string, result: unknown): void {
   if (result === '') {
     console.warn(
       `[Tasty] Handler "${name}" returned empty string. ` +
-        'Return void/undefined instead for no output.',
+        'Return null instead for no output.',
     );
     return;
   }
@@ -304,7 +302,7 @@ export function validateHandlerResult(name: string, result: unknown): void {
   if (typeof result !== 'object') {
     console.warn(
       `[Tasty] Handler "${name}" returned invalid type: ${typeof result}. ` +
-        'Expected CSSMap, CSSMap[], or void.',
+        'Expected CSSMap, CSSMap[], or null.',
     );
   }
 }
@@ -411,7 +409,6 @@ function wrapHandler<T extends { __lookupStyles: string[] }>(handler: T): T {
  * ```
  */
 export const styleHandlers = {
-  align: wrapHandler(alignStyle),
   border: wrapHandler(borderStyle),
   color: wrapHandler(colorStyle),
   display: wrapHandler(displayStyle),
@@ -422,12 +419,13 @@ export const styleHandlers = {
   gap: wrapHandler(gapStyle),
   height: wrapHandler(heightStyle),
   inset: wrapHandler(insetStyle),
-  justify: wrapHandler(justifyStyle),
   margin: wrapHandler(marginStyle),
   outline: wrapHandler(outlineStyle),
   padding: wrapHandler(paddingStyle),
+  placement: wrapHandler(placementStyle),
   preset: wrapHandler(presetStyle),
   radius: wrapHandler(radiusStyle),
+  scrollMargin: wrapHandler(scrollMarginStyle),
   scrollbar: wrapHandler(scrollbarStyle),
   shadow: wrapHandler(shadowStyle),
   transition: wrapHandler(transitionStyle),

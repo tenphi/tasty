@@ -2,8 +2,8 @@ import { marginStyle } from './margin';
 
 describe('marginStyle', () => {
   describe('basic functionality', () => {
-    it('returns empty object when no margin properties are provided', () => {
-      expect(marginStyle({})).toEqual({});
+    it('returns null when no margin properties are provided', () => {
+      expect(marginStyle({})).toBeNull();
     });
 
     it('handles boolean true value', () => {
@@ -182,7 +182,7 @@ describe('marginStyle', () => {
         marginBlock: undefined,
         marginTop: undefined,
       });
-      expect(result).toEqual({});
+      expect(result).toBeNull();
     });
 
     it('handles empty string values', () => {

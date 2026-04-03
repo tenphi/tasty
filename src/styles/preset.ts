@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
 
 import type { Styles } from './types';
@@ -27,8 +28,8 @@ function setCSSValue(
   { varOnly, cssOnly }: { varOnly?: boolean; cssOnly?: boolean } = {},
 ) {
   const value = (() => {
-    if (presetName === 'inherit') {
-      return 'inherit';
+    if (CSS_WIDE_KEYWORDS.has(presetName)) {
+      return presetName;
     }
 
     const defaultValue = `var(--default-${styleName}${
@@ -149,7 +150,7 @@ export function presetStyle({
     const namePart = parts[0];
     const modPart = parts[1];
 
-    const nameToken = namePart?.mods[0] ?? '';
+    const nameToken = namePart?.mods[0] ?? namePart?.values[0] ?? '';
     const isModOnly = PRESET_MODIFIERS.has(nameToken);
 
     const name = isModOnly ? 'inherit' : nameToken || 'inherit';
@@ -223,14 +224,16 @@ export function presetStyle({
     styles['font-weight'] = fontWeightVal;
   }
 
-  // fontStyle: handle boolean (true → italic) and string values
   if (fontStyle != null) {
     if (fontStyle === true) {
       styles['font-style'] = 'italic';
-    } else if (fontStyle !== 'inherit') {
-      styles['font-style'] = fontStyle ? 'italic' : 'normal';
+    } else if (
+      typeof fontStyle === 'string' &&
+      CSS_WIDE_KEYWORDS.has(fontStyle)
+    ) {
+      styles['font-style'] = fontStyle;
     } else {
-      styles['font-style'] = 'inherit';
+      styles['font-style'] = fontStyle ? 'italic' : 'normal';
     }
   }
 
@@ -244,9 +247,8 @@ export function presetStyle({
     styles['font-family'] = fontFamily_;
   }
 
-  // Return undefined if no styles to apply
   if (Object.keys(styles).length === 0) {
-    return;
+    return null;
   }
 
   return styles;

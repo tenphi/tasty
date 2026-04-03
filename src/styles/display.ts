@@ -9,20 +9,72 @@ interface DisplayStyleProps {
 }
 
 /**
- * Handles display, hide, textOverflow, overflow, and whiteSpace styles.
+ * Process textOverflow into CSS properties for truncation/clamping.
  *
- * textOverflow syntax:
- * - `textOverflow="ellipsis"` - single-line truncation with ellipsis
- * - `textOverflow="ellipsis / 3"` - multi-line clamping (3 lines) with ellipsis
- * - `textOverflow="clip"` - single-line truncation with clip (no ellipsis)
- * - `textOverflow="clip / 2"` - multi-line clip (2 lines)
- * - `textOverflow={true}` or `textOverflow="initial"` - reset to initial
+ * - `ellipsis` — single-line truncation with ellipsis
+ * - `ellipsis / 3` — multi-line clamping (3 lines) with ellipsis
+ * - `clip` — single-line truncation with clip
+ * - `clip / 2` — multi-line clip (2 lines)
+ * - `true` or `initial` — reset to initial
+ */
+function processTextOverflow(
+  textOverflow: string | boolean,
+  whiteSpace?: string,
+): Record<string, string | number> | null {
+  if (textOverflow === true || textOverflow === 'initial') {
+    return { 'text-overflow': 'initial' };
+  }
+
+  const processed = parseStyle(String(textOverflow));
+  const group = processed.groups[0];
+
+  if (!group) return null;
+
+  const { parts } = group;
+  const modePart = parts[0];
+  const clampPart = parts[1];
+
+  const hasEllipsis = modePart?.mods.includes('ellipsis');
+  const hasClip = modePart?.mods.includes('clip');
+
+  if (!hasEllipsis && !hasClip) return null;
+
+  let clamp = 1;
+
+  if (clampPart?.values[0]) {
+    const parsed = parseInt(clampPart.values[0], 10);
+
+    if (!isNaN(parsed) && parsed > 0) {
+      clamp = parsed;
+    }
+  }
+
+  const result: Record<string, string | number> = {
+    overflow: 'hidden',
+    'text-overflow': hasEllipsis ? 'ellipsis' : 'clip',
+  };
+
+  if (clamp === 1) {
+    result['white-space'] = whiteSpace || 'nowrap';
+  } else {
+    result['display'] = '-webkit-box';
+    result['-webkit-box-orient'] = 'vertical';
+    result['-webkit-line-clamp'] = clamp;
+    result['line-clamp'] = clamp;
+    result['white-space'] = whiteSpace || 'initial';
+  }
+
+  return result;
+}
+
+/**
+ * Handles display, hide, textOverflow, overflow, and whiteSpace styles.
  *
  * Priority:
  * 1. `hide` takes precedence (display: none)
  * 2. Multi-line `textOverflow` forces display: -webkit-box
- * 3. Single-line `textOverflow` defaults white-space to nowrap, multi-line defaults to initial
- * 4. Explicit `whiteSpace` overrides the default white-space from `textOverflow`
+ * 3. Single-line `textOverflow` defaults white-space to nowrap
+ * 4. Explicit `whiteSpace` overrides the default from `textOverflow`
  */
 export function displayStyle({
   display,
@@ -33,51 +85,12 @@ export function displayStyle({
 }: DisplayStyleProps) {
   const result: Record<string, string | number> = {};
 
-  // Handle textOverflow first to determine required overrides
   if (textOverflow != null && textOverflow !== false) {
-    // Boolean true or 'initial' → reset to initial
-    if (textOverflow === true || textOverflow === 'initial') {
-      result['text-overflow'] = 'initial';
-    } else {
-      const processed = parseStyle(String(textOverflow));
-      const group = processed.groups[0];
+    const textResult = processTextOverflow(textOverflow, whiteSpace);
 
-      if (group) {
-        const { parts } = group;
-        const modePart = parts[0];
-        const clampPart = parts[1];
-
-        const hasEllipsis = modePart?.mods.includes('ellipsis');
-        const hasClip = modePart?.mods.includes('clip');
-
-        // Get clamp value from second part (after /)
-        let clamp = 1;
-        if (clampPart?.values[0]) {
-          const parsed = parseInt(clampPart.values[0], 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            clamp = parsed;
-          }
-        }
-
-        if (hasEllipsis || hasClip) {
-          result['overflow'] = 'hidden';
-          result['text-overflow'] = hasEllipsis ? 'ellipsis' : 'clip';
-
-          if (clamp === 1) {
-            result['white-space'] = whiteSpace || 'nowrap';
-          } else {
-            result['display'] = '-webkit-box';
-            result['-webkit-box-orient'] = 'vertical';
-            result['-webkit-line-clamp'] = clamp;
-            result['line-clamp'] = clamp;
-            result['white-space'] = whiteSpace || 'initial';
-          }
-        }
-      }
-    }
+    if (textResult) Object.assign(result, textResult);
   }
 
-  // Apply user-specified values (only if not overridden by textOverflow)
   if (overflow && !result['overflow']) {
     result['overflow'] = overflow;
   }
@@ -85,16 +98,14 @@ export function displayStyle({
     result['white-space'] = whiteSpace;
   }
 
-  // Handle display (hide > textOverflow > user value)
   if (hide) {
     result['display'] = 'none';
   } else if (!result['display'] && display) {
     result['display'] = display;
   }
 
-  // Return undefined if no styles to apply
   if (Object.keys(result).length === 0) {
-    return;
+    return null;
   }
 
   return result;

@@ -254,8 +254,8 @@ describe('Tasty style tests', () => {
       inset: '10px 0 5px 0',
     });
 
-    // Empty when no props
-    expect(insetStyle({})).toEqual({});
+    // null when no props
+    expect(insetStyle({})).toBeNull();
   });
 
   it('should handle radius styles', () => {
@@ -265,6 +265,10 @@ describe('Tasty style tests', () => {
 
     expect(radiusStyle({ radius: 'inherit' })).toEqual({
       'border-radius': 'inherit',
+    });
+
+    expect(radiusStyle({ radius: 'revert' })).toEqual({
+      'border-radius': 'revert',
     });
 
     expect(radiusStyle({ radius: 'inherit right' })).toEqual({

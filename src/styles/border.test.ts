@@ -3,8 +3,8 @@
 import { borderStyle } from './border';
 
 describe('borderStyle', () => {
-  it('returns undefined when border is not defined', () => {
-    expect(borderStyle({})).toBeUndefined();
+  it('returns null when border is not defined', () => {
+    expect(borderStyle({})).toBeNull();
   });
 
   it('handles boolean true value', () => {
@@ -54,6 +54,20 @@ describe('borderStyle', () => {
     expect(result.border).toContain('2px');
     expect(result.border).toContain('dashed');
     expect(result.border).toContain('var(--purple-color)');
+  });
+
+  describe('CSS-wide keywords', () => {
+    it('passes through border: inherit', () => {
+      expect(borderStyle({ border: 'inherit' })).toEqual({
+        border: 'inherit',
+      });
+    });
+
+    it('passes through border: revert', () => {
+      expect(borderStyle({ border: 'revert' })).toEqual({
+        border: 'revert',
+      });
+    });
   });
 
   // Multi-group support tests

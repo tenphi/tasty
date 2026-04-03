@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 
@@ -15,11 +16,15 @@ export function gapStyle({
   }
 
   if (!gap) {
-    return;
+    return null;
   }
 
   if (gap === true) {
     gap = '1x';
+  }
+
+  if (CSS_WIDE_KEYWORDS.has(String(gap))) {
+    return { gap: String(gap) };
   }
 
   const isGrid = display.includes('grid');

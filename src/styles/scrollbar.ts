@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
 import { warn } from '../utils/warnings';
@@ -20,8 +21,15 @@ interface ScrollbarStyleProps {
 export function scrollbarStyle({
   scrollbar,
   overflow,
-}: ScrollbarStyleProps): Record<string, string> | undefined {
-  if (!scrollbar) return;
+}: ScrollbarStyleProps): Record<string, string> | null {
+  if (!scrollbar) return null;
+
+  if (typeof scrollbar === 'string' && CSS_WIDE_KEYWORDS.has(scrollbar)) {
+    return {
+      'scrollbar-width': scrollbar,
+      'scrollbar-color': scrollbar,
+    };
+  }
 
   // `true` is treated as `thin` (empty string is falsy, caught by the guard above)
   const value = scrollbar === true ? 'thin' : scrollbar;

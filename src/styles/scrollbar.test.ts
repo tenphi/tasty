@@ -3,8 +3,8 @@ import { renderStyles } from '../pipeline/index';
 import { scrollbarStyle } from './scrollbar';
 
 describe('scrollbarStyle', () => {
-  it('returns undefined when scrollbar is not defined', () => {
-    expect(scrollbarStyle({})).toBeUndefined();
+  it('returns null when scrollbar is not defined', () => {
+    expect(scrollbarStyle({})).toBeNull();
   });
 
   it('handles boolean true as thin', () => {
@@ -44,10 +44,10 @@ describe('scrollbarStyle', () => {
     );
   });
 
-  it('returns undefined for empty string', () => {
+  it('returns null for empty string', () => {
     const result = scrollbarStyle({ scrollbar: '' });
 
-    expect(result).toBeUndefined();
+    expect(result).toBeNull();
   });
 
   it('handles custom thumb and track colors', () => {

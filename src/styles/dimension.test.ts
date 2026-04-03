@@ -159,4 +159,15 @@ describe('dimensionStyle – width & height helpers', () => {
     expect(res['min-width']).toBe('initial');
     expect(res['max-width']).toBe('initial');
   });
+
+  describe('CSS-wide keywords', () => {
+    test('width inherit sets width, min-width, and max-width', () => {
+      const res = widthStyle({ width: 'inherit' }) as any;
+      expect(res).toEqual({
+        width: 'inherit',
+        'min-width': 'inherit',
+        'max-width': 'inherit',
+      });
+    });
+  });
 });

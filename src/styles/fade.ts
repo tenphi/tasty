@@ -1,3 +1,4 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
 
 const DIRECTION_MAP: Record<(typeof DIRECTIONS)[number], string> = {
@@ -57,12 +58,16 @@ function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
 }
 
 export function fadeStyle({ fade }: { fade?: string }) {
-  if (!fade) return;
+  if (!fade) return null;
+
+  if (CSS_WIDE_KEYWORDS.has(fade)) {
+    return { mask: fade, 'mask-composite': fade };
+  }
 
   const processed = parseStyle(fade);
   const groups: GroupData[] = processed.groups ?? [];
 
-  if (!groups.length) return;
+  if (!groups.length) return null;
 
   const isOnlyGroup = groups.length === 1;
 
@@ -81,7 +86,7 @@ export function fadeStyle({ fade }: { fade?: string }) {
     gradients.push(...groupGradients);
   }
 
-  if (!gradients.length) return;
+  if (!gradients.length) return null;
 
   return {
     mask: gradients.join(', '),

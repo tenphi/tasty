@@ -1,17 +1,6 @@
+import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
-
-const BORDER_STYLES = [
-  'none',
-  'hidden',
-  'dotted',
-  'dashed',
-  'solid',
-  'double',
-  'groove',
-  'ridge',
-  'inset',
-  'outset',
-] as const;
+import { BORDER_STYLES } from './const';
 
 type Direction = (typeof DIRECTIONS)[number];
 
@@ -75,14 +64,20 @@ export function borderStyle({
 }: {
   border?: string | number | boolean;
 }) {
-  if (!border && border !== 0) return;
+  if (!border && border !== 0) return null;
 
   if (border === true) border = '1bw';
 
-  const processed = parseStyle(String(border));
+  const strBorder = String(border);
+
+  if (CSS_WIDE_KEYWORDS.has(strBorder)) {
+    return { border: strBorder };
+  }
+
+  const processed = parseStyle(strBorder);
   const groups: GroupData[] = processed.groups ?? [];
 
-  if (!groups.length) return;
+  if (!groups.length) return null;
 
   // Single group - use original logic for backward compatibility
   if (groups.length === 1) {

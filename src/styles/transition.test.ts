@@ -2,10 +2,10 @@ import { transitionStyle } from './transition';
 
 describe('transitionStyle', () => {
   describe('basic functionality', () => {
-    it('returns undefined when no transition is provided', () => {
-      expect(transitionStyle({ transition: undefined })).toBeUndefined();
-      expect(transitionStyle({ transition: '' })).toBeUndefined();
-      expect(transitionStyle({ transition: false })).toBeUndefined();
+    it('returns null when no transition is provided', () => {
+      expect(transitionStyle({ transition: undefined })).toBeNull();
+      expect(transitionStyle({ transition: '' })).toBeNull();
+      expect(transitionStyle({ transition: false })).toBeNull();
     });
 
     it('handles semantic name with duration', () => {
@@ -38,6 +38,14 @@ describe('transitionStyle', () => {
           'background-image 0.2s ease-out 0.1s',
           '--tasty-second-fill-color 0.2s ease-out 0.1s',
         ].join(', '),
+      });
+    });
+  });
+
+  describe('CSS-wide keywords', () => {
+    it('passes through transition: inherit', () => {
+      expect(transitionStyle({ transition: 'inherit' })).toEqual({
+        transition: 'inherit',
       });
     });
   });

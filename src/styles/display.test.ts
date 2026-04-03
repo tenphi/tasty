@@ -4,8 +4,8 @@ import { displayStyle } from './display';
 
 describe('displayStyle', () => {
   describe('basic display and hide', () => {
-    it('returns undefined when no props provided', () => {
-      expect(displayStyle({})).toBeUndefined();
+    it('returns null when no props provided', () => {
+      expect(displayStyle({})).toBeNull();
     });
 
     it('returns display value when provided', () => {
@@ -123,7 +123,7 @@ describe('displayStyle', () => {
 
     it('handles false as no-op', () => {
       const result = displayStyle({ textOverflow: false });
-      expect(result).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 

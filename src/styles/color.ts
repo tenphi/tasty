@@ -4,7 +4,7 @@ import { parseColor } from '../utils/styles';
 import { convertColorChainToComponentChain } from './createStyle';
 
 export function colorStyle({ color }: { color?: string | boolean }) {
-  if (!color) return;
+  if (!color) return null;
 
   if (color === true) color = 'currentColor';
 

@@ -175,9 +175,7 @@ describe('GC: touch / gc / maybeGC', () => {
     });
 
     it('should never evict styles with refCount > 0', () => {
-      const result = injector.inject([
-        createStyleRule('.t0.t0', 'color: red'),
-      ]);
+      const result = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
 
       injector.touch(result.className);
 

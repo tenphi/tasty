@@ -698,9 +698,7 @@ export class SheetManager {
         const ruleInfo = registry.rules.get(className);
         return ruleInfo ? { className, ruleInfo } : null;
       })
-      .filter(
-        (entry): entry is NonNullable<typeof entry> => entry != null,
-      );
+      .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
     let cleanedUpCount = 0;
     let totalCssSize = 0;

@@ -18,6 +18,7 @@ import { getConfig } from '../config';
 import { ServerStyleCollector } from './collector';
 import { TastySSRContext } from './context';
 import { hydrateTastyCache } from './hydrate';
+import { registerSSRCollectorGetter } from './ssr-collector-ref';
 
 // Auto-hydrate on module load (client only).
 // When this module is imported by the TastyRegistry client component,
@@ -66,9 +67,17 @@ export function TastyRegistry({
 }: TastyRegistryProps) {
   const isClient = typeof window !== 'undefined';
 
-  const [collector] = useState(() =>
-    isClient ? null : new ServerStyleCollector(),
-  );
+  const [collector] = useState(() => {
+    if (isClient) return null;
+
+    const instance = new ServerStyleCollector();
+
+    // Register a global getter so that computeStyles() (which doesn't use
+    // useContext) can discover this collector during SSR.
+    registerSSRCollectorGetter(() => instance);
+
+    return instance;
+  });
   const nonce = getConfig().nonce;
 
   useServerInsertedHTML(() => {

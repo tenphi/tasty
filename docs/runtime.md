@@ -1,6 +1,6 @@
 # Runtime API
 
-The React-specific `tasty()` component factory, component props, and hooks. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+The React-specific `tasty()` component factory, component props, and hooks. `tasty()` components are hook-free and compatible with React Server Components — no `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -333,11 +333,29 @@ For the mental model behind sub-elements — how they share root state context a
 
 ---
 
+## computeStyles
+
+Hook-free, synchronous style computation. Can be used anywhere — including React Server Components, plain functions, and non-React code:
+
+```tsx
+import { computeStyles } from '@tenphi/tasty';
+
+const { className } = computeStyles({
+  padding: '2x',
+  fill: '#surface',
+  radius: '1r',
+});
+```
+
+On the client, CSS is injected synchronously into the DOM (idempotent via the injector cache). On the server, CSS is collected via the SSR collector if one is available. This is the same function that `tasty()` components use internally.
+
+---
+
 ## Hooks
 
 ### useStyles
 
-Generate a className from a style object:
+Generate a className from a style object. Thin wrapper around `computeStyles()` that adds React context-based SSR collector discovery for backward compatibility:
 
 ```tsx
 import { useStyles } from '@tenphi/tasty';
@@ -538,7 +556,7 @@ function useCounterStyle(
 ### Troubleshooting
 
 - Styles are not updating: make sure `configure()` runs before first render, and verify the generated class name or global rule with [Debug Utilities](debug.md).
-- SSR output looks wrong: check the [SSR guide](ssr.md) because the hooks integrate with SSR collectors differently than the client-only runtime path.
+- SSR output looks wrong: check the [SSR guide](ssr.md) for collector setup. `computeStyles()` discovers the SSR collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`.
 - Animation/custom property issues: prefer `useKeyframes()` and `useProperty()` over raw CSS when you want Tasty to manage injection and SSR collection for you.
 
 ---

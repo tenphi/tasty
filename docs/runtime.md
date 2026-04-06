@@ -154,6 +154,75 @@ For architecture guidance on when to use modifiers vs `styleProps`, see [Methodo
 
 ---
 
+## Token Props
+
+Use `tokenProps` to expose token keys as direct component props instead of requiring the `tokens` object:
+
+```jsx
+// Before: tokens object
+<ProgressBar tokens={{ $progress: '75%', '#accent': '#purple' }} />
+
+// After: token props
+<ProgressBar progress="75%" accentColor="#purple" />
+```
+
+### Array form
+
+List prop names. Names ending in `Color` map to `#` color tokens; everything else maps to `$` custom property tokens:
+
+```jsx
+const ProgressBar = tasty({
+  tokenProps: ['progress', 'accentColor'] as const,
+  styles: { width: '$progress', fill: '#accent' },
+});
+
+<ProgressBar progress="75%" accentColor="#purple" />
+// 'progress'    → $progress    → --progress
+// 'accentColor' → #accent      → --accent-color + --accent-color-oklch
+```
+
+### Object form
+
+Map prop names to explicit `$`/`#`-prefixed token keys:
+
+```tsx
+const Card = tasty({
+  tokenProps: {
+    size: '$card-size',
+    color: '#card-accent',
+  },
+  styles: { padding: '$card-size', fill: '#card-accent' },
+});
+
+<Card size="4x" color="#purple" />
+```
+
+### Merge with `tokens`
+
+Token props and the `tokens` prop can be used together. Token props take precedence over `tokens`, which takes precedence over default `tokens` in `tasty({...})`:
+
+```jsx
+const Bar = tasty({
+  tokenProps: ['progress'] as const,
+  tokens: { $progress: '0%' },  // default
+});
+
+<Bar tokens={{ $progress: '50%' }} progress="90%" />
+// progress="90%" wins (from token prop)
+```
+
+### When to use `tokenProps` vs `tokens`
+
+| Use case | Recommendation |
+|---|---|
+| Component has a fixed set of known token keys | `tokenProps` — cleaner API, better TypeScript autocomplete |
+| Component needs arbitrary/dynamic token values | `tokens` — open-ended `Record<string, TokenValue>` |
+| Both fixed and dynamic | Combine: `tokenProps` for known keys, `tokens` for ad-hoc |
+
+For architecture guidance, see [Methodology — tokenProps](methodology.md#tokenprops).
+
+---
+
 ## Variants
 
 Define named style variations. Only CSS for variants actually used at runtime is injected:

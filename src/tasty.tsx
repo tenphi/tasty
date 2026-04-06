@@ -17,6 +17,7 @@ import type {
   ModValue,
   Mods,
   Props,
+  TokenValue,
   Tokens,
 } from './types';
 import { getDisplayName } from './utils/get-display-name';
@@ -195,6 +196,50 @@ export type ResolveModProps<M extends ModPropsInput> =
       : // eslint-disable-next-line @typescript-eslint/no-empty-object-type
         {};
 
+// ============================================================================
+// Token props types — expose token keys as top-level component props
+// ============================================================================
+
+/** A token key with `$` or `#` prefix. */
+type TokenPropKey = `$${string}` | `#${string}`;
+
+/** Array form: list of prop names. Names ending in `Color` map to `#` color tokens. */
+type TokenPropsList = readonly string[];
+
+/** Object form: prop name -> token key with explicit `$`/`#` prefix. */
+type TokenPropsMap = Readonly<Record<string, TokenPropKey>>;
+
+/** Either array or object form accepted by `tokenProps` option. */
+export type TokenPropsInput = TokenPropsList | TokenPropsMap;
+
+/** Resolve a `tokenProps` definition to the component prop types it adds. */
+export type ResolveTokenProps<TP extends TokenPropsInput> =
+  TP extends readonly (infer K)[]
+    ? Partial<Record<K & string, TokenValue>>
+    : TP extends Record<string, TokenPropKey>
+      ? Partial<Record<keyof TP & string, TokenValue>>
+      : // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+        {};
+
+/**
+ * Pre-compute the mapping from prop name to token key at component-creation time.
+ * Array form: `'progress'` -> `'$progress'`, `'accentColor'` -> `'#accent'`.
+ * Object form: entries used as-is.
+ */
+function buildTokenPropsMapping(
+  def: TokenPropsInput,
+): [propName: string, tokenKey: string][] {
+  if (Array.isArray(def)) {
+    return (def as string[]).map((propName) => {
+      if (propName.endsWith('Color') && propName.length > 5) {
+        return [propName, `#${propName.slice(0, -5)}`];
+      }
+      return [propName, `$${propName}`];
+    });
+  }
+  return Object.entries(def);
+}
+
 export type PropsWithStyles = {
   styles?: Styles;
 } & Omit<Props, 'styles'>;
@@ -286,6 +331,7 @@ type TastyBaseProps<
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 > = {
   /** Default styles of the element. */
   styles?: Styles;
@@ -293,6 +339,8 @@ type TastyBaseProps<
   styleProps?: K;
   /** Modifier keys exposed as top-level component props (array or typed object form). */
   modProps?: M;
+  /** Token keys exposed as top-level component props (array or typed object form). */
+  tokenProps?: TP;
   element?: BaseProps['element'];
   variants?: V;
   /** Default tokens for inline CSS custom properties */
@@ -308,12 +356,16 @@ export type TastyProps<
   E extends ElementsDefinition = Record<string, never>,
   DefaultProps = Props,
   M extends ModPropsInput = readonly never[],
-> = TastyBaseProps<K, V, E, M> & {
+  TP extends TokenPropsInput = readonly never[],
+> = TastyBaseProps<K, V, E, M, TP> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: string | ComponentType<any>;
 } & Partial<
-    Omit<DefaultProps, 'as' | 'styles' | 'styleProps' | 'modProps' | 'tokens'>
+    Omit<
+      DefaultProps,
+      'as' | 'styles' | 'styleProps' | 'modProps' | 'tokenProps' | 'tokens'
+    >
   >;
 
 /**
@@ -330,7 +382,8 @@ export type TastyElementOptions<
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
   M extends ModPropsInput = readonly never[],
-> = TastyBaseProps<K, V, E, M> & {
+  TP extends TokenPropsInput = readonly never[],
+> = TastyBaseProps<K, V, E, M, TP> & {
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: Tag | ComponentType<any>;
@@ -339,12 +392,14 @@ export type TastyElementOptions<
 export type AllBasePropsWithMods<
   K extends StyleList,
   M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 > = AllBaseProps & {
   [key in K[number]]?:
     | StyleValue<StylesInterface[key]>
     | StyleValueStateMap<StylesInterface[key]>;
 } & BaseStyleProps &
-  ResolveModProps<M>;
+  ResolveModProps<M> &
+  ResolveTokenProps<TP>;
 
 /**
  * Keys from BasePropsWithoutChildren that should be omitted from HTML attributes.
@@ -387,8 +442,9 @@ export type TastyElementProps<
   V extends VariantMap,
   Tag extends keyof JSX.IntrinsicElements = 'div',
   M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 > = Omit<
-  AllBasePropsWithMods<K, M>,
+  AllBasePropsWithMods<K, M, TP>,
   Exclude<keyof JSX.IntrinsicElements[Tag], TastySpecificKeys | K[number]>
 > &
   WithVariant<V> &
@@ -415,11 +471,12 @@ export function tasty<
   E extends ElementsDefinition = Record<string, never>,
   Tag extends keyof JSX.IntrinsicElements = 'div',
   M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 >(
-  options: TastyElementOptions<K, V, E, Tag, M>,
+  options: TastyElementOptions<K, V, E, Tag, M, TP>,
   secondArg?: never,
 ): ForwardRefExoticComponent<
-  PropsWithoutRef<TastyElementProps<K, V, Tag, M>> & RefAttributes<unknown>
+  PropsWithoutRef<TastyElementProps<K, V, Tag, M, TP>> & RefAttributes<unknown>
 > &
   SubElementComponents<E>;
 export function tasty<
@@ -515,6 +572,7 @@ function tastyElement<
     styles: defaultStyles,
     styleProps,
     modProps: modPropsDef,
+    tokenProps: tokenPropsDef,
     variants,
     tokens: defaultTokens,
     elements,
@@ -585,6 +643,10 @@ function tastyElement<
         : Object.keys(modPropsDef)) as string[])
     : undefined;
 
+  const tokenPropsMapping: [string, string][] | undefined = tokenPropsDef
+    ? buildTokenPropsMapping(tokenPropsDef as TokenPropsInput)
+    : undefined;
+
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
@@ -629,6 +691,34 @@ function tastyElement<
       styles = undefined as unknown as Styles;
     }
 
+    // Extract mod props from otherProps before hooks
+    let propMods: Record<string, ModValue> | undefined;
+    if (modPropsKeys) {
+      for (const key of modPropsKeys) {
+        if (key in otherProps) {
+          if (!propMods) propMods = {};
+          propMods[key] = (otherProps as Record<string, unknown>)[
+            key
+          ] as ModValue;
+          delete (otherProps as Record<string, unknown>)[key];
+        }
+      }
+    }
+
+    // Extract token props from otherProps before hooks
+    let propTokens: Tokens | undefined;
+    if (tokenPropsMapping) {
+      for (const [propName, tokenKey] of tokenPropsMapping) {
+        if (propName in otherProps) {
+          if (!propTokens) propTokens = {} as Tokens;
+          (propTokens as Record<string, TokenValue>)[tokenKey] = (
+            otherProps as Record<string, unknown>
+          )[propName] as TokenValue;
+          delete (otherProps as Record<string, unknown>)[propName];
+        }
+      }
+    }
+
     // Stabilize propStyles reference: only update when content actually changes
     const propStylesRef = useRef<{ key: string; styles: Styles | null }>({
       key: '',
@@ -665,14 +755,19 @@ function tastyElement<
     // Use the useStyles hook for style generation and injection
     const { className: stylesClassName } = useStyles(allStyles);
 
-    // Merge default tokens with instance tokens (instance overrides defaults)
+    // Merge default tokens, instance tokens, and token props (token props have highest priority)
     const tokensKey = stringifyTokens(tokens as Tokens | undefined);
+    const propTokensKey = stringifyTokens(propTokens);
     const mergedTokens = useMemo(() => {
-      if (!defaultTokens && !tokens) return undefined;
-      if (!defaultTokens) return tokens as Tokens;
-      if (!tokens) return defaultTokens;
-      return { ...defaultTokens, ...tokens } as Tokens;
-    }, [tokensKey]);
+      if (!defaultTokens && !tokens && !propTokens) return undefined;
+      if (!defaultTokens && !propTokens) return tokens as Tokens;
+      if (!tokens && !propTokens) return defaultTokens;
+      return {
+        ...defaultTokens,
+        ...(tokens as Tokens),
+        ...propTokens,
+      } as Tokens;
+    }, [tokensKey, propTokensKey]);
 
     // Process merged tokens into inline style properties
     const processedTokenStyle = useMemo(() => {
@@ -686,19 +781,6 @@ function tastyElement<
       if (!style) return processedTokenStyle;
       return { ...processedTokenStyle, ...style };
     }, [processedTokenStyle, style]);
-
-    let propMods: Record<string, ModValue> | undefined;
-    if (modPropsKeys) {
-      for (const key of modPropsKeys) {
-        if (key in otherProps) {
-          if (!propMods) propMods = {};
-          propMods[key] = (otherProps as Record<string, unknown>)[
-            key
-          ] as ModValue;
-          delete (otherProps as Record<string, unknown>)[key];
-        }
-      }
-    }
 
     const mergedMods = propMods
       ? { ...(mods as Record<string, ModValue>), ...propMods }

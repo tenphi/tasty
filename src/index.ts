@@ -43,6 +43,8 @@ export type {
   ModPropsInput,
   ResolveModProps,
   ResolveModPropDef,
+  TokenPropsInput,
+  ResolveTokenProps,
 } from './tasty';
 export type {
   AllBaseProps,

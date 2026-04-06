@@ -19,6 +19,7 @@ import type {
   CacheMetrics,
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  GCOptions,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
@@ -40,8 +41,10 @@ function generateClassName(counter: number): string {
 export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
-  private cleanupScheduled = false;
   private globalRuleCounter = 0;
+  private lastGCTime = 0;
+  private backgroundSweepTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
@@ -51,6 +54,27 @@ export class StyleInjector {
   constructor(config: StyleInjectorConfig = {}) {
     this.config = config;
     this.sheetManager = new SheetManager(config);
+
+    if (config.gc?.auto && typeof document !== 'undefined') {
+      const interval = config.gc.autoInterval ?? 300_000;
+      const scheduleNext = () => {
+        this.backgroundSweepTimeout = setTimeout(() => {
+          const doSweep = () => {
+            this.sheetManager.pruneDisconnectedRoots();
+            for (const root of this.sheetManager.getActiveRoots()) {
+              this.gc({ root });
+            }
+            scheduleNext();
+          };
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => doSweep());
+          } else {
+            doSweep();
+          }
+        }, interval);
+      };
+      scheduleNext();
+    }
   }
 
   /**
@@ -364,11 +388,10 @@ export class StyleInjector {
   }
 
   /**
-   * Dispose of a className
+   * Dispose of a className (decrements refCount only).
    */
   private dispose(className: string, registry: RootRegistry): void {
     const currentRefCount = registry.refCounts.get(className);
-    // Guard against stale double-dispose or mismatched lifecycle
     if (currentRefCount == null || currentRefCount <= 0) {
       return;
     }
@@ -376,14 +399,8 @@ export class StyleInjector {
     const newRefCount = currentRefCount - 1;
     registry.refCounts.set(className, newRefCount);
 
-    if (newRefCount === 0) {
-      // Update metrics
-      if (registry.metrics) {
-        registry.metrics.totalUnused++;
-      }
-
-      // Check if cleanup should be scheduled
-      this.sheetManager.checkCleanupNeeded(registry);
+    if (newRefCount === 0 && registry.metrics) {
+      registry.metrics.totalUnused++;
     }
   }
 
@@ -814,11 +831,179 @@ export class StyleInjector {
     }
   }
 
+  // =========================================================================
+  // GC: popularity-aware garbage collection with DOM safety guard
+  // =========================================================================
+
+  private static readonly TOUCH_THROTTLE_MS = 5_000;
+  private static readonly TASTY_CLASS_RE = /^t\d+$/;
+
+  /**
+   * Record a render-time usage hit for one or more classNames.
+   * Handles space-separated multi-chunk classNames.
+   * No-op on the server.
+   */
+  touch(className: string, options?: { root?: Document | ShadowRoot }): void {
+    if (typeof document === 'undefined') return;
+    if (!this.config.gc) return;
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const now = Date.now();
+
+    const parts =
+      className.indexOf(' ') === -1 ? [className] : className.split(' ');
+
+    for (const cls of parts) {
+      if (!StyleInjector.TASTY_CLASS_RE.test(cls)) continue;
+      if (!registry.rules.has(cls)) continue;
+
+      const entry = registry.usageMap.get(cls);
+      if (entry) {
+        entry.hitCount++;
+        if (now - entry.lastUsedAt > StyleInjector.TOUCH_THROTTLE_MS) {
+          entry.lastUsedAt = now;
+        }
+      } else {
+        registry.usageMap.set(cls, { hitCount: 1, lastUsedAt: now });
+      }
+    }
+  }
+
+  /**
+   * Synchronous garbage collection.
+   *
+   * 1. Scans the DOM for live tasty classNames (safety guard).
+   * 2. Scores each non-live className via popularity-weighted TTL.
+   * 3. Marks evictable styles with refCount = 0 and deletes them.
+   * 4. Optionally enforces a hard `cacheCapacity` cap.
+   *
+   * @returns Number of styles evicted.
+   */
+  gc(options?: GCOptions): number {
+    if (typeof document === 'undefined') return 0;
+
+    // Cancel any pending idle-scheduled GC to prevent double runs
+    if (this.pendingGCHandle != null) {
+      if (typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(this.pendingGCHandle);
+      }
+      this.pendingGCHandle = null;
+    }
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const baseMaxAge =
+      options?.baseMaxAge ?? this.config.gc?.baseMaxAge ?? 60_000;
+    const cacheCapacity =
+      options?.cacheCapacity ?? this.config.gc?.cacheCapacity;
+    const now = Date.now();
+
+    // Phase 0: scan DOM for live classes (classList handles SVG elements too)
+    const liveClasses = new Set<string>();
+    for (const el of root.querySelectorAll('[class]')) {
+      for (const token of el.classList) {
+        if (StyleInjector.TASTY_CLASS_RE.test(token)) {
+          liveClasses.add(token);
+        }
+      }
+    }
+
+    let swept = 0;
+
+    // Phase 1: score-based eviction (skip live and actively-referenced classes)
+    for (const [className, usage] of registry.usageMap) {
+      if (liveClasses.has(className)) continue;
+      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
+
+      const age = now - usage.lastUsedAt;
+      const effectiveTTL = baseMaxAge * Math.log2(usage.hitCount + 1);
+
+      if (age > effectiveTTL) {
+        registry.usageMap.delete(className);
+        swept++;
+      }
+    }
+
+    // Phase 2: capacity cap (evict lowest-scored non-live, non-referenced styles)
+    if (cacheCapacity && registry.usageMap.size > cacheCapacity) {
+      const scored: { className: string; score: number }[] = [];
+      for (const [className, usage] of registry.usageMap) {
+        if (liveClasses.has(className)) continue;
+        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
+        const age = now - usage.lastUsedAt;
+        scored.push({
+          className,
+          score: usage.hitCount * Math.exp(-age / baseMaxAge),
+        });
+      }
+
+      if (scored.length > 0) {
+        scored.sort((a, b) => a.score - b.score);
+
+        const toEvict = registry.usageMap.size - cacheCapacity;
+        for (let i = 0; i < Math.min(toEvict, scored.length); i++) {
+          const { className } = scored[i];
+          registry.usageMap.delete(className);
+          swept++;
+        }
+      }
+    }
+
+    if (swept > 0) {
+      this.sheetManager.forceCleanup(registry);
+    }
+
+    this.lastGCTime = Date.now();
+
+    return swept;
+  }
+
+  /**
+   * Event-driven GC with cooldown.
+   * Skips if called within `cooldown` ms of the last run.
+   * Schedules the actual GC via `requestIdleCallback` when available.
+   */
+  maybeGC(options?: GCOptions): void {
+    if (typeof document === 'undefined') return;
+
+    const cooldown = this.config.gc?.cooldown ?? 30_000;
+    const now = Date.now();
+
+    if (now - this.lastGCTime < cooldown) return;
+
+    // Set before scheduling to prevent multiple idle callbacks from stacking
+    // when maybeGC is called rapidly (e.g. on every route change).
+    this.lastGCTime = now;
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      this.pendingGCHandle = requestIdleCallback(() => {
+        this.pendingGCHandle = null;
+        this.gc(options);
+      });
+    } else {
+      this.gc(options);
+    }
+  }
+
   /**
    * Destroy all resources for a root
    */
   destroy(root?: Document | ShadowRoot): void {
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
+
+    // Clear sweep timer and pending GC only when no active roots remain
+    if (this.backgroundSweepTimeout && !this.sheetManager.hasActiveRoots()) {
+      clearTimeout(this.backgroundSweepTimeout);
+      this.backgroundSweepTimeout = null;
+
+      if (this.pendingGCHandle != null) {
+        if (typeof cancelIdleCallback !== 'undefined') {
+          cancelIdleCallback(this.pendingGCHandle);
+        }
+        this.pendingGCHandle = null;
+      }
+    }
   }
 }

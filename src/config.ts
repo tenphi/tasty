@@ -35,6 +35,7 @@ import type { ColorSpace } from './utils/color-space';
 import type {
   CounterStyleDescriptors,
   FontFaceInput,
+  GCConfig,
   KeyframesSteps,
   PropertyDefinition,
 } from './injector/types';
@@ -52,27 +53,10 @@ export interface TastyConfig {
   nonce?: string;
   /** Maximum rules per stylesheet (default: 8192) */
   maxRulesPerSheet?: number;
-  /** Threshold for bulk cleanup of unused styles (default: 500) */
-  unusedStylesThreshold?: number;
-  /** Delay before bulk cleanup in ms, ignored if idleCleanup is true (default: 5000) */
-  bulkCleanupDelay?: number;
-  /** Use requestIdleCallback for cleanup when available (default: true) */
-  idleCleanup?: boolean;
   /** Force text injection mode, auto-detected in test environments (default: auto) */
   forceTextInjection?: boolean;
   /** Enable development mode features: performance metrics and debug info (default: auto) */
   devMode?: boolean;
-  /**
-   * Ratio of unused styles to delete per bulk cleanup run (0..1).
-   * Defaults to 0.5 (oldest half) to reduce risk of removing styles
-   * that may be restored shortly after being marked unused.
-   */
-  bulkCleanupBatchRatio?: number;
-  /**
-   * Minimum age (in ms) a style must remain unused before eligible for deletion.
-   * Helps avoid races during rapid mount/unmount cycles. Default: 10000ms.
-   */
-  unusedStylesMinAgeMs?: number;
   /**
    * Global predefined states for advanced state mapping.
    * These are state aliases that can be used in any component.
@@ -115,6 +99,17 @@ export interface TastyConfig {
    * @default true
    */
   autoPropertyTypes?: boolean;
+  /**
+   * Garbage collection configuration for unused styles.
+   * Controls popularity-aware style eviction with DOM safety guard.
+   * @example
+   * ```ts
+   * configure({
+   *   gc: { auto: true, baseMaxAge: 60000, cooldown: 30000 },
+   * });
+   * ```
+   */
+  gc?: GCConfig;
   /**
    * Plugins that extend tasty with custom functions, units, or states.
    * Plugins are processed in order, with later plugins overriding earlier ones.
@@ -520,13 +515,8 @@ export function isTestEnvironment(): boolean {
 function createDefaultConfig(isTest?: boolean): TastyConfig {
   return {
     maxRulesPerSheet: 8192,
-    unusedStylesThreshold: 500,
-    bulkCleanupDelay: 5000,
-    idleCleanup: true,
     forceTextInjection: isTest ?? false,
     devMode: isDevEnv(),
-    bulkCleanupBatchRatio: 0.5,
-    unusedStylesMinAgeMs: 10000,
   };
 }
 

@@ -15,23 +15,9 @@ export type DisposeFunction = () => void;
 export interface StyleInjectorConfig {
   nonce?: string;
   maxRulesPerSheet?: number; // default: infinite (no cap)
-  unusedStylesThreshold?: number; // default: 500 (threshold for bulk cleanup of unused styles)
-  bulkCleanupDelay?: number; // default: 5000ms (delay before bulk cleanup, ignored if idleCleanup is true)
-  idleCleanup?: boolean; // default: true (use requestIdleCallback for cleanup when available)
   forceTextInjection?: boolean; // default: auto-detected (true in test environments, false otherwise)
   /** Enable development mode features: performance metrics and debug information storage */
   devMode?: boolean; // default: auto-detected (true in development, false in production)
-  /**
-   * Ratio of unused styles to delete per bulk cleanup run (0..1).
-   * Defaults to 0.5 (oldest half) to reduce risk of removing styles
-   * that may be restored shortly after being marked unused.
-   */
-  bulkCleanupBatchRatio?: number;
-  /**
-   * Minimum age (in ms) a style must remain unused before eligible for deletion.
-   * Helps avoid races during rapid mount/unmount cycles. Default: 10000ms.
-   */
-  unusedStylesMinAgeMs?: number;
   /**
    * Global predefined states for advanced state mapping.
    * These are state aliases that can be used in any component.
@@ -44,6 +30,56 @@ export interface StyleInjectorConfig {
    * @default true
    */
   autoPropertyTypes?: boolean;
+  /** Garbage collection configuration for unused styles */
+  gc?: GCConfig;
+}
+
+/**
+ * Per-className usage tracking for popularity-aware GC.
+ */
+export interface StyleUsage {
+  hitCount: number;
+  lastUsedAt: number;
+}
+
+/**
+ * Configuration for the style garbage collector.
+ */
+export interface GCConfig {
+  /** Enable automatic background GC sweep. @default false */
+  auto?: boolean;
+  /**
+   * Base TTL (ms) for a style rendered only once.
+   * Popular styles get longer TTLs via log2 scaling.
+   * @default 60000
+   */
+  baseMaxAge?: number;
+  /**
+   * Minimum time (ms) between GC runs. Calls within this window are skipped.
+   * @default 30000
+   */
+  cooldown?: number;
+  /**
+   * Interval (ms) for automatic background sweeps.
+   * Only used when `auto` is true.
+   * @default 300000
+   */
+  autoInterval?: number;
+  /**
+   * Maximum number of cached styles to retain.
+   * When exceeded, lowest-scored styles are evicted first regardless of age.
+   * No default (unlimited).
+   */
+  cacheCapacity?: number;
+}
+
+/**
+ * Per-call options for gc() / maybeGC().
+ */
+export interface GCOptions {
+  baseMaxAge?: number;
+  cacheCapacity?: number;
+  root?: Document | ShadowRoot;
 }
 
 export interface RuleInfo {
@@ -93,13 +129,6 @@ export interface RootRegistry {
   cacheKeyToClassName: Map<string, string>; // cacheKey -> className
   /** Deduplication set of fully materialized CSS rules inserted into sheets */
   ruleTextSet: Set<string>;
-  /** Scheduled bulk cleanup timeout */
-  bulkCleanupTimeout:
-    | ReturnType<typeof requestIdleCallback>
-    | ReturnType<typeof setTimeout>
-    | null;
-  /** Scheduled cleanup check timeout */
-  cleanupCheckTimeout: ReturnType<typeof setTimeout> | null;
   /** Performance metrics (optional) */
   metrics?: CacheMetrics;
   /** Counter for generating sequential class names like t0, t1, t2... */
@@ -120,6 +149,8 @@ export interface RootRegistry {
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
+  /** Per-className usage tracking for GC scoring */
+  usageMap: Map<string, StyleUsage>;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

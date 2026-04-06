@@ -18,6 +18,8 @@ import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
+  /** Strong set of active roots so background GC can iterate them all */
+  private activeRoots = new Set<Document | ShadowRoot>();
   private config: StyleInjectorConfig;
   /** Dedicated style elements for raw CSS per root */
   private rawStyleElements = new WeakMap<
@@ -62,8 +64,6 @@ export class SheetManager {
         rules: new Map(),
         cacheKeyToClassName: new Map(),
         ruleTextSet: new Set<string>(),
-        bulkCleanupTimeout: null,
-        cleanupCheckTimeout: null,
         metrics,
         classCounter: 0,
         keyframesCache: new Map(),
@@ -74,12 +74,37 @@ export class SheetManager {
         injectedCounterStyles: new Set<string>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
+        usageMap: new Map(),
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);
+      this.activeRoots.add(root);
     }
 
     return registry;
+  }
+
+  /** Return all roots with active registries (for background GC sweep). */
+  getActiveRoots(): Iterable<Document | ShadowRoot> {
+    return this.activeRoots;
+  }
+
+  /** Check whether any roots have active registries. */
+  hasActiveRoots(): boolean {
+    return this.activeRoots.size > 0;
+  }
+
+  /** Remove registries for ShadowRoots whose host has been detached from the DOM. */
+  pruneDisconnectedRoots(): void {
+    const toPrune: (Document | ShadowRoot)[] = [];
+    for (const root of this.activeRoots) {
+      if (root !== document && !(root as ShadowRoot).host?.isConnected) {
+        toPrune.push(root);
+      }
+    }
+    for (const root of toPrune) {
+      this.cleanup(root);
+    }
   }
 
   /**
@@ -645,76 +670,35 @@ export class SheetManager {
   }
 
   /**
-   * Schedule bulk cleanup of all unused styles (non-stacking)
-   */
-  private scheduleBulkCleanup(registry: RootRegistry): void {
-    // Clear any existing timeout to prevent stacking
-    if (registry.bulkCleanupTimeout) {
-      if (
-        this.config.idleCleanup &&
-        typeof cancelIdleCallback !== 'undefined'
-      ) {
-        cancelIdleCallback(registry.bulkCleanupTimeout as unknown as number);
-      } else {
-        clearTimeout(registry.bulkCleanupTimeout);
-      }
-      registry.bulkCleanupTimeout = null;
-    }
-
-    const performCleanup = () => {
-      this.performBulkCleanup(registry);
-      registry.bulkCleanupTimeout = null;
-    };
-
-    if (this.config.idleCleanup && typeof requestIdleCallback !== 'undefined') {
-      registry.bulkCleanupTimeout = requestIdleCallback(performCleanup);
-    } else {
-      const delay = this.config.bulkCleanupDelay || 5000;
-      registry.bulkCleanupTimeout = setTimeout(performCleanup, delay);
-    }
-  }
-
-  /**
    * Force cleanup of unused styles
    */
   public forceCleanup(registry: RootRegistry): void {
-    this.performBulkCleanup(registry, true);
+    this.performBulkCleanup(registry);
   }
 
   /**
-   * Perform bulk cleanup of all unused styles
+   * Perform bulk cleanup of all unused styles (refCount = 0).
    */
-  private performBulkCleanup(registry: RootRegistry, cleanupAll = false): void {
+  private performBulkCleanup(registry: RootRegistry): void {
     const cleanupStartTime = Date.now();
 
     // Calculate unused rules dynamically: rules that have refCount = 0
+    // and are not tracked in usageMap (GC-kept styles must survive)
     const unusedClassNames = Array.from(registry.refCounts.entries())
-      .filter(([, refCount]) => refCount === 0)
+      .filter(
+        ([className, refCount]) =>
+          refCount === 0 && !registry.usageMap.has(className),
+      )
       .map(([className]) => className);
 
     if (unusedClassNames.length === 0) return;
 
-    // Build candidates list - no age filtering needed
-    const candidates = unusedClassNames.map((className) => {
-      const ruleInfo = registry.rules.get(className)!; // We know it exists
-      return {
-        className,
-        ruleInfo,
-      };
-    });
-
-    if (candidates.length === 0) return;
-
-    // Limit deletion scope per run (batch ratio) unless cleanupAll is true
-    let selected = candidates;
-    if (!cleanupAll) {
-      const ratio = this.config.bulkCleanupBatchRatio ?? 0.5;
-      const limit = Math.max(
-        1,
-        Math.floor(candidates.length * Math.min(1, Math.max(0, ratio))),
-      );
-      selected = candidates.slice(0, limit);
-    }
+    const selected = unusedClassNames
+      .map((className) => {
+        const ruleInfo = registry.rules.get(className);
+        return ruleInfo ? { className, ruleInfo } : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
     let cleanedUpCount = 0;
     let totalCssSize = 0;
@@ -1085,38 +1069,6 @@ export class SheetManager {
   }
 
   /**
-   * Schedule async cleanup check (non-stacking)
-   */
-  public checkCleanupNeeded(registry: RootRegistry): void {
-    // Clear any existing check timeout to prevent stacking
-    if (registry.cleanupCheckTimeout) {
-      clearTimeout(registry.cleanupCheckTimeout);
-      registry.cleanupCheckTimeout = null;
-    }
-
-    // Schedule the actual check with setTimeout(..., 0)
-    registry.cleanupCheckTimeout = setTimeout(() => {
-      this.performCleanupCheck(registry);
-      registry.cleanupCheckTimeout = null;
-    }, 0);
-  }
-
-  /**
-   * Perform the actual cleanup check (called asynchronously)
-   */
-  private performCleanupCheck(registry: RootRegistry): void {
-    // Count unused rules (refCount = 0) - keyframes are disposed immediately
-    const unusedRulesCount = Array.from(registry.refCounts.values()).filter(
-      (count) => count === 0,
-    ).length;
-    const threshold = this.config.unusedStylesThreshold || 500;
-
-    if (unusedRulesCount >= threshold) {
-      this.scheduleBulkCleanup(registry);
-    }
-  }
-
-  /**
    * Clean up resources for a root
    */
   cleanup(root: Document | ShadowRoot): void {
@@ -1124,25 +1076,6 @@ export class SheetManager {
 
     if (!registry) {
       return;
-    }
-
-    // Cancel any scheduled bulk cleanup
-    if (registry.bulkCleanupTimeout) {
-      if (
-        this.config.idleCleanup &&
-        typeof cancelIdleCallback !== 'undefined'
-      ) {
-        cancelIdleCallback(registry.bulkCleanupTimeout as unknown as number);
-      } else {
-        clearTimeout(registry.bulkCleanupTimeout);
-      }
-      registry.bulkCleanupTimeout = null;
-    }
-
-    // Cancel any scheduled cleanup check
-    if (registry.cleanupCheckTimeout) {
-      clearTimeout(registry.cleanupCheckTimeout);
-      registry.cleanupCheckTimeout = null;
     }
 
     // Remove all sheets
@@ -1160,6 +1093,7 @@ export class SheetManager {
 
     // Clear registry
     this.rootRegistries.delete(root);
+    this.activeRoots.delete(root);
 
     // Clean up raw CSS style element
     const rawStyleElement = this.rawStyleElements.get(root);

@@ -10,6 +10,7 @@ import { StyleInjector } from './injector';
 import type {
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  GCOptions,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
@@ -223,6 +224,38 @@ export function cleanup(root?: Document | ShadowRoot): void {
 }
 
 /**
+ * Record a render-time usage hit for one or more classNames.
+ * Used internally by computeStyles and tasty() to track style popularity for GC.
+ */
+export function touch(
+  className: string,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  if (!getConfig().gc) return;
+  getGlobalInjector().touch(className, options);
+}
+
+/**
+ * Synchronous garbage collection of unused styles.
+ * Scans the DOM for live classNames (never evicts them), then evicts
+ * absent styles whose age exceeds their popularity-weighted TTL.
+ *
+ * @returns Number of styles evicted.
+ */
+export function gc(options?: GCOptions): number {
+  return getGlobalInjector().gc(options);
+}
+
+/**
+ * Event-driven GC with cooldown.
+ * Skips if called within the configured cooldown of the last run.
+ * Schedules via requestIdleCallback when available.
+ */
+export function maybeGC(options?: GCOptions): void {
+  return getGlobalInjector().maybeGC(options);
+}
+
+/**
  * Check if we're currently running in a test environment
  */
 export function getIsTestEnvironment(): boolean {
@@ -282,6 +315,9 @@ export type {
   FontFaceDescriptors,
   FontFaceInput,
   CounterStyleDescriptors,
+  StyleUsage,
+  GCConfig,
+  GCOptions,
 } from './types';
 
 export { StyleInjector } from './injector';

@@ -57,10 +57,15 @@ export class StyleInjector {
     if (config.gc?.auto && typeof document !== 'undefined') {
       const interval = config.gc.autoInterval ?? 300_000;
       this.backgroundSweepInterval = setInterval(() => {
+        const sweep = () => {
+          for (const root of this.sheetManager.getActiveRoots()) {
+            this.gc({ root });
+          }
+        };
         if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(() => this.gc());
+          requestIdleCallback(() => sweep());
         } else {
-          this.gc();
+          sweep();
         }
       }, interval);
     }
@@ -834,6 +839,8 @@ export class StyleInjector {
    */
   touch(className: string, options?: { root?: Document | ShadowRoot }): void {
     if (typeof document === 'undefined') return;
+    if (!this.config.gc) return;
+
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     const now = Date.now();
@@ -843,6 +850,7 @@ export class StyleInjector {
 
     for (const cls of parts) {
       if (!StyleInjector.TASTY_CLASS_RE.test(cls)) continue;
+      if (!registry.rules.has(cls)) continue;
 
       const entry = registry.usageMap.get(cls);
       if (entry) {
@@ -877,12 +885,10 @@ export class StyleInjector {
       options?.cacheCapacity ?? this.config.gc?.cacheCapacity;
     const now = Date.now();
 
-    // Phase 0: scan DOM for live classes
+    // Phase 0: scan DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
-    for (const el of Array.from(root.querySelectorAll('[class]'))) {
-      const cls = el.className;
-      if (typeof cls !== 'string') continue;
-      for (const token of cls.split(/\s+/)) {
+    for (const el of root.querySelectorAll('[class]')) {
+      for (const token of el.classList) {
         if (StyleInjector.TASTY_CLASS_RE.test(token)) {
           liveClasses.add(token);
         }
@@ -891,25 +897,26 @@ export class StyleInjector {
 
     let swept = 0;
 
-    // Phase 1: score-based eviction (skip live classes)
+    // Phase 1: score-based eviction (skip live and actively-referenced classes)
     for (const [className, usage] of registry.usageMap) {
       if (liveClasses.has(className)) continue;
+      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
 
       const age = now - usage.lastUsedAt;
       const effectiveTTL = baseMaxAge * Math.log2(usage.hitCount + 1);
 
       if (age > effectiveTTL) {
-        registry.refCounts.set(className, 0);
         registry.usageMap.delete(className);
         swept++;
       }
     }
 
-    // Phase 2: capacity cap (evict lowest-scored non-live styles)
+    // Phase 2: capacity cap (evict lowest-scored non-live, non-referenced styles)
     if (cacheCapacity && registry.usageMap.size > cacheCapacity) {
       const scored: { className: string; score: number }[] = [];
       for (const [className, usage] of registry.usageMap) {
         if (liveClasses.has(className)) continue;
+        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
         const age = now - usage.lastUsedAt;
         scored.push({
           className,
@@ -921,7 +928,6 @@ export class StyleInjector {
       const toEvict = registry.usageMap.size - cacheCapacity;
       for (let i = 0; i < Math.min(toEvict, scored.length); i++) {
         const { className } = scored[i];
-        registry.refCounts.set(className, 0);
         registry.usageMap.delete(className);
         swept++;
       }
@@ -947,6 +953,8 @@ export class StyleInjector {
 
     if (now - this.lastGCTime < cooldown) return;
 
+    // Set before scheduling to prevent multiple idle callbacks from stacking
+    // when maybeGC is called rapidly (e.g. on every route change).
     this.lastGCTime = now;
 
     if (typeof requestIdleCallback !== 'undefined') {

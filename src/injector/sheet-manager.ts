@@ -18,6 +18,8 @@ import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
+  /** Strong set of active roots so background GC can iterate them all */
+  private activeRoots = new Set<Document | ShadowRoot>();
   private config: StyleInjectorConfig;
   /** Dedicated style elements for raw CSS per root */
   private rawStyleElements = new WeakMap<
@@ -76,9 +78,15 @@ export class SheetManager {
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);
+      this.activeRoots.add(root);
     }
 
     return registry;
+  }
+
+  /** Return all roots with active registries (for background GC sweep). */
+  getActiveRoots(): Iterable<Document | ShadowRoot> {
+    return this.activeRoots;
   }
 
   /**
@@ -668,8 +676,6 @@ export class SheetManager {
       return { className, ruleInfo };
     });
 
-    if (selected.length === 0) return;
-
     let cleanedUpCount = 0;
     let totalCssSize = 0;
     let totalRulesDeleted = 0;
@@ -1063,6 +1069,7 @@ export class SheetManager {
 
     // Clear registry
     this.rootRegistries.delete(root);
+    this.activeRoots.delete(root);
 
     // Clean up raw CSS style element
     const rawStyleElement = this.rawStyleElements.get(root);

@@ -14,7 +14,7 @@ describe('GC: touch / gc / maybeGC', () => {
   beforeEach(() => {
     document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
     document.body.innerHTML = '';
-    injector = new StyleInjector({ forceTextInjection: true });
+    injector = new StyleInjector({ forceTextInjection: true, gc: {} });
   });
 
   afterEach(() => {
@@ -85,6 +85,12 @@ describe('GC: touch / gc / maybeGC', () => {
       const registry = injector['sheetManager'].getRegistry(document);
       expect(registry.usageMap.size).toBe(0);
     });
+
+    it('should ignore tasty-shaped tokens not in the registry', () => {
+      injector.touch('t999');
+      const registry = injector['sheetManager'].getRegistry(document);
+      expect(registry.usageMap.size).toBe(0);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -93,11 +99,12 @@ describe('GC: touch / gc / maybeGC', () => {
 
   describe('gc', () => {
     it('should evict styles that exceed their popularity-weighted TTL', () => {
-      const { className } = injector.inject([
+      const { className, dispose } = injector.inject([
         createStyleRule('.t0.t0', 'color: red'),
       ]);
 
       injector.touch(className);
+      dispose(); // refCount → 0, eligible for GC
 
       // Artificially age the entry
       const registry = injector['sheetManager'].getRegistry(document);
@@ -110,10 +117,10 @@ describe('GC: touch / gc / maybeGC', () => {
     });
 
     it('should keep styles with high hitCount alive longer', () => {
-      const { className: lowHit } = injector.inject([
+      const { className: lowHit, dispose: disposeLow } = injector.inject([
         createStyleRule('.t0.t0', 'color: red'),
       ]);
-      const { className: highHit } = injector.inject([
+      const { className: highHit, dispose: disposeHigh } = injector.inject([
         createStyleRule('.t1.t1', 'color: blue'),
       ]);
 
@@ -125,6 +132,10 @@ describe('GC: touch / gc / maybeGC', () => {
       for (let i = 0; i < 50; i++) {
         injector.touch(highHit);
       }
+
+      // Dispose both so they are eligible for GC
+      disposeLow();
+      disposeHigh();
 
       // Age both by 90s
       const now = Date.now();
@@ -141,11 +152,12 @@ describe('GC: touch / gc / maybeGC', () => {
     });
 
     it('should never evict styles currently in the DOM', () => {
-      const { className } = injector.inject([
+      const { className, dispose } = injector.inject([
         createStyleRule('.t0.t0', 'color: red'),
       ]);
 
       injector.touch(className);
+      dispose(); // refCount → 0, but DOM guard should still protect it
 
       // Put the className in the DOM
       const el = document.createElement('div');
@@ -162,19 +174,46 @@ describe('GC: touch / gc / maybeGC', () => {
       expect(registry.usageMap.has(className)).toBe(true);
     });
 
+    it('should never evict styles with refCount > 0', () => {
+      const result = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+
+      injector.touch(result.className);
+
+      // Artificially age the entry well past any TTL
+      const registry = injector['sheetManager'].getRegistry(document);
+      registry.usageMap.get(result.className)!.lastUsedAt =
+        Date.now() - 999_999;
+
+      // Style still has refCount = 1 (not disposed), so GC must skip it
+      const swept = injector.gc({ baseMaxAge: 1 });
+
+      expect(swept).toBe(0);
+      expect(registry.usageMap.has(result.className)).toBe(true);
+      expect(registry.rules.has(result.className)).toBe(true);
+    });
+
     it('should enforce cacheCapacity by evicting lowest-scored styles', () => {
       const classNames: string[] = [];
+      const disposeFns: (() => void)[] = [];
       for (let i = 0; i < 5; i++) {
-        const { className } = injector.inject([
-          createStyleRule(`.t${i}.t${i}`, `order: ${i}`),
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.test-${i}`, `order: ${i}`),
         ]);
         classNames.push(className);
+        disposeFns.push(dispose);
         injector.touch(className);
       }
 
       // Give the first class many more hits (high score)
       for (let i = 0; i < 20; i++) {
         injector.touch(classNames[0]);
+      }
+
+      // Dispose all so they are eligible for GC
+      for (const dispose of disposeFns) {
+        dispose();
       }
 
       const swept = injector.gc({ cacheCapacity: 2 });
@@ -194,12 +233,13 @@ describe('GC: touch / gc / maybeGC', () => {
     });
 
     it('should clean up registry entries after eviction', () => {
-      const { className } = injector.inject(
+      const { className, dispose } = injector.inject(
         [createStyleRule('.t0.t0', 'color: red')],
         { cacheKey: 'test-key' },
       );
 
       injector.touch(className);
+      dispose(); // refCount → 0
 
       const registry = injector['sheetManager'].getRegistry(document);
       registry.usageMap.get(className)!.lastUsedAt = Date.now() - 120_000;

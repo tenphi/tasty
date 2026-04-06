@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 1.4.0
+
+### Minor Changes
+
+- [#101](https://github.com/tenphi/tasty/pull/101) [`e3847c1`](https://github.com/tenphi/tasty/commit/e3847c1e4629b74cec5b214c91acf1ed42b21de5) Thanks [@tenphi](https://github.com/tenphi)! - Add popularity-aware garbage collector for unused styles. Tracks per-className usage with DOM safety guard — styles visible in the DOM are never evicted. Exposes `gc()`, `maybeGC()`, and `touch()` APIs, with optional automatic background sweep via `configure({ gc: { auto: true } })`. Removes old dead-code auto-cleanup pipeline.
+
+### Patch Changes
+
+- [#99](https://github.com/tenphi/tasty/pull/99) [`b183c93`](https://github.com/tenphi/tasty/commit/b183c93d65c0702b35a8c8f06b85176937675fda) Thanks [@tenphi](https://github.com/tenphi)! - Remove `TastySSRContext` React context from SSR pipeline. All hooks now discover the SSR collector via the same global getter used by `computeStyles()`, eliminating the need for a React context Provider in `TastyRegistry`. This simplifies the SSR architecture to a single collector discovery mechanism.
+
 ## 1.3.0
 
 ### Minor Changes

@@ -33,6 +33,7 @@ import {
   inject,
   keyframes,
   property,
+  touch,
 } from './injector';
 import type { FontFaceDescriptors, KeyframesSteps } from './injector/types';
 import {
@@ -569,6 +570,10 @@ export function computeStyles(
 
     if (nameMap) {
       injectChunkRulesSync(chunks, nameMap);
+    }
+
+    for (const chunk of chunks) {
+      touch(chunk.className);
     }
   }
 

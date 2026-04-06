@@ -28,6 +28,7 @@ import { isSelector } from './pipeline';
 import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
+import { touch } from './injector';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
@@ -756,6 +757,7 @@ function tastyElement<
       classNameCache.has(allStyles)
     ) {
       stylesResult = { className: classNameCache.get(allStyles)! };
+      touch(stylesResult.className);
     } else {
       stylesResult = computeStyles(allStyles);
       if (useFactoryCache && allStyles === baseStyles) {

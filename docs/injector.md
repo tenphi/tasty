@@ -207,13 +207,15 @@ import { configure } from '@tenphi/tasty';
 configure({
   devMode: true,                     // Enable development features (auto-detected)
   maxRulesPerSheet: 8192,            // Cap rules per stylesheet (default: 8192)
-  unusedStylesThreshold: 500,        // Trigger cleanup threshold (CSS rules only)
-  bulkCleanupDelay: 5000,            // Cleanup delay (ms) - ignored if idleCleanup is true
-  idleCleanup: true,                 // Use requestIdleCallback for cleanup
-  bulkCleanupBatchRatio: 0.5,        // Clean up oldest 50% per batch
-  unusedStylesMinAgeMs: 10000,       // Minimum age before cleanup (ms)
   forceTextInjection: false,         // Force textContent insertion (auto-detected for tests)
   nonce: 'csp-nonce',                // CSP nonce for security
+  gc: {                              // Garbage collection for unused styles
+    auto: true,                      // Enable automatic background sweep
+    baseMaxAge: 60000,               // Base TTL (ms) for single-use styles
+    cooldown: 30000,                 // Minimum time between GC runs
+    autoInterval: 300000,            // Background sweep interval (ms)
+    cacheCapacity: 5000,             // Hard cap on cached styles (optional)
+  },
   states: {                          // Global predefined states for advanced state mapping
     '@mobile': '@media(w < 768px)',
     '@dark': '@root(schema=dark)',
@@ -229,7 +231,9 @@ configure({
 - Most options have sensible defaults and auto-detection
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
-- `unusedStylesMinAgeMs`: Minimum time (ms) a style must remain unused before being eligible for cleanup. Helps prevent removal of styles that might be quickly reactivated.
+- `gc.baseMaxAge`: Base TTL for a style rendered only once. Popular styles get longer TTLs via logarithmic scaling (`baseMaxAge * log2(hitCount + 1)`).
+- `gc.auto`: When true, runs a periodic background sweep at `gc.autoInterval` intervals using `requestIdleCallback`.
+- `gc.cooldown`: Minimum time between GC runs to avoid thrashing.
 
 ---
 
@@ -291,21 +295,31 @@ comp3.dispose(); // refCount: 1 → 0, eligible for bulk cleanup
 // Next inject() with same styles will increment refCount and reuse immediately
 ```
 
-### Smart Cleanup System
+### Garbage Collection
 
 ```typescript
-import { configure } from '@tenphi/tasty';
+import { configure, gc, maybeGC } from '@tenphi/tasty';
 
-// CSS rules: Not immediately deleted, marked for bulk cleanup (refCount = 0)
 // Keyframes: Disposed immediately when refCount = 0 (safer for global scope)
+// CSS rules: Tracked by popularity and cleaned up via gc()
 
 configure({
-  unusedStylesThreshold: 100,    // Cleanup when 100+ unused CSS rules
-  bulkCleanupBatchRatio: 0.3,    // Remove oldest 30% each time
+  gc: {
+    auto: true,          // Enable background sweep
+    baseMaxAge: 60000,   // 1-minute base TTL
+    cooldown: 30000,     // 30s between runs
+  },
 });
 
+// Manual GC (synchronous, returns number of swept styles):
+gc();
+
+// Event-driven GC with cooldown (e.g. on route change):
+maybeGC();
+
 // Benefits:
-// - CSS rules: Batch cleanup prevents DOM manipulation overhead  
+// - Popularity-aware: frequently used styles survive longer
+// - DOM-safe: styles currently in the DOM are never evicted
 // - Keyframes: Immediate cleanup prevents global namespace pollution
 // - Unused styles can be instantly reactivated (just increment refCount)
 ```
@@ -462,13 +476,14 @@ injectGlobal([
   { selector: '.container', declarations: 'max-width: 1200px;' }
 ]);
 
-// ✅ Configure appropriate thresholds for your app (BEFORE first render!)
+// ✅ Configure GC for your app (BEFORE first render!)
 import { configure } from '@tenphi/tasty';
 
 configure({
-  unusedStylesThreshold: 500,      // Default threshold (adjust based on app size)
-  bulkCleanupBatchRatio: 0.5,      // Default: clean oldest 50% per batch
-  unusedStylesMinAgeMs: 10000,     // Wait 10s before cleanup eligibility
+  gc: {
+    auto: true,            // Enable background sweep for long-lived pages
+    baseMaxAge: 60000,     // Default base TTL (adjust based on app size)
+  },
 });
 ```
 
@@ -480,8 +495,8 @@ configure({
 // 1. Hash-based deduplication - same CSS = same className
 // 2. Reference counting - styles stay alive while in use (refCount > 0)
 // 3. Immediate keyframes cleanup - disposed instantly when refCount = 0
-// 4. Batch CSS cleanup - unused CSS rules (refCount = 0) cleaned in batches
-// 5. Non-stacking cleanups - prevents timeout accumulation
+// 4. Popularity-aware GC - unused CSS rules are scored by hitCount and age
+// 5. DOM safety guard - styles visible in the DOM are never evicted
 
 // Manual cleanup is rarely needed but available:
 cleanup(); // Force immediate cleanup of all unused CSS rules (refCount = 0)

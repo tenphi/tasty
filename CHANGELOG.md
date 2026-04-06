@@ -1,5 +1,19 @@
 # @tenphi/tasty
 
+## 1.3.0
+
+### Minor Changes
+
+- [#97](https://github.com/tenphi/tasty/pull/97) [`3d06dba`](https://github.com/tenphi/tasty/commit/3d06dba9050487291c410920f0540f9548e56f9a) Thanks [@tenphi](https://github.com/tenphi)! - Make tasty() components hook-free and compatible with React Server Components. Styles are now computed synchronously via `computeStyles()`, removing the need for `'use client'` directives. SSR collectors are discovered via AsyncLocalStorage. Removes dead code: `stringifyTokens`, top-level `allocateClassName`, and `trackRef` wrappers.
+
+- [#95](https://github.com/tenphi/tasty/pull/95) [`310e08f`](https://github.com/tenphi/tasty/commit/310e08fbf6f7e2a317b228f89ad94446d50c28a6) Thanks [@tenphi](https://github.com/tenphi)! - Add `tokenProps` option to `tasty()` for exposing token keys as top-level component props. Supports array form (with `Color` suffix convention for color tokens) and object form (explicit `$`/`#` mapping).
+
+### Patch Changes
+
+- [#97](https://github.com/tenphi/tasty/pull/97) [`7eae685`](https://github.com/tenphi/tasty/commit/7eae685ef8346e601c7215c4e6a769e8222fb835) Thanks [@tenphi](https://github.com/tenphi)! - Add RSC inline style emission — tasty() components now render correctly as React Server Components by emitting inline `<style>` tags when no SSR collector or DOM is available.
+
+- [#98](https://github.com/tenphi/tasty/pull/98) [`4adfd20`](https://github.com/tenphi/tasty/commit/4adfd2032c293859d1b68e424246eb9d7f407c55) Thanks [@tenphi](https://github.com/tenphi)! - Make internal properties overridable via `configure({ properties })` by merging user properties on top of defaults. Add `#clear` (transparent) and `#border` (rgb(0 0 0)) color tokens.
+
 ## 1.2.0
 
 ### Minor Changes

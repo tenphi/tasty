@@ -1,10 +1,9 @@
-import { useContext, useInsertionEffect, useMemo } from 'react';
+import { useInsertionEffect, useMemo } from 'react';
 
 import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseCounterStyleOptions {
   name?: string;
@@ -73,8 +72,7 @@ export function useCounterStyle(
   depsOrOptions?: readonly unknown[] | UseCounterStyleOptions,
   options?: UseCounterStyleOptions,
 ): string {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   const isFactory = typeof descriptorsOrFactory === 'function';
 

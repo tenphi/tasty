@@ -256,6 +256,54 @@ The `tokens` prop sets `style="--progress: 75%"` on the DOM element. The `$progr
 
 Design tokens (via `configure({ tokens })`) are injected as CSS custom properties on `:root`. Replace tokens (via `configure({ replaceTokens })`) are resolved at parse time and baked into the generated CSS. The `tokens` prop on components is resolved at render time via inline CSS custom properties. Use design tokens for design-system constants, replace tokens for value aliases, and the `tokens` prop for truly dynamic per-instance values.
 
+### tokenProps
+
+`tokenProps` expose token keys as top-level component props — the token equivalent of `styleProps` and `modProps`. Use them when a component has a fixed set of known dynamic token values.
+
+#### Array form
+
+Prop names are plain camelCase identifiers. Names ending in `Color` map to `#` color tokens; everything else maps to `$` custom property tokens:
+
+```tsx
+const ProgressBar = tasty({
+  tokenProps: ['progress', 'accentColor'] as const,
+  styles: { width: '$progress', fill: '#accent' },
+});
+
+// Clean prop API — no tokens object needed
+<ProgressBar progress="75%" accentColor="#purple" />
+
+// Conversion:
+//   'progress'    → $progress    → --progress
+//   'accentColor' → #accent      → --accent-color + --accent-color-oklch
+```
+
+#### Object form
+
+Keys are prop names; values are `$`/`#`-prefixed token keys. No suffix convention needed — the prefix in the value is explicit:
+
+```tsx
+const Card = tasty({
+  tokenProps: {
+    size: '$card-size',
+    color: '#card-accent',
+  },
+  styles: { padding: '$card-size', fill: '#card-accent' },
+});
+
+<Card size="4x" color="#purple" />
+```
+
+#### Merge order
+
+When all three token sources are present, values merge with increasing priority:
+
+1. `tokens` option in `tasty({...})` — default tokens (lowest)
+2. `tokens` prop on the component instance — runtime overrides
+3. `tokenProps`-derived values — highest priority (explicit named props win)
+
+The `tokens` prop remains available for ad-hoc or dynamic tokens alongside `tokenProps`.
+
 ---
 
 ## styles prop vs style prop
@@ -458,7 +506,8 @@ See [Configuration](configuration.md) for the full `configure()` API.
 - **Use `elements` prop** to declare typed sub-components for compound components
 - **Use `styleProps`** to define what product engineers can customize
 - **Use `modProps`** to expose known modifier states as clean component props
-- **Use `tokens` prop** for per-instance dynamic values (progress, user color)
+- **Use `tokenProps`** to expose known token keys as clean component props
+- **Use `tokens` prop** for ad-hoc or dynamic per-instance token values (progress, user color)
 - **Use modifiers** (`mods` or `modProps`) for state-driven style changes instead of runtime `styles` prop changes
 
 ### Avoid

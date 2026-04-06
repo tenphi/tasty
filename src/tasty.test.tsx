@@ -1664,3 +1664,110 @@ describe('modProps', () => {
     expect(el.hasAttribute('data-is-selected')).toBe(false);
   });
 });
+
+describe('tokenProps', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('should support array form tokenProps', () => {
+    const Bar = tasty({
+      tokenProps: ['progress'] as const,
+      styles: { width: '$progress' },
+    });
+
+    const { container } = render(<Bar progress="75%" />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--progress')).toBe('75%');
+  });
+
+  it('should support Color suffix convention for color tokens', () => {
+    const Card = tasty({
+      tokenProps: ['accentColor'] as const,
+    });
+
+    const { container } = render(<Card accentColor="#ff0000" />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--accent-color')).toBeTruthy();
+  });
+
+  it('should support object form tokenProps', () => {
+    const Card = tasty({
+      tokenProps: {
+        size: '$card-size',
+        color: '#card-accent',
+      },
+    });
+
+    const { container } = render(<Card size="4x" color="#purple" />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--card-size')).toBe('32px');
+    expect(el.style.getPropertyValue('--card-accent-color')).toBeTruthy();
+  });
+
+  it('should strip tokenProps keys from DOM', () => {
+    const Bar = tasty({
+      tokenProps: ['progress'] as const,
+    });
+
+    const { container } = render(<Bar progress="50%" />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.hasAttribute('progress')).toBe(false);
+    expect(el.style.getPropertyValue('--progress')).toBe('50%');
+  });
+
+  it('should merge tokenProps with tokens prop (tokenProps wins)', () => {
+    const Bar = tasty({
+      tokenProps: ['progress'] as const,
+    });
+
+    const { container } = render(
+      <Bar tokens={{ $progress: '10%' }} progress="90%" />,
+    );
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--progress')).toBe('90%');
+  });
+
+  it('should merge tokenProps with default tokens (tokenProps wins)', () => {
+    const Bar = tasty({
+      tokenProps: ['progress'] as const,
+      tokens: { $progress: '25%' },
+    });
+
+    const { container } = render(<Bar progress="80%" />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--progress')).toBe('80%');
+  });
+
+  it('should fall back to default tokens when tokenProps not provided', () => {
+    const Bar = tasty({
+      tokenProps: ['progress'] as const,
+      tokens: { $progress: '25%' },
+    });
+
+    const { container } = render(<Bar />);
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--progress')).toBe('25%');
+  });
+
+  it('should handle mixed array form with both $ and Color tokens', () => {
+    const Component = tasty({
+      tokenProps: ['spacing', 'borderColor'] as const,
+    });
+
+    const { container } = render(
+      <Component spacing="2x" borderColor="#00ff00" />,
+    );
+    const el = container.firstElementChild as HTMLElement;
+
+    expect(el.style.getPropertyValue('--spacing')).toBe('16px');
+    expect(el.style.getPropertyValue('--border-color')).toBeTruthy();
+  });
+});

@@ -1400,9 +1400,7 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
         },
       });
 
-      const redRule = rules.find((r: any) =>
-        r.declarations.includes('red'),
-      );
+      const redRule = rules.find((r: any) => r.declarations.includes('red'));
       expect(redRule).toBeDefined();
       expect(redRule.selector).toContain('[data-hovered]');
       expect(redRule.selector).toContain('[data-focused]');

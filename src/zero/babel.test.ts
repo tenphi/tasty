@@ -165,7 +165,7 @@ const button = tastyStatic({
       expect(result).toContain('--gap');
     });
 
-    it('should not inject token CSS when no tokens configured', () => {
+    it('should inject default token CSS even when no user tokens configured', () => {
       const outputPath = path.join(tempDir, 'output.css');
 
       const code = `
@@ -181,7 +181,10 @@ const button = tastyStatic({
         mode: 'inject',
       });
 
-      expect(result).not.toContain('":root"');
+      expect(result).toContain('_$i(":root"');
+      expect(result).toContain('--white-color');
+      expect(result).toContain('--black-color');
+      expect(result).toContain('--border-color');
     });
 
     it('should not write CSS file in inject mode', () => {

@@ -142,8 +142,8 @@ export interface TastyConfig {
    * Global CSS @property definitions for custom properties.
    * Keys use tasty token syntax ($name for properties, #name for colors).
    *
-   * Tasty ships with `DEFAULT_PROPERTIES` (e.g. `$gap`, `$radius`, `#white`,
-   * `#black`, `#clear`, `#border`, etc.) that are always included.
+   * Tasty ships with `DEFAULT_PROPERTIES` (e.g. `$gap`, `$radius`, `#clear`,
+   * etc.) that are always included.
    * Properties you specify here are merged on top, so you can override any
    * default by using the same key.
    *
@@ -377,31 +377,16 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: false,
     initialValue: 'transparent',
   },
-  // Current color context variable (set by the color style handler).
-  '#current': {
-    inherits: true,
-    initialValue: 'transparent',
-  },
-  // White and black are fundamental colors that need explicit initial values.
-  '#white': {
-    inherits: true,
-    initialValue: 'rgb(255 255 255)',
-  },
-  '#black': {
-    inherits: true,
-    initialValue: 'rgb(0 0 0)',
-  },
   // Shorthand for transparent
   '#clear': {
     inherits: true,
     initialValue: 'transparent',
   },
-  // Default border color
-  '#border': {
+  // Current color context variable (set by the color style handler).
+  '#current': {
     inherits: true,
-    initialValue: 'rgb(0 0 0)',
+    initialValue: 'transparent',
   },
-
   // ---- Core design tokens used by style handlers ----
   // These provide sensible defaults so tasty works standalone without a design system.
   // Consuming projects (e.g. uikit) override these by defining tokens on :root.
@@ -456,6 +441,19 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   },
+};
+
+/**
+ * Default config tokens shipped with tasty.
+ * These are injected as CSS custom properties on `:root`, generating both
+ * `--name-color` and `--name-color-oklch` companions for opacity syntax support
+ * (e.g. `#white.5` → `oklch(var(--white-color-oklch) / .5)`).
+ * Users can override these via `configure({ tokens: { '#white': '...' } })`.
+ */
+export const DEFAULT_CONFIG_TOKENS: ConfigTokens = {
+  '#white': 'rgb(255 255 255)',
+  '#black': 'rgb(0 0 0)',
+  '#border': 'rgb(0 0 0)',
 };
 
 // Global injector instance key
@@ -884,7 +882,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
   let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
   let mergedReplaceTokens: Record<string, string | number | boolean> = {};
-  let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
+  let mergedConfigTokens: ConfigTokens = { ...DEFAULT_CONFIG_TOKENS };
   let mergedRecipes: Record<string, RecipeStyles> = {};
 
   // Process plugins in order

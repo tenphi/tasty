@@ -294,9 +294,9 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('@property --border-width');
     expect(css).toContain('@property --font-sans-fallback');
     expect(css).toContain('@property --font-mono-fallback');
-    // Color properties get companion -rgb rules
-    expect(css).toContain('@property --white-color');
-    expect(css).toContain('@property --white-color-oklch');
+    // #white, #black, #border are now predefined tokens (not @property)
+    expect(css).not.toContain('@property --white-color');
+    expect(css).not.toContain('@property --black-color');
   });
 
   it('collectInternals is idempotent', () => {

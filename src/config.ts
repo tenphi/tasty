@@ -146,7 +146,11 @@ export interface TastyConfig {
   /**
    * Global CSS @property definitions for custom properties.
    * Keys use tasty token syntax ($name for properties, #name for colors).
-   * Properties are only injected when the component using them is rendered.
+   *
+   * Tasty ships with `DEFAULT_PROPERTIES` (e.g. `$gap`, `$radius`, `#white`,
+   * `#black`, `#clear`, `#border`, etc.) that are always included.
+   * Properties you specify here are merged on top, so you can override any
+   * default by using the same key.
    *
    * For color tokens (#name), `syntax: '<color>'` is auto-set and
    * `initialValue` defaults to `'transparent'` if not specified.
@@ -158,6 +162,8 @@ export interface TastyConfig {
    *     '$rotation': { syntax: '<angle>', initialValue: '0deg' },
    *     '$scale': { syntax: '<number>', inherits: false, initialValue: 1 },
    *     '#accent': { initialValue: 'purple' }, // syntax: '<color>' auto-set
+   *     // Override a default property:
+   *     '$gap': { syntax: '<length>', inherits: true, initialValue: '8px' },
    *   },
    * });
    *
@@ -363,14 +369,14 @@ let globalRecipes: Record<string, RecipeStyles> | null = null;
 let globalConfigTokens: ConfigTokens | null = null;
 
 /**
- * Internal properties required by tasty core features.
- * These are always injected when styles are first generated.
+ * Default properties shipped with tasty.
+ * These are always included unless explicitly overridden via `configure({ properties })`.
  * Keys use tasty token syntax (#name for colors, $name for other properties).
  *
  * For properties with CSS @property-compatible types (length, time, number, color),
  * an `initialValue` is provided so the property works even without a project-level token.
  */
-export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
+export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   // Used by dual-fill feature to enable CSS transitions on the second fill color
   '#tasty-second-fill': {
     inherits: false,
@@ -387,6 +393,16 @@ export const INTERNAL_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue: 'rgb(255 255 255)',
   },
   '#black': {
+    inherits: true,
+    initialValue: 'rgb(0 0 0)',
+  },
+  // Shorthand for transparent
+  '#clear': {
+    inherits: true,
+    initialValue: 'transparent',
+  },
+  // Default border color
+  '#border': {
     inherits: true,
     initialValue: 'rgb(0 0 0)',
   },
@@ -530,17 +546,9 @@ export function markStylesGenerated(): void {
 
   const injector = getGlobalInjector();
 
-  // Inject internal properties required by tasty core features
-  for (const [token, definition] of Object.entries(INTERNAL_PROPERTIES)) {
+  // Inject all properties (defaults merged with user-configured overrides)
+  for (const [token, definition] of Object.entries(getEffectiveProperties())) {
     injector.property(token, definition);
-  }
-
-  // Inject global properties if any were configured
-  // Properties are permanent and only need to be injected once
-  if (globalProperties && Object.keys(globalProperties).length > 0) {
-    for (const [token, definition] of Object.entries(globalProperties)) {
-      injector.property(token, definition);
-    }
   }
 
   // Inject global @font-face rules (eagerly — fonts should be available before render)
@@ -665,6 +673,15 @@ function setGlobalProperties(
     return;
   }
   globalProperties = properties;
+}
+
+/**
+ * Get the effective properties: DEFAULT_PROPERTIES merged with user-configured
+ * properties. User properties override defaults with matching keys.
+ */
+export function getEffectiveProperties(): Record<string, PropertyDefinition> {
+  if (!globalProperties) return DEFAULT_PROPERTIES;
+  return { ...DEFAULT_PROPERTIES, ...globalProperties };
 }
 
 // ============================================================================

@@ -22,12 +22,10 @@ import {
   getConfig,
   getGlobalConfigTokens,
   getGlobalCounterStyle,
+  getEffectiveProperties,
   getGlobalFontFace,
   getGlobalKeyframes,
-  getGlobalProperties,
   hasGlobalKeyframes,
-  hasGlobalProperties,
-  INTERNAL_PROPERTIES,
 } from './config';
 import {
   counterStyle,
@@ -138,19 +136,9 @@ function collectInternalsRSC(rscCache: RSCStyleCache): string {
 
   const parts: string[] = [];
 
-  for (const [token, definition] of Object.entries(INTERNAL_PROPERTIES)) {
+  for (const [token, definition] of Object.entries(getEffectiveProperties())) {
     const css = formatPropertyCSS(token, definition);
     if (css) parts.push(css);
-  }
-
-  if (hasGlobalProperties()) {
-    const globalProps = getGlobalProperties();
-    if (globalProps) {
-      for (const [token, definition] of Object.entries(globalProps)) {
-        const css = formatPropertyCSS(token, definition);
-        if (css) parts.push(css);
-      }
-    }
   }
 
   const tokenStyles = getGlobalConfigTokens();

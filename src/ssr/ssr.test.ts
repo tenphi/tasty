@@ -288,7 +288,7 @@ describe('ServerStyleCollector', () => {
     collector.collectInternals();
 
     const css = collector.getCSS();
-    // INTERNAL_PROPERTIES: gap, radius, border-width, font fallbacks, etc.
+    // DEFAULT_PROPERTIES: gap, radius, border-width, font fallbacks, etc.
     expect(css).toContain('@property --gap');
     expect(css).toContain('@property --radius');
     expect(css).toContain('@property --border-width');

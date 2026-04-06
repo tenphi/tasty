@@ -11,12 +11,10 @@
  */
 
 import {
+  getEffectiveProperties,
   getGlobalCounterStyle,
   getGlobalFontFace,
-  getGlobalProperties,
   getGlobalConfigTokens,
-  hasGlobalProperties,
-  INTERNAL_PROPERTIES,
 } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
@@ -70,22 +68,12 @@ export class ServerStyleCollector {
     if (this.internalsCollected) return;
     this.internalsCollected = true;
 
-    for (const [token, definition] of Object.entries(INTERNAL_PROPERTIES)) {
+    for (const [token, definition] of Object.entries(
+      getEffectiveProperties(),
+    )) {
       const css = formatPropertyCSS(token, definition);
       if (css) {
-        this.collectProperty(`__internal:${token}`, css);
-      }
-    }
-
-    if (hasGlobalProperties()) {
-      const globalProps = getGlobalProperties();
-      if (globalProps) {
-        for (const [token, definition] of Object.entries(globalProps)) {
-          const css = formatPropertyCSS(token, definition);
-          if (css) {
-            this.collectProperty(`__global:${token}`, css);
-          }
-        }
+        this.collectProperty(`__prop:${token}`, css);
       }
     }
 

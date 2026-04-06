@@ -2,19 +2,33 @@
  * Hook-free, synchronous style computation.
  *
  * Extracts the core logic from useStyles() into a plain function that can
- * be called during React render without any hooks. On the client, styles
- * are injected synchronously (idempotent via the injector cache). On the
- * server, styles are collected via the SSR collector.
+ * be called during React render without any hooks. Three code paths:
+ *
+ * 1. SSR collector — styles collected via ServerStyleCollector
+ * 2. Client inject — styles injected synchronously into the DOM
+ * 3. RSC inline — styles returned as CSS strings for inline <style> emission
  *
  * This enables tasty() components to work as React Server Components.
  */
+
+import { cache } from 'react';
 
 import {
   categorizeStyleKeys,
   generateChunkCacheKey,
   renderStylesForChunk,
 } from './chunks';
-import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from './config';
+import {
+  getConfig,
+  getGlobalConfigTokens,
+  getGlobalCounterStyle,
+  getGlobalFontFace,
+  getGlobalKeyframes,
+  getGlobalProperties,
+  hasGlobalKeyframes,
+  hasGlobalProperties,
+  INTERNAL_PROPERTIES,
+} from './config';
 import {
   counterStyle,
   fontFace,
@@ -43,18 +57,23 @@ import {
   replaceAnimationNames,
 } from './keyframes';
 import type { RenderResult, StyleResult } from './pipeline';
+import { renderStyles } from './pipeline';
 import { extractLocalProperties, hasLocalProperties } from './properties';
 import { collectAutoInferredProperties } from './ssr/collect-auto-properties';
 import type { ServerStyleCollector } from './ssr/collector';
-import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
+import { formatGlobalRules } from './ssr/format-global-rules';
 import { formatKeyframesCSS } from './ssr/format-keyframes';
 import { formatPropertyCSS } from './ssr/format-property';
+import { formatRules } from './ssr/format-rules';
+import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
 import type { Styles } from './styles/types';
 import { hasKeys } from './utils/has-keys';
 import { resolveRecipes } from './utils/resolve-recipes';
 
 export interface ComputeStylesResult {
   className: string;
+  /** CSS text to emit as an inline <style> tag (RSC mode only). */
+  css?: string;
 }
 
 export interface ComputeStylesOptions {
@@ -70,6 +89,215 @@ interface ProcessedChunk {
 }
 
 const EMPTY_RESULT: ComputeStylesResult = { className: '' };
+
+// ---------------------------------------------------------------------------
+// RSC (React Server Components) inline style support
+// ---------------------------------------------------------------------------
+
+interface RSCStyleCache {
+  cacheKeyToClassName: Map<string, string>;
+  classCounter: number;
+  emittedKeys: Set<string>;
+  internalsEmitted: boolean;
+}
+
+/**
+ * Per-request RSC style cache using React.cache.
+ * React.cache provides per-request memoization in Server Components,
+ * so each request gets its own isolated cache.
+ */
+const getRSCCache = cache(
+  (): RSCStyleCache => ({
+    cacheKeyToClassName: new Map(),
+    classCounter: 0,
+    emittedKeys: new Set(),
+    internalsEmitted: false,
+  }),
+);
+
+function rscAllocateClassName(
+  rscCache: RSCStyleCache,
+  cacheKey: string,
+): { className: string; isNew: boolean } {
+  const existing = rscCache.cacheKeyToClassName.get(cacheKey);
+  if (existing) return { className: existing, isNew: false };
+
+  // Use 'r' prefix to avoid collisions with SSR collector's 't' prefix
+  const className = `r${rscCache.classCounter++}`;
+  rscCache.cacheKeyToClassName.set(cacheKey, className);
+  return { className, isNew: true };
+}
+
+/**
+ * Collect internals CSS for RSC — mirrors ServerStyleCollector.collectInternals().
+ * Emitted once per request (tracked via rscCache.internalsEmitted).
+ */
+function collectInternalsRSC(rscCache: RSCStyleCache): string {
+  if (rscCache.internalsEmitted) return '';
+  rscCache.internalsEmitted = true;
+
+  const parts: string[] = [];
+
+  for (const [token, definition] of Object.entries(INTERNAL_PROPERTIES)) {
+    const css = formatPropertyCSS(token, definition);
+    if (css) parts.push(css);
+  }
+
+  if (hasGlobalProperties()) {
+    const globalProps = getGlobalProperties();
+    if (globalProps) {
+      for (const [token, definition] of Object.entries(globalProps)) {
+        const css = formatPropertyCSS(token, definition);
+        if (css) parts.push(css);
+      }
+    }
+  }
+
+  const tokenStyles = getGlobalConfigTokens();
+  if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+    const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
+    if (tokenRules.length > 0) {
+      const css = formatGlobalRules(tokenRules);
+      if (css) parts.push(css);
+    }
+  }
+
+  const globalFF = getGlobalFontFace();
+  if (globalFF) {
+    for (const [family, input] of Object.entries(globalFF)) {
+      const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+        ? input
+        : [input];
+      for (const desc of descriptors) {
+        parts.push(formatFontFaceRule(family, desc));
+      }
+    }
+  }
+
+  const globalCS = getGlobalCounterStyle();
+  if (globalCS) {
+    for (const [name, descriptors] of Object.entries(globalCS)) {
+      parts.push(formatCounterStyleRule(name, descriptors));
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Collect per-component ancillary CSS (keyframes, @property, font-face,
+ * counter-style) for RSC mode.
+ */
+function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
+  const parts: string[] = [];
+
+  const usedKf = getUsedKeyframes(styles);
+  if (usedKf) {
+    for (const [name, steps] of Object.entries(usedKf)) {
+      const key = `__kf:${name}`;
+      if (!rscCache.emittedKeys.has(key)) {
+        rscCache.emittedKeys.add(key);
+        parts.push(formatKeyframesCSS(name, steps));
+      }
+    }
+  }
+
+  if (hasLocalProperties(styles)) {
+    const localProperties = extractLocalProperties(styles);
+    if (localProperties) {
+      for (const [token, definition] of Object.entries(localProperties)) {
+        const key = `__prop:${token}`;
+        if (!rscCache.emittedKeys.has(key)) {
+          rscCache.emittedKeys.add(key);
+          const css = formatPropertyCSS(token, definition);
+          if (css) parts.push(css);
+        }
+      }
+    }
+  }
+
+  if (hasLocalFontFace(styles)) {
+    const localFontFace = extractLocalFontFace(styles);
+    if (localFontFace) {
+      for (const [family, input] of Object.entries(localFontFace)) {
+        const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+          ? input
+          : [input];
+        for (const desc of descriptors) {
+          const hash = fontFaceContentHash(family, desc);
+          const key = `__ff:${hash}`;
+          if (!rscCache.emittedKeys.has(key)) {
+            rscCache.emittedKeys.add(key);
+            parts.push(formatFontFaceRule(family, desc));
+          }
+        }
+      }
+    }
+  }
+
+  if (hasLocalCounterStyle(styles)) {
+    const localCounterStyle = extractLocalCounterStyle(styles);
+    if (localCounterStyle) {
+      for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+        const key = `__cs:${name}`;
+        if (!rscCache.emittedKeys.has(key)) {
+          rscCache.emittedKeys.add(key);
+          parts.push(formatCounterStyleRule(name, descriptors));
+        }
+      }
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Process all chunks in RSC mode: render CSS to strings, allocate classNames,
+ * and return combined { className, css }.
+ */
+function computeStylesRSC(
+  styles: Styles,
+  chunkMap: Map<string, string[]>,
+): ComputeStylesResult {
+  const rscCache = getRSCCache();
+  const cssParts: string[] = [];
+  const classNames: string[] = [];
+
+  const internalsCSS = collectInternalsRSC(rscCache);
+  if (internalsCSS) cssParts.push(internalsCSS);
+
+  for (const [chunkName, chunkStyleKeys] of chunkMap) {
+    if (chunkStyleKeys.length === 0) continue;
+
+    const cacheKey = generateChunkCacheKey(styles, chunkName, chunkStyleKeys);
+    const { className, isNew } = rscAllocateClassName(rscCache, cacheKey);
+    classNames.push(className);
+
+    if (isNew) {
+      const renderResult = renderStylesForChunk(
+        styles,
+        chunkName,
+        chunkStyleKeys,
+      );
+      if (renderResult.rules.length > 0) {
+        const css = formatRules(renderResult.rules, className);
+        if (css) cssParts.push(css);
+      }
+    }
+  }
+
+  const ancillaryCSS = collectAncillaryRSC(rscCache, styles);
+  if (ancillaryCSS) cssParts.push(ancillaryCSS);
+
+  if (classNames.length === 0) return EMPTY_RESULT;
+
+  const css = cssParts.join('\n');
+
+  return {
+    className: classNames.join(' '),
+    css: css || undefined,
+  };
+}
 
 /**
  * Get keyframes that are actually used in styles.
@@ -294,14 +522,13 @@ function collectAncillarySSR(
  * Synchronous, hook-free style computation.
  *
  * Resolves recipes, categorizes style keys into chunks, renders CSS rules,
- * allocates class names, and injects (client) or collects (SSR) the CSS.
+ * allocates class names, and injects / collects / returns the CSS.
  *
- * On the client, CSS is injected synchronously into the DOM. The injector's
- * content-based cache makes this idempotent — repeated calls with the same
- * styles are essentially free (Map lookup + refCount bump).
- *
- * On the server, an SSR collector is discovered via AsyncLocalStorage
- * (or passed explicitly via options) and CSS is collected as strings.
+ * Three code paths:
+ * 1. SSR collector — discovered via ALS or passed explicitly; CSS collected
+ * 2. RSC inline — no collector and no `document`; CSS returned as `result.css`
+ *    for the caller to emit as an inline `<style>` tag
+ * 3. Client inject — CSS injected synchronously into the DOM (idempotent)
  *
  * @param styles - Tasty styles object (or undefined for no styles)
  * @param options - Optional SSR collector override
@@ -338,6 +565,9 @@ export function computeStyles(
     }
 
     collectAncillarySSR(collector, resolved, chunks);
+  } else if (typeof document === 'undefined') {
+    // RSC path: render CSS to strings for inline <style> emission
+    return computeStylesRSC(resolved, chunkMap);
   } else {
     injectAncillarySync(resolved);
 

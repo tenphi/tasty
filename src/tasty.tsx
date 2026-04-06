@@ -6,7 +6,8 @@ import type {
   PropsWithoutRef,
   RefAttributes,
 } from 'react';
-import { createElement, forwardRef } from 'react';
+import { createElement, forwardRef, Fragment } from 'react';
+import type { ComputeStylesResult } from './compute-styles';
 import { computeStyles } from './compute-styles';
 import { BASE_STYLES } from './styles/list';
 import type { Styles, StylesInterface } from './styles/types';
@@ -743,14 +744,22 @@ function tastyElement<
         ? mergeStyles(baseStyles, styles as Styles, propStyles as Styles)
         : baseStyles;
 
-    // Use factory-level cache for stable style references (the common case)
-    let stylesClassName: string;
-    if (allStyles === baseStyles && classNameCache.has(allStyles)) {
-      stylesClassName = classNameCache.get(allStyles)!;
+    // Use factory-level cache for stable style references (client only).
+    // On the server the cache must be skipped: both the SSR collector and
+    // the RSC inline-style paths are per-request, so every request must
+    // call computeStyles() to ensure CSS is actually collected/emitted.
+    const useFactoryCache = typeof document !== 'undefined';
+    let stylesResult: ComputeStylesResult;
+    if (
+      useFactoryCache &&
+      allStyles === baseStyles &&
+      classNameCache.has(allStyles)
+    ) {
+      stylesResult = { className: classNameCache.get(allStyles)! };
     } else {
-      stylesClassName = computeStyles(allStyles).className;
-      if (allStyles === baseStyles) {
-        classNameCache.set(allStyles, stylesClassName);
+      stylesResult = computeStyles(allStyles);
+      if (useFactoryCache && allStyles === baseStyles) {
+        classNameCache.set(allStyles, stylesResult.className);
       }
     }
 
@@ -798,7 +807,10 @@ function tastyElement<
       >;
     }
 
-    const finalClassName = [(userClassName as string) || '', stylesClassName]
+    const finalClassName = [
+      (userClassName as string) || '',
+      stylesResult.className,
+    ]
       .filter(Boolean)
       .join(' ');
 
@@ -816,7 +828,25 @@ function tastyElement<
 
     handleIsProperties(elementProps);
 
-    return createElement((as as string | 'div') ?? originalAs, elementProps);
+    const el = createElement(
+      (as as string | 'div') ?? originalAs,
+      elementProps,
+    );
+
+    // RSC mode: wrap element with inline <style> for server-rendered CSS
+    if (stylesResult.css) {
+      return createElement(
+        Fragment,
+        null,
+        createElement('style', {
+          'data-tasty-rsc': '',
+          dangerouslySetInnerHTML: { __html: stylesResult.css },
+        }),
+        el,
+      );
+    }
+
+    return el;
   });
 
   _TastyComponent.displayName = `TastyComponent(${

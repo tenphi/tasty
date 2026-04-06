@@ -43,12 +43,12 @@ interface PropsFilterOptions {
  * @param props - The component props to be filtered.
  * @param opts - Props to override.
  */
-export function filterBaseProps(
-  props: Record<string, unknown>,
+export function filterBaseProps<T extends Record<string, unknown>>(
+  props: T,
   opts: PropsFilterOptions = {},
-): Record<string, unknown> {
+): Partial<T> {
   const { propNames, eventProps } = opts;
-  const filteredProps: Record<string, unknown> = {};
+  const filteredProps: Partial<T> = {};
 
   for (const prop in props) {
     if (

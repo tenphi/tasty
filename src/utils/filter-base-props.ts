@@ -43,7 +43,7 @@ interface PropsFilterOptions {
  * @param props - The component props to be filtered.
  * @param opts - Props to override.
  */
-export function filterBaseProps<T extends Record<string, unknown>>(
+export function filterBaseProps<T extends object>(
   props: T,
   opts: PropsFilterOptions = {},
 ): Partial<T> {

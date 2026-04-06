@@ -6,8 +6,8 @@ import type {
   PropsWithoutRef,
   RefAttributes,
 } from 'react';
-import { createElement, forwardRef, useMemo, useRef } from 'react';
-import { useStyles } from './hooks/useStyles';
+import { createElement, forwardRef } from 'react';
+import { computeStyles } from './compute-styles';
 import { BASE_STYLES } from './styles/list';
 import type { Styles, StylesInterface } from './styles/types';
 import type {
@@ -26,7 +26,7 @@ import { mergeStyles } from './utils/merge-styles';
 import { isSelector } from './pipeline';
 import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
-import { processTokens, stringifyTokens } from './utils/process-tokens';
+import { processTokens } from './utils/process-tokens';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
@@ -532,12 +532,9 @@ function tastyWrap<
 
   const _WrappedComponent = forwardRef<any, any>((props, ref) => {
     const { as, element, ...restProps } = props as Record<string, unknown>;
-    const propsWithStylesValues = propsWithStyles.map(
-      (prop) => (props as any)[prop],
-    );
 
-    const mergedStylesMap: Styles | undefined = useMemo(() => {
-      return propsWithStyles.reduce((map, prop) => {
+    const mergedStylesMap = propsWithStyles.reduce(
+      (map, prop) => {
         const restValue = (restProps as any)[prop];
         const defaultValue = (defaultProps as any)[prop];
 
@@ -548,13 +545,14 @@ function tastyWrap<
         }
 
         return map;
-      }, {} as Styles);
-    }, [propsWithStylesValues]);
+      },
+      {} as Record<string, unknown>,
+    );
 
     const elementProps = {
       ...(defaultProps as unknown as Record<string, unknown>),
       ...(restProps as unknown as Record<string, unknown>),
-      ...(mergedStylesMap as unknown as Record<string, unknown>),
+      ...mergedStylesMap,
       as: (as as string | undefined) ?? extendTag,
       element: (element as string | undefined) || extendElement,
       ref,
@@ -659,6 +657,10 @@ function tastyElement<
     ? buildTokenPropsMapping(tokenPropsDef as TokenPropsInput)
     : undefined;
 
+  // Factory-level cache: maps stable style references to computed classNames.
+  // For the common case (no instance overrides), this avoids recomputation.
+  const classNameCache = new Map<Styles | undefined, string>();
+
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
@@ -685,7 +687,6 @@ function tastyElement<
     let styles = rawStyles;
 
     let propStyles: Styles | null = null;
-    let propStylesKey = '';
 
     for (const prop of propsToCheck) {
       const key = prop as unknown as string;
@@ -695,7 +696,6 @@ function tastyElement<
         const value = (otherProps as any)[key];
         (propStyles as any)[key] = value;
         delete (otherProps as any)[key];
-        propStylesKey += key + '\0' + value + '\0';
       }
     }
 
@@ -703,7 +703,6 @@ function tastyElement<
       styles = undefined as unknown as Styles;
     }
 
-    // Extract mod props from otherProps before hooks
     let propMods: Record<string, ModValue> | undefined;
     if (modPropsKeys) {
       for (const key of modPropsKeys) {
@@ -717,7 +716,6 @@ function tastyElement<
       }
     }
 
-    // Extract token props from otherProps before hooks
     let propTokens: Tokens | undefined;
     if (tokenPropsMapping) {
       for (const [propName, tokenKey] of tokenPropsMapping) {
@@ -731,68 +729,62 @@ function tastyElement<
       }
     }
 
-    // Stabilize propStyles reference: only update when content actually changes
-    const propStylesRef = useRef<{ key: string; styles: Styles | null }>({
-      key: '',
-      styles: null,
-    });
-    if (propStylesRef.current.key !== propStylesKey) {
-      propStylesRef.current = { key: propStylesKey, styles: propStyles };
-    }
-
-    // Determine base styles: use variant styles if available, otherwise default styles
     const baseStyles = variantStylesMap
       ? (variantStylesMap[(variant as string) || 'default'] ??
         variantStylesMap['default'])
       : defaultStyles;
 
-    // Merge base styles with instance styles and prop styles
-    const allStyles = useMemo(() => {
-      const currentPropStyles = propStylesRef.current.styles;
-      const hasStyleProps =
-        styles && hasKeys(styles as Record<string, unknown>);
-      const hasPropStyles = currentPropStyles && hasKeys(currentPropStyles);
+    const hasInstanceStyles =
+      styles && hasKeys(styles as Record<string, unknown>);
+    const hasPropStyles = propStyles && hasKeys(propStyles);
 
-      if (!hasStyleProps && !hasPropStyles) {
-        return baseStyles;
+    const allStyles =
+      hasInstanceStyles || hasPropStyles
+        ? mergeStyles(baseStyles, styles as Styles, propStyles as Styles)
+        : baseStyles;
+
+    // Use factory-level cache for stable style references (the common case)
+    let stylesClassName: string;
+    if (allStyles === baseStyles && classNameCache.has(allStyles)) {
+      stylesClassName = classNameCache.get(allStyles)!;
+    } else {
+      stylesClassName = computeStyles(allStyles).className;
+      if (allStyles === baseStyles) {
+        classNameCache.set(allStyles, stylesClassName);
       }
+    }
 
-      return mergeStyles(
-        baseStyles,
-        styles as Styles,
-        currentPropStyles as Styles,
-      );
-    }, [baseStyles, styles, propStylesKey]);
+    // Merge tokens: default -> instance -> tokenProps
+    let mergedTokens: Tokens | undefined;
+    if (defaultTokens || tokens || propTokens) {
+      if (!defaultTokens && !propTokens) {
+        mergedTokens = tokens as Tokens;
+      } else if (!tokens && !propTokens) {
+        mergedTokens = defaultTokens;
+      } else {
+        mergedTokens = {
+          ...defaultTokens,
+          ...(tokens as Tokens),
+          ...propTokens,
+        } as Tokens;
+      }
+    }
 
-    // Use the useStyles hook for style generation and injection
-    const { className: stylesClassName } = useStyles(allStyles);
+    const processedTokenStyle = processTokens(mergedTokens);
 
-    // Merge default tokens, instance tokens, and token props (token props have highest priority)
-    const tokensKey = stringifyTokens(tokens as Tokens | undefined);
-    const propTokensKey = stringifyTokens(propTokens);
-    const mergedTokens = useMemo(() => {
-      if (!defaultTokens && !tokens && !propTokens) return undefined;
-      if (!defaultTokens && !propTokens) return tokens as Tokens;
-      if (!tokens && !propTokens) return defaultTokens;
-      return {
-        ...defaultTokens,
-        ...(tokens as Tokens),
-        ...propTokens,
-      } as Tokens;
-    }, [tokensKey, propTokensKey]);
-
-    // Process merged tokens into inline style properties
-    const processedTokenStyle = useMemo(() => {
-      return processTokens(mergedTokens);
-    }, [mergedTokens]);
-
-    // Merge processed tokens with explicit style prop (style has priority)
-    const mergedStyle = useMemo(() => {
-      if (!processedTokenStyle && !style) return undefined;
-      if (!processedTokenStyle) return style;
-      if (!style) return processedTokenStyle;
-      return { ...processedTokenStyle, ...style };
-    }, [processedTokenStyle, style]);
+    let mergedStyle: Record<string, unknown> | undefined;
+    if (processedTokenStyle || style) {
+      if (!processedTokenStyle) {
+        mergedStyle = style;
+      } else if (!style) {
+        mergedStyle = processedTokenStyle as Record<string, unknown>;
+      } else {
+        mergedStyle = {
+          ...(processedTokenStyle as Record<string, unknown>),
+          ...style,
+        };
+      }
+    }
 
     const mergedMods = propMods
       ? { ...(mods as Record<string, ModValue>), ...propMods }
@@ -806,7 +798,6 @@ function tastyElement<
       >;
     }
 
-    // Merge user className with generated className
     const finalClassName = [(userClassName as string) || '', stylesClassName]
       .filter(Boolean)
       .join(' ');
@@ -823,15 +814,9 @@ function tastyElement<
       ref,
     } as Record<string, unknown>;
 
-    // Apply the helper to handle is* properties
     handleIsProperties(elementProps);
 
-    const renderedElement = createElement(
-      (as as string | 'div') ?? originalAs,
-      elementProps,
-    );
-
-    return renderedElement;
+    return createElement((as as string | 'div') ?? originalAs, elementProps);
   });
 
   _TastyComponent.displayName = `TastyComponent(${

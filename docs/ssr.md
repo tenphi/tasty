@@ -18,16 +18,16 @@ The Astro integration (`@tenphi/tasty/ssr/astro`) has no additional dependencies
 
 ## How It Works
 
-When the environment can execute runtime React code during server rendering, the same `tasty()` and `useStyles()` calls can run there too. In Next.js, generic React SSR, and Astro islands, Tasty simply changes where that runtime-generated CSS goes: `useStyles()` detects a `ServerStyleCollector` and collects CSS into it instead of trying to access the DOM. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `useStyles()` skips the rendering pipeline entirely during hydration.
+`tasty()` components are hook-free and use `computeStyles()` internally — a synchronous, framework-agnostic function. On the server, `computeStyles()` detects a `ServerStyleCollector` (via `AsyncLocalStorage` or an explicit option) and collects CSS into it instead of trying to access the DOM. On the client, CSS is injected synchronously into the DOM during render; the injector's content-based cache makes this idempotent. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `computeStyles()` skips the rendering pipeline entirely during hydration.
 
 ```
 Server                         Client
 ──────                         ──────
 tasty() renders                hydrateTastyCache() pre-populates cache
-  └─ useStyles()                 └─ cacheKey → className map ready
+  └─ computeStyles()              └─ cacheKey → className map ready
        └─ collector.collect()
                                  tasty() renders
-After render:                    └─ useStyles()
+After render:                    └─ computeStyles()
   <style data-tasty-ssr>              └─ cache hit → skip pipeline
   <script data-tasty-cache>           └─ no CSS re-injection
 ```
@@ -83,14 +83,14 @@ That's it. All `tasty()` components inside the tree automatically get SSR suppor
 ### How it works
 
 - `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load.
-- During SSR, `useStyles()` finds the collector via React context and pushes CSS rules to it.
+- During SSR, `computeStyles()` finds the collector (registered globally by `TastyRegistry`) and collects CSS rules into it.
 - `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible -- styles are injected alongside each Suspense boundary as it resolves.
 - A companion `<script>` tag transfers the `cacheKey → className` mapping to the client.
-- When the module loads on the client, `hydrateTastyCache()` runs automatically and pre-populates the injector cache. During hydration, `useStyles()` hits the cache and skips the entire pipeline.
+- When the module loads on the client, `hydrateTastyCache()` runs automatically and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
 
 ### Using tasty() in Server Components
 
-`tasty()` components use React hooks internally, so they require `'use client'`. However, this does **not** prevent them from being used in Server Component pages. In Next.js, `'use client'` components are still server-rendered on initial load. Dynamic `styleProps` like `<Grid flow="column">` work normally when a `tasty()` component is imported into a Server Component page.
+`tasty()` components are hook-free and do not require `'use client'`. They can be used directly in React Server Components. Dynamic `styleProps` like `<Grid flow="column">` work normally in server components. During SSR, the `TastyRegistry` registers its collector globally so that `computeStyles()` can discover it without React context.
 
 ### Options
 
@@ -161,10 +161,10 @@ import Card from '../components/Card.tsx';
 
 ### How it works
 
-Astro's `@astrojs/react` renderer calls `renderToString()` for each React component without wrapping the tree in a provider. The middleware uses `AsyncLocalStorage` to make the collector available to all `useStyles()` calls within the request.
+Astro's `@astrojs/react` renderer calls `renderToString()` for each React component without wrapping the tree in a provider. The middleware uses `AsyncLocalStorage` to make the collector available to all `computeStyles()` calls within the request.
 
 - **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>`. No JavaScript is shipped for these components.
-- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, importing `@tenphi/tasty/ssr/astro` auto-hydrates the cache from `<script data-tasty-cache>`. The island's `useStyles()` calls hit the cache during hydration.
+- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, importing `@tenphi/tasty/ssr/astro` auto-hydrates the cache from `<script data-tasty-cache>`. The island's `computeStyles()` calls hit the cache during hydration.
 
 ### Client-side hydration for islands
 
@@ -325,7 +325,7 @@ Server-safe style collector. One instance per request.
 
 ### `TastySSRContext`
 
-React context (`createContext<ServerStyleCollector | null>(null)`). Used by `useStyles()` to find the collector during SSR.
+React context (`createContext<ServerStyleCollector | null>(null)`). Used by the `useStyles()` hook to find the collector during SSR. Not needed when using `computeStyles()` directly (which discovers the collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`).
 
 ### `TastyRegistry`
 
@@ -350,7 +350,7 @@ Pre-populate the client injector cache. When called without arguments, reads fro
 
 ### `runWithCollector(collector, fn)`
 
-Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All `useStyles()` calls within `fn` (and async continuations) will find this collector.
+Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All `computeStyles()` and `useStyles()` calls within `fn` (and async continuations) will find this collector.
 
 ---
 

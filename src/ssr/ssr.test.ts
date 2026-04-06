@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { configure, resetConfig } from '../config';
-import { allocateClassName, inject, trackRef } from '../injector';
+import { inject, injector } from '../injector';
 
 import { collectAutoInferredProperties } from './collect-auto-properties';
 import { ServerStyleCollector } from './collector';
@@ -467,7 +467,9 @@ describe('hydrateTastyCache', () => {
       classCounter: 1,
     });
 
-    const result = allocateClassName('APPEARANCE:fill=#purple');
+    const result = injector.instance.allocateClassName(
+      'APPEARANCE:fill=#purple',
+    );
     expect(result.className).toBe('t0');
     expect(result.isNewAllocation).toBe(false);
   });
@@ -480,7 +482,7 @@ describe('hydrateTastyCache', () => {
 
     hydrateTastyCache();
 
-    const result = allocateClassName('DIMENSION:padding=2x');
+    const result = injector.instance.allocateClassName('DIMENSION:padding=2x');
     expect(result.className).toBe('t5');
     expect(result.isNewAllocation).toBe(false);
   });
@@ -497,7 +499,7 @@ describe('hydrateTastyCache', () => {
 
     hydrateTastyCache();
 
-    const result = allocateClassName('LAYOUT:flow=column');
+    const result = injector.instance.allocateClassName('LAYOUT:flow=column');
     expect(result.className).toBe('t2');
     expect(result.isNewAllocation).toBe(false);
   });
@@ -529,7 +531,7 @@ describe('hydrateTastyCache', () => {
       classCounter: 4,
     });
 
-    const result = trackRef('DIMENSION:padding=2x');
+    const result = injector.instance.trackRef('DIMENSION:padding=2x');
     expect(result).not.toBeNull();
     expect(result!.className).toBe('t3');
     expect(typeof result!.dispose).toBe('function');
@@ -539,7 +541,7 @@ describe('hydrateTastyCache', () => {
   });
 
   it('trackRef returns null for unknown cacheKey', () => {
-    const result = trackRef('NONEXISTENT:key');
+    const result = injector.instance.trackRef('NONEXISTENT:key');
     expect(result).toBeNull();
   });
 
@@ -550,7 +552,9 @@ describe('hydrateTastyCache', () => {
     });
 
     // allocateClassName finds the SSR entry
-    const alloc = allocateClassName('APPEARANCE:fill=#purple');
+    const alloc = injector.instance.allocateClassName(
+      'APPEARANCE:fill=#purple',
+    );
     expect(alloc.className).toBe('t0');
     expect(alloc.isNewAllocation).toBe(false);
 
@@ -570,7 +574,7 @@ describe('hydrateTastyCache', () => {
     expect(typeof result.dispose).toBe('function');
 
     // New className allocations produce a fresh class
-    const newAlloc = allocateClassName('NEW:chunk');
+    const newAlloc = injector.instance.allocateClassName('NEW:chunk');
     expect(newAlloc.isNewAllocation).toBe(true);
     expect(newAlloc.className).toMatch(/^t\d+$/);
   });

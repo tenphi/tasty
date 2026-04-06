@@ -152,11 +152,3 @@ export function processTokens(
 
   return result as CSSProperties | undefined;
 }
-
-/**
- * Stringify tokens for memoization key.
- */
-export function stringifyTokens(tokens: Tokens | undefined): string {
-  if (!tokens) return '';
-  return JSON.stringify(tokens);
-}

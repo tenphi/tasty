@@ -56,6 +56,13 @@ export type {
 } from '../parser/types';
 export { Bucket } from '../parser/types';
 
+// Style computation (hook-free)
+export { computeStyles } from '../compute-styles';
+export type {
+  ComputeStylesResult,
+  ComputeStylesOptions,
+} from '../compute-styles';
+
 // Injector
 export * from '../injector';
 

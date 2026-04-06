@@ -18,38 +18,17 @@ import type {
 } from './types';
 
 /**
- * Allocate a className for a cacheKey without injecting styles yet
- */
-export function allocateClassName(
-  cacheKey: string,
-  options?: { root?: Document | ShadowRoot },
-): { className: string; isNewAllocation: boolean } {
-  return getGlobalInjector().allocateClassName(cacheKey, options);
-}
-
-/**
- * Track a reference to an already-injected cacheKey (refCount + dispose).
- * Used on cache hits (SSR hydration or runtime reuse) where the pipeline
- * was skipped. Returns null if the cacheKey is not in the cache.
- */
-export function trackRef(
-  cacheKey: string,
-  options?: { root?: Document | ShadowRoot },
-): InjectResult | null {
-  return getGlobalInjector().trackRef(cacheKey, options);
-}
-
-/**
  * Inject styles and return className with dispose function
  */
 export function inject(
   rules: StyleResult[],
   options?: { root?: Document | ShadowRoot; cacheKey?: string },
 ): InjectResult {
-  // Mark that styles have been generated (prevents configuration changes)
+  const injector = getGlobalInjector();
+
   markStylesGenerated();
 
-  return getGlobalInjector().inject(rules, options);
+  return injector.inject(rules, options);
 }
 
 /**

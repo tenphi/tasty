@@ -25,7 +25,21 @@ fill: { '': '#white', hovered: '#gray.05', 'theme=danger': '#red' }
 | Pseudo-class | `:hover` | `:hover` |
 | Class selector | `.active` | `.active` |
 | Attribute selector | `[aria-expanded="true"]` | `[aria-expanded="true"]` |
-| Combined | `hovered & .active` | `[data-hovered].active` |
+| Combined (AND) | `hovered & .active` | `[data-hovered].active` |
+| Combined (OR) | `hovered \| focused` | `[data-hovered], [data-focused]` |
+| Negated (NOT) | `!disabled` | `:not([data-disabled])` |
+| Exclusive (XOR) | `hovered ^ focused` | `[data-hovered]:not([data-focused]), :not([data-hovered])[data-focused]` |
+
+Operator precedence (highest to lowest): `!` (NOT) > `^` (XOR) > `|` (OR) > `&` (AND). Use parentheses to override: `hovered & (pressed ^ focused)`.
+
+`^` (XOR) means "exactly one of" — `A ^ B` expands to `(A & !B) | (!A & B)`. This is useful for mutually exclusive states where exactly one should be active:
+
+```jsx
+fill: {
+  '': '#surface',
+  'hovered ^ focused': '#accent',  // active when hovered OR focused, but not both
+}
+```
 
 ### Sub-element
 
@@ -430,7 +444,7 @@ const FadeIn = tasty({
 
 ### `@parent(...)` — Parent Element States
 
-Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`) is supported inside `@parent()`.
+Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`, `^`) is supported inside `@parent()`.
 
 ```jsx
 const Highlight = tasty({
@@ -508,12 +522,13 @@ const Card = tasty({
 | `!:has(> Icon)` | `:not(:has(> [data-element="Icon"]))` | Negation (use `!`) |
 | `!:is(Panel)` | `:not([data-element="Panel"])` | Negation (use `!:is`) |
 
-Combine with other states using boolean logic:
+Combine with other states using boolean logic (`&`, `|`, `!`, `^`):
 
 ```jsx
-':has(> Icon) & hovered'                // structural + data attribute
-'@parent(hovered) & :has(> Icon)'       // parent check + structural
+':has(> Icon) & hovered'                // AND: structural + data attribute
+'@parent(hovered) & :has(> Icon)'       // AND: parent check + structural
 ':has(> Icon) | :has(> Button)'         // OR: either sub-element present
+':has(> Icon) ^ :has(> Button)'         // XOR: exactly one present
 ```
 
 > **Nesting limit:** The state key parser supports up to 2 levels of nested parentheses inside `:is()`, `:has()`, `:not()`, and `:where()` — e.g. `:has(Input:not(:disabled))` works, but 3+ levels like `:has(:is(:not(:hover)))` will not be tokenized correctly. This covers virtually all practical use cases.

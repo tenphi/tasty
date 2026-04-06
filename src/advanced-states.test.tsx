@@ -1390,4 +1390,35 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       expect(rules[0].atRules?.[0]).toBe('@media print');
     });
   });
+
+  describe('XOR (^) operator', () => {
+    it('should render XOR with exclusive selectors via renderStyles', () => {
+      const { rules } = renderStyles({
+        color: {
+          '': 'black',
+          'hovered ^ focused': 'red',
+        },
+      });
+
+      const redRule = rules.find((r: any) => r.declarations.includes('red'));
+      expect(redRule).toBeDefined();
+      expect(redRule.selector).toContain('[data-hovered]');
+      expect(redRule.selector).toContain('[data-focused]');
+      expect(redRule.selector).toContain(':not(');
+    });
+
+    it('should render a tasty() component with XOR state', () => {
+      const Element = tasty({
+        styles: {
+          color: {
+            '': 'black',
+            'hovered ^ focused': 'red',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
+    });
+  });
 });

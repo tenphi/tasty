@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.4.2
+
+### Patch Changes
+
+- [#104](https://github.com/tenphi/tasty/pull/104) [`2f4576e`](https://github.com/tenphi/tasty/commit/2f4576ee665212de48253ae558498ec91f38e9b5) Thanks [@tenphi](https://github.com/tenphi)! - Relax `filterBaseProps` generic constraint from `Record<string, unknown>` to `object` so composed prop types (built from `Omit`/intersections) are accepted without requiring a string index signature.
+
 ## 1.4.1
 
 ### Patch Changes

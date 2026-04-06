@@ -44,7 +44,7 @@ export class StyleInjector {
   private globalRuleCounter = 0;
   private lastGCTime = 0;
   private backgroundSweepTimeout: ReturnType<typeof setTimeout> | null = null;
-  private pendingGCHandle: number | null = null;
+  private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
@@ -937,13 +937,16 @@ export class StyleInjector {
           score: usage.hitCount * Math.exp(-age / baseMaxAge),
         });
       }
-      scored.sort((a, b) => a.score - b.score);
 
-      const toEvict = registry.usageMap.size - cacheCapacity;
-      for (let i = 0; i < Math.min(toEvict, scored.length); i++) {
-        const { className } = scored[i];
-        registry.usageMap.delete(className);
-        swept++;
+      if (scored.length > 0) {
+        scored.sort((a, b) => a.score - b.score);
+
+        const toEvict = registry.usageMap.size - cacheCapacity;
+        for (let i = 0; i < Math.min(toEvict, scored.length); i++) {
+          const { className } = scored[i];
+          registry.usageMap.delete(className);
+          swept++;
+        }
       }
     }
 
@@ -990,21 +993,17 @@ export class StyleInjector {
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
 
-    // Clear sweep timer only when no active roots remain
-    const hasRoots = !this.sheetManager
-      .getActiveRoots()
-      [Symbol.iterator]()
-      .next().done;
-    if (this.backgroundSweepTimeout && !hasRoots) {
+    // Clear sweep timer and pending GC only when no active roots remain
+    if (this.backgroundSweepTimeout && !this.sheetManager.hasActiveRoots()) {
       clearTimeout(this.backgroundSweepTimeout);
       this.backgroundSweepTimeout = null;
-    }
 
-    if (this.pendingGCHandle != null) {
-      if (typeof cancelIdleCallback !== 'undefined') {
-        cancelIdleCallback(this.pendingGCHandle);
+      if (this.pendingGCHandle != null) {
+        if (typeof cancelIdleCallback !== 'undefined') {
+          cancelIdleCallback(this.pendingGCHandle);
+        }
+        this.pendingGCHandle = null;
       }
-      this.pendingGCHandle = null;
     }
   }
 }

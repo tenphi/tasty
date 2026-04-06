@@ -89,12 +89,21 @@ export class SheetManager {
     return this.activeRoots;
   }
 
+  /** Check whether any roots have active registries. */
+  hasActiveRoots(): boolean {
+    return this.activeRoots.size > 0;
+  }
+
   /** Remove registries for ShadowRoots whose host has been detached from the DOM. */
   pruneDisconnectedRoots(): void {
+    const toPrune: (Document | ShadowRoot)[] = [];
     for (const root of this.activeRoots) {
       if (root !== document && !(root as ShadowRoot).host?.isConnected) {
-        this.cleanup(root);
+        toPrune.push(root);
       }
+    }
+    for (const root of toPrune) {
+      this.cleanup(root);
     }
   }
 

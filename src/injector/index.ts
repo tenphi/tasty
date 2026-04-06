@@ -231,7 +231,8 @@ export function touch(
   className: string,
   options?: { root?: Document | ShadowRoot },
 ): void {
-  return getGlobalInjector().touch(className, options);
+  if (!getConfig().gc) return;
+  getGlobalInjector().touch(className, options);
 }
 
 /**

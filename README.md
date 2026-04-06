@@ -347,7 +347,7 @@ Every style property accepts a state mapping object. Keys can be combined with b
 | Feature query | `@supports(display: grid)` | `@supports (display: grid)` |
 | Entry animation | `@starting` | `@starting-style` |
 
-Combine with `&` (AND), `|` (OR), `!` (NOT):
+Combine with `&` (AND), `|` (OR), `!` (NOT), `^` (XOR):
 
 ```tsx
 fill: {

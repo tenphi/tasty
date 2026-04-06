@@ -685,6 +685,110 @@ describe('XOR parsing and simplification', () => {
   });
 });
 
+describe('XOR integration with renderStyles', () => {
+  it('should render XOR branches for A ^ B with correct selectors', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        'hovered ^ focused': 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const xorRule = result.find((r) => r.declarations.includes('red'));
+    expect(xorRule).toBeDefined();
+
+    // XOR branches may be merged into a single :is() selector
+    const sel = xorRule!.selector;
+    expect(sel).toContain('[data-hovered]');
+    expect(sel).toContain('[data-focused]');
+    expect(sel).toContain(':not(');
+  });
+
+  it('should render default with exclusive negation of XOR branches', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        'hovered ^ focused': 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const defaultRule = result.find((r) => r.declarations.includes('black'));
+    expect(defaultRule).toBeDefined();
+    // Default should exclude the XOR states (both active or neither)
+    expect(defaultRule!.selector).toContain(':not(');
+  });
+
+  it('should handle A & (B ^ C) — AND combined with XOR', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        'disabled & (hovered ^ focused)': 'gray',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const xorRule = result.find((r) => r.declarations.includes('gray'));
+    expect(xorRule).toBeDefined();
+    expect(xorRule!.selector).toContain('[data-disabled]');
+    expect(xorRule!.selector).toContain(':not(');
+  });
+
+  it('should handle A | (B ^ C) — OR combined with XOR', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        'pressed | (hovered ^ focused)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const blueRule = result.find((r) => r.declarations.includes('blue'));
+    expect(blueRule).toBeDefined();
+    expect(blueRule!.selector).toContain('[data-pressed]');
+  });
+
+  it('should handle XOR with @media queries', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        '@media(w < 768px) ^ @media(w < 1024px)': 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const mediaRules = result.filter((r) => r.atRules?.length);
+    expect(mediaRules.length).toBeGreaterThanOrEqual(1);
+
+    const allAtRules = mediaRules.flatMap((r) => r.atRules ?? []);
+    const has768 = allAtRules.some((a) => a.includes('768px'));
+    const has1024 = allAtRules.some((a) => a.includes('1024px'));
+    expect(has768).toBe(true);
+    expect(has1024).toBe(true);
+  });
+
+  it('should handle chained XOR: A ^ B ^ C', () => {
+    const styles = {
+      color: {
+        '': 'black',
+        'hovered ^ focused ^ disabled': 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const xorRule = result.find((r) => r.declarations.includes('red'));
+    expect(xorRule).toBeDefined();
+    expect(xorRule!.selector).toContain(':not(');
+  });
+});
+
 describe('De Morgan expansion in exclusive conditions', () => {
   it('should handle NOT(AND) in exclusive conditions', () => {
     const entries = parseStyleEntries(

@@ -424,6 +424,15 @@ type TastySpecificKeys =
   | 'ref'
   | 'color';
 
+/** Extract prop key names from a ModPropsInput (array elements or object keys). */
+type ModPropsKeys<M extends ModPropsInput> = M extends readonly (infer K)[]
+  ? K & string
+  : keyof M & string;
+
+/** Extract prop key names from a TokenPropsInput (array elements or object keys). */
+type TokenPropsKeys<TP extends TokenPropsInput> =
+  TP extends readonly (infer K)[] ? K & string : keyof TP & string;
+
 /**
  * Props type for tasty elements that combines:
  * - AllBasePropsWithMods for style props with strict tokens type
@@ -434,8 +443,8 @@ type TastySpecificKeys =
  * with tag-specific types from JSX.IntrinsicElements (e.g. `src` is `string`
  * in AllHTMLAttributes but `string | Blob` in ImgHTMLAttributes). To avoid
  * intersection-narrowing, we Omit tag-specific keys from AllBasePropsWithMods
- * (keeping TastySpecificKeys and style props) and let JSX.IntrinsicElements
- * supply the authoritative HTML attribute types.
+ * (keeping TastySpecificKeys, style props, mod props, and token props) and let
+ * JSX.IntrinsicElements supply the authoritative HTML attribute types.
  */
 export type TastyElementProps<
   K extends StyleList,
@@ -445,13 +454,16 @@ export type TastyElementProps<
   TP extends TokenPropsInput = readonly never[],
 > = Omit<
   AllBasePropsWithMods<K, M, TP>,
-  Exclude<keyof JSX.IntrinsicElements[Tag], TastySpecificKeys | K[number]>
+  Exclude<
+    keyof JSX.IntrinsicElements[Tag],
+    TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
+  >
 > &
   WithVariant<V> &
   Omit<
     Omit<AllHTMLAttributes<HTMLElement>, keyof JSX.IntrinsicElements[Tag]> &
       JSX.IntrinsicElements[Tag],
-    TastySpecificKeys | K[number]
+    TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
   >;
 
 type TastyComponentPropsWithDefaults<

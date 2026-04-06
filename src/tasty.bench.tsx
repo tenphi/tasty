@@ -171,7 +171,10 @@ const WithStyleProps = tasty({
 });
 
 const WithModProps = tasty({
-  modProps: ['isActive', 'size'] as const,
+  modProps: {
+    isActive: Boolean,
+    size: ['small', 'medium', 'large'] as const,
+  },
   styles: {
     fill: { '': '#surface', isActive: '#primary' },
     padding: { '': '2x', 'size=large': '4x' },

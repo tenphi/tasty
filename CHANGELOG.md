@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.4.1
+
+### Patch Changes
+
+- [#102](https://github.com/tenphi/tasty/pull/102) [`0a3a431`](https://github.com/tenphi/tasty/commit/0a3a431c01c5a838958d0ebc4f63539c54fd4d2b) Thanks [@tenphi](https://github.com/tenphi)! - Make `filterBaseProps` generic so callers can pass strongly-typed props without casting; return `Partial<T>` to preserve value types.
+
 ## 1.4.0
 
 ### Minor Changes

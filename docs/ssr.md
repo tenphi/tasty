@@ -82,15 +82,15 @@ That's it. All `tasty()` components inside the tree automatically get SSR suppor
 
 ### How it works
 
-- `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load.
-- During SSR, `computeStyles()` finds the collector (registered globally by `TastyRegistry`) and collects CSS rules into it.
-- `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible -- styles are injected alongside each Suspense boundary as it resolves.
+- `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load. The `'use client'` boundary is required solely to access `useServerInsertedHTML` — **not** because `tasty()` components need the client.
+- During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level global getter. All style computation — whether from `tasty()` components, `computeStyles()`, `useStyles()`, or other hooks like `useGlobalStyles()` — discovers the collector through this single global getter. No React context is involved.
+- `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible — styles are injected alongside each Suspense boundary as it resolves.
 - A companion `<script>` tag transfers the `cacheKey → className` mapping to the client.
 - When the module loads on the client, `hydrateTastyCache()` runs automatically and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
 
 ### Using tasty() in Server Components
 
-`tasty()` components are hook-free and do not require `'use client'`. They can be used directly in React Server Components. Dynamic `styleProps` like `<Grid flow="column">` work normally in server components. During SSR, the `TastyRegistry` registers its collector globally so that `computeStyles()` can discover it without React context.
+`tasty()` components are hook-free and do not require `'use client'`. They can be used directly in React Server Components. Dynamic `styleProps` like `<Grid flow="column">` work normally in server components. During SSR, `computeStyles()` discovers the collector via the same global getter registered by `TastyRegistry` — no React context or client boundary needed for this path.
 
 ### Options
 
@@ -197,12 +197,12 @@ Same as Next.js -- call `configure({ nonce: '...' })` before any rendering happe
 
 ## Generic Framework Integration
 
-Any React-based framework can integrate using the core SSR API:
+Any React-based framework can integrate using `runWithCollector`, which binds a `ServerStyleCollector` to the current async context via `AsyncLocalStorage`. All `computeStyles()` and hook calls within the render automatically discover the collector.
 
 ```tsx
 import {
   ServerStyleCollector,
-  TastySSRContext,
+  runWithCollector,
   hydrateTastyCache,
 } from '@tenphi/tasty/ssr';
 import { renderToString } from 'react-dom/server';
@@ -212,10 +212,8 @@ import { hydrateRoot } from 'react-dom/client';
 
 const collector = new ServerStyleCollector();
 
-const html = renderToString(
-  <TastySSRContext.Provider value={collector}>
-    <App />
-  </TastySSRContext.Provider>
+const html = await runWithCollector(collector, () =>
+  renderToString(<App />)
 );
 
 const css = collector.getCSS();
@@ -251,11 +249,8 @@ For streaming with `renderToPipeableStream`, use `flushCSS()` instead of `getCSS
 ```tsx
 const collector = new ServerStyleCollector();
 
-const stream = renderToPipeableStream(
-  <TastySSRContext.Provider value={collector}>
-    <App />
-  </TastySSRContext.Provider>,
-  {
+const stream = await runWithCollector(collector, () =>
+  renderToPipeableStream(<App />, {
     onShellReady() {
       // Flush styles collected so far
       const css = collector.flushCSS();
@@ -270,29 +265,8 @@ const stream = renderToPipeableStream(
       const state = collector.getCacheState();
       res.write(`<script data-tasty-cache type="application/json">${JSON.stringify(state)}</script>`);
     },
-  }
+  })
 );
-```
-
-### AsyncLocalStorage (no React context)
-
-If your framework doesn't support wrapping the React tree with a provider, use `runWithCollector`:
-
-```tsx
-import {
-  ServerStyleCollector,
-  runWithCollector,
-  hydrateTastyCache,
-} from '@tenphi/tasty/ssr';
-
-const collector = new ServerStyleCollector();
-
-const html = await runWithCollector(collector, () =>
-  renderToString(<App />)
-);
-
-const css = collector.getCSS();
-// ... inject into HTML as above
 ```
 
 ---
@@ -303,7 +277,7 @@ const css = collector.getCSS();
 
 | Import path | Description |
 |---|---|
-| `@tenphi/tasty/ssr` | Core SSR API: `ServerStyleCollector`, `TastySSRContext`, `runWithCollector`, `hydrateTastyCache` |
+| `@tenphi/tasty/ssr` | Core SSR API: `ServerStyleCollector`, `runWithCollector`, `hydrateTastyCache` |
 | `@tenphi/tasty/ssr/next` | Next.js App Router: `TastyRegistry` component |
 | `@tenphi/tasty/ssr/astro` | Astro: `tastyMiddleware`, auto-hydration on import |
 
@@ -322,10 +296,6 @@ Server-safe style collector. One instance per request.
 | `getCSS()` | Get all collected CSS as a single string. For non-streaming SSR. |
 | `flushCSS()` | Get only CSS collected since the last flush. For streaming SSR. |
 | `getCacheState()` | Serialize `{ entries: Record<cacheKey, className>, classCounter }` for client hydration. |
-
-### `TastySSRContext`
-
-React context (`createContext<ServerStyleCollector | null>(null)`). Used by the `useStyles()` hook to find the collector during SSR. Not needed when using `computeStyles()` directly (which discovers the collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`).
 
 ### `TastyRegistry`
 

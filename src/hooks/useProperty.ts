@@ -1,9 +1,8 @@
-import { useContext, useInsertionEffect, useMemo } from 'react';
+import { useInsertionEffect, useMemo } from 'react';
 
 import { getGlobalInjector } from '../config';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
 import { formatPropertyCSS } from '../ssr/format-property';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 export interface UsePropertyOptions {
   /**
@@ -81,8 +80,7 @@ export interface UsePropertyOptions {
  * ```
  */
 export function useProperty(name: string, options?: UsePropertyOptions): void {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   // Memoize the options to create a stable dependency
   const optionsKey = useMemo(() => {

@@ -1,13 +1,12 @@
-import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
+import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { getConfig } from '../config';
 import { injectGlobal } from '../injector';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
 import { collectAutoInferredProperties } from '../ssr/collect-auto-properties';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
 import { formatGlobalRules } from '../ssr/format-global-rules';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
 import { resolveRecipes } from '../utils/resolve-recipes';
 
@@ -35,8 +34,7 @@ import { resolveRecipes } from '../utils/resolve-recipes';
  * ```
  */
 export function useGlobalStyles(selector: string, styles?: Styles): void {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   const disposeRef = useRef<(() => void) | null>(null);
 

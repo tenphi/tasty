@@ -1,10 +1,9 @@
-import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
+import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { keyframes } from '../injector';
 import type { KeyframesResult, KeyframesSteps } from '../injector/types';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseKeyframesOptions {
   name?: string;
@@ -75,8 +74,7 @@ export function useKeyframes(
   depsOrOptions?: readonly unknown[] | UseKeyframesOptions,
   options?: UseKeyframesOptions,
 ): string {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   // Detect which overload is being used
   const isFactory = typeof stepsOrFactory === 'function';

@@ -1,10 +1,9 @@
-import { useContext, useInsertionEffect, useMemo } from 'react';
+import { useInsertionEffect, useMemo } from 'react';
 
 import { getGlobalInjector } from '../config';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import type { FontFaceDescriptors, FontFaceInput } from '../injector/types';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseFontFaceOptions {
   root?: Document | ShadowRoot;
@@ -48,8 +47,7 @@ export function useFontFace(
   input: FontFaceInput,
   options?: UseFontFaceOptions,
 ): void {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   const inputKey = useMemo(() => JSON.stringify(input), [input]);
 

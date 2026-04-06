@@ -1,8 +1,7 @@
-import { useContext, useInsertionEffect, useMemo, useRef } from 'react';
+import { useInsertionEffect, useMemo, useRef } from 'react';
 
 import { injectRawCSS } from '../injector';
-import { resolveSSRCollector } from './resolve-ssr-collector';
-import { TastySSRContext } from '../ssr/context';
+import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseRawCSSOptions {
   root?: Document | ShadowRoot;
@@ -69,8 +68,7 @@ export function useRawCSS(
   depsOrOptions?: readonly unknown[] | UseRawCSSOptions,
   options?: UseRawCSSOptions,
 ): void {
-  const ssrContextValue = useContext(TastySSRContext);
-  const ssrCollector = resolveSSRCollector(ssrContextValue);
+  const ssrCollector = getRegisteredSSRCollector();
 
   // Detect which overload is being used
   const isFactory = typeof cssOrFactory === 'function';

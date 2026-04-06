@@ -89,6 +89,15 @@ export class SheetManager {
     return this.activeRoots;
   }
 
+  /** Remove registries for ShadowRoots whose host has been detached from the DOM. */
+  pruneDisconnectedRoots(): void {
+    for (const root of this.activeRoots) {
+      if (root !== document && !(root as ShadowRoot).host?.isConnected) {
+        this.cleanup(root);
+      }
+    }
+  }
+
   /**
    * Create a new stylesheet for the registry
    */
@@ -665,16 +674,24 @@ export class SheetManager {
     const cleanupStartTime = Date.now();
 
     // Calculate unused rules dynamically: rules that have refCount = 0
+    // and are not tracked in usageMap (GC-kept styles must survive)
     const unusedClassNames = Array.from(registry.refCounts.entries())
-      .filter(([, refCount]) => refCount === 0)
+      .filter(
+        ([className, refCount]) =>
+          refCount === 0 && !registry.usageMap.has(className),
+      )
       .map(([className]) => className);
 
     if (unusedClassNames.length === 0) return;
 
-    const selected = unusedClassNames.map((className) => {
-      const ruleInfo = registry.rules.get(className)!;
-      return { className, ruleInfo };
-    });
+    const selected = unusedClassNames
+      .map((className) => {
+        const ruleInfo = registry.rules.get(className);
+        return ruleInfo ? { className, ruleInfo } : null;
+      })
+      .filter(
+        (entry): entry is NonNullable<typeof entry> => entry != null,
+      );
 
     let cleanedUpCount = 0;
     let totalCssSize = 0;

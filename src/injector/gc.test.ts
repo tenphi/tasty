@@ -293,27 +293,108 @@ describe('GC: touch / gc / maybeGC', () => {
   // -------------------------------------------------------------------------
 
   describe('background sweep', () => {
-    it('should set up interval when gc.auto is true', () => {
+    it('should set up timeout when gc.auto is true', () => {
       const autoInjector = new StyleInjector({
         forceTextInjection: true,
         gc: { auto: true, autoInterval: 1000 },
       });
 
-      expect(autoInjector['backgroundSweepInterval']).not.toBeNull();
+      expect(autoInjector['backgroundSweepTimeout']).not.toBeNull();
 
       autoInjector.destroy();
-      expect(autoInjector['backgroundSweepInterval']).toBeNull();
+      expect(autoInjector['backgroundSweepTimeout']).toBeNull();
     });
 
-    it('should not set up interval when gc.auto is false', () => {
+    it('should not set up timeout when gc.auto is false', () => {
       const noAutoInjector = new StyleInjector({
         forceTextInjection: true,
         gc: { auto: false },
       });
 
-      expect(noAutoInjector['backgroundSweepInterval']).toBeNull();
+      expect(noAutoInjector['backgroundSweepTimeout']).toBeNull();
 
       noAutoInjector.destroy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // forceCleanup + usageMap interaction
+  // -------------------------------------------------------------------------
+
+  describe('forceCleanup respects usageMap', () => {
+    it('should not evict GC-kept styles when forceCleanup is called', () => {
+      const { className: lowHit, dispose: disposeLow } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      const { className: highHit, dispose: disposeHigh } = injector.inject([
+        createStyleRule('.t1.t1', 'color: blue'),
+      ]);
+
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      // Low hit: 1 touch
+      injector.touch(lowHit);
+      // High hit: many touches
+      for (let i = 0; i < 50; i++) {
+        injector.touch(highHit);
+      }
+
+      // Dispose both so they are eligible for GC
+      disposeLow();
+      disposeHigh();
+
+      // Age both by 90s
+      const now = Date.now();
+      registry.usageMap.get(lowHit)!.lastUsedAt = now - 90_000;
+      registry.usageMap.get(highHit)!.lastUsedAt = now - 90_000;
+
+      // GC should only evict lowHit (effectiveTTL ~60s), keep highHit (~340s)
+      injector.gc({ baseMaxAge: 60_000 });
+
+      // Now forceCleanup should NOT delete highHit because it's still in usageMap
+      expect(registry.usageMap.has(highHit)).toBe(true);
+      expect(registry.rules.has(highHit)).toBe(true);
+
+      // lowHit should have been cleaned up
+      expect(registry.usageMap.has(lowHit)).toBe(false);
+      expect(registry.rules.has(lowHit)).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // destroy(root) preserves sweep for other roots
+  // -------------------------------------------------------------------------
+
+  describe('destroy(root) preserves sweep', () => {
+    it('should not kill background sweep when destroying a specific root', () => {
+      const autoInjector = new StyleInjector({
+        forceTextInjection: true,
+        gc: { auto: true, autoInterval: 1000 },
+      });
+
+      expect(autoInjector['backgroundSweepTimeout']).not.toBeNull();
+
+      // The document root is always registered via getRegistry,
+      // so destroying a different root should keep the sweep alive
+      autoInjector['sheetManager'].getRegistry(document);
+
+      // Create a shadow root to destroy
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: 'open' });
+      autoInjector['sheetManager'].getRegistry(shadow);
+
+      // Destroy only the shadow root
+      autoInjector.destroy(shadow);
+
+      // Background sweep should still be active (document root remains)
+      expect(autoInjector['backgroundSweepTimeout']).not.toBeNull();
+
+      // Full destroy clears it
+      autoInjector.destroy();
+      expect(autoInjector['backgroundSweepTimeout']).toBeNull();
+
+      host.remove();
     });
   });
 });

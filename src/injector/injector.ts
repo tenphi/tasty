@@ -43,7 +43,8 @@ export class StyleInjector {
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
   private lastGCTime = 0;
-  private backgroundSweepInterval: ReturnType<typeof setInterval> | null = null;
+  private backgroundSweepTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingGCHandle: number | null = null;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
@@ -56,18 +57,23 @@ export class StyleInjector {
 
     if (config.gc?.auto && typeof document !== 'undefined') {
       const interval = config.gc.autoInterval ?? 300_000;
-      this.backgroundSweepInterval = setInterval(() => {
-        const sweep = () => {
-          for (const root of this.sheetManager.getActiveRoots()) {
-            this.gc({ root });
+      const scheduleNext = () => {
+        this.backgroundSweepTimeout = setTimeout(() => {
+          const doSweep = () => {
+            this.sheetManager.pruneDisconnectedRoots();
+            for (const root of this.sheetManager.getActiveRoots()) {
+              this.gc({ root });
+            }
+            scheduleNext();
+          };
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => doSweep());
+          } else {
+            doSweep();
           }
-        };
-        if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(() => sweep());
-        } else {
-          sweep();
-        }
-      }, interval);
+        }, interval);
+      };
+      scheduleNext();
     }
   }
 
@@ -877,6 +883,14 @@ export class StyleInjector {
   gc(options?: GCOptions): number {
     if (typeof document === 'undefined') return 0;
 
+    // Cancel any pending idle-scheduled GC to prevent double runs
+    if (this.pendingGCHandle != null) {
+      if (typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(this.pendingGCHandle);
+      }
+      this.pendingGCHandle = null;
+    }
+
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     const baseMaxAge =
@@ -937,6 +951,8 @@ export class StyleInjector {
       this.sheetManager.forceCleanup(registry);
     }
 
+    this.lastGCTime = Date.now();
+
     return swept;
   }
 
@@ -958,7 +974,10 @@ export class StyleInjector {
     this.lastGCTime = now;
 
     if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(() => this.gc(options));
+      this.pendingGCHandle = requestIdleCallback(() => {
+        this.pendingGCHandle = null;
+        this.gc(options);
+      });
     } else {
       this.gc(options);
     }
@@ -968,12 +987,24 @@ export class StyleInjector {
    * Destroy all resources for a root
    */
   destroy(root?: Document | ShadowRoot): void {
-    if (this.backgroundSweepInterval) {
-      clearInterval(this.backgroundSweepInterval);
-      this.backgroundSweepInterval = null;
-    }
-
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
+
+    // Clear sweep timer only when no active roots remain
+    const hasRoots = !this.sheetManager
+      .getActiveRoots()
+      [Symbol.iterator]()
+      .next().done;
+    if (this.backgroundSweepTimeout && !hasRoots) {
+      clearTimeout(this.backgroundSweepTimeout);
+      this.backgroundSweepTimeout = null;
+    }
+
+    if (this.pendingGCHandle != null) {
+      if (typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(this.pendingGCHandle);
+      }
+      this.pendingGCHandle = null;
+    }
   }
 }

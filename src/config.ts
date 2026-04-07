@@ -102,7 +102,7 @@ export interface TastyConfig {
   /**
    * Garbage collection configuration for unused styles.
    * GC is triggered by touch count: every `touchInterval` touches, the
-   * oldest unused styles above `capacity` are evicted.
+   * oldest unused styles are evicted when their count exceeds `capacity`.
    * @example
    * ```ts
    * configure({

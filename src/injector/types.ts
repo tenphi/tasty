@@ -55,8 +55,10 @@ export interface GCConfig {
    */
   touchInterval?: number;
   /**
-   * Maximum number of cached styles to retain.
+   * Maximum number of unused styles to retain.
    * GC evicts the oldest unused styles when this limit is exceeded.
+   * Actively referenced styles (refCount > 0) and DOM-live styles
+   * do not count against this limit.
    * @default 1000
    */
   capacity?: number;

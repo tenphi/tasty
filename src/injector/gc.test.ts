@@ -137,13 +137,31 @@ describe('GC: touch / gc', () => {
   // -------------------------------------------------------------------------
 
   describe('gc', () => {
-    it('should skip when usageMap is within capacity', () => {
-      const { className } = injector.inject([
+    it('should skip when unused count is within capacity', () => {
+      const { className, dispose } = injector.inject([
         createStyleRule('.t0.t0', 'color: red'),
       ]);
       injector.touch(className);
+      dispose();
 
-      // capacity is 3, usageMap has 1 entry
+      // capacity is 3, 1 unused entry → within capacity
+      const swept = injector.gc();
+      expect(swept).toBe(0);
+    });
+
+    it('should not count active refs against capacity', () => {
+      const classNames: string[] = [];
+
+      // Create 5 styles, all actively referenced (refCount > 0)
+      for (let i = 0; i < 5; i++) {
+        const { className } = injector.inject([
+          createStyleRule(`.test-${i}`, `order: ${i}`),
+        ]);
+        classNames.push(className);
+        injector.touch(className);
+      }
+
+      // capacity=3, but all 5 are active (refCount > 0) → 0 unused → skip
       const swept = injector.gc();
       expect(swept).toBe(0);
     });
@@ -175,7 +193,7 @@ describe('GC: touch / gc', () => {
         dispose();
       }
 
-      // capacity=3, usageMap has 5 → should evict 2 oldest
+      // capacity=3, 5 unused → should evict 2 oldest
       const swept = injector.gc();
 
       expect(swept).toBe(2);

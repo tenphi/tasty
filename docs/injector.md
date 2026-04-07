@@ -211,7 +211,7 @@ configure({
   nonce: 'csp-nonce',                // CSP nonce for security
   gc: {                              // Garbage collection for unused styles
     touchInterval: 1000,             // Touch events between GC cycles (default: 1000)
-    capacity: 1000,                  // Max cached styles to retain (default: 1000)
+    capacity: 1000,                  // Max unused styles to retain (default: 1000)
   },
   states: {                          // Global predefined states for advanced state mapping
     '@mobile': '@media(w < 768px)',
@@ -229,7 +229,7 @@ configure({
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of touch events between GC cycles. Each style render counts as a touch. When the counter reaches this value, GC is scheduled via `requestIdleCallback`.
-- `gc.capacity`: Maximum number of cached styles. When exceeded, the oldest unused styles are evicted first.
+- `gc.capacity`: Maximum number of unused styles (refCount = 0, not in DOM) to retain. When exceeded, the oldest are evicted first. Actively referenced styles don't count against this limit.
 
 ---
 
@@ -302,7 +302,7 @@ import { configure, gc } from '@tenphi/tasty';
 configure({
   gc: {
     touchInterval: 1000,   // Schedule GC every 1000 touches
-    capacity: 1000,        // Max cached styles to retain
+    capacity: 1000,        // Max unused styles to retain
   },
 });
 
@@ -481,7 +481,7 @@ import { configure } from '@tenphi/tasty';
 configure({
   gc: {
     touchInterval: 1000,   // Schedule GC every 1000 style touches
-    capacity: 1000,        // Max cached styles to retain
+    capacity: 1000,        // Max unused styles to retain
   },
 });
 ```

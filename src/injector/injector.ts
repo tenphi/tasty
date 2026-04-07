@@ -873,10 +873,11 @@ export class StyleInjector {
   /**
    * Synchronous garbage collection.
    *
-   * 1. Checks if usageMap exceeds capacity (skip if not, unless `force`).
+   * 1. Quick check: if non-active entries can't exceed capacity, skip entirely.
    * 2. Scans the DOM for live tasty classNames (safety guard).
    * 3. Collects unused entries (refCount === 0, not in DOM).
-   * 4. Sorts unused by lastTouchedAt ascending, evicts oldest until at capacity.
+   * 4. Checks if unused count exceeds capacity (skip if not, unless `force`).
+   * 5. Sorts unused by lastTouchedAt ascending, evicts oldest until at capacity.
    *    With `force: true`, evicts ALL unused regardless of capacity.
    *
    * @returns Number of styles evicted.
@@ -897,8 +898,17 @@ export class StyleInjector {
     const registry = this.sheetManager.getRegistry(root);
     const capacity = this.config.gc?.capacity ?? 1000;
 
-    if (!force && registry.usageMap.size <= capacity) {
-      return 0;
+    // Quick upper-bound check: count active refs to see if there could
+    // possibly be enough unused entries to exceed capacity.
+    // This avoids the expensive DOM scan when most styles are active.
+    if (!force) {
+      let activeCount = 0;
+      for (const refCount of registry.refCounts.values()) {
+        if (refCount > 0) activeCount++;
+      }
+      if (registry.usageMap.size - activeCount <= capacity) {
+        return 0;
+      }
     }
 
     // Scan DOM for live classes (classList handles SVG elements too)
@@ -921,6 +931,10 @@ export class StyleInjector {
 
     if (unused.length === 0) return 0;
 
+    if (!force && unused.length <= capacity) {
+      return 0;
+    }
+
     let swept = 0;
 
     if (force) {
@@ -932,8 +946,8 @@ export class StyleInjector {
       // Sort oldest first
       unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
 
-      const toEvict = registry.usageMap.size - capacity;
-      for (let i = 0; i < Math.min(toEvict, unused.length); i++) {
+      const toEvict = unused.length - capacity;
+      for (let i = 0; i < toEvict; i++) {
         registry.usageMap.delete(unused[i].className);
         swept++;
       }

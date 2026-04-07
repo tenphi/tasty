@@ -1,4 +1,4 @@
-import type { ConfigTokens } from '../styles/types';
+import type { ConfigTokens, ConfigTokenValue } from '../styles/types';
 
 const RESERVED_PRESET_NAMES = new Set([
   'strong',
@@ -9,21 +9,36 @@ const RESERVED_PRESET_NAMES = new Set([
 ]);
 
 /**
+ * A typography token value: plain value or a state map for responsive/theme-aware presets.
+ *
+ * @example
+ * // Plain value
+ * fontWeight: '400'
+ * // State map
+ * fontWeight: { '': '400', '@dark': '300' }
+ */
+export type TypographyTokenValue =
+  | string
+  | number
+  | Record<string, string | number | undefined | null | '@inherit'>;
+
+/**
  * Typography preset configuration.
  * Each preset defines font properties that get expanded into CSS custom properties.
+ * All fields accept plain values or state maps for responsive/theme-aware tokens.
  *
  * Use with `generateTypographyTokens()` to create typography tokens for your design system.
  */
 export interface TypographyPreset {
-  fontSize: string;
-  lineHeight: string;
-  letterSpacing?: string;
-  fontWeight: string | number;
-  boldFontWeight?: string | number;
-  iconSize?: string;
-  textTransform?: string;
-  fontFamily?: string;
-  fontStyle?: string;
+  fontSize: TypographyTokenValue;
+  lineHeight: TypographyTokenValue;
+  letterSpacing?: TypographyTokenValue;
+  fontWeight: TypographyTokenValue;
+  boldFontWeight?: TypographyTokenValue;
+  iconSize?: TypographyTokenValue;
+  textTransform?: TypographyTokenValue;
+  fontFamily?: TypographyTokenValue;
+  fontStyle?: TypographyTokenValue;
 }
 
 /**
@@ -52,7 +67,7 @@ export interface TypographyPreset {
 export function generateTypographyTokens(
   presets: Record<string, TypographyPreset>,
 ): ConfigTokens {
-  const tokens: Record<`$${string}`, string | number> = {};
+  const tokens: Record<`$${string}`, ConfigTokenValue> = {};
 
   for (const [name, preset] of Object.entries(presets)) {
     if (RESERVED_PRESET_NAMES.has(name)) {

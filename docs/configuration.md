@@ -58,6 +58,8 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
+| `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
+| `bodyStyles` | `Styles` | - | Tasty styles applied to the `body` tag |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
 
 ---
@@ -217,6 +219,67 @@ configure({
 Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@properties`. Recipes cannot reference other recipes.
 
 For how to apply, compose, and override recipes in components, see [Recipes](dsl.md#recipes) in the Style DSL reference.
+
+---
+
+## Typography Presets
+
+Typography presets are a shorthand for `generateTypographyTokens()`. Instead of calling the function manually and spreading the result into `tokens`, pass the presets directly:
+
+```jsx
+configure({
+  presets: {
+    h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
+    t2: { fontSize: '16px', lineHeight: '1.5', fontWeight: '400' },
+    tag: {
+      fontSize: '10px',
+      lineHeight: '1.4',
+      letterSpacing: '0.04em',
+      fontWeight: '600',
+    },
+  },
+});
+```
+
+Each preset generates `$name-font-size`, `$name-line-height`, `$name-letter-spacing`, `$name-font-weight`, and optional `$name-bold-font-weight`, `$name-icon-size`, `$name-text-transform`, `$name-font-family`, `$name-font-style` tokens.
+
+Preset values support state maps for responsive or theme-aware typography:
+
+```jsx
+configure({
+  presets: {
+    t2: {
+      fontSize: '16px',
+      lineHeight: '1.5',
+      fontWeight: { '': '400', '@dark': '300' },
+    },
+  },
+});
+```
+
+The generated tokens are merged **under** explicit `tokens` — if both `presets` and `tokens` define `$t2-font-weight`, the `tokens` value wins. Plugins can also provide `presets`; plugin presets are merged first, then config presets, then explicit tokens on top.
+
+---
+
+## Body Styles
+
+Apply Tasty styles to the `body` element via configuration, without needing `useGlobalStyles('body', ...)` at runtime:
+
+```jsx
+configure({
+  bodyStyles: {
+    fill: '#surface',
+    color: '#text',
+    preset: 't2',
+    margin: 0,
+    fontFamily: 'system-ui, sans-serif',
+  },
+});
+```
+
+Body styles support the full Tasty style syntax including style properties, tokens, state maps, `@keyframes`, `@fontFace`, and sub-element selectors. They are injected alongside `:root` tokens when the first style is rendered.
+
+Body styles are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin). Plugins can also provide `bodyStyles`; they are merged with config body styles (config wins on conflict).
 
 ---
 

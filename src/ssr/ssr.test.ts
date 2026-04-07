@@ -359,6 +359,42 @@ describe('ServerStyleCollector', () => {
     const flush2 = collector.flushCSS();
     expect(flush2).not.toContain('--my-gap');
   });
+
+  it('collectInternals includes configured bodyStyles', () => {
+    resetConfig();
+    configure({
+      bodyStyles: {
+        color: 'red',
+        padding: '0',
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    expect(css).toContain('body');
+    expect(css).toContain('color');
+    expect(css).toContain('red');
+    expect(css).toContain('padding');
+  });
+
+  it('collectInternals includes presets as :root tokens', () => {
+    resetConfig();
+    configure({
+      presets: {
+        h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    expect(css).toContain(':root');
+    expect(css).toContain('--h1-font-size');
+    expect(css).toContain('32px');
+  });
 });
 
 // ============================================================================

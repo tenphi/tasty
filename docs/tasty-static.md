@@ -174,6 +174,8 @@ module.exports = {
 | `config.funcs` | `Record<string, Function>` | — | Custom functions for the style parser (merged with existing) |
 | `config.plugins` | `TastyPlugin[]` | — | Plugins that extend tasty with custom functions, units, states, and handlers |
 | `config.handlers` | `Record<string, StyleHandlerDefinition>` | — | Custom style handlers that transform style properties into CSS declarations |
+| `config.presets` | `Record<string, TypographyPreset>` | — | Typography presets — shorthand for `generateTypographyTokens()`. Generated tokens merge under explicit `tokens`. |
+| `config.bodyStyles` | `Styles` | — | Tasty styles applied to the `body` tag. Supports the full style syntax. |
 | `config.autoPropertyTypes` | `boolean` | `true` | Automatically infer and register CSS `@property` declarations from values |
 | `config.parserCacheSize` | `number` | `1000` | Parser LRU cache size. Larger values improve performance for builds with many unique style values |
 

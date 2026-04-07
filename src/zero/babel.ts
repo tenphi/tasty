@@ -24,7 +24,12 @@ import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 import { createJiti } from 'jiti';
 
-import { configure, getGlobalConfigTokens, resetConfig } from '../config';
+import {
+  configure,
+  getGlobalBodyStyles,
+  getGlobalConfigTokens,
+  resetConfig,
+} from '../config';
 import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
@@ -55,6 +60,7 @@ import type {
 } from '../injector/types';
 import type { StyleDetails, UnitHandler } from '../parser/types';
 import type { TastyPlugin } from '../plugins/types';
+import type { TypographyPreset } from '../utils/typography';
 
 /**
  * Build-time configuration for zero-runtime mode.
@@ -160,6 +166,18 @@ export interface TastyZeroConfig {
    * ```
    */
   recipes?: Record<string, RecipeStyles>;
+  /**
+   * Typography presets — shorthand for `generateTypographyTokens()`.
+   * Generated tokens are merged under explicit `tokens` (tokens win on conflict).
+   * @example { h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' } }
+   */
+  presets?: Record<string, TypographyPreset>;
+  /**
+   * Tasty styles applied to the `body` tag.
+   * Supports the full Tasty style syntax.
+   * @example { fill: '#surface', color: '#text', preset: 't2', margin: 0 }
+   */
+  bodyStyles?: Styles;
   /**
    * Automatically infer and register CSS @property declarations from values.
    * @default true
@@ -398,6 +416,14 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
           newWriter.add(':root:tokens', result.css);
         }
       }
+
+      const bodyStyles = getGlobalBodyStyles();
+      if (bodyStyles && Object.keys(bodyStyles).length > 0) {
+        const result = extractStylesForSelector('body', bodyStyles);
+        if (result.css) {
+          newWriter.add('body:styles', result.css);
+        }
+      }
     }
 
     writerCache.set(resolvedOutputPath, {
@@ -414,14 +440,22 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const config = entry.config;
   const devMode = config.devMode ?? false;
 
-  // Precompute token CSS for inject mode
+  // Precompute token CSS and body CSS for inject mode
   let tokenCSS: string | undefined;
+  let bodyCSS: string | undefined;
   if (mode === 'inject') {
     const tokenStyles = getGlobalConfigTokens();
     if (tokenStyles && Object.keys(tokenStyles).length > 0) {
       const result = extractStylesForSelector(':root', tokenStyles);
       if (result.css) {
         tokenCSS = result.css;
+      }
+    }
+    const bodyStyles = getGlobalBodyStyles();
+    if (bodyStyles && Object.keys(bodyStyles).length > 0) {
+      const result = extractStylesForSelector('body', bodyStyles);
+      if (result.css) {
+        bodyCSS = result.css;
       }
     }
   }
@@ -582,13 +616,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     post(this: PluginState) {
       if (mode === 'inject') {
-        // In inject mode, inject token CSS as a top-level statement
-        // when this file had tastyStatic calls and tokens are configured.
-        if (this._fileAddedCSS && tokenCSS) {
+        // In inject mode, inject token/body CSS as top-level statements
+        // when this file had tastyStatic calls and config CSS exists.
+        if (this._fileAddedCSS && (tokenCSS || bodyCSS)) {
           const program = this.file.ast.program;
-          const injectCall = createInjectCallAST(':root', tokenCSS);
 
-          // Find the position after the inject import to insert the token call
+          // Find the position after the inject import
           let insertIndex = 0;
           for (let i = 0; i < program.body.length; i++) {
             if (t.isImportDeclaration(program.body[i])) {
@@ -596,11 +629,24 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             }
           }
 
-          program.body.splice(
-            insertIndex,
-            0,
-            t.expressionStatement(injectCall),
-          );
+          if (tokenCSS) {
+            const injectCall = createInjectCallAST(':root', tokenCSS);
+            program.body.splice(
+              insertIndex,
+              0,
+              t.expressionStatement(injectCall),
+            );
+            insertIndex++;
+          }
+
+          if (bodyCSS) {
+            const injectCall = createInjectCallAST('body', bodyCSS);
+            program.body.splice(
+              insertIndex,
+              0,
+              t.expressionStatement(injectCall),
+            );
+          }
         }
         return;
       }

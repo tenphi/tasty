@@ -17,7 +17,7 @@ Create a changeset file directly (non-interactive):
 Short description of what changed.
 ```
 
-- Use `patch` for fixes and small changes, `minor` for new features or non-breaking API changes, `major` for breaking changes.
+- Use `patch` for fixes and small changes, `minor` for new features and other more significant changes. Do not use `major` unless explicitly asked.
 - The description should be a concise user-facing summary (what changed, not how).
 
 ## 2. Typecheck

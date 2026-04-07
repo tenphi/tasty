@@ -62,11 +62,12 @@ import type {
 /**
  * Build-time configuration for zero-runtime mode.
  * Subset of TastyConfig excluding runtime-only DOM options
- * (`nonce`, `maxRulesPerSheet`, `forceTextInjection`, `gc`).
+ * (`nonce`, `maxRulesPerSheet`, `forceTextInjection`, `gc`)
+ * and overriding `devMode` default to `false`.
  */
 export type TastyZeroConfig = Omit<
   TastyConfig,
-  'nonce' | 'maxRulesPerSheet' | 'forceTextInjection' | 'gc'
+  'nonce' | 'maxRulesPerSheet' | 'forceTextInjection' | 'gc' | 'devMode'
 > & {
   /**
    * Enable development mode features: source comments in generated CSS.

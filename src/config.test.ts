@@ -84,6 +84,32 @@ describe('configure() presets', () => {
       '@dark': '300',
     });
   });
+
+  it('should let plugin tokens override plugin preset-generated tokens', () => {
+    configure({
+      plugins: [
+        {
+          name: 'test-plugin',
+          presets: {
+            t1: { fontSize: '20px', lineHeight: '1.5', fontWeight: '400' },
+          },
+          tokens: {
+            '$t1-font-weight': '500',
+          },
+        },
+      ],
+    });
+
+    const tokens = getGlobalConfigTokens();
+    expect(tokens!['$t1-font-size']).toBe('20px');
+    expect(tokens!['$t1-font-weight']).toBe('500');
+  });
+
+  it('should ignore empty presets object', () => {
+    configure({ presets: {} });
+
+    expect(getGlobalConfigTokens()).toBeNull();
+  });
 });
 
 describe('configure() bodyStyles', () => {
@@ -138,6 +164,12 @@ describe('configure() bodyStyles', () => {
 
     const styles = getGlobalBodyStyles();
     expect(styles).toBeNull();
+  });
+
+  it('should ignore empty bodyStyles object', () => {
+    configure({ bodyStyles: {} });
+
+    expect(getGlobalBodyStyles()).toBeNull();
   });
 
   it('should work with preset reference when presets defined in same configure call', () => {

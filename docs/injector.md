@@ -210,11 +210,8 @@ configure({
   forceTextInjection: false,         // Force textContent insertion (auto-detected for tests)
   nonce: 'csp-nonce',                // CSP nonce for security
   gc: {                              // Garbage collection for unused styles
-    auto: true,                      // Enable automatic background sweep
-    baseMaxAge: 60000,               // Base TTL (ms) for single-use styles
-    cooldown: 30000,                 // Minimum time between GC runs
-    autoInterval: 300000,            // Background sweep interval (ms)
-    cacheCapacity: 5000,             // Hard cap on cached styles (optional)
+    touchInterval: 1000,             // Touch events between GC cycles (default: 1000)
+    capacity: 1000,                  // Max unused styles to retain (default: 1000)
   },
   states: {                          // Global predefined states for advanced state mapping
     '@mobile': '@media(w < 768px)',
@@ -231,9 +228,8 @@ configure({
 - Most options have sensible defaults and auto-detection
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
-- `gc.baseMaxAge`: Base TTL for a style rendered only once. Popular styles get longer TTLs via logarithmic scaling (`baseMaxAge * log2(hitCount + 1)`).
-- `gc.auto`: When true, runs a periodic background sweep at `gc.autoInterval` intervals using `requestIdleCallback`.
-- `gc.cooldown`: Minimum time between GC runs to avoid thrashing.
+- `gc.touchInterval`: Number of touch events between GC cycles. Each style render counts as a touch. When the counter reaches this value, GC is scheduled via `requestIdleCallback`.
+- `gc.capacity`: Maximum number of unused styles (refCount = 0, not in DOM) to retain. When exceeded, the oldest are evicted first. Actively referenced styles don't count against this limit.
 
 ---
 
@@ -298,28 +294,31 @@ comp3.dispose(); // refCount: 1 → 0, eligible for bulk cleanup
 ### Garbage Collection
 
 ```typescript
-import { configure, gc, maybeGC } from '@tenphi/tasty';
+import { configure, gc } from '@tenphi/tasty';
 
 // Keyframes: Disposed immediately when refCount = 0 (safer for global scope)
-// CSS rules: Tracked by popularity and cleaned up via gc()
+// CSS rules: Tracked by touch count and cleaned up via gc()
 
 configure({
   gc: {
-    auto: true,          // Enable background sweep
-    baseMaxAge: 60000,   // 1-minute base TTL
-    cooldown: 30000,     // 30s between runs
+    touchInterval: 1000,   // Schedule GC every 1000 touches
+    capacity: 1000,        // Max unused styles to retain
   },
 });
 
 // Manual GC (synchronous, returns number of swept styles):
 gc();
 
-// Event-driven GC with cooldown (e.g. on route change):
-maybeGC();
+// Force-remove ALL unused styles (e.g. on route change or test teardown):
+gc({ force: true });
+
+// GC is also triggered automatically by touch count during rendering.
+// Every `touchInterval` touches, GC is scheduled via requestIdleCallback.
 
 // Benefits:
-// - Popularity-aware: frequently used styles survive longer
+// - Activity-proportional: busy apps trigger GC more often
 // - DOM-safe: styles currently in the DOM are never evicted
+// - Oldest-first: least recently used styles are evicted first
 // - Keyframes: Immediate cleanup prevents global namespace pollution
 // - Unused styles can be instantly reactivated (just increment refCount)
 ```
@@ -481,8 +480,8 @@ import { configure } from '@tenphi/tasty';
 
 configure({
   gc: {
-    auto: true,            // Enable background sweep for long-lived pages
-    baseMaxAge: 60000,     // Default base TTL (adjust based on app size)
+    touchInterval: 1000,   // Schedule GC every 1000 style touches
+    capacity: 1000,        // Max unused styles to retain
   },
 });
 ```
@@ -495,7 +494,7 @@ configure({
 // 1. Hash-based deduplication - same CSS = same className
 // 2. Reference counting - styles stay alive while in use (refCount > 0)
 // 3. Immediate keyframes cleanup - disposed instantly when refCount = 0
-// 4. Popularity-aware GC - unused CSS rules are scored by hitCount and age
+// 4. Touch-count GC - unused CSS rules are evicted oldest-first when over capacity
 // 5. DOM safety guard - styles visible in the DOM are never evicted
 
 // Manual cleanup is rarely needed but available:

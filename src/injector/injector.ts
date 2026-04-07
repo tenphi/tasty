@@ -42,8 +42,6 @@ export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  private lastGCTime = 0;
-  private backgroundSweepTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
 
   /** @internal — exposed for debug utilities only */
@@ -54,27 +52,6 @@ export class StyleInjector {
   constructor(config: StyleInjectorConfig = {}) {
     this.config = config;
     this.sheetManager = new SheetManager(config);
-
-    if (config.gc?.auto && typeof document !== 'undefined') {
-      const interval = config.gc.autoInterval ?? 300_000;
-      const scheduleNext = () => {
-        this.backgroundSweepTimeout = setTimeout(() => {
-          const doSweep = () => {
-            this.sheetManager.pruneDisconnectedRoots();
-            for (const root of this.sheetManager.getActiveRoots()) {
-              this.gc({ root });
-            }
-            scheduleNext();
-          };
-          if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => doSweep());
-          } else {
-            doSweep();
-          }
-        }, interval);
-      };
-      scheduleNext();
-    }
   }
 
   /**
@@ -832,15 +809,16 @@ export class StyleInjector {
   }
 
   // =========================================================================
-  // GC: popularity-aware garbage collection with DOM safety guard
+  // GC: touch-count-driven garbage collection with DOM safety guard
   // =========================================================================
 
-  private static readonly TOUCH_THROTTLE_MS = 5_000;
   private static readonly TASTY_CLASS_RE = /^t\d+$/;
 
   /**
    * Record a render-time usage hit for one or more classNames.
    * Handles space-separated multi-chunk classNames.
+   * When the global touch counter reaches `touchInterval`, schedules a GC
+   * via `requestIdleCallback`.
    * No-op on the server.
    */
   touch(className: string, options?: { root?: Document | ShadowRoot }): void {
@@ -860,23 +838,49 @@ export class StyleInjector {
 
       const entry = registry.usageMap.get(cls);
       if (entry) {
-        entry.hitCount++;
-        if (now - entry.lastUsedAt > StyleInjector.TOUCH_THROTTLE_MS) {
-          entry.lastUsedAt = now;
-        }
+        entry.lastTouchedAt = now;
       } else {
-        registry.usageMap.set(cls, { hitCount: 1, lastUsedAt: now });
+        registry.usageMap.set(cls, { lastTouchedAt: now });
       }
+      registry.touchCount++;
+    }
+
+    const touchInterval = this.config.gc.touchInterval ?? 1000;
+    if (registry.touchCount >= touchInterval) {
+      registry.touchCount = 0;
+      this.scheduleGC();
+    }
+  }
+
+  /**
+   * Schedule a GC via `requestIdleCallback` (or synchronously as fallback).
+   * Runs GC on all active roots. Avoids double-scheduling via `pendingGCHandle`.
+   */
+  private scheduleGC(): void {
+    if (this.pendingGCHandle != null) return;
+
+    const runGC = () => {
+      this.pendingGCHandle = null;
+      this.sheetManager.pruneDisconnectedRoots();
+      for (const root of this.sheetManager.getActiveRoots()) {
+        this.gc({ root });
+      }
+    };
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      this.pendingGCHandle = requestIdleCallback(() => runGC());
+    } else {
+      runGC();
     }
   }
 
   /**
    * Synchronous garbage collection.
    *
-   * 1. Scans the DOM for live tasty classNames (safety guard).
-   * 2. Scores each non-live className via popularity-weighted TTL.
-   * 3. Marks evictable styles with refCount = 0 and deletes them.
-   * 4. Optionally enforces a hard `cacheCapacity` cap.
+   * 1. Quick upper-bound check: skip if unused count can't exceed capacity.
+   * 2. Scans the DOM for live tasty classNames (safety guard).
+   * 3. With `force: true`: deletes all unused entries inline.
+   *    Without `force`: collects unused, sorts oldest-first, evicts over capacity.
    *
    * @returns Number of styles evicted.
    */
@@ -892,14 +896,24 @@ export class StyleInjector {
     }
 
     const root = options?.root || document;
+    const force = options?.force ?? false;
     const registry = this.sheetManager.getRegistry(root);
-    const baseMaxAge =
-      options?.baseMaxAge ?? this.config.gc?.baseMaxAge ?? 60_000;
-    const cacheCapacity =
-      options?.cacheCapacity ?? this.config.gc?.cacheCapacity;
-    const now = Date.now();
+    const capacity = this.config.gc?.capacity ?? 1000;
 
-    // Phase 0: scan DOM for live classes (classList handles SVG elements too)
+    // Quick upper-bound check: count active refs to see if there could
+    // possibly be enough unused entries to exceed capacity.
+    // This avoids the expensive DOM scan when most styles are active.
+    if (!force) {
+      let activeCount = 0;
+      for (const refCount of registry.refCounts.values()) {
+        if (refCount > 0) activeCount++;
+      }
+      if (registry.usageMap.size - activeCount <= capacity) {
+        return 0;
+      }
+    }
+
+    // Scan DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
       for (const token of el.classList) {
@@ -911,40 +925,26 @@ export class StyleInjector {
 
     let swept = 0;
 
-    // Phase 1: score-based eviction (skip live and actively-referenced classes)
-    for (const [className, usage] of registry.usageMap) {
-      if (liveClasses.has(className)) continue;
-      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-
-      const age = now - usage.lastUsedAt;
-      const effectiveTTL = baseMaxAge * Math.log2(usage.hitCount + 1);
-
-      if (age > effectiveTTL) {
+    if (force) {
+      for (const [className] of registry.usageMap) {
+        if (liveClasses.has(className)) continue;
+        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
         registry.usageMap.delete(className);
         swept++;
       }
-    }
-
-    // Phase 2: capacity cap (evict lowest-scored non-live, non-referenced styles)
-    if (cacheCapacity && registry.usageMap.size > cacheCapacity) {
-      const scored: { className: string; score: number }[] = [];
+    } else {
+      const unused: { className: string; lastTouchedAt: number }[] = [];
       for (const [className, usage] of registry.usageMap) {
         if (liveClasses.has(className)) continue;
         if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-        const age = now - usage.lastUsedAt;
-        scored.push({
-          className,
-          score: usage.hitCount * Math.exp(-age / baseMaxAge),
-        });
+        unused.push({ className, lastTouchedAt: usage.lastTouchedAt });
       }
 
-      if (scored.length > 0) {
-        scored.sort((a, b) => a.score - b.score);
-
-        const toEvict = registry.usageMap.size - cacheCapacity;
-        for (let i = 0; i < Math.min(toEvict, scored.length); i++) {
-          const { className } = scored[i];
-          registry.usageMap.delete(className);
+      if (unused.length > capacity) {
+        unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
+        const toEvict = unused.length - capacity;
+        for (let i = 0; i < toEvict; i++) {
+          registry.usageMap.delete(unused[i].className);
           swept++;
         }
       }
@@ -954,36 +954,7 @@ export class StyleInjector {
       this.sheetManager.forceCleanup(registry);
     }
 
-    this.lastGCTime = Date.now();
-
     return swept;
-  }
-
-  /**
-   * Event-driven GC with cooldown.
-   * Skips if called within `cooldown` ms of the last run.
-   * Schedules the actual GC via `requestIdleCallback` when available.
-   */
-  maybeGC(options?: GCOptions): void {
-    if (typeof document === 'undefined') return;
-
-    const cooldown = this.config.gc?.cooldown ?? 30_000;
-    const now = Date.now();
-
-    if (now - this.lastGCTime < cooldown) return;
-
-    // Set before scheduling to prevent multiple idle callbacks from stacking
-    // when maybeGC is called rapidly (e.g. on every route change).
-    this.lastGCTime = now;
-
-    if (typeof requestIdleCallback !== 'undefined') {
-      this.pendingGCHandle = requestIdleCallback(() => {
-        this.pendingGCHandle = null;
-        this.gc(options);
-      });
-    } else {
-      this.gc(options);
-    }
   }
 
   /**
@@ -993,17 +964,12 @@ export class StyleInjector {
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
 
-    // Clear sweep timer and pending GC only when no active roots remain
-    if (this.backgroundSweepTimeout && !this.sheetManager.hasActiveRoots()) {
-      clearTimeout(this.backgroundSweepTimeout);
-      this.backgroundSweepTimeout = null;
-
-      if (this.pendingGCHandle != null) {
-        if (typeof cancelIdleCallback !== 'undefined') {
-          cancelIdleCallback(this.pendingGCHandle);
-        }
-        this.pendingGCHandle = null;
+    // Clear pending GC when no active roots remain
+    if (this.pendingGCHandle != null && !this.sheetManager.hasActiveRoots()) {
+      if (typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(this.pendingGCHandle);
       }
+      this.pendingGCHandle = null;
     }
   }
 }

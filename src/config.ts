@@ -101,11 +101,12 @@ export interface TastyConfig {
   autoPropertyTypes?: boolean;
   /**
    * Garbage collection configuration for unused styles.
-   * Controls popularity-aware style eviction with DOM safety guard.
+   * GC is triggered by touch count: every `touchInterval` touches, the
+   * oldest unused styles are evicted when their count exceeds `capacity`.
    * @example
    * ```ts
    * configure({
-   *   gc: { auto: true, baseMaxAge: 60000, cooldown: 30000 },
+   *   gc: { touchInterval: 1000, capacity: 1000 },
    * });
    * ```
    */

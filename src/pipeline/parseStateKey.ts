@@ -74,13 +74,13 @@ const parseCache = new Lru<string, ConditionNode>(5000);
  * Matches: operators, parentheses, @-prefixed states, value mods, boolean mods,
  * pseudo-classes, class selectors, and attribute selectors.
  *
- * Note: For @supports, @(...) container queries, and :is/:has/:not/:where
- * we need to handle nested parentheses.
- * We use a pattern that allows up to 2 levels of nesting:
+ * All @-prefixed state groups (@supports, @root, @parent, @own, @(...))
+ * and :is/:has/:not/:where pseudo-classes support up to 2 levels of
+ * nested parentheses via:
  *   [^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*
  */
 const STATE_TOKEN_PATTERN =
-  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^)]*\))?[^)]*\))|(@root\([^)]+\))|(@parent\([^)]+\))|(@own\([^)]+\))|(@\([^()]*(?:\([^)]*\))?[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:(?:is|has|not|where)\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
+  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@root\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@parent\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@own\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:(?:is|has|not|where)\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
 
 // ============================================================================
 // Token Types

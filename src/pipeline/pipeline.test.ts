@@ -387,6 +387,24 @@ describe('parseStateKey()', () => {
     }
   });
 
+  it('should parse @own with nested :has()', () => {
+    const result = parseStateKey('@own(:has(input:checked))', {
+      isSubElement: true,
+    });
+    expect(result.kind).toBe('state');
+    if (result.kind === 'state') {
+      expect(result.type).toBe('own');
+      expect(result.innerCondition).toBeDefined();
+      if (result.innerCondition) {
+        expect(result.innerCondition.kind).toBe('state');
+        if (result.innerCondition.kind === 'state') {
+          expect(result.innerCondition.type).toBe('pseudo');
+          expect(result.innerCondition.pseudo).toBe(':has(input:checked)');
+        }
+      }
+    }
+  });
+
   it('should parse container query', () => {
     const result = parseStateKey('@(layout, w < 600px)');
     expect(result.kind).toBe('state');

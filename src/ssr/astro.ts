@@ -61,8 +61,30 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
 
     const response = await runWithCollector(collector, () => next());
 
+    const body = response.body;
+    if (!body) {
+      return response;
+    }
+
+    // Read the full response body so all React components render and
+    // populate the collector. Streaming frameworks (like Astro dev mode)
+    // may defer component rendering until the body stream is consumed.
+    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+    const bodyParts: string[] = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bodyParts.push(value);
+    }
+    let html = bodyParts.join('');
+
     const css = collector.getCSS();
-    if (!css) return response;
+    if (!css) {
+      return new Response(html, {
+        status: response.status,
+        headers: response.headers,
+      });
+    }
 
     const nonce = getConfig().nonce;
     const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
@@ -78,62 +100,17 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     }
 
     const injection = styleTag + cacheTag;
-    const body = response.body;
-
-    if (!body) {
-      return response;
+    const idx = html.indexOf('</head>');
+    if (idx !== -1) {
+      html = html.slice(0, idx) + injection + html.slice(idx);
+    } else {
+      html = injection + html;
     }
-
-    const { readable, writable } = new TransformStream<string, string>();
-    const writer = writable.getWriter();
-    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
-
-    let injected = false;
-    let leftover = '';
-
-    void (async () => {
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          if (injected) {
-            await writer.write(value);
-            continue;
-          }
-
-          const text = leftover + value;
-          const idx = text.indexOf('</head>');
-
-          if (idx !== -1) {
-            injected = true;
-            const before = text.slice(0, idx);
-            const after = text.slice(idx);
-            await writer.write(before + injection + after);
-            leftover = '';
-          } else {
-            // Keep last len("</head>")-1 = 6 chars in case it spans two chunks
-            const safeLen = Math.max(0, text.length - 6);
-            if (safeLen > 0) {
-              await writer.write(text.slice(0, safeLen));
-            }
-            leftover = text.slice(safeLen);
-          }
-        }
-
-        if (leftover) {
-          await writer.write(leftover);
-        }
-        await writer.close();
-      } catch (err) {
-        await writer.abort(err);
-      }
-    })();
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
 
-    return new Response(readable.pipeThrough(new TextEncoderStream()), {
+    return new Response(html, {
       status: response.status,
       headers,
     });

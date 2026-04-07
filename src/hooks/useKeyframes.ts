@@ -1,8 +1,8 @@
 import { keyframes } from '../injector';
 import type { KeyframesSteps } from '../injector/types';
-import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { depsEqual } from '../utils/deps-equal';
 
 interface UseKeyframesOptions {
   name?: string;
@@ -11,9 +11,17 @@ interface UseKeyframesOptions {
 
 const clientContentToName = new Map<string, string>();
 
+interface FactoryDepsEntry {
+  deps: readonly unknown[];
+  name: string;
+}
+
+const factoryDepsCache = new Map<string, FactoryDepsEntry>();
+
 /* @internal — used only for tests */
 export function _resetKeyframesCache(): void {
   clientContentToName.clear();
+  factoryDepsCache.clear();
 }
 
 /**
@@ -84,9 +92,21 @@ export function useKeyframes(
 ): string {
   const isFactory = typeof stepsOrFactory === 'function';
 
+  const deps =
+    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseKeyframesOptions | undefined);
+
+  const target = getStyleTarget();
+
+  // Client deps cache: skip factory re-evaluation when deps haven't changed
+  if (isFactory && deps && opts?.name && target.mode === 'client') {
+    const cached = factoryDepsCache.get(opts.name);
+    if (cached && depsEqual(cached.deps, deps)) {
+      return cached.name;
+    }
+  }
 
   const steps = isFactory
     ? (stepsOrFactory as () => KeyframesSteps)()
@@ -96,33 +116,30 @@ export function useKeyframes(
     return '';
   }
 
-  const ssrCollector = getRegisteredSSRCollector();
-
-  if (ssrCollector) {
-    const actualName = ssrCollector.allocateKeyframeName(opts?.name);
+  if (target.mode === 'ssr') {
+    const actualName = target.collector.allocateKeyframeName(opts?.name);
     const css = formatKeyframesCSS(actualName, steps);
-    ssrCollector.collectKeyframes(actualName, css);
+    target.collector.collectKeyframes(actualName, css);
     return actualName;
   }
 
-  if (isServerEnvironment()) {
-    const rscCache = getRSCCache();
-    const contentHash = JSON.stringify(steps);
-    const key = `__kf:${opts?.name ?? ''}:${contentHash}`;
+  if (target.mode === 'rsc') {
+    const serializedContent = JSON.stringify(steps);
+    const key = `__kf:${opts?.name ?? ''}:${serializedContent}`;
 
-    const existingName = rscCache.generatedNames.get(key);
+    const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName = opts?.name ?? `k${rscCache.keyframesCounter++}`;
+    const actualName = opts?.name ?? `k${target.cache.keyframesCounter++}`;
     const css = formatKeyframesCSS(actualName, steps);
-    pushRSCCSS(rscCache, key, css);
-    rscCache.generatedNames.set(key, actualName);
+    pushRSCCSS(target.cache, key, css);
+    target.cache.generatedNames.set(key, actualName);
     return actualName;
   }
 
   // Client path: stable name via content-based dedup
-  const contentHash = JSON.stringify(steps);
-  const cacheKey = `${opts?.name ?? ''}:${contentHash}`;
+  const serializedContent = JSON.stringify(steps);
+  const cacheKey = `${opts?.name ?? ''}:${serializedContent}`;
 
   const cachedName = clientContentToName.get(cacheKey);
   if (cachedName) {
@@ -136,6 +153,10 @@ export function useKeyframes(
 
   const name = result.toString();
   clientContentToName.set(cacheKey, name);
+
+  if (deps && opts?.name) {
+    factoryDepsCache.set(opts.name, { deps, name });
+  }
 
   return name;
 }

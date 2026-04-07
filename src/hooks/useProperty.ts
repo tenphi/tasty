@@ -1,7 +1,6 @@
 import { getGlobalInjector } from '../config';
-import { pushRSCCSS, getRSCCache, isServerEnvironment } from '../rsc-cache';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatPropertyCSS } from '../ssr/format-property';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 export interface UsePropertyOptions {
   /**
@@ -88,10 +87,10 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
     return;
   }
 
-  const ssrCollector = getRegisteredSSRCollector();
+  const target = getStyleTarget();
 
-  if (ssrCollector) {
-    ssrCollector.collectInternals();
+  if (target.mode === 'ssr') {
+    target.collector.collectInternals();
 
     const css = formatPropertyCSS(name, {
       syntax: options?.syntax,
@@ -99,20 +98,19 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
       initialValue: options?.initialValue,
     });
     if (css) {
-      ssrCollector.collectProperty(name, css);
+      target.collector.collectProperty(name, css);
     }
     return;
   }
 
-  if (isServerEnvironment()) {
-    const rscCache = getRSCCache();
+  if (target.mode === 'rsc') {
     const css = formatPropertyCSS(name, {
       syntax: options?.syntax,
       inherits: options?.inherits,
       initialValue: options?.initialValue,
     });
     if (css) {
-      pushRSCCSS(rscCache, `__prop:${name}`, css);
+      pushRSCCSS(target.cache, `__prop:${name}`, css);
     }
     return;
   }

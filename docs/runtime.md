@@ -523,34 +523,11 @@ function EmojiList() {
 }
 ```
 
-Factory form with dependencies:
-
-```tsx
-function DynamicList({ marker }: { marker: string }) {
-  const styleName = useCounterStyle(
-    () => ({
-      system: 'cyclic',
-      symbols: `"${marker}"`,
-      suffix: '" "',
-    }),
-    [marker],
-  );
-
-  return <ol style={{ listStyleType: styleName }}>...</ol>;
-}
-```
-
-Signatures:
+Signature:
 
 ```ts
 function useCounterStyle(
   descriptors: CounterStyleDescriptors,
-  options?: { name?: string; root?: Document | ShadowRoot },
-): string;
-
-function useCounterStyle(
-  factory: () => CounterStyleDescriptors,
-  deps: readonly unknown[],
   options?: { name?: string; root?: Document | ShadowRoot },
 ): string;
 ```

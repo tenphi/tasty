@@ -10,6 +10,9 @@
 
 import { cache } from 'react';
 
+import type { ServerStyleCollector } from './ssr/collector';
+import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
+
 export interface RSCStyleCache {
   cacheKeyToClassName: Map<string, string>;
   classCounter: number;
@@ -85,4 +88,22 @@ export function pushRSCCSS(
  */
 export function isServerEnvironment(): boolean {
   return typeof document === 'undefined';
+}
+
+export type StyleTarget =
+  | { mode: 'ssr'; collector: ServerStyleCollector }
+  | { mode: 'rsc'; cache: RSCStyleCache }
+  | { mode: 'client' };
+
+/**
+ * Determine the current style injection target.
+ * Centralizes the three-way detection (SSR collector / RSC cache / client DOM)
+ * used by all style functions.
+ */
+export function getStyleTarget(): StyleTarget {
+  const collector = getRegisteredSSRCollector();
+  if (collector) return { mode: 'ssr', collector };
+  if (typeof document === 'undefined')
+    return { mode: 'rsc', cache: getRSCCache() };
+  return { mode: 'client' };
 }

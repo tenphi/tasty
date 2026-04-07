@@ -1,9 +1,14 @@
 import { injectRawCSS } from '../injector';
-import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
+import { depsEqual } from '../utils/deps-equal';
 import { hashString } from '../utils/hash';
 
 interface UseRawCSSOptions {
+  /**
+   * Shadow root or document to inject into.
+   * Note: `root` is not part of the update-tracking comparison — changing
+   * only the root for the same id/content will not re-inject.
+   */
   root?: Document | ShadowRoot;
   /**
    * Stable identifier for update tracking (client-only). When provided,
@@ -22,11 +27,13 @@ interface ClientEntry {
 
 const clientEntries = new Map<string, ClientEntry>();
 const clientContentDedup = new Set<string>();
+const factoryDepsCache = new Map<string, readonly unknown[]>();
 
 /* @internal — used only for tests */
 export function _resetRawCSSCache(): void {
   clientEntries.clear();
   clientContentDedup.clear();
+  factoryDepsCache.clear();
 }
 
 // Overload 1: Static CSS string
@@ -96,9 +103,19 @@ export function useRawCSS(
 ): void {
   const isFactory = typeof cssOrFactory === 'function';
 
+  const deps =
+    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseRawCSSOptions | undefined);
+
+  // Client deps cache: skip factory re-evaluation when deps haven't changed
+  if (isFactory && deps && opts?.id) {
+    const cachedDeps = factoryDepsCache.get(opts.id);
+    if (cachedDeps && depsEqual(cachedDeps, deps)) {
+      return;
+    }
+  }
 
   const css = isFactory
     ? (cssOrFactory as () => string)()
@@ -106,18 +123,17 @@ export function useRawCSS(
 
   if (!css.trim()) return;
 
-  const ssrCollector = getRegisteredSSRCollector();
+  const target = getStyleTarget();
 
-  if (ssrCollector) {
-    const key = `raw:${hashString(css)}`;
-    ssrCollector.collectRawCSS(key, css);
+  if (target.mode === 'ssr') {
+    const key = opts?.id ? `raw:${opts.id}` : `raw:${hashString(css)}`;
+    target.collector.collectRawCSS(key, css);
     return;
   }
 
-  if (isServerEnvironment()) {
-    const rscCache = getRSCCache();
+  if (target.mode === 'rsc') {
     const key = opts?.id ? `__raw:${opts.id}` : `__raw:${hashString(css)}`;
-    pushRSCCSS(rscCache, key, css);
+    pushRSCCSS(target.cache, key, css);
     return;
   }
 
@@ -133,6 +149,7 @@ export function useRawCSS(
 
     const { dispose } = injectRawCSS(css, opts);
     clientEntries.set(id, { contentKey: css, dispose });
+    if (deps) factoryDepsCache.set(id, deps);
   } else {
     const contentKey = hashString(css);
     if (clientContentDedup.has(contentKey)) return;

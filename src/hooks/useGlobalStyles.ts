@@ -2,13 +2,12 @@ import { getConfig } from '../config';
 import { injectGlobal } from '../injector';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
-import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import {
   collectAutoInferredProperties,
   collectAutoInferredPropertiesRSC,
 } from '../ssr/collect-auto-properties';
 import { formatGlobalRules } from '../ssr/format-global-rules';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
 import { hashString } from '../utils/hash';
 import { resolveRecipes } from '../utils/resolve-recipes';
@@ -82,14 +81,13 @@ export function useGlobalStyles(
     return;
   }
 
-  const ssrCollector = getRegisteredSSRCollector();
-  const isServer = !ssrCollector && isServerEnvironment();
+  const target = getStyleTarget();
 
   const slotKey = options?.id ?? selector;
   const stylesKey = JSON.stringify(styles);
 
   // Client fast path: skip resolveRecipes/renderStyles if styles haven't changed
-  if (!ssrCollector && !isServer) {
+  if (target.mode === 'client') {
     const existing = clientGlobalEntries.get(slotKey);
     if (existing && existing.stylesKey === stylesKey) return;
   }
@@ -100,33 +98,42 @@ export function useGlobalStyles(
 
   if (styleResults.length === 0) return;
 
-  if (ssrCollector) {
-    ssrCollector.collectInternals();
+  if (target.mode === 'ssr') {
+    target.collector.collectInternals();
 
     const css = formatGlobalRules(styleResults);
     if (css) {
-      const key = `global:${selector}:${hashString(css)}`;
-      ssrCollector.collectGlobalStyles(key, css);
+      const key = options?.id
+        ? `global:${options.id}`
+        : `global:${selector}:${hashString(css)}`;
+      target.collector.collectGlobalStyles(key, css);
     }
 
     if (getConfig().autoPropertyTypes !== false) {
-      collectAutoInferredProperties(styleResults, ssrCollector, resolvedStyles);
+      collectAutoInferredProperties(
+        styleResults,
+        target.collector,
+        resolvedStyles,
+      );
     }
     return;
   }
 
-  if (isServer) {
-    const rscCache = getRSCCache();
+  if (target.mode === 'rsc') {
     const css = formatGlobalRules(styleResults);
     if (css) {
       const key = options?.id
         ? `__global:${options.id}`
         : `__global:${selector}:${hashString(css)}`;
-      pushRSCCSS(rscCache, key, css);
+      pushRSCCSS(target.cache, key, css);
     }
 
     if (getConfig().autoPropertyTypes !== false) {
-      collectAutoInferredPropertiesRSC(styleResults, rscCache, resolvedStyles);
+      collectAutoInferredPropertiesRSC(
+        styleResults,
+        target.cache,
+        resolvedStyles,
+      );
     }
     return;
   }

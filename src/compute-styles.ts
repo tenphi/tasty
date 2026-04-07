@@ -153,7 +153,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
   const usedKf = getUsedKeyframes(styles);
   if (usedKf) {
     for (const [name, steps] of Object.entries(usedKf)) {
-      const key = `__kf:${name}`;
+      const key = `__kf:${name}:${JSON.stringify(steps)}`;
       if (!rscCache.emittedKeys.has(key)) {
         rscCache.emittedKeys.add(key);
         parts.push(formatKeyframesCSS(name, steps));
@@ -198,7 +198,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
     const localCounterStyle = extractLocalCounterStyle(styles);
     if (localCounterStyle) {
       for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        const key = `__cs:${name}`;
+        const key = `__cs:${name}:${JSON.stringify(descriptors)}`;
         if (!rscCache.emittedKeys.has(key)) {
           rscCache.emittedKeys.add(key);
           parts.push(formatCounterStyleRule(name, descriptors));

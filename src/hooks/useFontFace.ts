@@ -1,8 +1,7 @@
 import { getGlobalInjector } from '../config';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import type { FontFaceDescriptors, FontFaceInput } from '../injector/types';
-import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
 interface UseFontFaceOptions {
   root?: Document | ShadowRoot;
@@ -54,23 +53,22 @@ export function useFontFace(
     ? input
     : [input];
 
-  const ssrCollector = getRegisteredSSRCollector();
+  const target = getStyleTarget();
 
-  if (ssrCollector) {
+  if (target.mode === 'ssr') {
     for (const desc of descriptors) {
       const hash = fontFaceContentHash(family, desc);
       const css = formatFontFaceRule(family, desc);
-      ssrCollector.collectFontFace(hash, css);
+      target.collector.collectFontFace(hash, css);
     }
     return;
   }
 
-  if (isServerEnvironment()) {
-    const rscCache = getRSCCache();
+  if (target.mode === 'rsc') {
     for (const desc of descriptors) {
       const hash = fontFaceContentHash(family, desc);
       const css = formatFontFaceRule(family, desc);
-      pushRSCCSS(rscCache, `__ff:${hash}`, css);
+      pushRSCCSS(target.cache, `__ff:${hash}`, css);
     }
     return;
   }

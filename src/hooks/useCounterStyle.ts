@@ -1,8 +1,7 @@
 import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
-import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
 interface UseCounterStyleOptions {
   name?: string;
@@ -43,96 +42,53 @@ export function _resetCounterStyleCache(): void {
  * }
  * ```
  *
- * @example Factory function with dependencies
- * ```tsx
- * function DynamicList({ marker }: { marker: string }) {
- *   const styleName = useCounterStyle(
- *     () => ({
- *       system: 'cyclic',
- *       symbols: `"${marker}"`,
- *       suffix: '" "',
- *     }),
- *     [marker],
- *   );
- *
- *   return <ol style={{ listStyleType: styleName }}>...</ol>;
- * }
- * ```
  */
-
-// Overload 1: Static descriptors
 export function useCounterStyle(
   descriptors: CounterStyleDescriptors,
   options?: UseCounterStyleOptions,
-): string;
-
-// Overload 2: Factory function with dependencies
-export function useCounterStyle(
-  factory: () => CounterStyleDescriptors,
-  deps: readonly unknown[],
-  options?: UseCounterStyleOptions,
-): string;
-
-// Implementation
-export function useCounterStyle(
-  descriptorsOrFactory:
-    | CounterStyleDescriptors
-    | (() => CounterStyleDescriptors),
-  depsOrOptions?: readonly unknown[] | UseCounterStyleOptions,
-  options?: UseCounterStyleOptions,
 ): string {
-  const isFactory = typeof descriptorsOrFactory === 'function';
-
-  const opts = isFactory
-    ? options
-    : (depsOrOptions as UseCounterStyleOptions | undefined);
-
-  const descriptors = isFactory
-    ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
-    : (descriptorsOrFactory as CounterStyleDescriptors);
-
   if (!descriptors || !descriptors.system) {
     return '';
   }
 
-  const ssrCollector = getRegisteredSSRCollector();
+  const target = getStyleTarget();
 
-  if (ssrCollector) {
-    const actualName = ssrCollector.allocateCounterStyleName(opts?.name);
+  if (target.mode === 'ssr') {
+    const actualName = target.collector.allocateCounterStyleName(options?.name);
     const css = formatCounterStyleRule(actualName, descriptors);
-    ssrCollector.collectCounterStyle(actualName, css);
+    target.collector.collectCounterStyle(actualName, css);
     return actualName;
   }
 
-  if (isServerEnvironment()) {
-    const rscCache = getRSCCache();
-    const contentKey = JSON.stringify(descriptors);
-    const key = `__cs:${opts?.name ?? ''}:${contentKey}`;
+  if (target.mode === 'rsc') {
+    const serializedContent = JSON.stringify(descriptors);
+    const key = `__cs:${options?.name ?? ''}:${serializedContent}`;
 
-    const existingName = rscCache.generatedNames.get(key);
+    const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName = opts?.name ?? `cs${rscCache.counterStyleCounter++}`;
+    const actualName =
+      options?.name ?? `cs${target.cache.counterStyleCounter++}`;
     const css = formatCounterStyleRule(actualName, descriptors);
-    pushRSCCSS(rscCache, key, css);
-    rscCache.generatedNames.set(key, actualName);
+    pushRSCCSS(target.cache, key, css);
+    target.cache.generatedNames.set(key, actualName);
     return actualName;
   }
 
   // Client path: stable name via content-based dedup
-  const contentKey = JSON.stringify(descriptors);
-  const cacheKey = `${opts?.name ?? ''}:${contentKey}`;
+  const serializedContent = JSON.stringify(descriptors);
+  const cacheKey = `${options?.name ?? ''}:${serializedContent}`;
 
   const existingName = clientContentToName.get(cacheKey);
   if (existingName) {
     return existingName;
   }
 
-  const name = opts?.name ?? `cs${clientCounterStyleCounter++}`;
+  const name = options?.name ?? `cs${clientCounterStyleCounter++}`;
   clientContentToName.set(cacheKey, name);
 
   const injector = getGlobalInjector();
-  injector.counterStyle(name, descriptors, { root: opts?.root });
+  injector.counterStyle(name, descriptors, { root: options?.root });
 
   return name;
 }

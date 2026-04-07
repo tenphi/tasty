@@ -83,14 +83,20 @@ That's it. All `tasty()` components inside the tree automatically get SSR suppor
 ### How it works
 
 - `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load. The `'use client'` boundary is required solely to access `useServerInsertedHTML` — **not** because `tasty()` components need the client.
-- During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level global getter. All style computation — whether from `tasty()` components, `computeStyles()`, `useStyles()`, or other hooks like `useGlobalStyles()` — discovers the collector through this single global getter. No React context is involved.
+- During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level global getter. All style functions — `tasty()` components, `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — discover the collector through this single global getter. No React context is involved.
 - `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible — styles are injected alongside each Suspense boundary as it resolves.
 - A companion `<script>` tag transfers the `cacheKey → className` mapping to the client.
 - When the module loads on the client, `hydrateTastyCache()` runs automatically and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
 
-### Using tasty() in Server Components
+### Using Tasty in Server Components
 
-`tasty()` components are hook-free and do not require `'use client'`. They can be used directly in React Server Components. Dynamic `styleProps` like `<Grid flow="column">` work normally in server components. During SSR, `computeStyles()` discovers the collector via the same global getter registered by `TastyRegistry` — no React context or client boundary needed for this path.
+All Tasty style functions are hook-free and do not require `'use client'`. They can be used directly in React Server Components:
+
+- `tasty()` components — dynamic `styleProps` like `<Grid flow="column">` work normally
+- `useStyles()`, `useGlobalStyles()`, `useRawCSS()` — inject styles by class or selector
+- `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()` — inject ancillary CSS rules
+
+During SSR, all functions discover the collector via the same global getter registered by `TastyRegistry` — no React context or client boundary needed. In RSC mode without a collector (e.g., Astro zero-setup), CSS is accumulated in a per-request cache and flushed into an inline `<style>` tag by the next `tasty()` component in the tree.
 
 ### Options
 
@@ -157,7 +163,7 @@ import Card from '../components/Card.tsx';
 </html>
 ```
 
-**Trade-offs**: Styles are deduplicated within each React render tree, but Astro renders separate component trees independently, so shared CSS (tokens, `@property` rules) may appear more than once. Hooks like `useGlobalStyles`, `useRawCSS`, `useKeyframes`, and `useProperty` require the SSR collector and will not produce CSS on the server without the integration.
+**Trade-offs**: Styles are deduplicated within each React render tree, but Astro renders separate component trees independently, so shared CSS (tokens, `@property` rules) may appear more than once. All style functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`) work in zero-setup mode — their CSS is accumulated in the RSC cache and flushed by the next `tasty()` component in the tree.
 
 Best for quick prototyping, small static sites, or trying Tasty out in Astro.
 
@@ -185,7 +191,7 @@ This gives you:
 - A `<script data-tasty-cache>` tag with the `cacheKey -> className` map for client hydration
 - Auto-injected client hydration script (via `injectScript('before-hydration')`) so islands skip the style pipeline during hydration -- no need to import anything manually in each island component
 
-All hooks (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`) work on the server.
+All style functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`) work on the server.
 
 ```astro
 ---
@@ -263,7 +269,7 @@ Call `configure({ nonce: '...' })` before any rendering happens. The middleware 
 
 ## Generic Framework Integration
 
-Any React-based framework can integrate using `runWithCollector`, which binds a `ServerStyleCollector` to the current async context via `AsyncLocalStorage`. All `computeStyles()` and hook calls within the render automatically discover the collector.
+Any React-based framework can integrate using `runWithCollector`, which binds a `ServerStyleCollector` to the current async context via `AsyncLocalStorage`. All style function calls within the render automatically discover the collector.
 
 ```tsx
 import {
@@ -395,7 +401,7 @@ Pre-populate the client injector cache. When called without arguments, reads fro
 
 ### `runWithCollector(collector, fn)`
 
-Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All `computeStyles()` and `useStyles()` calls within `fn` (and async continuations) will find this collector.
+Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All style function calls within `fn` (and async continuations) — including `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — will find this collector.
 
 ---
 

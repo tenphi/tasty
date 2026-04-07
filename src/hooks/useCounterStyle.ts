@@ -1,8 +1,7 @@
-import { useInsertionEffect, useMemo } from 'react';
-
 import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
+import { getRSCCache, isRSCEnvironment, pushRSCCSS } from '../rsc-cache';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseCounterStyleOptions {
@@ -12,9 +11,13 @@ interface UseCounterStyleOptions {
 
 let clientCounterStyleCounter = 0;
 
+const clientContentToName = new Map<string, string>();
+
 /**
- * Hook to inject a CSS @counter-style rule and return the generated name.
+ * Inject a CSS @counter-style rule and return the generated name.
  * Permanent — no cleanup on unmount. Deduplicates by name.
+ *
+ * Works in all environments: client, SSR with collector, and React Server Components.
  *
  * @example Basic usage
  * ```tsx
@@ -72,63 +75,63 @@ export function useCounterStyle(
   depsOrOptions?: readonly unknown[] | UseCounterStyleOptions,
   options?: UseCounterStyleOptions,
 ): string {
-  const ssrCollector = getRegisteredSSRCollector();
-
   const isFactory = typeof descriptorsOrFactory === 'function';
 
-  const deps =
-    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseCounterStyleOptions | undefined);
 
-  // Stable key for the static path — avoids re-triggering when caller
-  // passes an inline object literal with the same content.
-  const inputKey = useMemo(
-    () => (isFactory ? null : JSON.stringify(descriptorsOrFactory)),
-    [isFactory ? null : descriptorsOrFactory],
-  );
+  const descriptors = isFactory
+    ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
+    : (descriptorsOrFactory as CounterStyleDescriptors);
 
-  const descriptorsData = useMemo(
-    () => {
-      const descriptors = isFactory
-        ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
-        : (descriptorsOrFactory as CounterStyleDescriptors);
+  if (!descriptors || !descriptors.system) {
+    return '';
+  }
 
-      if (!descriptors || !descriptors.system) {
-        return null;
-      }
+  const ssrCollector = getRegisteredSSRCollector();
 
-      return descriptors;
-    },
+  if (ssrCollector) {
+    const actualName = ssrCollector.allocateCounterStyleName(opts?.name);
+    const css = formatCounterStyleRule(actualName, descriptors);
+    ssrCollector.collectCounterStyle(actualName, css);
+    return actualName;
+  }
 
-    isFactory ? (deps ?? []) : [inputKey],
-  );
+  if (isRSCEnvironment()) {
+    const rscCache = getRSCCache();
+    const contentKey = JSON.stringify(descriptors);
+    const key = `__cs:${contentKey}`;
 
-  const name = useMemo(() => {
-    if (!descriptorsData) {
-      return '';
-    }
+    const existingName = rscCache.generatedNames.get(key);
+    if (existingName) return existingName;
 
-    // SSR path: format and collect, return name without DOM injection
-    if (ssrCollector) {
-      const actualName = ssrCollector.allocateCounterStyleName(opts?.name);
-      const css = formatCounterStyleRule(actualName, descriptorsData);
-      ssrCollector.collectCounterStyle(actualName, css);
-      return actualName;
-    }
+    const actualName = opts?.name ?? `cs${rscCache.counterStyleCounter++}`;
+    const css = formatCounterStyleRule(actualName, descriptors);
+    pushRSCCSS(rscCache, key, css);
+    rscCache.generatedNames.set(key, actualName);
+    return actualName;
+  }
 
-    // Client path: return the name (injection happens in useInsertionEffect)
-    return opts?.name ?? `cs${clientCounterStyleCounter++}`;
-  }, [descriptorsData, opts?.name, ssrCollector]);
+  // Client path: stable name via content-based dedup
+  const contentKey = JSON.stringify(descriptors);
 
-  // Client path: inject via DOM
-  useInsertionEffect(() => {
-    if (!descriptorsData || !name) return;
-
+  if (opts?.name) {
     const injector = getGlobalInjector();
-    injector.counterStyle(name, descriptorsData, { root: opts?.root });
-  }, [descriptorsData, name, opts?.root]);
+    injector.counterStyle(opts.name, descriptors, { root: opts?.root });
+    return opts.name;
+  }
+
+  const existingName = clientContentToName.get(contentKey);
+  if (existingName) {
+    return existingName;
+  }
+
+  const name = `cs${clientCounterStyleCounter++}`;
+  clientContentToName.set(contentKey, name);
+
+  const injector = getGlobalInjector();
+  injector.counterStyle(name, descriptors, { root: opts?.root });
 
   return name;
 }

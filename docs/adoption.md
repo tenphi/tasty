@@ -289,7 +289,7 @@ const LoadingButton = tasty(Button, {
 - [Methodology](methodology.md) -- the recommended patterns for structuring Tasty components
 - [Building a Design System](design-system.md) -- practical guide to building a DS layer with Tasty
 - [Style DSL](dsl.md) -- state maps, tokens, units, extending semantics, keyframes, @property
-- [Runtime API](runtime.md) -- `tasty()` factory, component props, variants, sub-elements, hooks
+- [Runtime API](runtime.md) -- `tasty()` factory, component props, variants, sub-elements, style functions
 - [Configuration](configuration.md) -- tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Style Properties](styles.md) -- complete reference for all enhanced style properties
 - [Comparison](comparison.md) -- positioning and trade-offs vs. other styling systems

@@ -412,7 +412,7 @@ Tasty is most compelling when the problem is not just "how do we write styles," 
 
 - [README](../README.md) — overview, quick start, and feature highlights
 - [Style DSL](dsl.md) — state maps, tokens, units, extending semantics, keyframes, @property
-- [Runtime API](runtime.md) — `tasty()` factory, component props, variants, sub-elements, hooks
+- [Runtime API](runtime.md) — `tasty()` factory, component props, variants, sub-elements, style functions
 - [Style Properties](styles.md) — complete reference for all enhanced style properties
 - [Configuration](configuration.md) — tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Zero Runtime (tastyStatic)](tasty-static.md) — build-time static styling with Babel plugin

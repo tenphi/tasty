@@ -1,4 +1,4 @@
-import type { ConfigTokens, ConfigTokenValue } from '../styles/types';
+import type { ConfigTokens } from '../styles/types';
 
 const RESERVED_PRESET_NAMES = new Set([
   'strong',
@@ -67,7 +67,7 @@ export interface TypographyPreset {
 export function generateTypographyTokens(
   presets: Record<string, TypographyPreset>,
 ): ConfigTokens {
-  const tokens: Record<`$${string}`, ConfigTokenValue> = {};
+  const tokens: ConfigTokens = {} as ConfigTokens;
 
   for (const [name, preset] of Object.entries(presets)) {
     if (RESERVED_PRESET_NAMES.has(name)) {
@@ -78,7 +78,7 @@ export function generateTypographyTokens(
 
     tokens[`$${name}-font-size`] = preset.fontSize;
     tokens[`$${name}-line-height`] = preset.lineHeight;
-    tokens[`$${name}-letter-spacing`] = preset.letterSpacing ?? '0';
+    tokens[`$${name}-letter-spacing`] = preset.letterSpacing ?? 'normal';
     tokens[`$${name}-font-weight`] = preset.fontWeight;
 
     if (preset.boldFontWeight !== undefined) {
@@ -102,5 +102,5 @@ export function generateTypographyTokens(
     }
   }
 
-  return tokens as ConfigTokens;
+  return tokens;
 }

@@ -345,7 +345,8 @@ export interface TastyConfig {
   /**
    * Tasty styles applied to the `body` tag.
    * Supports the full Tasty style syntax including style properties,
-   * tokens, sub-element selectors, `@keyframes`, `@fontFace`, etc.
+   * tokens, state maps, and selector-based sub-styling
+   * (e.g. `$: '> .app'` for elements outside React scope).
    * Injected alongside `:root` tokens when the first style is rendered.
    *
    * @example
@@ -1097,7 +1098,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     mergedConfigTokens = {
       ...presetTokens,
       ...mergedConfigTokens,
-    } as ConfigTokens;
+    };
   }
 
   if (config.tokens) {

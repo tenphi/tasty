@@ -29,7 +29,7 @@ describe('configure() presets', () => {
     expect(tokens!['$h1-font-size']).toBe('32px');
     expect(tokens!['$h1-line-height']).toBe('1.2');
     expect(tokens!['$h1-font-weight']).toBe('700');
-    expect(tokens!['$h1-letter-spacing']).toBe('0');
+    expect(tokens!['$h1-letter-spacing']).toBe('normal');
   });
 
   it('should let explicit tokens override preset-generated tokens', () => {
@@ -138,5 +138,28 @@ describe('configure() bodyStyles', () => {
 
     const styles = getGlobalBodyStyles();
     expect(styles).toBeNull();
+  });
+
+  it('should work with preset reference when presets defined in same configure call', () => {
+    configure({
+      presets: {
+        t2: { fontSize: '16px', lineHeight: '1.5', fontWeight: '400' },
+      },
+      bodyStyles: {
+        preset: 't2',
+        margin: 0,
+      },
+    });
+
+    const tokens = getGlobalConfigTokens();
+    expect(tokens).toBeDefined();
+    expect(tokens!['$t2-font-size']).toBe('16px');
+    expect(tokens!['$t2-line-height']).toBe('1.5');
+    expect(tokens!['$t2-font-weight']).toBe('400');
+
+    const styles = getGlobalBodyStyles();
+    expect(styles).toBeDefined();
+    expect(styles!.preset).toBe('t2');
+    expect(styles!.margin).toBe(0);
   });
 });

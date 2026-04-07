@@ -13,7 +13,7 @@ describe('generateTypographyTokens', () => {
     ).toEqual({
       '$body-font-size': '16px',
       '$body-line-height': '24px',
-      '$body-letter-spacing': '0',
+      '$body-letter-spacing': 'normal',
       '$body-font-weight': 400,
     });
   });
@@ -44,7 +44,7 @@ describe('generateTypographyTokens', () => {
     ).toEqual({
       '$t2-font-size': '16px',
       '$t2-line-height': '1.5',
-      '$t2-letter-spacing': '0',
+      '$t2-letter-spacing': 'normal',
       '$t2-font-weight': { '': '400', '@dark': '300' },
     });
   });

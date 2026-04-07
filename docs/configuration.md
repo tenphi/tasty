@@ -277,7 +277,7 @@ configure({
 });
 ```
 
-Body styles support the full Tasty style syntax including style properties, tokens, state maps, `@keyframes`, `@fontFace`, and sub-element selectors. They are injected alongside `:root` tokens when the first style is rendered.
+Body styles support the full Tasty style syntax including style properties, tokens, state maps, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). They are injected alongside `:root` tokens when the first style is rendered.
 
 Body styles are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin). Plugins can also provide `bodyStyles`; they are merged with config body styles (config wins on conflict).
 

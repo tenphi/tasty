@@ -30,10 +30,10 @@ import {
   getGlobalConfigTokens,
   resetConfig,
 } from '../config';
-import type { RecipeStyles, Styles, ConfigTokens } from '../styles/types';
+import type { TastyConfig } from '../config';
+import type { Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { resolveRecipes } from '../utils/resolve-recipes';
-import type { StyleHandlerDefinition } from '../utils/styles';
 
 import { CSSWriter } from './css-writer';
 import {
@@ -58,132 +58,22 @@ import type {
   FontFaceInput,
   KeyframesSteps,
 } from '../injector/types';
-import type { StyleDetails, UnitHandler } from '../parser/types';
-import type { TastyPlugin } from '../plugins/types';
-import type { TypographyPreset } from '../utils/typography';
 
 /**
  * Build-time configuration for zero-runtime mode.
- * Subset of TastyConfig that applies at build time.
+ * Subset of TastyConfig excluding runtime-only DOM options
+ * (`nonce`, `maxRulesPerSheet`, `forceTextInjection`, `gc`).
  */
-export interface TastyZeroConfig {
-  /**
-   * Global predefined states for advanced state mapping.
-   * Example: { '@mobile': '@media(w < 768px)', '@dark': '@root(theme=dark)' }
-   */
-  states?: Record<string, string>;
+export type TastyZeroConfig = Omit<
+  TastyConfig,
+  'nonce' | 'maxRulesPerSheet' | 'forceTextInjection' | 'gc'
+> & {
   /**
    * Enable development mode features: source comments in generated CSS.
-   * Default: false
+   * @default false
    */
   devMode?: boolean;
-  /**
-   * Parser LRU cache size (default: 1000).
-   * Larger values improve performance for builds with many unique style values.
-   */
-  parserCacheSize?: number;
-  /**
-   * Custom units for the style parser (merged with built-in units).
-   * Units transform numeric values like `2x` → `calc(2 * var(--gap))`.
-   * @example { em: 'em', vw: 'vw', custom: (n) => `${n * 10}px` }
-   */
-  units?: Record<string, string | UnitHandler>;
-  /**
-   * Custom functions for the style parser (merged with existing).
-   * Functions process parsed style groups and return CSS values.
-   * @example { myFunc: (groups) => groups.map(g => g.output).join(' ') }
-   */
-  funcs?: Record<string, (groups: StyleDetails[]) => string>;
-  /**
-   * Plugins that extend tasty with custom functions, units, states, and handlers.
-   * Plugins are processed in order, with later plugins overriding earlier ones.
-   * @example
-   * ```ts
-   * import { okhslPlugin } from '@tenphi/tasty';
-   *
-   * // babel.config.js
-   * module.exports = {
-   *   plugins: [
-   *     ['@tenphi/tasty/babel-plugin', {
-   *       config: { plugins: [okhslPlugin()] }
-   *     }]
-   *   ]
-   * };
-   * ```
-   */
-  plugins?: TastyPlugin[];
-  /**
-   * Global keyframes definitions for static extraction.
-   * Keys are animation names, values are keyframes step definitions.
-   * @example { fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } } }
-   */
-  keyframes?: Record<string, KeyframesSteps>;
-  /**
-   * Global @font-face definitions for static extraction.
-   * Keys are font-family names, values are descriptors or arrays of descriptors.
-   */
-  fontFace?: Record<string, FontFaceInput>;
-  /**
-   * Global @counter-style definitions for static extraction.
-   * Keys are counter-style names, values are descriptor objects.
-   */
-  counterStyle?: Record<string, CounterStyleDescriptors>;
-  /**
-   * Custom style handlers that transform style properties into CSS declarations.
-   * Handlers replace built-in handlers for the same style name.
-   * @example
-   * ```ts
-   * handlers: {
-   *   fill: ({ fill }) => fill ? { 'background-color': fill } : undefined,
-   *   elevation: ({ elevation }) => ({
-   *     'box-shadow': `0 ${elevation}px ${elevation * 2}px rgba(0,0,0,0.1)`,
-   *   }),
-   * }
-   * ```
-   */
-  handlers?: Record<string, StyleHandlerDefinition>;
-  /**
-   * Design tokens injected as CSS custom properties on `:root`.
-   * Values are parsed through the Tasty DSL. Supports state maps.
-   * @example { '$gap': '4px', '#primary': { '': '#purple', '@dark': '#light-purple' } }
-   */
-  tokens?: ConfigTokens;
-  /**
-   * Predefined tokens replaced during style parsing (parse-time substitution).
-   * Use `$name` for custom properties and `#name` for color tokens.
-   * @example { $spacing: '2x', '#accent': '#purple' }
-   */
-  replaceTokens?: Record<`$${string}` | `#${string}`, string | number>;
-  /**
-   * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
-   * Recipe values are flat tasty styles (no sub-element keys).
-   * @example
-   * ```ts
-   * recipes: {
-   *   card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
-   *   elevated: { shadow: '2x 2x 4x #shadow' },
-   * }
-   * ```
-   */
-  recipes?: Record<string, RecipeStyles>;
-  /**
-   * Typography presets — shorthand for `generateTypographyTokens()`.
-   * Generated tokens are merged under explicit `tokens` (tokens win on conflict).
-   * @example { h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' } }
-   */
-  presets?: Record<string, TypographyPreset>;
-  /**
-   * Tasty styles applied to the `body` tag.
-   * Supports the full Tasty style syntax.
-   * @example { fill: '#surface', color: '#text', preset: 't2', margin: 0 }
-   */
-  bodyStyles?: Styles;
-  /**
-   * Automatically infer and register CSS @property declarations from values.
-   * @default true
-   */
-  autoPropertyTypes?: boolean;
-}
+};
 
 export interface TastyZeroBabelOptions {
   /** Output path for generated CSS (default: 'tasty.css') */
@@ -406,24 +296,14 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     const newWriter = new CSSWriter(outputPath, { devMode });
 
-    // Emit configured tokens as :root CSS custom properties (file mode only;
-    // inject mode handles token injection per-file in the post hook).
+    // Emit configured tokens and body styles (file mode only;
+    // inject mode handles injection per-file in the post hook).
     if (mode !== 'inject') {
-      const tokenStyles = getGlobalConfigTokens();
-      if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-        const result = extractStylesForSelector(':root', tokenStyles);
-        if (result.css) {
-          newWriter.add(':root:tokens', result.css);
-        }
-      }
+      const tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
+      if (tokenCSS) newWriter.add(':root:tokens', tokenCSS);
 
-      const bodyStyles = getGlobalBodyStyles();
-      if (bodyStyles && Object.keys(bodyStyles).length > 0) {
-        const result = extractStylesForSelector('body', bodyStyles);
-        if (result.css) {
-          newWriter.add('body:styles', result.css);
-        }
-      }
+      const bodyCSS = extractCSSFromStyles('body', getGlobalBodyStyles());
+      if (bodyCSS) newWriter.add('body:styles', bodyCSS);
     }
 
     writerCache.set(resolvedOutputPath, {
@@ -444,20 +324,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   let tokenCSS: string | undefined;
   let bodyCSS: string | undefined;
   if (mode === 'inject') {
-    const tokenStyles = getGlobalConfigTokens();
-    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-      const result = extractStylesForSelector(':root', tokenStyles);
-      if (result.css) {
-        tokenCSS = result.css;
-      }
-    }
-    const bodyStyles = getGlobalBodyStyles();
-    if (bodyStyles && Object.keys(bodyStyles).length > 0) {
-      const result = extractStylesForSelector('body', bodyStyles);
-      if (result.css) {
-        bodyCSS = result.css;
-      }
-    }
+    tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
+    bodyCSS = extractCSSFromStyles('body', getGlobalBodyStyles());
   }
 
   return {
@@ -1083,6 +951,19 @@ function writeCSSToWriter(
         : chunk.css;
     cssWriter.add(chunk.className, css, sourceFile);
   }
+}
+
+/**
+ * Extract CSS for a selector from a styles/tokens object.
+ * Returns undefined when there are no styles or no CSS output.
+ */
+function extractCSSFromStyles(
+  selector: string,
+  styles: Styles | ConfigTokens | null,
+): string | undefined {
+  if (!styles || Object.keys(styles).length === 0) return undefined;
+  const result = extractStylesForSelector(selector, styles as Styles);
+  return result.css || undefined;
 }
 
 /**

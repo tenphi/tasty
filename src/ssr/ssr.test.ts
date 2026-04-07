@@ -179,6 +179,14 @@ describe('formatPropertyCSS', () => {
 // ============================================================================
 
 describe('ServerStyleCollector', () => {
+  beforeEach(() => {
+    resetConfig();
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
   it('allocates sequential class names', () => {
     const collector = new ServerStyleCollector();
 
@@ -323,7 +331,6 @@ describe('ServerStyleCollector', () => {
   });
 
   it('collectInternals includes configured tokens as :root CSS custom properties', () => {
-    resetConfig();
     configure({
       tokens: {
         '$my-gap': '8px',
@@ -341,7 +348,6 @@ describe('ServerStyleCollector', () => {
   });
 
   it('flushCSS includes configured tokens on first flush', () => {
-    resetConfig();
     configure({
       tokens: {
         '$my-gap': '8px',
@@ -361,7 +367,6 @@ describe('ServerStyleCollector', () => {
   });
 
   it('collectInternals includes configured bodyStyles', () => {
-    resetConfig();
     configure({
       bodyStyles: {
         color: 'red',
@@ -380,7 +385,6 @@ describe('ServerStyleCollector', () => {
   });
 
   it('collectInternals includes presets as :root tokens', () => {
-    resetConfig();
     configure({
       presets: {
         h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },

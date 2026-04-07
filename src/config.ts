@@ -364,6 +364,37 @@ let globalRecipes: Record<string, RecipeStyles> | null = null;
 // Global token styles storage (injected as :root CSS custom properties)
 let globalConfigTokens: ConfigTokens | null = null;
 
+// ============================================================================
+// Cross-module config sharing via globalThis
+//
+// Frameworks like Astro may load middleware and page components from
+// separate module graphs, creating duplicate module-level state.
+// Config values read by SSR collector's collectInternals() are mirrored
+// to globalThis so they're accessible regardless of which module instance
+// the collector was loaded from.
+// ============================================================================
+
+const GTKEY_TOKENS = '__tasty_cfg_tokens__';
+const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
+const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
+const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
+
+function setOnGlobalThis(key: string, value: unknown): void {
+  (globalThis as Record<string, unknown>)[key] = value;
+}
+
+function getFromGlobalThis<T>(key: string): T | undefined {
+  return (globalThis as Record<string, unknown>)[key] as T | undefined;
+}
+
+function clearGlobalThisConfig(): void {
+  const g = globalThis as Record<string, unknown>;
+  delete g[GTKEY_TOKENS];
+  delete g[GTKEY_FONT_FACE];
+  delete g[GTKEY_COUNTER_STYLE];
+  delete g[GTKEY_PROPERTIES];
+}
+
 /**
  * Default properties shipped with tasty.
  * These are always included unless explicitly overridden via `configure({ properties })`.
@@ -664,15 +695,20 @@ function setGlobalProperties(
     return;
   }
   globalProperties = properties;
+  setOnGlobalThis(GTKEY_PROPERTIES, globalProperties);
 }
 
 /**
  * Get the effective properties: DEFAULT_PROPERTIES merged with user-configured
  * properties. User properties override defaults with matching keys.
+ * Reads from globalThis first for cross-module SSR support.
  */
 export function getEffectiveProperties(): Record<string, PropertyDefinition> {
-  if (!globalProperties) return DEFAULT_PROPERTIES;
-  return { ...DEFAULT_PROPERTIES, ...globalProperties };
+  const props =
+    globalProperties ??
+    getFromGlobalThis<Record<string, PropertyDefinition>>(GTKEY_PROPERTIES);
+  if (!props) return DEFAULT_PROPERTIES;
+  return { ...DEFAULT_PROPERTIES, ...props };
 }
 
 // ============================================================================
@@ -682,9 +718,14 @@ export function getEffectiveProperties(): Record<string, PropertyDefinition> {
 /**
  * Get global font-face configuration.
  * Returns null if no font faces configured.
+ * Reads from globalThis first for cross-module SSR support.
  */
 export function getGlobalFontFace(): Record<string, FontFaceInput> | null {
-  return globalFontFace;
+  return (
+    globalFontFace ??
+    getFromGlobalThis<Record<string, FontFaceInput>>(GTKEY_FONT_FACE) ??
+    null
+  );
 }
 
 /**
@@ -701,6 +742,7 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
     return;
   }
   globalFontFace = fontFace;
+  setOnGlobalThis(GTKEY_FONT_FACE, globalFontFace);
 }
 
 // ============================================================================
@@ -710,12 +752,19 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
 /**
  * Get global counter-style configuration.
  * Returns null if no counter styles configured.
+ * Reads from globalThis first for cross-module SSR support.
  */
 export function getGlobalCounterStyle(): Record<
   string,
   CounterStyleDescriptors
 > | null {
-  return globalCounterStyle;
+  return (
+    globalCounterStyle ??
+    getFromGlobalThis<Record<string, CounterStyleDescriptors>>(
+      GTKEY_COUNTER_STYLE,
+    ) ??
+    null
+  );
 }
 
 /**
@@ -734,6 +783,7 @@ function setGlobalCounterStyle(
     return;
   }
   globalCounterStyle = counterStyle;
+  setOnGlobalThis(GTKEY_COUNTER_STYLE, globalCounterStyle);
 }
 
 // ============================================================================
@@ -814,9 +864,12 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
 /**
  * Get global token styles for :root injection.
  * Returns null if no tokens configured.
+ * Reads from globalThis first for cross-module SSR support.
  */
 export function getGlobalConfigTokens(): ConfigTokens | null {
-  return globalConfigTokens;
+  return (
+    globalConfigTokens ?? getFromGlobalThis<ConfigTokens>(GTKEY_TOKENS) ?? null
+  );
 }
 
 /**
@@ -835,6 +888,7 @@ function setGlobalConfigTokens(styles: ConfigTokens): void {
   globalConfigTokens = globalConfigTokens
     ? { ...globalConfigTokens, ...styles }
     : styles;
+  setOnGlobalThis(GTKEY_TOKENS, globalConfigTokens);
 }
 
 /**
@@ -1119,6 +1173,7 @@ export function resetConfig(): void {
   globalCounterStyle = null;
   globalRecipes = null;
   globalConfigTokens = null;
+  clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
   resetHandlers();
   resetColorSpace();

@@ -57,6 +57,11 @@
       "import": "./dist/ssr/astro.js",
       "default": "./dist/ssr/astro.js"
     },
+    "./ssr/astro-client": {
+      "types": "./dist/ssr/astro-client.d.ts",
+      "import": "./dist/ssr/astro-client.js",
+      "default": "./dist/ssr/astro-client.js"
+    },
     "./tasty.config": "./tasty.config.ts"
   },
   "files": [
@@ -67,7 +72,8 @@
   "sideEffects": [
     "./dist/ssr/index.js",
     "./dist/ssr/next.js",
-    "./dist/ssr/astro.js"
+    "./dist/ssr/astro.js",
+    "./dist/ssr/astro-client.js"
   ],
   "engines": {
     "node": ">=20"

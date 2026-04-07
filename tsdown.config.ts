@@ -12,6 +12,8 @@ export default defineConfig({
     'ssr/index': 'src/ssr/index.ts',
     'ssr/next': 'src/ssr/next.ts',
     'ssr/astro': 'src/ssr/astro.ts',
+    'ssr/astro-middleware': 'src/ssr/astro-middleware.ts',
+    'ssr/astro-client': 'src/ssr/astro-client.ts',
   },
   format: 'esm',
   outDir: 'dist',

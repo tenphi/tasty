@@ -55,7 +55,8 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 | `@tenphi/tasty/next` | Next.js integration wrapper for zero-runtime | Node |
 | `@tenphi/tasty/ssr` | Server-side rendering collector + hydration | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
-| `@tenphi/tasty/ssr/astro` | Astro SSR integration | Node |
+| `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
+| `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
 
 ## Project Structure
 

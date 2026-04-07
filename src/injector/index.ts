@@ -225,7 +225,8 @@ export function cleanup(root?: Document | ShadowRoot): void {
 
 /**
  * Record a render-time usage hit for one or more classNames.
- * Used internally by computeStyles and tasty() to track style popularity for GC.
+ * Used internally by computeStyles and tasty() to track usage for GC.
+ * When the global touch counter reaches `touchInterval`, schedules GC.
  */
 export function touch(
   className: string,
@@ -237,22 +238,13 @@ export function touch(
 
 /**
  * Synchronous garbage collection of unused styles.
- * Scans the DOM for live classNames (never evicts them), then evicts
- * absent styles whose age exceeds their popularity-weighted TTL.
+ * Evicts the oldest unused styles when usageMap exceeds capacity.
+ * With `{ force: true }`, removes ALL unused styles regardless of capacity.
  *
  * @returns Number of styles evicted.
  */
 export function gc(options?: GCOptions): number {
   return getGlobalInjector().gc(options);
-}
-
-/**
- * Event-driven GC with cooldown.
- * Skips if called within the configured cooldown of the last run.
- * Schedules via requestIdleCallback when available.
- */
-export function maybeGC(options?: GCOptions): void {
-  return getGlobalInjector().maybeGC(options);
 }
 
 /**

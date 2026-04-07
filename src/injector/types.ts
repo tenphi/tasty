@@ -35,51 +35,40 @@ export interface StyleInjectorConfig {
 }
 
 /**
- * Per-className usage tracking for popularity-aware GC.
+ * Per-className usage tracking for GC.
  */
 export interface StyleUsage {
-  hitCount: number;
-  lastUsedAt: number;
+  lastTouchedAt: number;
 }
 
 /**
  * Configuration for the style garbage collector.
+ *
+ * GC is triggered by touch count rather than timers: every `touchInterval`
+ * touches, an idle callback is scheduled to evict unused styles above
+ * `capacity`, oldest first.
  */
 export interface GCConfig {
-  /** Enable automatic background GC sweep. @default false */
-  auto?: boolean;
   /**
-   * Base TTL (ms) for a style rendered only once.
-   * Popular styles get longer TTLs via log2 scaling.
-   * @default 60000
+   * Number of touch events between GC cycles.
+   * @default 1000
    */
-  baseMaxAge?: number;
-  /**
-   * Minimum time (ms) between GC runs. Calls within this window are skipped.
-   * @default 30000
-   */
-  cooldown?: number;
-  /**
-   * Interval (ms) for automatic background sweeps.
-   * Only used when `auto` is true.
-   * @default 300000
-   */
-  autoInterval?: number;
+  touchInterval?: number;
   /**
    * Maximum number of cached styles to retain.
-   * When exceeded, lowest-scored styles are evicted first regardless of age.
-   * No default (unlimited).
+   * GC evicts the oldest unused styles when this limit is exceeded.
+   * @default 1000
    */
-  cacheCapacity?: number;
+  capacity?: number;
 }
 
 /**
- * Per-call options for gc() / maybeGC().
+ * Per-call options for gc().
  */
 export interface GCOptions {
-  baseMaxAge?: number;
-  cacheCapacity?: number;
   root?: Document | ShadowRoot;
+  /** Bypass capacity threshold and remove ALL unused styles. */
+  force?: boolean;
 }
 
 export interface RuleInfo {
@@ -149,7 +138,7 @@ export interface RootRegistry {
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
-  /** Per-className usage tracking for GC scoring */
+  /** Per-className usage tracking for GC */
   usageMap: Map<string, StyleUsage>;
 }
 

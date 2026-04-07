@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.5.1
+
+### Patch Changes
+
+- [#111](https://github.com/tenphi/tasty/pull/111) [`0544f16`](https://github.com/tenphi/tasty/commit/0544f16d3f609ed7922e88dea096289a81b56b1e) Thanks [@tenphi](https://github.com/tenphi)! - Share SSR AsyncLocalStorage and collector getter on `globalThis` so Astro and similar setups with split module graphs see one collector.
+
 ## 1.5.0
 
 ### Minor Changes

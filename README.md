@@ -465,7 +465,8 @@ See the [full SSR guide](docs/ssr.md).
 | `@tenphi/tasty/next` | Next.js integration wrapper | Node |
 | `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
-| `@tenphi/tasty/ssr/astro` | Astro middleware + auto-hydration | Node / Browser |
+| `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
+| `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
 
 ## Browser Requirements
 

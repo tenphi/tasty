@@ -116,18 +116,17 @@ The nonce is automatically applied to all `<style>` and `<script>` tags injected
 
 ## Astro
 
-### 1. Add the middleware
+Tasty offers three levels of Astro integration. Choose the one that matches your needs:
 
-Create or update your Astro middleware:
+| Setup | Config needed | Deduplication | Hooks work | Client JS |
+|---|---|---|---|---|
+| Zero setup | None | Per render tree | No | None |
+| `tastyIntegration({ islands: false })` | One line | Cross-tree | Yes | None |
+| `tastyIntegration()` | One line | Cross-tree | Yes | Auto-hydration |
 
-```ts
-// src/middleware.ts
-import { tastyMiddleware } from '@tenphi/tasty/ssr/astro';
+### Zero setup (static pages)
 
-export const onRequest = tastyMiddleware();
-```
-
-### 2. Use tasty() components as normal
+`tasty()` components work in Astro with **no configuration**. Each component emits its own inline `<style>` tag during server rendering via the RSC inline path. Just import and use:
 
 ```tsx
 // src/components/Card.tsx
@@ -153,45 +152,112 @@ import Card from '../components/Card.tsx';
 
 <html>
   <body>
-    <Card>Static card — styles collected by middleware</Card>
-    <Card client:load>Island card — styles hydrated on client</Card>
+    <Card>Styled with zero setup</Card>
   </body>
 </html>
 ```
 
-### How it works
+**Trade-offs**: Styles are deduplicated within each React render tree, but Astro renders separate component trees independently, so shared CSS (tokens, `@property` rules) may appear more than once. Hooks like `useGlobalStyles`, `useRawCSS`, `useKeyframes`, and `useProperty` require the SSR collector and will not produce CSS on the server without the integration.
 
-Astro's `@astrojs/react` renderer calls `renderToString()` for each React component without wrapping the tree in a provider. The middleware uses `AsyncLocalStorage` to make the collector available to all `computeStyles()` calls within the request.
+Best for quick prototyping, small static sites, or trying Tasty out in Astro.
 
-- **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>`. No JavaScript is shipped for these components.
-- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, importing `@tenphi/tasty/ssr/astro` auto-hydrates the cache from `<script data-tasty-cache>`. The island's `computeStyles()` calls hit the cache during hydration.
+### Astro Integration (recommended)
 
-### Client-side hydration for islands
+For production use, add `tastyIntegration()` to your Astro config. This registers middleware automatically and, by default, injects client-side hydration for islands.
 
-The `@tenphi/tasty/ssr/astro` module auto-hydrates when imported on the client. To ensure the cache is warm before any island renders, import it in a shared entry point or in each island component:
-
-```tsx
-// src/components/MyIsland.tsx
-import '@tenphi/tasty/ssr/astro'; // auto-hydrates cache on import
-import { tasty } from '@tenphi/tasty';
-
-const MyIsland = tasty({
-  styles: { padding: '2x', fill: '#blue' },
-});
-
-export default MyIsland;
-```
-
-### Options
+#### With islands (default)
 
 ```ts
-// Skip cache state transfer
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
+import { tastyIntegration } from '@tenphi/tasty/ssr/astro';
+
+export default defineConfig({
+  integrations: [react(), tastyIntegration()],
+});
+```
+
+This gives you:
+
+- A `ServerStyleCollector` per request via `AsyncLocalStorage`, deduplicating CSS across all React trees on the page
+- A single consolidated `<style data-tasty-ssr>` injected into `</head>`
+- A `<script data-tasty-cache>` tag with the `cacheKey -> className` map for client hydration
+- Auto-injected client hydration script (via `injectScript('before-hydration')`) so islands skip the style pipeline during hydration -- no need to import anything manually in each island component
+
+All hooks (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`) work on the server.
+
+```astro
+---
+// src/pages/index.astro
+import Card from '../components/Card.tsx';
+import Interactive from '../components/Interactive.tsx';
+---
+
+<html>
+  <body>
+    <Card>Static -- styles in <style data-tasty-ssr></Card>
+    <Interactive client:load>Island -- cache hydrated automatically</Interactive>
+  </body>
+</html>
+```
+
+#### Static only (no client JS)
+
+If your site has no `client:*` islands, skip the hydration script and cache transfer:
+
+```ts
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
+import { tastyIntegration } from '@tenphi/tasty/ssr/astro';
+
+export default defineConfig({
+  integrations: [react(), tastyIntegration({ islands: false })],
+});
+```
+
+This gives the same middleware deduplication and hook support, but ships zero client-side JavaScript. No `<script data-tasty-cache>` is emitted.
+
+### Manual middleware (advanced)
+
+If you need to compose Tasty's middleware with other middleware (e.g., via `sequence()`), use `tastyMiddleware()` directly:
+
+```ts
+// src/middleware.ts
+import { sequence } from 'astro:middleware';
+import { tastyMiddleware } from '@tenphi/tasty/ssr/astro';
+
+export const onRequest = sequence(
+  tastyMiddleware(),
+  myOtherMiddleware,
+);
+```
+
+For island hydration with manual middleware, import the client module in a shared entry point or in each island:
+
+```tsx
+import '@tenphi/tasty/ssr/astro-client';
+```
+
+#### Options
+
+```ts
+// Skip cache state transfer (static-only, no islands)
 export const onRequest = tastyMiddleware({ transferCache: false });
 ```
 
+### How it works
+
+Astro's `@astrojs/react` renderer calls `renderToString()` for each React component without wrapping the tree in a provider. The middleware creates a `ServerStyleCollector` and binds it via `AsyncLocalStorage`. All `computeStyles()` calls within the request discover this collector automatically.
+
+- **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>` as a single `<style>` tag. No JavaScript is shipped.
+- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, the hydration script (auto-injected by `tastyIntegration()` or manually via `@tenphi/tasty/ssr/astro-client`) reads the cache state from `<script data-tasty-cache>` and pre-populates the injector. The island's `computeStyles()` calls hit the cache during hydration.
+- The middleware uses streaming-compatible `TransformStream` processing to inject CSS into the response without buffering the entire HTML.
+
 ### CSP nonce
 
-Same as Next.js -- call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected tags.
+Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags.
 
 ---
 
@@ -279,7 +345,8 @@ const stream = await runWithCollector(collector, () =>
 |---|---|
 | `@tenphi/tasty/ssr` | Core SSR API: `ServerStyleCollector`, `runWithCollector`, `hydrateTastyCache` |
 | `@tenphi/tasty/ssr/next` | Next.js App Router: `TastyRegistry` component |
-| `@tenphi/tasty/ssr/astro` | Astro: `tastyMiddleware`, auto-hydration on import |
+| `@tenphi/tasty/ssr/astro` | Astro: `tastyIntegration`, `tastyMiddleware` |
+| `@tenphi/tasty/ssr/astro-client` | Astro: client-side cache hydration (auto-injected by integration, or import manually) |
 
 ### `ServerStyleCollector`
 
@@ -306,9 +373,17 @@ Next.js App Router component. Props:
 | `children` | `ReactNode` | required | Application tree |
 | `transferCache` | `boolean` | `true` | Embed cache state script for zero-cost hydration |
 
+### `tastyIntegration(options?)`
+
+Astro integration factory. Registers middleware and optionally injects client hydration.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `islands` | `boolean` | `true` | When `true`, injects client hydration script and enables `transferCache`. When `false`, no client JS is shipped. |
+
 ### `tastyMiddleware(options?)`
 
-Astro middleware factory. Options:
+Astro middleware factory. Use for manual middleware composition.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -328,11 +403,11 @@ Run a function with a `ServerStyleCollector` bound to the current async context 
 
 ### Styles flash on page load (FOUC)
 
-The `TastyRegistry` or `tastyMiddleware` is missing. Ensure your layout wraps the app with `TastyRegistry` (Next.js) or the middleware is registered (Astro).
+The `TastyRegistry` or `tastyIntegration` is missing. Ensure your layout wraps the app with `TastyRegistry` (Next.js) or that `tastyIntegration()` is in your Astro config (or `tastyMiddleware()` is registered manually).
 
 ### Hydration mismatch warnings
 
-Class names are deterministic for the same render order. If you see mismatches, ensure `hydrateTastyCache()` runs before React hydration. For Next.js, this is automatic. For Astro, import `@tenphi/tasty/ssr/astro` in your island components. For custom setups, call `hydrateTastyCache()` before `hydrateRoot()`.
+Class names are deterministic for the same render order. If you see mismatches, ensure `hydrateTastyCache()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, call `hydrateTastyCache()` before `hydrateRoot()`.
 
 ### Styles duplicated after hydration
 

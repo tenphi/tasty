@@ -16,6 +16,7 @@ import { useServerInsertedHTML } from 'next/navigation';
 
 import { getConfig } from '../config';
 import { ServerStyleCollector } from './collector';
+import { TastySSRContext } from './context';
 import { hydrateTastyCache } from './hydrate';
 import { registerSSRCollectorGetter } from './ssr-collector-ref';
 
@@ -108,5 +109,9 @@ export function TastyRegistry({
     return createElement(Fragment, null, styleEl, scriptEl);
   });
 
-  return children;
+  return createElement(
+    TastySSRContext.Provider,
+    { value: collector },
+    children,
+  );
 }

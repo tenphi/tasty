@@ -11,15 +11,11 @@
 import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { ServerStyleCollector } from './collector';
-import { hydrateTastyCache } from './hydrate';
 import { registerSSRCollectorGetter } from './ssr-collector-ref';
 
 // Wire up ALS-based collector discovery so computeStyles() can find
 // the collector set by tastyMiddleware's runWithCollector().
 registerSSRCollectorGetter(getSSRCollector);
-
-// Re-export for convenience
-export { hydrateTastyCache };
 
 export interface TastyMiddlewareOptions {
   /**
@@ -116,7 +112,7 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
             await writer.write(before + injection + after);
             leftover = '';
           } else {
-            // Keep the last 6 chars in case </head> spans two chunks
+            // Keep last len("</head>")-1 = 6 chars in case it spans two chunks
             const safeLen = Math.max(0, text.length - 6);
             if (safeLen > 0) {
               await writer.write(text.slice(0, safeLen));
@@ -128,14 +124,18 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
         if (leftover) {
           await writer.write(leftover);
         }
-      } finally {
         await writer.close();
+      } catch (err) {
+        await writer.abort(err);
       }
     })();
 
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+
     return new Response(readable.pipeThrough(new TextEncoderStream()), {
       status: response.status,
-      headers: response.headers,
+      headers,
     });
   };
 }

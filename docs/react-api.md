@@ -1,6 +1,8 @@
-# Runtime API
+# React API
 
 The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+
+> **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
 ---
 
@@ -354,6 +356,8 @@ On the client, CSS is injected synchronously into the DOM (idempotent via the in
 ## Style Functions
 
 All style functions below are plain functions (not React hooks) and can be used in any environment: client components, SSR with a `ServerStyleCollector`, and React Server Components. They retain their `use` prefix for backward compatibility, but do not use any React hooks internally.
+
+In server-only contexts (Next.js RSC without `'use client'`, Astro without `client:*` directives, SSG), components that use only Tasty style functions produce zero client JavaScript. Tasty never forces the `'use client'` boundary — that decision belongs to your component when it needs React interactivity (state, effects, event handlers).
 
 ### useStyles
 

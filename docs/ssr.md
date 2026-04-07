@@ -18,7 +18,7 @@ The Astro integration (`@tenphi/tasty/ssr/astro`) has no additional dependencies
 
 ## How It Works
 
-`tasty()` components are hook-free and use `computeStyles()` internally — a synchronous, framework-agnostic function. On the server, `computeStyles()` detects a `ServerStyleCollector` (via `AsyncLocalStorage` or an explicit option) and collects CSS into it instead of trying to access the DOM. On the client, CSS is injected synchronously into the DOM during render; the injector's content-based cache makes this idempotent. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `computeStyles()` skips the rendering pipeline entirely during hydration.
+`tasty()` components are hook-free and use `computeStyles()` internally — a synchronous, framework-agnostic function. On the server, `computeStyles()` discovers a `ServerStyleCollector` via a registered getter (module-level for Next.js, `globalThis` for Astro/generic frameworks using `AsyncLocalStorage`) and collects CSS into it instead of trying to access the DOM. On the client, CSS is injected synchronously into the DOM during render; the injector's content-based cache makes this idempotent. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `computeStyles()` skips the rendering pipeline entirely during hydration.
 
 ```
 Server                         Client
@@ -83,10 +83,10 @@ That's it. All `tasty()` components inside the tree automatically get SSR suppor
 ### How it works
 
 - `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load. The `'use client'` boundary is required solely to access `useServerInsertedHTML` — **not** because `tasty()` components need the client.
-- During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level global getter. All style functions — `tasty()` components, `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — discover the collector through this single global getter. No React context is involved.
+- During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level getter (not `globalThis` — this avoids leaking between Next.js's separate RSC and SSR module graphs). It also wraps children in a React context provider so that hooks inside the SSR tree can discover the collector. All style functions — `tasty()` components, `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — discover the collector through the module-level getter or context provider.
 - `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible — styles are injected alongside each Suspense boundary as it resolves.
-- A companion `<script>` tag transfers the `cacheKey → className` mapping to the client.
-- When the module loads on the client, `hydrateTastyCache()` runs automatically and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
+- A companion inline `<script>` tag merges the `cacheKey → className` mapping into `window.__TASTY_SSR_CACHE__` for each flush. This streaming-friendly approach accumulates cache entries incrementally as Suspense boundaries resolve.
+- When the `@tenphi/tasty/ssr/next` module loads on the client, `hydrateTastyCache()` runs automatically from `window.__TASTY_SSR_CACHE__` and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
 
 ### Using Tasty in Server Components
 
@@ -126,7 +126,7 @@ Tasty offers three levels of Astro integration. Choose the one that matches your
 
 | Setup | Config needed | Deduplication | Hooks work | Client JS |
 |---|---|---|---|---|
-| Zero setup | None | Per render tree | No | None |
+| Zero setup | None | Per render tree | Yes (within each tree) | None |
 | `tastyIntegration({ islands: false })` | One line | Cross-tree | Yes | None |
 | `tastyIntegration()` | One line | Cross-tree | Yes | Auto-hydration |
 
@@ -259,7 +259,7 @@ Astro's `@astrojs/react` renderer calls `renderToString()` for each React compon
 
 - **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>` as a single `<style>` tag. No JavaScript is shipped.
 - **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, the hydration script (auto-injected by `tastyIntegration()` or manually via `@tenphi/tasty/ssr/astro-client`) reads the cache state from `<script data-tasty-cache>` and pre-populates the injector. The island's `computeStyles()` calls hit the cache during hydration.
-- The middleware uses streaming-compatible `TransformStream` processing to inject CSS into the response without buffering the entire HTML.
+- The middleware reads the full response body, then injects the collected CSS into `</head>` before sending the final HTML.
 
 ### CSP nonce
 
@@ -363,9 +363,14 @@ Server-safe style collector. One instance per request.
 | `allocateClassName(cacheKey)` | Allocate a sequential class name (`t0`, `t1`, ...) for a cache key. Returns `{ className, isNewAllocation }`. |
 | `collectChunk(cacheKey, className, rules)` | Record CSS rules for a chunk. Deduplicated by `cacheKey`. |
 | `collectKeyframes(name, css)` | Record a `@keyframes` rule. Deduplicated by name. |
+| `allocateKeyframeName(providedName?)` | Allocate a keyframe name. Returns `providedName` if given, otherwise generates one (`k0`, `k1`, ...). |
 | `collectProperty(name, css)` | Record a `@property` rule. Deduplicated by name. |
 | `collectFontFace(key, css)` | Record a `@font-face` rule. Deduplicated by content hash. |
 | `collectCounterStyle(name, css)` | Record a `@counter-style` rule. Deduplicated by name. |
+| `allocateCounterStyleName(providedName?)` | Allocate a counter-style name. Returns `providedName` if given, otherwise generates one (`cs0`, `cs1`, ...). |
+| `collectGlobalStyles(key, css)` | Record global styles (from `useGlobalStyles`). Deduplicated by key. |
+| `collectRawCSS(key, css)` | Record raw CSS text (from `useRawCSS`). Deduplicated by key. |
+| `collectInternals()` | Collect internal `@property` rules, `:root` token defaults, `@font-face`, and `@counter-style` rules from the global config. Called automatically on first chunk collection; idempotent. |
 | `getCSS()` | Get all collected CSS as a single string. For non-streaming SSR. |
 | `flushCSS()` | Get only CSS collected since the last flush. For streaming SSR. |
 | `getCacheState()` | Serialize `{ entries: Record<cacheKey, className>, classCounter }` for client hydration. |

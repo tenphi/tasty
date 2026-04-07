@@ -161,11 +161,21 @@ module.exports = {
 | `configFile` | `string` | — | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack. |
 | `config` | `TastyZeroConfig \| () => TastyZeroConfig` | `{}` | Inline config object or factory function. Takes precedence over `configFile`. |
 | `configDeps` | `string[]` | `[]` | Absolute file paths that affect config (for cache invalidation) |
-| `config.states` | `Record<string, string>` | `{}` | Predefined state aliases |
+| `injectImport` | `boolean` | `true` | Replace `@tenphi/tasty/static` imports with an import of the generated CSS file. Set to `false` to manage CSS imports manually. |
+| `config.states` | `Record<string, string>` | `{}` | Predefined state aliases (e.g. `{ '@mobile': '@media(w < 768px)' }`) |
 | `config.devMode` | `boolean` | `false` | Add source comments to CSS |
+| `config.tokens` | `ConfigTokens` | — | Design tokens injected as CSS custom properties on `:root`. Values are parsed through the Tasty DSL. Supports state maps for responsive/themed tokens. |
+| `config.replaceTokens` | `Record<string, string \| number>` | — | Parse-time token substitution. Keys use `$name` for custom properties and `#name` for color tokens. |
 | `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
+| `config.keyframes` | `Record<string, KeyframesSteps>` | — | Global `@keyframes` definitions available to all `tastyStatic` calls |
 | `config.fontFace` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
 | `config.counterStyle` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
+| `config.units` | `Record<string, string \| UnitHandler>` | — | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }` |
+| `config.funcs` | `Record<string, Function>` | — | Custom functions for the style parser (merged with existing) |
+| `config.plugins` | `TastyPlugin[]` | — | Plugins that extend tasty with custom functions, units, states, and handlers |
+| `config.handlers` | `Record<string, StyleHandlerDefinition>` | — | Custom style handlers that transform style properties into CSS declarations |
+| `config.autoPropertyTypes` | `boolean` | `true` | Automatically infer and register CSS `@property` declarations from values |
+| `config.parserCacheSize` | `number` | `1000` | Parser LRU cache size. Larger values improve performance for builds with many unique style values |
 
 ---
 
@@ -516,5 +526,5 @@ const card = tastyStatic({
 
 - [Docs Hub](README.md) — Choose the right guide by task or rendering mode
 - [Style DSL](dsl.md) — State maps, tokens, units, extending semantics (shared by runtime and static)
-- [Runtime API](runtime.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, style functions
+- [React API](react-api.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, style functions
 - [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers

@@ -13,7 +13,7 @@ Tasty is not the surface your product engineers interact with directly. It sits 
 ```
 Product code
   └─ DS components (Button, Card, Layout, ...)
-       └─ Tasty engine (tasty(), configure(), hooks)
+       └─ Tasty engine (tasty(), configure(), style functions)
             └─ CSS (mutually exclusive selectors, tokens, custom properties)
 ```
 
@@ -270,6 +270,8 @@ const LoadingButton = tasty(Button, {
 </Space>
 ```
 
+**Components are server components by default.** All `tasty()` components and style functions are hook-free, so they work as React Server Components without `'use client'`. In server-only contexts (Next.js RSC, Astro without `client:*` directives), they produce zero client JavaScript. Product engineers only add `'use client'` when their component needs actual React interactivity (state, effects, event handlers), never because of styling.
+
 **No cascade/specificity concerns.** Tasty's mutually exclusive selectors mean extending a component cannot accidentally break another. Import order, class name collisions, and specificity arithmetic are non-issues.
 
 ---
@@ -289,7 +291,7 @@ const LoadingButton = tasty(Button, {
 - [Methodology](methodology.md) -- the recommended patterns for structuring Tasty components
 - [Building a Design System](design-system.md) -- practical guide to building a DS layer with Tasty
 - [Style DSL](dsl.md) -- state maps, tokens, units, extending semantics, keyframes, @property
-- [Runtime API](runtime.md) -- `tasty()` factory, component props, variants, sub-elements, style functions
+- [React API](react-api.md) -- `tasty()` factory, component props, variants, sub-elements, style functions
 - [Configuration](configuration.md) -- tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Style Properties](styles.md) -- complete reference for all enhanced style properties
 - [Comparison](comparison.md) -- positioning and trade-offs vs. other styling systems

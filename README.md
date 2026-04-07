@@ -42,7 +42,7 @@ On top of that foundation, Tasty gives teams a governed styling model: a CSS-lik
 ### Supporting capabilities
 
 - **Typed style props and mod props** — `styleProps` exposes selected CSS properties as typed React props (`<Space flow="row" gap="2x">`); `modProps` does the same for modifier keys (`<Button isLoading size="large">`). Both support state maps and full TypeScript autocomplete. See [Style Props](#style-props) and [Mod Props](#mod-props).
-- **Runtime, SSR, and zero-runtime options** — Use `tasty()` for runtime React components, add SSR integrations when your framework renders that runtime on the server, or use `tastyStatic()` when you specifically want build-time extraction instead of runtime styling.
+- **Server-compatible by default, zero client JS in server-only contexts** — All `tasty()` components and style functions are hook-free. In server-only rendering (Next.js RSC, Astro without islands, SSG), they produce zero client JavaScript with the full feature set. Add SSR integration only when your app also has client-side hydration. Use `tastyStatic()` only when you need build-time extraction without React.
 - **Broad modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
 - **Performance and caching** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
 - **TypeScript-first and AI-friendly** — Style definitions are declarative, structurally consistent, and fully typed, which helps both humans and tooling understand advanced stateful styles without hidden cascade logic.
@@ -188,7 +188,7 @@ Use `configure()` once when your app or design system needs shared aliases, toke
 </Space>
 ```
 
-See [Style Props](#style-props) and [Mod Props](#mod-props) below, or the full reference in [Runtime API](docs/runtime.md#style-props).
+See [Style Props](#style-props) and [Mod Props](#mod-props) below, or the full reference in [React API](docs/react-api.md#style-props).
 
 ## Choose a Styling Approach
 
@@ -196,10 +196,11 @@ Once you understand the component model, pick the rendering mode that matches yo
 
 | Approach | Entry point | Best for | Trade-off |
 |----------|-------------|----------|-----------|
-| **Runtime** | `@tenphi/tasty` | Interactive apps with reusable stateful components and design systems | Full feature set; CSS is generated on demand at runtime |
-| **Zero-runtime** | `@tenphi/tasty/static` | Static sites, SSG, landing pages | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
+| **Runtime (default)** | `tasty()` from `@tenphi/tasty` | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set; CSS computed during React rendering (server or client) |
+| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*` | Apps with client-side hydration (Next.js client components, Astro islands) | Adds CSS deduplication, FOUC prevention, and client cache hydration |
+| **Zero-runtime** | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or when you need build-time extraction without React | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
 
-If your framework can execute runtime React code on the server, you can also add **SSR on top of runtime** with `@tenphi/tasty/ssr/*`. This uses the same `tasty()` pipeline, but collects CSS during server rendering and hydrates the cache on the client. That is the model for Next.js, generic React SSR, and Astro islands. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
+All `tasty()` components are hook-free and work as React Server Components. In server-only contexts — Next.js RSC without `'use client'`, Astro without `client:*` directives, and other SSG setups — they produce the same end result as `tastyStatic()` (static HTML + CSS, zero client JavaScript) but with the full feature set including `styleProps`, sub-elements, and variants. SSR integration is only needed when your app also has client-side rendering. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
 
 ## How It Actually Works
 
@@ -363,7 +364,7 @@ Compound components can style inner parts from the parent definition with capita
 
 Sub-elements share the root state context by default, so keys like `:hover`, modifiers, root states, and media queries resolve as one coordinated styling block. Use `@own(...)` when a sub-element should react to its own state, and use the `$` selector affix when you need precise descendant targeting.
 
-See [Runtime API - Sub-element Styling](docs/runtime.md#sub-element-styling), [Style DSL - Advanced States](docs/dsl.md#advanced-states--prefix), and [Methodology](docs/methodology.md#component-architecture-root--sub-elements).
+See [React API - Sub-element Styling](docs/react-api.md#sub-element-styling), [Style DSL - Advanced States](docs/dsl.md#advanced-states--prefix), and [Methodology](docs/methodology.md#component-architecture-root--sub-elements).
 
 ### Style Props
 
@@ -378,7 +379,7 @@ const Space = tasty({
 <Space flow="row" gap={{ '': '2x', '@tablet': '4x' }}>
 ```
 
-See [Runtime API - Style Props](docs/runtime.md#style-props) and [Methodology - styleProps](docs/methodology.md#styleprops-as-the-public-api).
+See [React API - Style Props](docs/react-api.md#style-props) and [Methodology - styleProps](docs/methodology.md#styleprops-as-the-public-api).
 
 ### Mod Props
 
@@ -397,13 +398,13 @@ const Button = tasty({
 <Button isLoading size="lg">Submit</Button>
 ```
 
-See [Runtime API - Mod Props](docs/runtime.md#mod-props) and [Methodology - modProps](docs/methodology.md#modprops-and-mods).
+See [React API - Mod Props](docs/react-api.md#mod-props) and [Methodology - modProps](docs/methodology.md#modprops-and-mods).
 
 ### Variants
 
 Variants let one component expose named visual versions without pre-generating a separate class for every possible combination. In runtime mode, Tasty emits only the variant CSS that is actually used.
 
-See [Runtime API - Variants](docs/runtime.md#variants).
+See [React API - Variants](docs/react-api.md#variants).
 
 ### Recipes
 
@@ -431,7 +432,7 @@ See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
 When you do not need a full component wrapper, use the style functions directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, and `useCounterStyle` for animation, custom-property, font, and counter-style primitives. All style functions are hook-free and work in React Server Components.
 
-See [Runtime API - Style Functions](docs/runtime.md#style-functions).
+See [React API - Style Functions](docs/react-api.md#style-functions).
 
 ### Zero-Runtime Mode
 
@@ -441,15 +442,19 @@ See [Zero Runtime (tastyStatic)](docs/tasty-static.md) and [Getting Started - Ch
 
 ### `tasty` vs `tastyStatic`
 
-`tasty()` returns React components and injects CSS on demand at runtime. `tastyStatic()` returns class names and extracts CSS during the build. Both share the same DSL, tokens, units, state mappings, and recipes, so the main choice is runtime flexibility versus build-time extraction.
+`tasty()` returns React components that compute CSS during rendering. In server-only contexts, this produces static HTML + CSS with zero client JavaScript — the same end result as `tastyStatic()` but with the full feature set. `tastyStatic()` returns class names and extracts CSS during the build via a Babel plugin, with no React dependency at runtime. Both share the same DSL, tokens, units, state mappings, and recipes. Use `tasty()` as the default for any React-based setup; use `tastyStatic()` when you need build-time extraction without React.
 
-See [Zero Runtime (tastyStatic)](docs/tasty-static.md), [Runtime API](docs/runtime.md), and [Comparison - Build-time vs runtime](docs/comparison.md#build-time-vs-runtime).
+See [Zero Runtime (tastyStatic)](docs/tasty-static.md), [React API](docs/react-api.md), and [Comparison - Build-time vs runtime](docs/comparison.md#build-time-vs-runtime).
 
 ### Server-Side Rendering
 
-SSR layers on top of runtime `tasty()` rather than introducing a separate styling model. Existing components stay unchanged while Tasty collects CSS during server rendering and hydrates the cache on the client.
+`tasty()` components already work on the server without any SSR integration — they are hook-free and render as React Server Components by default. In server-only contexts (Next.js RSC, Astro without islands), they produce zero client JavaScript with the full feature set.
 
-Use `@tenphi/tasty/ssr/next` for Next.js App Router, `@tenphi/tasty/ssr/astro` for Astro, or the core SSR API for other React SSR setups.
+SSR integration (`TastyRegistry`, `tastyIntegration`) adds CSS batching, deduplication across component trees, FOUC prevention, and client cache hydration. Use it when your app also has client-side rendering:
+
+- `@tenphi/tasty/ssr/next` for Next.js App Router (mixed server + client components)
+- `@tenphi/tasty/ssr/astro` for Astro (with or without islands)
+- The core SSR API for other React SSR setups
 
 See the [full SSR guide](docs/ssr.md).
 
@@ -606,7 +611,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 ### Reference
 
 - **[Style DSL](docs/dsl.md)** — The Tasty style language: state maps, tokens, units, color syntax, extending semantics, recipes, keyframes, and @property
-- **[Runtime API](docs/runtime.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and style functions
+- **[React API](docs/react-api.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and style functions
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 

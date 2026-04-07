@@ -334,7 +334,7 @@ Usage:
 
 Sub-elements share the root component's state context by default. A `disabled` modifier on `<Card>` affects `Title`, `Content`, and `Footer` styles automatically — no prop drilling. For the full mental model, see [Methodology — Component architecture](methodology.md#component-architecture-root--sub-elements).
 
-For sub-element syntax details (selector affix `$`, `@own()`, `elements` config), see [Runtime API — Sub-element Styling](runtime.md#sub-element-styling).
+For sub-element syntax details (selector affix `$`, `@own()`, `elements` config), see [React API — Sub-element Styling](react-api.md#sub-element-styling).
 
 ---
 
@@ -418,7 +418,7 @@ The key principle: `config.ts` imports tokens and recipes, calls `configure()`, 
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components
 - **[Getting Started](getting-started.md)** — Installation, first component, tooling setup
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
-- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
+- **[React API](react-api.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers
 - **[Adoption Guide](adoption.md)** — Who should adopt Tasty, incremental phases, what changes for product engineers
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties

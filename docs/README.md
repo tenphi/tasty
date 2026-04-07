@@ -11,13 +11,13 @@ Tasty is a styling engine for design systems that turns component state into det
 
 ## By Role
 
-- **Application developer using an existing design system**: [Getting Started](getting-started.md), then [Runtime API](runtime.md).
+- **Application developer using an existing design system**: [Getting Started](getting-started.md), then [React API](react-api.md).
 - **Design-system author**: [Methodology](methodology.md), [Building a Design System](design-system.md), [Configuration](configuration.md), and [Adoption Guide](adoption.md).
 - **Platform or tooling engineer**: [Configuration](configuration.md), [Zero Runtime (tastyStatic)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
 
 ## By Styling Approach
 
-- **Runtime React components**: [Runtime API](runtime.md)
+- **React components**: [React API](react-api.md)
 - **Zero-runtime / build-time extraction**: [Zero Runtime (tastyStatic)](tasty-static.md)
 - **Runtime `tasty()` with server collection and hydration**: [Server-Side Rendering](ssr.md)
 

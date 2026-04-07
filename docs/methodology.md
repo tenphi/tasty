@@ -214,7 +214,7 @@ The array form is simpler but types all values as `ModValue`:
 modProps: ['isLoading', 'isSelected'] as const,
 ```
 
-For the full API reference, see [Runtime — Mod Props](runtime.md#mod-props).
+For the full API reference, see [Runtime — Mod Props](react-api.md#mod-props).
 
 ---
 
@@ -610,7 +610,7 @@ The `elements` prop gives you typed sub-components with automatic `data-element`
 - **[Getting Started](getting-started.md)** — Installation, first component, tooling setup
 - **[Building a Design System](design-system.md)** — Practical guide to building a DS layer with Tasty
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
-- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
+- **[React API](react-api.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
 - **[Adoption Guide](adoption.md)** — Who should adopt Tasty, incremental phases, what changes for product engineers

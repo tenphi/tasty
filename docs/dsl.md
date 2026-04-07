@@ -2,7 +2,7 @@
 
 This is the Tasty style language reference — the value syntax, state mappings, tokens, units, extending semantics, and special declarations that apply to both runtime `tasty()` and build-time `tastyStatic()`.
 
-For the runtime React API (`tasty()`, hooks, component props), see [Runtime API](runtime.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
+For the runtime React API (`tasty()`, hooks, component props), see [React API](react-api.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
 
 ---
 
@@ -107,7 +107,7 @@ mods={{ hovered: true, theme: 'danger' }}
 // → data-hovered="" data-theme="danger"
 ```
 
-Modifiers can also be exposed as top-level component props via `modProps` — see [Runtime — Mod Props](runtime.md#mod-props).
+Modifiers can also be exposed as top-level component props via `modProps` — see [Runtime — Mod Props](react-api.md#mod-props).
 
 ---
 
@@ -681,7 +681,7 @@ For a complete reference of all enhanced style properties — syntax, values, mo
 
 ## Learn more
 
-- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
+- **[React API](react-api.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
 - **[Methodology](methodology.md)** — Recommended patterns: root + sub-elements, styleProps, tokens, wrapping
 - **[Configuration](configuration.md)** — Tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties

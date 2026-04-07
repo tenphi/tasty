@@ -6,6 +6,10 @@
  * The middleware calls runWithCollector() around the render, and
  * useStyles() calls getSSRCollector() to find it.
  *
+ * Uses globalThis to ensure the AsyncLocalStorage instance is shared
+ * across module instances — frameworks like Astro may load middleware
+ * and page components from separate module graphs.
+ *
  * This module imports from 'node:async_hooks' — it must be excluded
  * from client bundles via the build configuration.
  */
@@ -14,7 +18,15 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import type { ServerStyleCollector } from './collector';
 
-const tastySSRStorage = new AsyncLocalStorage<ServerStyleCollector>();
+const ALS_KEY = '__tasty_ssr_als__';
+
+function getSharedStorage(): AsyncLocalStorage<ServerStyleCollector> {
+  const g = globalThis as Record<string, unknown>;
+  if (!g[ALS_KEY]) {
+    g[ALS_KEY] = new AsyncLocalStorage<ServerStyleCollector>();
+  }
+  return g[ALS_KEY] as AsyncLocalStorage<ServerStyleCollector>;
+}
 
 /**
  * Run a function with a ServerStyleCollector bound to the current
@@ -25,7 +37,7 @@ export function runWithCollector<T>(
   collector: ServerStyleCollector,
   fn: () => T,
 ): T {
-  return tastySSRStorage.run(collector, fn);
+  return getSharedStorage().run(collector, fn);
 }
 
 /**
@@ -33,6 +45,7 @@ export function runWithCollector<T>(
  * Returns null when called outside of runWithCollector() or on the client.
  */
 export function getSSRCollector(): ServerStyleCollector | null {
-  if (typeof tastySSRStorage?.getStore !== 'function') return null;
-  return tastySSRStorage.getStore() ?? null;
+  const storage = getSharedStorage();
+  if (typeof storage?.getStore !== 'function') return null;
+  return storage.getStore() ?? null;
 }

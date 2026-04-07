@@ -12,12 +12,10 @@ interface UseCounterStyleOptions {
 let clientCounterStyleCounter = 0;
 
 const clientContentToName = new Map<string, string>();
-const clientDepsCache = new Map<string, string>();
 
 /* @internal — used only for tests */
 export function _resetCounterStyleCache(): void {
   clientContentToName.clear();
-  clientDepsCache.clear();
   clientCounterStyleCounter = 0;
 }
 
@@ -85,18 +83,9 @@ export function useCounterStyle(
 ): string {
   const isFactory = typeof descriptorsOrFactory === 'function';
 
-  const deps =
-    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseCounterStyleOptions | undefined);
-
-  // Fast path: if deps haven't changed, return cached result
-  if (deps) {
-    const depsKey = JSON.stringify(deps);
-    const cached = clientDepsCache.get(depsKey);
-    if (cached !== undefined) return cached;
-  }
 
   const descriptors = isFactory
     ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
@@ -144,10 +133,6 @@ export function useCounterStyle(
 
   const injector = getGlobalInjector();
   injector.counterStyle(name, descriptors, { root: opts?.root });
-
-  if (deps) {
-    clientDepsCache.set(JSON.stringify(deps), name);
-  }
 
   return name;
 }

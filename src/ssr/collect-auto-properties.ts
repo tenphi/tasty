@@ -17,6 +17,51 @@ import type { ServerStyleCollector } from './collector';
 import { formatPropertyCSS } from './format-property';
 
 /**
+ * Scan rendered rules for auto-inferable custom properties and emit
+ * @property CSS via the provided callback.
+ */
+function scanAndEmitAutoProperties(
+  rules: StyleResult[],
+  styles: Styles | undefined,
+  emit: (name: string, css: string) => void,
+): void {
+  const registered = new Set<string>();
+
+  if (styles) {
+    const localProps = styles['@properties'];
+    if (localProps && typeof localProps === 'object') {
+      for (const token of Object.keys(localProps as Record<string, unknown>)) {
+        const parsed = parsePropertyToken(token);
+        if (parsed.isValid) {
+          registered.add(parsed.cssName);
+        }
+      }
+    }
+  }
+
+  const resolver = new PropertyTypeResolver();
+
+  for (const rule of rules) {
+    if (!rule.declarations) continue;
+    resolver.scanDeclarations(
+      rule.declarations,
+      (name) => registered.has(name),
+      (name, syntax, initialValue) => {
+        registered.add(name);
+        const css = formatPropertyCSS(name, {
+          syntax,
+          inherits: true,
+          initialValue,
+        });
+        if (css) {
+          emit(name, css);
+        }
+      },
+    );
+  }
+}
+
+/**
  * Scan rendered rules for custom property declarations and collect
  * auto-inferred @property rules via the SSR collector.
  *
@@ -29,40 +74,9 @@ export function collectAutoInferredProperties(
   collector: ServerStyleCollector,
   styles?: Styles,
 ): void {
-  const registered = new Set<string>();
-
-  if (styles) {
-    const localProps = styles['@properties'];
-    if (localProps && typeof localProps === 'object') {
-      for (const token of Object.keys(localProps as Record<string, unknown>)) {
-        const parsed = parsePropertyToken(token);
-        if (parsed.isValid) {
-          registered.add(parsed.cssName);
-        }
-      }
-    }
-  }
-
-  const resolver = new PropertyTypeResolver();
-
-  for (const rule of rules) {
-    if (!rule.declarations) continue;
-    resolver.scanDeclarations(
-      rule.declarations,
-      (name) => registered.has(name),
-      (name, syntax, initialValue) => {
-        registered.add(name);
-        const css = formatPropertyCSS(name, {
-          syntax,
-          inherits: true,
-          initialValue,
-        });
-        if (css) {
-          collector.collectProperty(`__auto:${name}`, css);
-        }
-      },
-    );
-  }
+  scanAndEmitAutoProperties(rules, styles, (name, css) => {
+    collector.collectProperty(`__auto:${name}`, css);
+  });
 }
 
 /**
@@ -74,38 +88,7 @@ export function collectAutoInferredPropertiesRSC(
   rscCache: RSCStyleCache,
   styles?: Styles,
 ): void {
-  const registered = new Set<string>();
-
-  if (styles) {
-    const localProps = styles['@properties'];
-    if (localProps && typeof localProps === 'object') {
-      for (const token of Object.keys(localProps as Record<string, unknown>)) {
-        const parsed = parsePropertyToken(token);
-        if (parsed.isValid) {
-          registered.add(parsed.cssName);
-        }
-      }
-    }
-  }
-
-  const resolver = new PropertyTypeResolver();
-
-  for (const rule of rules) {
-    if (!rule.declarations) continue;
-    resolver.scanDeclarations(
-      rule.declarations,
-      (name) => registered.has(name),
-      (name, syntax, initialValue) => {
-        registered.add(name);
-        const css = formatPropertyCSS(name, {
-          syntax,
-          inherits: true,
-          initialValue,
-        });
-        if (css) {
-          pushRSCCSS(rscCache, `__auto:${name}`, css);
-        }
-      },
-    );
-  }
+  scanAndEmitAutoProperties(rules, styles, (name, css) => {
+    pushRSCCSS(rscCache, `__auto:${name}`, css);
+  });
 }

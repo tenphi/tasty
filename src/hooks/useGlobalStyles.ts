@@ -15,9 +15,10 @@ import { resolveRecipes } from '../utils/resolve-recipes';
 
 interface UseGlobalStylesOptions {
   /**
-   * Stable identifier for update tracking. When provided, changing the styles
-   * will dispose the previous injection and inject the new one.
-   * Without an id, the selector is used as the slot key.
+   * Stable identifier for update tracking (client-only). When provided,
+   * changing the styles will dispose the previous injection and inject the
+   * new one. Without an id, the selector is used as the slot key.
+   * In RSC mode, renders are single-pass so update tracking does not apply.
    */
   id?: string;
 }
@@ -84,10 +85,11 @@ export function useGlobalStyles(
   const ssrCollector = getRegisteredSSRCollector();
   const isServer = !ssrCollector && isServerEnvironment();
 
+  const slotKey = options?.id ?? selector;
+  const stylesKey = JSON.stringify(styles);
+
   // Client fast path: skip resolveRecipes/renderStyles if styles haven't changed
   if (!ssrCollector && !isServer) {
-    const slotKey = options?.id ?? selector;
-    const stylesKey = JSON.stringify(styles);
     const existing = clientGlobalEntries.get(slotKey);
     if (existing && existing.stylesKey === stylesKey) return;
   }
@@ -130,9 +132,6 @@ export function useGlobalStyles(
   }
 
   // Client path
-  const slotKey = options?.id ?? selector;
-  const stylesKey = JSON.stringify(styles);
-
   const existing = clientGlobalEntries.get(slotKey);
   if (existing) {
     existing.dispose();

@@ -10,12 +10,10 @@ interface UseKeyframesOptions {
 }
 
 const clientContentToName = new Map<string, string>();
-const clientDepsCache = new Map<string, string>();
 
 /* @internal — used only for tests */
 export function _resetKeyframesCache(): void {
   clientContentToName.clear();
-  clientDepsCache.clear();
 }
 
 /**
@@ -86,18 +84,9 @@ export function useKeyframes(
 ): string {
   const isFactory = typeof stepsOrFactory === 'function';
 
-  const deps =
-    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseKeyframesOptions | undefined);
-
-  // Fast path: if deps haven't changed, return cached result
-  if (deps) {
-    const depsKey = JSON.stringify(deps);
-    const cached = clientDepsCache.get(depsKey);
-    if (cached !== undefined) return cached;
-  }
 
   const steps = isFactory
     ? (stepsOrFactory as () => KeyframesSteps)()
@@ -147,10 +136,6 @@ export function useKeyframes(
 
   const name = result.toString();
   clientContentToName.set(cacheKey, name);
-
-  if (deps) {
-    clientDepsCache.set(JSON.stringify(deps), name);
-  }
 
   return name;
 }

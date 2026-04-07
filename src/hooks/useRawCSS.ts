@@ -6,10 +6,11 @@ import { hashString } from '../utils/hash';
 interface UseRawCSSOptions {
   root?: Document | ShadowRoot;
   /**
-   * Stable identifier for update tracking. When provided, changing the CSS
-   * content will dispose the previous injection and inject the new one.
-   * Without an id, deduplication is purely content-based (same CSS is
-   * injected only once).
+   * Stable identifier for update tracking (client-only). When provided,
+   * changing the CSS content will dispose the previous injection and inject
+   * the new one. Without an id, deduplication is purely content-based (same
+   * CSS is injected only once). In RSC mode, renders are single-pass so
+   * update tracking does not apply.
    */
   id?: string;
 }
@@ -21,13 +22,11 @@ interface ClientEntry {
 
 const clientEntries = new Map<string, ClientEntry>();
 const clientContentDedup = new Set<string>();
-const clientDepsCache = new Set<string>();
 
 /* @internal — used only for tests */
 export function _resetRawCSSCache(): void {
   clientEntries.clear();
   clientContentDedup.clear();
-  clientDepsCache.clear();
 }
 
 // Overload 1: Static CSS string
@@ -97,17 +96,9 @@ export function useRawCSS(
 ): void {
   const isFactory = typeof cssOrFactory === 'function';
 
-  const deps =
-    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseRawCSSOptions | undefined);
-
-  // Fast path: if deps haven't changed, skip entirely
-  if (deps) {
-    const depsKey = JSON.stringify(deps);
-    if (clientDepsCache.has(depsKey)) return;
-  }
 
   const css = isFactory
     ? (cssOrFactory as () => string)()
@@ -131,10 +122,6 @@ export function useRawCSS(
   }
 
   // Client path
-  if (deps) {
-    clientDepsCache.add(JSON.stringify(deps));
-  }
-
   const id = opts?.id;
 
   if (id) {
@@ -147,8 +134,9 @@ export function useRawCSS(
     const { dispose } = injectRawCSS(css, opts);
     clientEntries.set(id, { contentKey: css, dispose });
   } else {
-    if (clientContentDedup.has(css)) return;
-    clientContentDedup.add(css);
+    const contentKey = hashString(css);
+    if (clientContentDedup.has(contentKey)) return;
+    clientContentDedup.add(contentKey);
     injectRawCSS(css, opts);
   }
 }

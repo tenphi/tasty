@@ -43,7 +43,10 @@ import type { StyleDetails, UnitHandler } from './parser/types';
 import type { StyleResult } from './pipeline';
 import type { TastyPlugin } from './plugins/types';
 import type { RecipeStyles, ConfigTokens } from './styles/types';
+import type { Styles } from './styles/types';
 import type { StyleHandlerDefinition } from './utils/styles';
+import type { TypographyPreset } from './utils/typography';
+import { generateTypographyTokens } from './utils/typography';
 
 /**
  * Configuration options for the Tasty style system
@@ -319,6 +322,46 @@ export interface TastyConfig {
    * ```
    */
   recipes?: Record<string, RecipeStyles>;
+  /**
+   * Typography presets — shorthand for `generateTypographyTokens()`.
+   * Accepts the same input and internally generates typography tokens
+   * that are merged into `tokens`. Explicit `tokens` override preset-generated ones.
+   *
+   * @example
+   * ```ts
+   * configure({
+   *   presets: {
+   *     h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
+   *     t2: { fontSize: '16px', lineHeight: '1.5', fontWeight: '400' },
+   *   },
+   *   tokens: {
+   *     // Overrides the preset-generated $t2-font-weight
+   *     '$t2-font-weight': { '': '400', '@dark': '300' },
+   *   },
+   * });
+   * ```
+   */
+  presets?: Record<string, TypographyPreset>;
+  /**
+   * Tasty styles applied to the `body` tag.
+   * Supports the full Tasty style syntax including style properties,
+   * tokens, state maps, and selector-based sub-styling
+   * (e.g. `$: '> .app'` for elements outside React scope).
+   * Injected alongside `:root` tokens when the first style is rendered.
+   *
+   * @example
+   * ```ts
+   * configure({
+   *   bodyStyles: {
+   *     fill: '#surface',
+   *     color: '#text',
+   *     preset: 't2',
+   *     margin: 0,
+   *   },
+   * });
+   * ```
+   */
+  bodyStyles?: Styles;
 }
 
 // Warnings tracking to avoid duplicates
@@ -364,6 +407,9 @@ let globalRecipes: Record<string, RecipeStyles> | null = null;
 // Global token styles storage (injected as :root CSS custom properties)
 let globalConfigTokens: ConfigTokens | null = null;
 
+// Global body styles storage (injected as body CSS)
+let globalBodyStyles: Styles | null = null;
+
 // ============================================================================
 // Cross-module config sharing via globalThis
 //
@@ -378,6 +424,7 @@ const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
 const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
+const GTKEY_BODY_STYLES = '__tasty_cfg_body_styles__';
 
 function setOnGlobalThis(key: string, value: unknown): void {
   (globalThis as Record<string, unknown>)[key] = value;
@@ -393,6 +440,7 @@ function clearGlobalThisConfig(): void {
   delete g[GTKEY_FONT_FACE];
   delete g[GTKEY_COUNTER_STYLE];
   delete g[GTKEY_PROPERTIES];
+  delete g[GTKEY_BODY_STYLES];
 }
 
 /**
@@ -598,6 +646,14 @@ export function markStylesGenerated(): void {
     ) as StyleResult[];
     if (tokenRules.length > 0) {
       injector.injectGlobal(tokenRules);
+    }
+  }
+
+  // Inject configured body styles
+  if (globalBodyStyles && Object.keys(globalBodyStyles).length > 0) {
+    const bodyRules = renderStyles(globalBodyStyles, 'body') as StyleResult[];
+    if (bodyRules.length > 0) {
+      injector.injectGlobal(bodyRules);
     }
   }
 }
@@ -891,6 +947,40 @@ function setGlobalConfigTokens(styles: ConfigTokens): void {
   setOnGlobalThis(GTKEY_TOKENS, globalConfigTokens);
 }
 
+// ============================================================================
+// Global Body Styles Management
+// ============================================================================
+
+/**
+ * Get global body styles for injection.
+ * Returns null if no body styles configured.
+ * Reads from globalThis first for cross-module SSR support.
+ */
+export function getGlobalBodyStyles(): Styles | null {
+  return (
+    globalBodyStyles ?? getFromGlobalThis<Styles>(GTKEY_BODY_STYLES) ?? null
+  );
+}
+
+/**
+ * Set global body styles (called from configure).
+ * Internal use only.
+ */
+function setGlobalBodyStyles(styles: Styles): void {
+  if (stylesGenerated) {
+    warnOnce(
+      'bodyStyles-after-styles',
+      `[Tasty] Cannot update bodyStyles after styles have been generated.\n` +
+        `The new body styles will be ignored.`,
+    );
+    return;
+  }
+  globalBodyStyles = globalBodyStyles
+    ? { ...globalBodyStyles, ...styles }
+    : styles;
+  setOnGlobalThis(GTKEY_BODY_STYLES, globalBodyStyles);
+}
+
 /**
  * Check if configuration is locked (styles have been generated)
  */
@@ -941,6 +1031,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedReplaceTokens: Record<string, string | number | boolean> = {};
   let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
   let mergedRecipes: Record<string, RecipeStyles> = {};
+  let mergedPresets: Record<string, TypographyPreset> = {};
+  let mergedBodyStyles: Styles | undefined;
 
   // Process plugins in order
   if (config.plugins) {
@@ -969,6 +1061,14 @@ export function configure(config: Partial<TastyConfig> = {}): void {
       if (plugin.recipes) {
         mergedRecipes = { ...mergedRecipes, ...plugin.recipes };
       }
+      if (plugin.presets) {
+        mergedPresets = { ...mergedPresets, ...plugin.presets };
+      }
+      if (plugin.bodyStyles) {
+        mergedBodyStyles = mergedBodyStyles
+          ? { ...mergedBodyStyles, ...plugin.bodyStyles }
+          : plugin.bodyStyles;
+      }
     }
   }
 
@@ -988,11 +1088,29 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   if (config.replaceTokens) {
     mergedReplaceTokens = { ...mergedReplaceTokens, ...config.replaceTokens };
   }
+  if (config.presets) {
+    mergedPresets = { ...mergedPresets, ...config.presets };
+  }
+
+  // Generate typography tokens from presets and merge UNDER explicit tokens
+  if (Object.keys(mergedPresets).length > 0) {
+    const presetTokens = generateTypographyTokens(mergedPresets);
+    mergedConfigTokens = {
+      ...presetTokens,
+      ...mergedConfigTokens,
+    };
+  }
+
   if (config.tokens) {
     mergedConfigTokens = { ...mergedConfigTokens, ...config.tokens };
   }
   if (config.recipes) {
     mergedRecipes = { ...mergedRecipes, ...config.recipes };
+  }
+  if (config.bodyStyles) {
+    mergedBodyStyles = mergedBodyStyles
+      ? { ...mergedBodyStyles, ...config.bodyStyles }
+      : config.bodyStyles;
   }
 
   // Warn on tokens/replaceTokens key conflicts
@@ -1100,6 +1218,11 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalRecipes(mergedRecipes);
   }
 
+  // Handle body styles
+  if (mergedBodyStyles && Object.keys(mergedBodyStyles).length > 0) {
+    setGlobalBodyStyles(mergedBodyStyles);
+  }
+
   const {
     states: _states,
     parserCacheSize: _parserCacheSize,
@@ -1115,6 +1238,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     replaceTokens: _replaceTokens,
     recipes: _recipes,
     colorSpace: _colorSpace,
+    presets: _presets,
+    bodyStyles: _bodyStyles,
     ...injectorConfig
   } = config;
 
@@ -1173,6 +1298,7 @@ export function resetConfig(): void {
   globalCounterStyle = null;
   globalRecipes = null;
   globalConfigTokens = null;
+  globalBodyStyles = null;
   clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
   resetHandlers();

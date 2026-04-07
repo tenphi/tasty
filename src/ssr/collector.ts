@@ -12,6 +12,7 @@
 
 import {
   getEffectiveProperties,
+  getGlobalBodyStyles,
   getGlobalCounterStyle,
   getGlobalFontFace,
   getGlobalConfigTokens,
@@ -85,6 +86,18 @@ export class ServerStyleCollector {
         const css = formatGlobalRules(tokenRules);
         if (css) {
           this.collectGlobalStyles('__global:tokens', css);
+        }
+      }
+    }
+
+    // Inject configured body styles
+    const bodyStyles = getGlobalBodyStyles();
+    if (bodyStyles && Object.keys(bodyStyles).length > 0) {
+      const bodyRules = renderStyles(bodyStyles, 'body') as StyleResult[];
+      if (bodyRules.length > 0) {
+        const css = formatGlobalRules(bodyRules);
+        if (css) {
+          this.collectGlobalStyles('__global:bodyStyles', css);
         }
       }
     }

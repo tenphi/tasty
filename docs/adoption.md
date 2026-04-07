@@ -64,7 +64,7 @@ Tasty provides the engine. The DS team defines the language that runs on it. Her
 | **Units** | Custom multiplier units (`x`, `r`, `bw`, or your own) | `configure({ units })` |
 | **State aliases** | Responsive breakpoints, theme modes, feature flags | `configure({ states })` |
 | **Recipes** | Reusable style bundles (card, elevated, input-reset) | `configure({ recipes })` |
-| **Typography** | Preset definitions (h1-h6, t1-t4, etc.) | `configure({ tokens: generateTypographyTokens(...) })` |
+| **Typography** | Preset definitions (h1-h6, t1-t4, etc.) | `configure({ presets: { ... } })` |
 | **Style props** | Which CSS properties each component exposes as React props | `styleProps` in each component |
 | **Sub-elements** | Inner parts of compound components (Title, Icon, Content) | `elements` + capitalized keys in `styles` |
 | **Override rules** | How product engineers extend or constrain components | Styled wrappers via `tasty(Base, { ... })` |

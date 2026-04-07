@@ -84,24 +84,36 @@ configure({
 
 ### Typography presets
 
-Use `generateTypographyTokens()` to create typography tokens from your own presets, then pass them to `configure({ tokens })`:
+Pass typography presets directly to `configure()` — they are converted to tokens automatically:
 
 ```tsx
-import { configure, generateTypographyTokens } from '@tenphi/tasty';
-
-const typographyTokens = generateTypographyTokens({
-  h1: { fontSize: '2rem', lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: 700 },
-  t2: { fontSize: '0.875rem', lineHeight: '1.5', letterSpacing: 'normal', fontWeight: 400 },
-});
+import { configure } from '@tenphi/tasty';
 
 configure({
-  tokens: {
-    ...typographyTokens,
+  presets: {
+    h1: { fontSize: '2rem', lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: 700 },
+    t2: { fontSize: '0.875rem', lineHeight: '1.5', letterSpacing: 'normal', fontWeight: 400 },
+  },
+});
+```
+
+Preset values support state maps for responsive or theme-aware typography:
+
+```tsx
+configure({
+  presets: {
+    t2: {
+      fontSize: '0.875rem',
+      lineHeight: '1.5',
+      fontWeight: { '': 400, '@dark': 300 },
+    },
   },
 });
 ```
 
 Then use `preset: 'h1'` or `preset: 't2'` in any component's styles.
+
+> You can also call `generateTypographyTokens()` manually and spread the result into `tokens` for more control — `presets` is just a shorthand.
 
 ### Registering brand fonts
 
@@ -404,7 +416,7 @@ ds/
     index.ts              # Recipe definitions (imported by config.ts)
   tokens/
     colors.ts             # Color token definitions
-    typography.ts         # Typography presets via generateTypographyTokens()
+    typography.ts         # Typography presets for configure({ presets })
     spacing.ts            # Spacing token definitions
   index.ts                # Public API: re-exports components + configure
 ```

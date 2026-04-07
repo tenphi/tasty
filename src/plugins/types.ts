@@ -1,6 +1,7 @@
 import type { StyleDetails, UnitHandler } from '../parser/types';
-import type { RecipeStyles, ConfigTokens } from '../styles/types';
+import type { RecipeStyles, ConfigTokens, Styles } from '../styles/types';
 import type { StyleHandlerDefinition } from '../utils/styles';
+import type { TypographyPreset } from '../utils/typography';
 
 /**
  * A tasty plugin that extends the style system with custom functions, units, states, or handlers.
@@ -49,6 +50,16 @@ export interface TastyPlugin {
    * ```
    */
   recipes?: Record<string, RecipeStyles>;
+  /**
+   * Typography presets — shorthand for `generateTypographyTokens()`.
+   * Generated tokens are merged under explicit `tokens` (tokens win on conflict).
+   */
+  presets?: Record<string, TypographyPreset>;
+  /**
+   * Tasty styles applied to the `body` tag.
+   * Supports the full Tasty style syntax.
+   */
+  bodyStyles?: Styles;
 }
 
 /**

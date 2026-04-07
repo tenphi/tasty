@@ -65,7 +65,13 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     const rendered = await runWithCollector(collector, async () => {
       const response = await next();
       const body = response.body;
-      if (!body) return null;
+      if (!body) {
+        return {
+          html: null as string | null,
+          status: response.status,
+          headers: response.headers,
+        };
+      }
 
       const reader = body.pipeThrough(new TextDecoderStream()).getReader();
       const parts: string[] = [];
@@ -81,8 +87,11 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
       };
     });
 
-    if (!rendered) {
-      return new Response(null, { status: 200 });
+    if (!rendered.html) {
+      return new Response(null, {
+        status: rendered.status,
+        headers: rendered.headers,
+      });
     }
 
     let { html } = rendered;

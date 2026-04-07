@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 1.5.3
+
+### Patch Changes
+
+- [#115](https://github.com/tenphi/tasty/pull/115) [`75585fc`](https://github.com/tenphi/tasty/commit/75585fcb85cf9c1d8df1f13dd9bbccd7a0be1e97) Thanks [@tenphi](https://github.com/tenphi)! - Keep Astro SSR middleware style collection active while the response body stream is consumed, so styles from lazily rendered components are included.
+
+- [#115](https://github.com/tenphi/tasty/pull/115) [`5c670b5`](https://github.com/tenphi/tasty/commit/5c670b5e9c33e70e73e9f68d06b5a9015d5a5217) Thanks [@tenphi](https://github.com/tenphi)! - Mirror global config (tokens, font-face, counter-style, properties) to globalThis so SSR collectors in separate module graphs (e.g. Astro middleware) can read it.
+
 ## 1.5.2
 
 ### Patch Changes

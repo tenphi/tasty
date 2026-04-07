@@ -1,5 +1,33 @@
 # @tenphi/tasty
 
+## 1.5.0
+
+### Minor Changes
+
+- [#109](https://github.com/tenphi/tasty/pull/109) [`d084195`](https://github.com/tenphi/tasty/commit/d084195352b859ea64fe6e07d78bd2dad0b56e33) Thanks [@tenphi](https://github.com/tenphi)! - Add Astro Integration API (`tastyIntegration()`) with three-tier support: zero-setup for static pages, optimized static without client JS (`islands: false`), and full island hydration (default). Split client hydration into `@tenphi/tasty/ssr/astro-client`. Middleware now uses streaming `TransformStream` instead of buffering the full response.
+
+- [#110](https://github.com/tenphi/tasty/pull/110) [`b52bad7`](https://github.com/tenphi/tasty/commit/b52bad7952e60c2a121f54f3c64bfaae539f0417) Thanks [@tenphi](https://github.com/tenphi)! - Make all style functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`) hook-free and compatible with React Server Components. Add RSC inline support via shared per-request cache. Add `id` option to `useRawCSS` and `useGlobalStyles` for update tracking. Extract `getStyleTarget()` helper to DRY up SSR/RSC/client detection. Add deps-based factory caching to `useKeyframes` and `useRawCSS`. Remove unused factory overload from `useCounterStyle`.
+
+  **Breaking behavior change:** `useGlobalStyles` and `useRawCSS` no longer clean up injected styles on component unmount. Styles are now permanent once injected. For dynamic styles that change over the component lifecycle, use the `id` option to enable update tracking — when styles change for the same `id`, the previous injection is replaced.
+
+- [#107](https://github.com/tenphi/tasty/pull/107) [`9fbd328`](https://github.com/tenphi/tasty/commit/9fbd328c63f7c0ee1e6e5e35179c605b102b12bc) Thanks [@tenphi](https://github.com/tenphi)! - Simplified the injector garbage collector to a touch-count-driven mechanism.
+
+  **Breaking changes to GC API:**
+  - Removed `maybeGC()` — GC is now auto-scheduled by touch count via `requestIdleCallback`
+  - Removed `gc()` options: `baseMaxAge`, `cacheCapacity` — replaced with `gc({ force?: boolean })`
+  - Replaced `GCConfig` fields (`auto`, `baseMaxAge`, `cooldown`, `autoInterval`, `cacheCapacity`) with `touchInterval` and `capacity`
+  - Removed `StyleUsage.hitCount` — only `lastTouchedAt` is tracked
+
+  **New behavior:**
+  - Every `touchInterval` touches (default: 1000), GC is scheduled via `requestIdleCallback`
+  - GC evicts the oldest unused styles when their count exceeds `capacity` (default: 1000); actively referenced styles don't count against the limit
+  - `gc({ force: true })` bypasses the capacity threshold and removes ALL unused styles
+  - No timers, no scoring math — activity-proportional triggering with oldest-first eviction
+
+### Patch Changes
+
+- [#109](https://github.com/tenphi/tasty/pull/109) [`8cacca3`](https://github.com/tenphi/tasty/commit/8cacca386756fbe30d7d689eaed2231ee61791ab) Thanks [@tenphi](https://github.com/tenphi)! - Fix Astro streaming middleware: strip Content-Length header after injection, propagate upstream errors instead of silently truncating, remove dead hydrateTastyCache re-export.
+
 ## 1.4.2
 
 ### Patch Changes

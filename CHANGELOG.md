@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.5.2
+
+### Patch Changes
+
+- [#113](https://github.com/tenphi/tasty/pull/113) [`547451d`](https://github.com/tenphi/tasty/commit/547451d2b1409c70fe5ee01c4925861307231a86) Thanks [@tenphi](https://github.com/tenphi)! - Fix Astro SSR middleware by buffering the response body so styles are collected when HTML is streamed. Improve parsing of nested parentheses in `@supports`, `@root`, `@parent`, `@own`, and `@(...)` state keys.
+
 ## 1.5.1
 
 ### Patch Changes

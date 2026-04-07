@@ -109,8 +109,10 @@ export function useRawCSS(
     ? options
     : (depsOrOptions as UseRawCSSOptions | undefined);
 
+  const target = getStyleTarget();
+
   // Client deps cache: skip factory re-evaluation when deps haven't changed
-  if (isFactory && deps && opts?.id) {
+  if (isFactory && deps && opts?.id && target.mode === 'client') {
     const cachedDeps = factoryDepsCache.get(opts.id);
     if (cachedDeps && depsEqual(cachedDeps, deps)) {
       return;
@@ -122,8 +124,6 @@ export function useRawCSS(
     : (cssOrFactory as string);
 
   if (!css.trim()) return;
-
-  const target = getStyleTarget();
 
   if (target.mode === 'ssr') {
     const key = opts?.id ? `raw:${opts.id}` : `raw:${hashString(css)}`;

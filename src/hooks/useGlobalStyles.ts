@@ -83,11 +83,10 @@ export function useGlobalStyles(
 
   const target = getStyleTarget();
 
-  const slotKey = options?.id ?? selector;
-  const stylesKey = JSON.stringify(styles);
-
   // Client fast path: skip resolveRecipes/renderStyles if styles haven't changed
   if (target.mode === 'client') {
+    const slotKey = options?.id ?? selector;
+    const stylesKey = JSON.stringify(styles);
     const existing = clientGlobalEntries.get(slotKey);
     if (existing && existing.stylesKey === stylesKey) return;
   }
@@ -139,11 +138,16 @@ export function useGlobalStyles(
   }
 
   // Client path
+  const slotKey = options?.id ?? selector;
+
   const existing = clientGlobalEntries.get(slotKey);
   if (existing) {
     existing.dispose();
   }
 
   const { dispose } = injectGlobal(styleResults);
-  clientGlobalEntries.set(slotKey, { stylesKey, dispose });
+  clientGlobalEntries.set(slotKey, {
+    stylesKey: JSON.stringify(styles),
+    dispose,
+  });
 }

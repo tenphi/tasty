@@ -96,7 +96,7 @@ All Tasty style functions are hook-free and do not require `'use client'`. They 
 - `useStyles()`, `useGlobalStyles()`, `useRawCSS()` — inject styles by class or selector
 - `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()` — inject ancillary CSS rules
 
-During SSR, all functions discover the collector via the same global getter registered by `TastyRegistry` — no React context or client boundary needed. In RSC mode without a collector (e.g., Astro zero-setup), CSS is accumulated in a per-request cache and flushed into an inline `<style>` tag by the next `tasty()` component in the tree.
+During SSR, all functions discover the collector via the same global getter registered by `TastyRegistry` — no React context or client boundary needed. In RSC mode without a collector (e.g., Astro zero-setup), CSS is accumulated in a per-request cache and flushed into an inline `<style>` tag by the next `tasty()` component in the tree. Ensure at least one `tasty()` component is present in every RSC render tree — standalone style functions alone cannot emit their CSS without a `tasty()` component to trigger the flush.
 
 ### Options
 

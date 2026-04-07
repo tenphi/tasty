@@ -82,14 +82,6 @@ export function pushRSCCSS(
   return true;
 }
 
-/**
- * Check whether we're in a server environment without a collector.
- * Covers RSC, SSR without a collector, and any headless Node context.
- */
-export function isServerEnvironment(): boolean {
-  return typeof document === 'undefined';
-}
-
 export type StyleTarget =
   | { mode: 'ssr'; collector: ServerStyleCollector }
   | { mode: 'rsc'; cache: RSCStyleCache }

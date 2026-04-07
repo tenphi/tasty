@@ -42,7 +42,6 @@ export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  private touchCount = 0;
   private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
 
   /** @internal — exposed for debug utilities only */
@@ -843,42 +842,45 @@ export class StyleInjector {
       } else {
         registry.usageMap.set(cls, { lastTouchedAt: now });
       }
-      this.touchCount++;
+      registry.touchCount++;
     }
 
     const touchInterval = this.config.gc.touchInterval ?? 1000;
-    if (this.touchCount >= touchInterval) {
-      this.touchCount = 0;
-      this.scheduleGC(root);
+    if (registry.touchCount >= touchInterval) {
+      registry.touchCount = 0;
+      this.scheduleGC();
     }
   }
 
   /**
    * Schedule a GC via `requestIdleCallback` (or synchronously as fallback).
-   * Avoids double-scheduling via `pendingGCHandle`.
+   * Runs GC on all active roots. Avoids double-scheduling via `pendingGCHandle`.
    */
-  private scheduleGC(root: Document | ShadowRoot): void {
+  private scheduleGC(): void {
     if (this.pendingGCHandle != null) return;
 
-    if (typeof requestIdleCallback !== 'undefined') {
-      this.pendingGCHandle = requestIdleCallback(() => {
-        this.pendingGCHandle = null;
+    const runGC = () => {
+      this.pendingGCHandle = null;
+      this.sheetManager.pruneDisconnectedRoots();
+      for (const root of this.sheetManager.getActiveRoots()) {
         this.gc({ root });
-      });
+      }
+    };
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      this.pendingGCHandle = requestIdleCallback(() => runGC());
     } else {
-      this.gc({ root });
+      runGC();
     }
   }
 
   /**
    * Synchronous garbage collection.
    *
-   * 1. Quick check: if non-active entries can't exceed capacity, skip entirely.
+   * 1. Quick upper-bound check: skip if unused count can't exceed capacity.
    * 2. Scans the DOM for live tasty classNames (safety guard).
-   * 3. Collects unused entries (refCount === 0, not in DOM).
-   * 4. Checks if unused count exceeds capacity (skip if not, unless `force`).
-   * 5. Sorts unused by lastTouchedAt ascending, evicts oldest until at capacity.
-   *    With `force: true`, evicts ALL unused regardless of capacity.
+   * 3. With `force: true`: deletes all unused entries inline.
+   *    Without `force`: collects unused, sorts oldest-first, evicts over capacity.
    *
    * @returns Number of styles evicted.
    */
@@ -921,35 +923,30 @@ export class StyleInjector {
       }
     }
 
-    // Collect unused entries (refCount === 0 and not in DOM)
-    const unused: { className: string; lastTouchedAt: number }[] = [];
-    for (const [className, usage] of registry.usageMap) {
-      if (liveClasses.has(className)) continue;
-      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-      unused.push({ className, lastTouchedAt: usage.lastTouchedAt });
-    }
-
-    if (unused.length === 0) return 0;
-
-    if (!force && unused.length <= capacity) {
-      return 0;
-    }
-
     let swept = 0;
 
     if (force) {
-      for (const { className } of unused) {
+      for (const [className] of registry.usageMap) {
+        if (liveClasses.has(className)) continue;
+        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
         registry.usageMap.delete(className);
         swept++;
       }
     } else {
-      // Sort oldest first
-      unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
+      const unused: { className: string; lastTouchedAt: number }[] = [];
+      for (const [className, usage] of registry.usageMap) {
+        if (liveClasses.has(className)) continue;
+        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
+        unused.push({ className, lastTouchedAt: usage.lastTouchedAt });
+      }
 
-      const toEvict = unused.length - capacity;
-      for (let i = 0; i < toEvict; i++) {
-        registry.usageMap.delete(unused[i].className);
-        swept++;
+      if (unused.length > capacity) {
+        unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
+        const toEvict = unused.length - capacity;
+        for (let i = 0; i < toEvict; i++) {
+          registry.usageMap.delete(unused[i].className);
+          swept++;
+        }
       }
     }
 

@@ -142,6 +142,8 @@ export interface RootRegistry {
   propertyTypeResolver: PropertyTypeResolver;
   /** Per-className usage tracking for GC */
   usageMap: Map<string, StyleUsage>;
+  /** Touch counter for scheduling GC (per-root) */
+  touchCount: number;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

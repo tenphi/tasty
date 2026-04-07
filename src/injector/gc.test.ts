@@ -226,22 +226,12 @@ describe('GC: touch / gc', () => {
     });
 
     it('should never evict styles with refCount > 0', () => {
-      const classNames: string[] = [];
-      const now = Date.now();
-
       // Create 5 styles, all with refCount > 0 (not disposed)
       for (let i = 0; i < 5; i++) {
         const { className } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
         ]);
-        classNames.push(className);
-      }
-
-      const registry = injector['sheetManager'].getRegistry(document);
-      for (let i = 0; i < 5; i++) {
-        registry.usageMap.set(classNames[i], {
-          lastTouchedAt: now - 999_999,
-        });
+        injector.touch(className);
       }
 
       const swept = injector.gc({ force: true });
@@ -330,9 +320,7 @@ describe('GC: touch / gc', () => {
   describe('destroy', () => {
     it('should cancel pending GC on full destroy', () => {
       let cancelledId: number | null = null;
-      const origRIC = globalThis.requestIdleCallback;
       const origCIC = globalThis.cancelIdleCallback;
-      (globalThis as any).requestIdleCallback = (_cb: () => void) => 42;
       (globalThis as any).cancelIdleCallback = (id: number) => {
         cancelledId = id;
       };
@@ -345,7 +333,6 @@ describe('GC: touch / gc', () => {
       expect(cancelledId).toBe(42);
       expect(injector['pendingGCHandle']).toBeNull();
 
-      (globalThis as any).requestIdleCallback = origRIC;
       (globalThis as any).cancelIdleCallback = origCIC;
     });
   });

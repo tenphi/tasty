@@ -1,6 +1,6 @@
 ---
-
-## '@tenphi/tasty': minor
+'@tenphi/tasty': minor
+---
 
 Simplified the injector garbage collector to a touch-count-driven mechanism.
 
@@ -17,4 +17,3 @@ Simplified the injector garbage collector to a touch-count-driven mechanism.
 - GC evicts the oldest unused styles when their count exceeds `capacity` (default: 1000); actively referenced styles don't count against the limit
 - `gc({ force: true })` bypasses the capacity threshold and removes ALL unused styles
 - No timers, no scoring math — activity-proportional triggering with oldest-first eviction
-

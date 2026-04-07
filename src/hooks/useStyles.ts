@@ -1,4 +1,7 @@
+import { useContext } from 'react';
+
 import { computeStyles } from '../compute-styles';
+import { TastySSRContext } from '../ssr/context';
 import type { Styles } from '../styles/types';
 
 /**
@@ -17,11 +20,11 @@ export interface UseStylesResult {
 }
 
 /**
- * Generate CSS classes from Tasty styles.
- * Thin re-export of `computeStyles()` kept for backward compatibility.
+ * Hook to generate CSS classes from Tasty styles.
+ * Thin wrapper around `computeStyles()` that adds React context-based
+ * SSR collector discovery for backward compatibility with TastyRegistry.
  *
- * Unlike a React hook, this is a plain function and can be called
- * from both client components and React Server Components.
+ * For hook-free usage (e.g. in server components), use `computeStyles()` directly.
  *
  * @example
  * ```tsx
@@ -37,5 +40,5 @@ export interface UseStylesResult {
  * ```
  */
 export function useStyles(styles: UseStylesOptions): UseStylesResult {
-  return computeStyles(styles);
+  return computeStyles(styles, { ssrCollector: useContext(TastySSRContext) });
 }

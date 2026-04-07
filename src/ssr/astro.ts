@@ -11,11 +11,13 @@
 import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { ServerStyleCollector } from './collector';
-import { registerSSRCollectorGetter } from './ssr-collector-ref';
+import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
 
 // Wire up ALS-based collector discovery so computeStyles() can find
 // the collector set by tastyMiddleware's runWithCollector().
-registerSSRCollectorGetter(getSSRCollector);
+// Uses globalThis so the getter is visible across Astro's separate
+// module graphs (middleware vs page components).
+registerSSRCollectorGetterGlobal(getSSRCollector);
 
 export interface TastyMiddlewareOptions {
   /**

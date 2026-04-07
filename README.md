@@ -427,11 +427,11 @@ Use explicit `@properties` only when you need to override defaults such as `inhe
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
-### React Hooks
+### Style Functions
 
-When you do not need a full component wrapper, use the hooks directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes` and `useProperty` for animation and custom-property primitives.
+When you do not need a full component wrapper, use the style functions directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, and `useCounterStyle` for animation, custom-property, font, and counter-style primitives. All style functions are hook-free and work in React Server Components.
 
-See [Runtime API - Hooks](docs/runtime.md#hooks).
+See [Runtime API - Style Functions](docs/runtime.md#style-functions).
 
 ### Zero-Runtime Mode
 
@@ -457,7 +457,7 @@ See the [full SSR guide](docs/ssr.md).
 
 | Import | Description | Platform |
 |--------|-------------|----------|
-| `@tenphi/tasty` | Runtime style engine (`tasty`, hooks, `configure`) | Browser |
+| `@tenphi/tasty` | Runtime style engine (`tasty`, style functions, `configure`) | Browser |
 | `@tenphi/tasty/static` | Zero-runtime static styles (`tastyStatic`) | Browser |
 | `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
@@ -606,7 +606,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 ### Reference
 
 - **[Style DSL](docs/dsl.md)** — The Tasty style language: state maps, tokens, units, color syntax, extending semantics, recipes, keyframes, and @property
-- **[Runtime API](docs/runtime.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and hooks
+- **[Runtime API](docs/runtime.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and style functions
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 

@@ -1,8 +1,6 @@
-import { useInsertionEffect, useMemo } from 'react';
-
 import { getGlobalInjector } from '../config';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatPropertyCSS } from '../ssr/format-property';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 export interface UsePropertyOptions {
   /**
@@ -28,16 +26,18 @@ export interface UsePropertyOptions {
 }
 
 /**
- * Hook to register a CSS @property custom property.
+ * Register a CSS @property custom property.
  * This enables advanced features like animating custom properties.
  *
  * Note: @property rules are global and persistent once defined.
- * The hook ensures the property is only registered once per root.
+ * The function ensures the property is only registered once per root.
  *
  * Accepts tasty token syntax for the property name:
  * - `$name` → defines `--name`
  * - `#name` → defines `--name-color` (auto-sets syntax: '<color>', defaults initialValue: 'transparent')
  * - `--name` → defines `--name` (legacy format)
+ *
+ * Works in all environments: client, SSR with collector, and React Server Components.
  *
  * @param name - The property token ($name, #name) or CSS property name (--name)
  * @param options - Property configuration
@@ -80,23 +80,17 @@ export interface UsePropertyOptions {
  * ```
  */
 export function useProperty(name: string, options?: UsePropertyOptions): void {
-  const ssrCollector = getRegisteredSSRCollector();
+  if (!name) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[Tasty] useProperty: property name is required`);
+    }
+    return;
+  }
 
-  // Memoize the options to create a stable dependency
-  const optionsKey = useMemo(() => {
-    if (!options) return '';
-    return JSON.stringify({
-      syntax: options.syntax,
-      inherits: options.inherits,
-      initialValue: options.initialValue,
-    });
-  }, [options?.syntax, options?.inherits, options?.initialValue]);
+  const target = getStyleTarget();
 
-  // SSR path: collect @property CSS during render
-  useMemo(() => {
-    if (!ssrCollector || !name) return;
-
-    ssrCollector.collectInternals();
+  if (target.mode === 'ssr') {
+    target.collector.collectInternals();
 
     const css = formatPropertyCSS(name, {
       syntax: options?.syntax,
@@ -104,30 +98,33 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
       initialValue: options?.initialValue,
     });
     if (css) {
-      ssrCollector.collectProperty(name, css);
+      target.collector.collectProperty(name, css);
     }
-  }, [ssrCollector, name, optionsKey]);
+    return;
+  }
 
-  // Client path: inject via DOM
-  useInsertionEffect(() => {
-    if (!name) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(`[Tasty] useProperty: property name is required`);
-      }
-      return;
-    }
-
-    const injector = getGlobalInjector();
-
-    if (injector.isPropertyDefined(name, { root: options?.root })) {
-      return;
-    }
-
-    injector.property(name, {
+  if (target.mode === 'rsc') {
+    const css = formatPropertyCSS(name, {
       syntax: options?.syntax,
       inherits: options?.inherits,
       initialValue: options?.initialValue,
-      root: options?.root,
     });
-  }, [name, optionsKey, options?.root]);
+    if (css) {
+      pushRSCCSS(target.cache, `__prop:${name}`, css);
+    }
+    return;
+  }
+
+  const injector = getGlobalInjector();
+
+  if (injector.isPropertyDefined(name, { root: options?.root })) {
+    return;
+  }
+
+  injector.property(name, {
+    syntax: options?.syntax,
+    inherits: options?.inherits,
+    initialValue: options?.initialValue,
+    root: options?.root,
+  });
 }

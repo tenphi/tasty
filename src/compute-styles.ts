@@ -11,8 +11,6 @@
  * This enables tasty() components to work as React Server Components.
  */
 
-import { cache } from 'react';
-
 import {
   categorizeStyleKeys,
   generateChunkCacheKey,
@@ -57,6 +55,12 @@ import {
 } from './keyframes';
 import type { RenderResult, StyleResult } from './pipeline';
 import { renderStyles } from './pipeline';
+import {
+  flushPendingCSS,
+  getRSCCache,
+  rscAllocateClassName,
+} from './rsc-cache';
+import type { RSCStyleCache } from './rsc-cache';
 import { extractLocalProperties, hasLocalProperties } from './properties';
 import { collectAutoInferredProperties } from './ssr/collect-auto-properties';
 import type { ServerStyleCollector } from './ssr/collector';
@@ -92,40 +96,6 @@ const EMPTY_RESULT: ComputeStylesResult = { className: '' };
 // ---------------------------------------------------------------------------
 // RSC (React Server Components) inline style support
 // ---------------------------------------------------------------------------
-
-interface RSCStyleCache {
-  cacheKeyToClassName: Map<string, string>;
-  classCounter: number;
-  emittedKeys: Set<string>;
-  internalsEmitted: boolean;
-}
-
-/**
- * Per-request RSC style cache using React.cache.
- * React.cache provides per-request memoization in Server Components,
- * so each request gets its own isolated cache.
- */
-const getRSCCache = cache(
-  (): RSCStyleCache => ({
-    cacheKeyToClassName: new Map(),
-    classCounter: 0,
-    emittedKeys: new Set(),
-    internalsEmitted: false,
-  }),
-);
-
-function rscAllocateClassName(
-  rscCache: RSCStyleCache,
-  cacheKey: string,
-): { className: string; isNew: boolean } {
-  const existing = rscCache.cacheKeyToClassName.get(cacheKey);
-  if (existing) return { className: existing, isNew: false };
-
-  // Use 'r' prefix to avoid collisions with SSR collector's 't' prefix
-  const className = `r${rscCache.classCounter++}`;
-  rscCache.cacheKeyToClassName.set(cacheKey, className);
-  return { className, isNew: true };
-}
 
 /**
  * Collect internals CSS for RSC — mirrors ServerStyleCollector.collectInternals().
@@ -183,7 +153,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
   const usedKf = getUsedKeyframes(styles);
   if (usedKf) {
     for (const [name, steps] of Object.entries(usedKf)) {
-      const key = `__kf:${name}`;
+      const key = `__kf:${name}:${JSON.stringify(steps)}`;
       if (!rscCache.emittedKeys.has(key)) {
         rscCache.emittedKeys.add(key);
         parts.push(formatKeyframesCSS(name, steps));
@@ -228,7 +198,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
     const localCounterStyle = extractLocalCounterStyle(styles);
     if (localCounterStyle) {
       for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        const key = `__cs:${name}`;
+        const key = `__cs:${name}:${JSON.stringify(descriptors)}`;
         if (!rscCache.emittedKeys.has(key)) {
           rscCache.emittedKeys.add(key);
           parts.push(formatCounterStyleRule(name, descriptors));
@@ -251,6 +221,10 @@ function computeStylesRSC(
   const rscCache = getRSCCache();
   const cssParts: string[] = [];
   const classNames: string[] = [];
+
+  // Flush CSS accumulated by standalone style functions
+  const pendingCSS = flushPendingCSS(rscCache);
+  if (pendingCSS) cssParts.push(pendingCSS);
 
   const internalsCSS = collectInternalsRSC(rscCache);
   if (internalsCSS) cssParts.push(internalsCSS);

@@ -115,11 +115,13 @@ dispose();
 
 ### `useRawCSS(css, options?)` or `useRawCSS(factory, deps, options?)`
 
-React hook for injecting raw CSS. Uses `useInsertionEffect` for proper timing and cleanup.
+Inject raw CSS without parsing. Hook-free — works in client components, SSR, and React Server Components.
 
 Supports two overloads:
-- **Static CSS**: `useRawCSS(cssString, options?)`
-- **Factory function**: `useRawCSS(() => cssString, deps, options?)` - re-evaluates when deps change (like `useMemo`)
+- **Static CSS**: `useRawCSS(cssString, options?)` — content-based deduplication
+- **Factory function**: `useRawCSS(() => cssString, deps, options?)` — factory called on every invocation, dedup handled internally
+
+Use the `id` option for update tracking — when the CSS changes for the same id, the previous injection is replaced:
 
 ```tsx
 import { useRawCSS } from '@tenphi/tasty';
@@ -132,7 +134,7 @@ function GlobalReset() {
   return null;
 }
 
-// Dynamic CSS with factory function (like useMemo)
+// Dynamic CSS with factory function and update tracking
 function ThemeStyles({ theme }: { theme: 'dark' | 'light' }) {
   useRawCSS(() => `
     body {
@@ -140,7 +142,7 @@ function ThemeStyles({ theme }: { theme: 'dark' | 'light' }) {
       background: ${theme === 'dark' ? '#000' : '#fff'};
       color: ${theme === 'dark' ? '#fff' : '#000'};
     }
-  `, [theme]);
+  `, [theme], { id: 'theme-body' });
 
   return null;
 }

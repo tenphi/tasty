@@ -1,17 +1,17 @@
-import { useInsertionEffect, useMemo } from 'react';
-
 import { getGlobalInjector } from '../config';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import type { FontFaceDescriptors, FontFaceInput } from '../injector/types';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
 interface UseFontFaceOptions {
   root?: Document | ShadowRoot;
 }
 
 /**
- * Hook to inject CSS @font-face rules.
+ * Inject CSS @font-face rules.
  * Permanent — no cleanup on unmount. Deduplicates by content hash.
+ *
+ * Works in all environments: client, SSR with collector, and React Server Components.
  *
  * @param family - The font-family name
  * @param input - Single descriptor object or array of descriptors (for multiple weights/styles)
@@ -47,36 +47,34 @@ export function useFontFace(
   input: FontFaceInput,
   options?: UseFontFaceOptions,
 ): void {
-  const ssrCollector = getRegisteredSSRCollector();
+  if (!family) return;
 
-  const inputKey = useMemo(() => JSON.stringify(input), [input]);
+  const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+    ? input
+    : [input];
 
-  // SSR path: collect @font-face CSS during render
-  useMemo(() => {
-    if (!ssrCollector || !family) return;
+  const target = getStyleTarget();
 
-    const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-      ? input
-      : [input];
-
+  if (target.mode === 'ssr') {
     for (const desc of descriptors) {
       const hash = fontFaceContentHash(family, desc);
       const css = formatFontFaceRule(family, desc);
-      ssrCollector.collectFontFace(hash, css);
+      target.collector.collectFontFace(hash, css);
     }
-  }, [ssrCollector, family, inputKey]);
+    return;
+  }
 
-  // Client path: inject via DOM
-  useInsertionEffect(() => {
-    if (!family) return;
-
-    const injector = getGlobalInjector();
-    const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-      ? input
-      : [input];
-
+  if (target.mode === 'rsc') {
     for (const desc of descriptors) {
-      injector.fontFace(family, desc, { root: options?.root });
+      const hash = fontFaceContentHash(family, desc);
+      const css = formatFontFaceRule(family, desc);
+      pushRSCCSS(target.cache, `__ff:${hash}`, css);
     }
-  }, [family, inputKey, options?.root]);
+    return;
+  }
+
+  const injector = getGlobalInjector();
+  for (const desc of descriptors) {
+    injector.fontFace(family, desc, { root: options?.root });
+  }
 }

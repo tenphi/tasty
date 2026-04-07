@@ -200,7 +200,7 @@ Both share the same DSL, tokens, units, and state mappings.
 - **[Docs Hub](README.md)** — Pick the next guide by role, styling approach, or task
 - **[Methodology](methodology.md)** — The recommended patterns for structuring Tasty components: sub-elements, styleProps, tokens, extension
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
-- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
+- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
 - **[Building a Design System](design-system.md)** — Practical guide to building a DS layer with Tasty: tokens, recipes, primitives, compound components
 - **[Adoption Guide](adoption.md)** — Roll out Tasty inside an existing design system or platform team
 - **[Comparison](comparison.md)** — Evaluate Tasty against other styling systems

@@ -681,7 +681,7 @@ For a complete reference of all enhanced style properties — syntax, values, mo
 
 ## Learn more
 
-- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, hooks
+- **[Runtime API](runtime.md)** — `tasty()` factory, component props, variants, sub-elements, style functions
 - **[Methodology](methodology.md)** — Recommended patterns: root + sub-elements, styleProps, tokens, wrapping
 - **[Configuration](configuration.md)** — Tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties

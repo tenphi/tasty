@@ -1,18 +1,34 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
-
 import { keyframes } from '../injector';
-import type { KeyframesResult, KeyframesSteps } from '../injector/types';
+import type { KeyframesSteps } from '../injector/types';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { depsEqual } from '../utils/deps-equal';
 
 interface UseKeyframesOptions {
   name?: string;
   root?: Document | ShadowRoot;
 }
 
+const clientContentToName = new Map<string, string>();
+
+interface FactoryDepsEntry {
+  deps: readonly unknown[];
+  name: string;
+}
+
+const factoryDepsCache = new Map<string, FactoryDepsEntry>();
+
+/* @internal — used only for tests */
+export function _resetKeyframesCache(): void {
+  clientContentToName.clear();
+  factoryDepsCache.clear();
+}
+
 /**
- * Hook to inject CSS @keyframes and return the generated animation name.
- * Handles keyframes injection with proper cleanup on unmount or dependency changes.
+ * Inject CSS @keyframes and return the generated animation name.
+ * Deduplicates by content — identical steps always return the same name.
+ *
+ * Works in all environments: client, SSR with collector, and React Server Components.
  *
  * @example Basic usage - steps object is the dependency
  * ```tsx
@@ -74,86 +90,73 @@ export function useKeyframes(
   depsOrOptions?: readonly unknown[] | UseKeyframesOptions,
   options?: UseKeyframesOptions,
 ): string {
-  const ssrCollector = getRegisteredSSRCollector();
-
-  // Detect which overload is being used
   const isFactory = typeof stepsOrFactory === 'function';
 
-  // Parse arguments based on overload
   const deps =
     isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseKeyframesOptions | undefined);
 
-  // Memoize the keyframes steps to get a stable reference
-  const stepsData = useMemo(
-    () => {
-      const steps = isFactory
-        ? (stepsOrFactory as () => KeyframesSteps)()
-        : (stepsOrFactory as KeyframesSteps);
+  const target = getStyleTarget();
 
-      if (!steps || Object.keys(steps).length === 0) {
-        return null;
-      }
-
-      return steps;
-    },
-
-    isFactory ? (deps ?? []) : [stepsOrFactory],
-  );
-
-  // Store keyframes results for cleanup (client only)
-  const renderResultRef = useRef<KeyframesResult | null>(null);
-  const effectResultRef = useRef<KeyframesResult | null>(null);
-
-  const name = useMemo(() => {
-    if (!stepsData) {
-      return '';
+  // Client deps cache: skip factory re-evaluation when deps haven't changed
+  if (isFactory && deps && opts?.name && target.mode === 'client') {
+    const cached = factoryDepsCache.get(opts.name);
+    if (cached && depsEqual(cached.deps, deps)) {
+      return cached.name;
     }
+  }
 
-    // SSR path: format and collect, return name without DOM injection
-    if (ssrCollector) {
-      const actualName = ssrCollector.allocateKeyframeName(opts?.name);
-      const css = formatKeyframesCSS(actualName, stepsData);
-      ssrCollector.collectKeyframes(actualName, css);
-      return actualName;
-    }
+  const steps = isFactory
+    ? (stepsOrFactory as () => KeyframesSteps)()
+    : (stepsOrFactory as KeyframesSteps);
 
-    // Client path: inject keyframes synchronously for immediate name availability
-    renderResultRef.current?.dispose();
-    renderResultRef.current = null;
+  if (!steps || Object.keys(steps).length === 0) {
+    return '';
+  }
 
-    const result = keyframes(stepsData, {
-      name: opts?.name,
-      root: opts?.root,
-    });
+  if (target.mode === 'ssr') {
+    const actualName = target.collector.allocateKeyframeName(opts?.name);
+    const css = formatKeyframesCSS(actualName, steps);
+    target.collector.collectKeyframes(actualName, css);
+    return actualName;
+  }
 
-    renderResultRef.current = result;
+  if (target.mode === 'rsc') {
+    const serializedContent = JSON.stringify(steps);
+    const key = `__kf:${opts?.name ?? ''}:${serializedContent}`;
 
-    return result.toString();
-  }, [stepsData, opts?.name, opts?.root, ssrCollector]);
+    const existingName = target.cache.generatedNames.get(key);
+    if (existingName) return existingName;
 
-  // Client path: handle Strict Mode double-invocation and cleanup
-  useInsertionEffect(() => {
-    effectResultRef.current?.dispose();
-    effectResultRef.current = null;
+    const actualName = opts?.name ?? `k${target.cache.keyframesCounter++}`;
+    const css = formatKeyframesCSS(actualName, steps);
+    pushRSCCSS(target.cache, key, css);
+    target.cache.generatedNames.set(key, actualName);
+    return actualName;
+  }
 
-    if (stepsData) {
-      const result = keyframes(stepsData, {
-        name: opts?.name,
-        root: opts?.root,
-      });
-      effectResultRef.current = result;
-    }
+  // Client path: stable name via content-based dedup
+  const serializedContent = JSON.stringify(steps);
+  const cacheKey = `${opts?.name ?? ''}:${serializedContent}`;
 
-    return () => {
-      effectResultRef.current?.dispose();
-      effectResultRef.current = null;
-      renderResultRef.current?.dispose();
-      renderResultRef.current = null;
-    };
-  }, [stepsData, opts?.name, opts?.root]);
+  const cachedName = clientContentToName.get(cacheKey);
+  if (cachedName) {
+    return cachedName;
+  }
+
+  const result = keyframes(steps, {
+    name: opts?.name,
+    root: opts?.root,
+  });
+
+  const name = result.toString();
+  clientContentToName.set(cacheKey, name);
+
+  if (deps && opts?.name) {
+    factoryDepsCache.set(opts.name, { deps, name });
+  }
 
   return name;
 }

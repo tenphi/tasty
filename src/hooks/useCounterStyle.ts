@@ -1,9 +1,7 @@
-import { useInsertionEffect, useMemo } from 'react';
-
 import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
 interface UseCounterStyleOptions {
   name?: string;
@@ -12,9 +10,19 @@ interface UseCounterStyleOptions {
 
 let clientCounterStyleCounter = 0;
 
+const clientContentToName = new Map<string, string>();
+
+/* @internal — used only for tests */
+export function _resetCounterStyleCache(): void {
+  clientContentToName.clear();
+  clientCounterStyleCounter = 0;
+}
+
 /**
- * Hook to inject a CSS @counter-style rule and return the generated name.
+ * Inject a CSS @counter-style rule and return the generated name.
  * Permanent — no cleanup on unmount. Deduplicates by name.
+ *
+ * Works in all environments: client, SSR with collector, and React Server Components.
  *
  * @example Basic usage
  * ```tsx
@@ -34,101 +42,53 @@ let clientCounterStyleCounter = 0;
  * }
  * ```
  *
- * @example Factory function with dependencies
- * ```tsx
- * function DynamicList({ marker }: { marker: string }) {
- *   const styleName = useCounterStyle(
- *     () => ({
- *       system: 'cyclic',
- *       symbols: `"${marker}"`,
- *       suffix: '" "',
- *     }),
- *     [marker],
- *   );
- *
- *   return <ol style={{ listStyleType: styleName }}>...</ol>;
- * }
- * ```
  */
-
-// Overload 1: Static descriptors
 export function useCounterStyle(
   descriptors: CounterStyleDescriptors,
   options?: UseCounterStyleOptions,
-): string;
-
-// Overload 2: Factory function with dependencies
-export function useCounterStyle(
-  factory: () => CounterStyleDescriptors,
-  deps: readonly unknown[],
-  options?: UseCounterStyleOptions,
-): string;
-
-// Implementation
-export function useCounterStyle(
-  descriptorsOrFactory:
-    | CounterStyleDescriptors
-    | (() => CounterStyleDescriptors),
-  depsOrOptions?: readonly unknown[] | UseCounterStyleOptions,
-  options?: UseCounterStyleOptions,
 ): string {
-  const ssrCollector = getRegisteredSSRCollector();
+  if (!descriptors || !descriptors.system) {
+    return '';
+  }
 
-  const isFactory = typeof descriptorsOrFactory === 'function';
+  const target = getStyleTarget();
 
-  const deps =
-    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
-  const opts = isFactory
-    ? options
-    : (depsOrOptions as UseCounterStyleOptions | undefined);
+  if (target.mode === 'ssr') {
+    const actualName = target.collector.allocateCounterStyleName(options?.name);
+    const css = formatCounterStyleRule(actualName, descriptors);
+    target.collector.collectCounterStyle(actualName, css);
+    return actualName;
+  }
 
-  // Stable key for the static path — avoids re-triggering when caller
-  // passes an inline object literal with the same content.
-  const inputKey = useMemo(
-    () => (isFactory ? null : JSON.stringify(descriptorsOrFactory)),
-    [isFactory ? null : descriptorsOrFactory],
-  );
+  if (target.mode === 'rsc') {
+    const serializedContent = JSON.stringify(descriptors);
+    const key = `__cs:${options?.name ?? ''}:${serializedContent}`;
 
-  const descriptorsData = useMemo(
-    () => {
-      const descriptors = isFactory
-        ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
-        : (descriptorsOrFactory as CounterStyleDescriptors);
+    const existingName = target.cache.generatedNames.get(key);
+    if (existingName) return existingName;
 
-      if (!descriptors || !descriptors.system) {
-        return null;
-      }
+    const actualName =
+      options?.name ?? `cs${target.cache.counterStyleCounter++}`;
+    const css = formatCounterStyleRule(actualName, descriptors);
+    pushRSCCSS(target.cache, key, css);
+    target.cache.generatedNames.set(key, actualName);
+    return actualName;
+  }
 
-      return descriptors;
-    },
+  // Client path: stable name via content-based dedup
+  const serializedContent = JSON.stringify(descriptors);
+  const cacheKey = `${options?.name ?? ''}:${serializedContent}`;
 
-    isFactory ? (deps ?? []) : [inputKey],
-  );
+  const existingName = clientContentToName.get(cacheKey);
+  if (existingName) {
+    return existingName;
+  }
 
-  const name = useMemo(() => {
-    if (!descriptorsData) {
-      return '';
-    }
+  const name = options?.name ?? `cs${clientCounterStyleCounter++}`;
+  clientContentToName.set(cacheKey, name);
 
-    // SSR path: format and collect, return name without DOM injection
-    if (ssrCollector) {
-      const actualName = ssrCollector.allocateCounterStyleName(opts?.name);
-      const css = formatCounterStyleRule(actualName, descriptorsData);
-      ssrCollector.collectCounterStyle(actualName, css);
-      return actualName;
-    }
-
-    // Client path: return the name (injection happens in useInsertionEffect)
-    return opts?.name ?? `cs${clientCounterStyleCounter++}`;
-  }, [descriptorsData, opts?.name, ssrCollector]);
-
-  // Client path: inject via DOM
-  useInsertionEffect(() => {
-    if (!descriptorsData || !name) return;
-
-    const injector = getGlobalInjector();
-    injector.counterStyle(name, descriptorsData, { root: opts?.root });
-  }, [descriptorsData, name, opts?.root]);
+  const injector = getGlobalInjector();
+  injector.counterStyle(name, descriptors, { root: options?.root });
 
   return name;
 }

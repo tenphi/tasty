@@ -1,6 +1,6 @@
 # Runtime API
 
-The React-specific `tasty()` component factory, component props, and hooks. `tasty()` components are hook-free and compatible with React Server Components — no `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -351,11 +351,13 @@ On the client, CSS is injected synchronously into the DOM (idempotent via the in
 
 ---
 
-## Hooks
+## Style Functions
+
+All style functions below are plain functions (not React hooks) and can be used in any environment: client components, SSR with a `ServerStyleCollector`, and React Server Components. They retain their `use` prefix for backward compatibility, but do not use any React hooks internally.
 
 ### useStyles
 
-Generate a className from a style object. Thin wrapper around `computeStyles()` that adds React context-based SSR collector discovery for backward compatibility:
+Generate a className from a style object. Thin wrapper around `computeStyles()`:
 
 ```tsx
 import { useStyles } from '@tenphi/tasty';
@@ -373,7 +375,7 @@ function MyComponent() {
 
 ### useGlobalStyles
 
-Inject global styles for a CSS selector:
+Inject global styles for a CSS selector. Accepts an optional third argument with an `id` for update tracking — when the styles change, the previous injection is disposed and the new one is injected:
 
 ```tsx
 import { useGlobalStyles } from '@tenphi/tasty';
@@ -391,7 +393,7 @@ function ThemeStyles() {
 
 ### useRawCSS
 
-Inject raw CSS strings:
+Inject raw CSS strings. Accepts an optional `id` in the options for update tracking — when the CSS changes for the same id, the previous injection is replaced:
 
 ```tsx
 import { useRawCSS } from '@tenphi/tasty';
@@ -425,7 +427,7 @@ function Spinner() {
 }
 ```
 
-`useKeyframes()` also supports a factory function with dependencies:
+`useKeyframes()` also supports a factory function. The deps array is accepted for backward compatibility but the factory is called on every invocation — deduplication is handled internally by content hash:
 
 ```tsx
 function Pulse({ scale }: { scale: number }) {
@@ -521,34 +523,11 @@ function EmojiList() {
 }
 ```
 
-Factory form with dependencies:
-
-```tsx
-function DynamicList({ marker }: { marker: string }) {
-  const styleName = useCounterStyle(
-    () => ({
-      system: 'cyclic',
-      symbols: `"${marker}"`,
-      suffix: '" "',
-    }),
-    [marker],
-  );
-
-  return <ol style={{ listStyleType: styleName }}>...</ol>;
-}
-```
-
-Signatures:
+Signature:
 
 ```ts
 function useCounterStyle(
   descriptors: CounterStyleDescriptors,
-  options?: { name?: string; root?: Document | ShadowRoot },
-): string;
-
-function useCounterStyle(
-  factory: () => CounterStyleDescriptors,
-  deps: readonly unknown[],
   options?: { name?: string; root?: Document | ShadowRoot },
 ): string;
 ```
@@ -556,8 +535,10 @@ function useCounterStyle(
 ### Troubleshooting
 
 - Styles are not updating: make sure `configure()` runs before first render, and verify the generated class name or global rule with [Debug Utilities](debug.md).
-- SSR output looks wrong: check the [SSR guide](ssr.md) for collector setup. `computeStyles()` discovers the SSR collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`.
+- SSR output looks wrong: check the [SSR guide](ssr.md) for collector setup. All style functions discover the SSR collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`.
 - Animation/custom property issues: prefer `useKeyframes()` and `useProperty()` over raw CSS when you want Tasty to manage injection and SSR collection for you.
+- For dynamic styles that change over the component lifecycle, use the `id` option in `useGlobalStyles()` and `useRawCSS()` to enable update tracking.
+- RSC inline mode: CSS accumulated by standalone style functions (`useGlobalStyles`, `useRawCSS`, etc.) is flushed into inline `<style>` tags by the next `tasty()` component in the render tree. If your page uses only standalone style functions without any `tasty()` component, the CSS will not be emitted. Ensure at least one `tasty()` component is present in each RSC render tree.
 
 ---
 

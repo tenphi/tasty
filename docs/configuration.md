@@ -323,4 +323,4 @@ declare module '@tenphi/tasty' {
 }
 ```
 
-See [Style DSL](dsl.md) for state maps, tokens, units, and extending semantics, and [Runtime API](runtime.md) for `tasty()`, hooks, and component props.
+See [Style DSL](dsl.md) for state maps, tokens, units, and extending semantics, and [Runtime API](runtime.md) for `tasty()`, style functions, and component props.

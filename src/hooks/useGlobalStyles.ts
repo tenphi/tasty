@@ -1,24 +1,55 @@
-import { useInsertionEffect, useMemo, useRef } from 'react';
-
 import { getConfig } from '../config';
 import { injectGlobal } from '../injector';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
-import { collectAutoInferredProperties } from '../ssr/collect-auto-properties';
+import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
+import {
+  collectAutoInferredProperties,
+  collectAutoInferredPropertiesRSC,
+} from '../ssr/collect-auto-properties';
 import { formatGlobalRules } from '../ssr/format-global-rules';
-import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 import type { Styles } from '../styles/types';
+import { hashString } from '../utils/hash';
 import { resolveRecipes } from '../utils/resolve-recipes';
 
+interface UseGlobalStylesOptions {
+  /**
+   * Stable identifier for update tracking (client-only). When provided,
+   * changing the styles will dispose the previous injection and inject the
+   * new one. Without an id, the selector is used as the slot key.
+   * In RSC mode, renders are single-pass so update tracking does not apply.
+   */
+  id?: string;
+}
+
+interface ClientGlobalEntry {
+  stylesKey: string;
+  dispose: () => void;
+}
+
+const clientGlobalEntries = new Map<string, ClientGlobalEntry>();
+
+/* @internal — used only for tests */
+export function _resetGlobalStylesCache(): void {
+  clientGlobalEntries.clear();
+}
+
 /**
- * Hook to inject global styles for a given selector.
+ * Inject global styles for a given selector.
  * Useful for styling elements by selector without generating classNames.
  *
  * SSR-aware: when a ServerStyleCollector is available, CSS is collected
  * during the render phase instead of being injected into the DOM.
  *
+ * Works in all environments: client, SSR with collector, and React Server Components.
+ *
+ * Injected styles are permanent — they are not cleaned up on component unmount.
+ * Use the `id` option for update tracking when styles change over the
+ * component lifecycle.
+ *
  * @param selector - CSS selector to apply styles to (e.g., '.my-class', ':root', 'body')
  * @param styles - Tasty styles object
+ * @param options - Optional settings including `id` for update tracking
  *
  * @example
  * ```tsx
@@ -33,67 +64,90 @@ import { resolveRecipes } from '../utils/resolve-recipes';
  * }
  * ```
  */
-export function useGlobalStyles(selector: string, styles?: Styles): void {
-  const ssrCollector = getRegisteredSSRCollector();
+export function useGlobalStyles(
+  selector: string,
+  styles?: Styles,
+  options?: UseGlobalStylesOptions,
+): void {
+  if (!styles) return;
 
-  const disposeRef = useRef<(() => void) | null>(null);
-
-  // Resolve recipes before rendering (zero overhead if no recipes configured)
-  const resolvedStyles = useMemo(() => {
-    if (!styles) return styles;
-    return resolveRecipes(styles);
-  }, [styles]);
-
-  // Render styles with the provided selector
-  // Note: renderStyles overload with selector string returns StyleResult[] directly
-  const styleResults = useMemo((): StyleResult[] => {
-    if (!resolvedStyles) return [];
-
-    if (!selector) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(
-          '[Tasty] useGlobalStyles: selector is required and cannot be empty. ' +
-            'Styles will not be injected.',
-        );
-      }
-      return [];
+  if (!selector) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[Tasty] useGlobalStyles: selector is required and cannot be empty. ' +
+          'Styles will not be injected.',
+      );
     }
+    return;
+  }
 
-    const result = renderStyles(resolvedStyles, selector);
-    return result as StyleResult[];
-  }, [resolvedStyles, selector]);
+  const target = getStyleTarget();
 
-  // SSR path: collect CSS during render
-  useMemo(() => {
-    if (!ssrCollector || styleResults.length === 0) return;
+  // Client fast path: skip resolveRecipes/renderStyles if styles haven't changed
+  if (target.mode === 'client') {
+    const slotKey = options?.id ?? selector;
+    const stylesKey = JSON.stringify(styles);
+    const existing = clientGlobalEntries.get(slotKey);
+    if (existing && existing.stylesKey === stylesKey) return;
+  }
 
-    ssrCollector.collectInternals();
+  const resolvedStyles = resolveRecipes(styles);
+
+  const styleResults = renderStyles(resolvedStyles, selector) as StyleResult[];
+
+  if (styleResults.length === 0) return;
+
+  if (target.mode === 'ssr') {
+    target.collector.collectInternals();
 
     const css = formatGlobalRules(styleResults);
     if (css) {
-      const key = `global:${selector}:${css.length}:${css.slice(0, 64)}`;
-      ssrCollector.collectGlobalStyles(key, css);
+      const key = options?.id
+        ? `global:${options.id}`
+        : `global:${selector}:${hashString(css)}`;
+      target.collector.collectGlobalStyles(key, css);
     }
 
     if (getConfig().autoPropertyTypes !== false) {
-      collectAutoInferredProperties(styleResults, ssrCollector, resolvedStyles);
+      collectAutoInferredProperties(
+        styleResults,
+        target.collector,
+        resolvedStyles,
+      );
     }
-  }, [ssrCollector, styleResults, selector]);
+    return;
+  }
 
-  // Client path: inject via DOM
-  useInsertionEffect(() => {
-    disposeRef.current?.();
-
-    if (styleResults.length > 0) {
-      const { dispose } = injectGlobal(styleResults);
-      disposeRef.current = dispose;
-    } else {
-      disposeRef.current = null;
+  if (target.mode === 'rsc') {
+    const css = formatGlobalRules(styleResults);
+    if (css) {
+      const key = options?.id
+        ? `__global:${options.id}`
+        : `__global:${selector}:${hashString(css)}`;
+      pushRSCCSS(target.cache, key, css);
     }
 
-    return () => {
-      disposeRef.current?.();
-      disposeRef.current = null;
-    };
-  }, [styleResults]);
+    if (getConfig().autoPropertyTypes !== false) {
+      collectAutoInferredPropertiesRSC(
+        styleResults,
+        target.cache,
+        resolvedStyles,
+      );
+    }
+    return;
+  }
+
+  // Client path
+  const slotKey = options?.id ?? selector;
+
+  const existing = clientGlobalEntries.get(slotKey);
+  if (existing) {
+    existing.dispose();
+  }
+
+  const { dispose } = injectGlobal(styleResults);
+  clientGlobalEntries.set(slotKey, {
+    stylesKey: JSON.stringify(styles),
+    dispose,
+  });
 }

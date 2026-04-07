@@ -516,5 +516,5 @@ const card = tastyStatic({
 
 - [Docs Hub](README.md) — Choose the right guide by task or rendering mode
 - [Style DSL](dsl.md) — State maps, tokens, units, extending semantics (shared by runtime and static)
-- [Runtime API](runtime.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, hooks
+- [Runtime API](runtime.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, style functions
 - [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers

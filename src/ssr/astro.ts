@@ -59,30 +59,39 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     const transferCache = options?.transferCache ?? true;
     const collector = new ServerStyleCollector();
 
-    const response = await runWithCollector(collector, () => next());
+    // Run the entire request — including body stream consumption — inside
+    // the ALS context so that components rendering lazily during stream
+    // reads can still find the collector via getSSRCollector().
+    const rendered = await runWithCollector(collector, async () => {
+      const response = await next();
+      const body = response.body;
+      if (!body) return null;
 
-    const body = response.body;
-    if (!body) {
-      return response;
+      const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+      const parts: string[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+      }
+      return {
+        html: parts.join(''),
+        status: response.status,
+        headers: response.headers,
+      };
+    });
+
+    if (!rendered) {
+      return new Response(null, { status: 200 });
     }
 
-    // Read the full response body so all React components render and
-    // populate the collector. Streaming frameworks (like Astro dev mode)
-    // may defer component rendering until the body stream is consumed.
-    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
-    const bodyParts: string[] = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bodyParts.push(value);
-    }
-    let html = bodyParts.join('');
+    let { html } = rendered;
 
     const css = collector.getCSS();
     if (!css) {
       return new Response(html, {
-        status: response.status,
-        headers: response.headers,
+        status: rendered.status,
+        headers: rendered.headers,
       });
     }
 
@@ -107,11 +116,11 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
       html = injection + html;
     }
 
-    const headers = new Headers(response.headers);
+    const headers = new Headers(rendered.headers);
     headers.delete('content-length');
 
     return new Response(html, {
-      status: response.status,
+      status: rendered.status,
       headers,
     });
   };

@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 1.5.4
+
+### Patch Changes
+
+- [#117](https://github.com/tenphi/tasty/pull/117) [`186d305`](https://github.com/tenphi/tasty/commit/186d305f2909bb3e56783f689ece09ac90044456) Thanks [@tenphi](https://github.com/tenphi)! - Fix SSR style loss in Next.js static export by using React context for collector discovery instead of globalThis
+
 ## 1.5.3
 
 ### Patch Changes

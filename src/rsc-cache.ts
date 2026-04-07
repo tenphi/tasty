@@ -80,8 +80,9 @@ export function pushRSCCSS(
 }
 
 /**
- * Check whether we're in an RSC environment (server, no collector).
+ * Check whether we're in a server environment without a collector.
+ * Covers RSC, SSR without a collector, and any headless Node context.
  */
-export function isRSCEnvironment(): boolean {
+export function isServerEnvironment(): boolean {
   return typeof document === 'undefined';
 }

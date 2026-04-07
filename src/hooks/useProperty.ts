@@ -1,5 +1,5 @@
 import { getGlobalInjector } from '../config';
-import { pushRSCCSS, getRSCCache, isRSCEnvironment } from '../rsc-cache';
+import { pushRSCCSS, getRSCCache, isServerEnvironment } from '../rsc-cache';
 import { formatPropertyCSS } from '../ssr/format-property';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
@@ -104,7 +104,7 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
     return;
   }
 
-  if (isRSCEnvironment()) {
+  if (isServerEnvironment()) {
     const rscCache = getRSCCache();
     const css = formatPropertyCSS(name, {
       syntax: options?.syntax,

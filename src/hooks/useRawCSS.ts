@@ -1,6 +1,7 @@
 import { injectRawCSS } from '../injector';
-import { getRSCCache, isRSCEnvironment, pushRSCCSS } from '../rsc-cache';
+import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
+import { hashString } from '../utils/hash';
 
 interface UseRawCSSOptions {
   root?: Document | ShadowRoot;
@@ -13,6 +14,32 @@ interface UseRawCSSOptions {
   id?: string;
 }
 
+interface ClientEntry {
+  contentKey: string;
+  dispose: () => void;
+}
+
+const clientEntries = new Map<string, ClientEntry>();
+const clientContentDedup = new Set<string>();
+const clientDepsCache = new Set<string>();
+
+/* @internal — used only for tests */
+export function _resetRawCSSCache(): void {
+  clientEntries.clear();
+  clientContentDedup.clear();
+  clientDepsCache.clear();
+}
+
+// Overload 1: Static CSS string
+export function useRawCSS(css: string, options?: UseRawCSSOptions): void;
+
+// Overload 2: Factory function with dependencies
+export function useRawCSS(
+  factory: () => string,
+  deps: readonly unknown[],
+  options?: UseRawCSSOptions,
+): void;
+
 /**
  * Inject raw CSS text directly without parsing.
  * This is a low-overhead alternative for injecting global CSS that doesn't need tasty processing.
@@ -21,6 +48,10 @@ interface UseRawCSSOptions {
  * with tasty's chunked style sheets.
  *
  * Works in all environments: client, SSR with collector, and React Server Components.
+ *
+ * Injected styles are permanent — they are not cleaned up on component unmount.
+ * Use the `id` option for update tracking when styles change over the
+ * component lifecycle.
  *
  * @example Static CSS string
  * ```tsx
@@ -59,26 +90,6 @@ interface UseRawCSSOptions {
  * }
  * ```
  */
-
-interface ClientEntry {
-  contentKey: string;
-  dispose: () => void;
-}
-
-const clientEntries = new Map<string, ClientEntry>();
-const clientContentDedup = new Set<string>();
-
-// Overload 1: Static CSS string
-export function useRawCSS(css: string, options?: UseRawCSSOptions): void;
-
-// Overload 2: Factory function with dependencies
-export function useRawCSS(
-  factory: () => string,
-  deps: readonly unknown[],
-  options?: UseRawCSSOptions,
-): void;
-
-// Implementation
 export function useRawCSS(
   cssOrFactory: string | (() => string),
   depsOrOptions?: readonly unknown[] | UseRawCSSOptions,
@@ -86,9 +97,17 @@ export function useRawCSS(
 ): void {
   const isFactory = typeof cssOrFactory === 'function';
 
+  const deps =
+    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseRawCSSOptions | undefined);
+
+  // Fast path: if deps haven't changed, skip entirely
+  if (deps) {
+    const depsKey = JSON.stringify(deps);
+    if (clientDepsCache.has(depsKey)) return;
+  }
 
   const css = isFactory
     ? (cssOrFactory as () => string)()
@@ -99,21 +118,23 @@ export function useRawCSS(
   const ssrCollector = getRegisteredSSRCollector();
 
   if (ssrCollector) {
-    const key = `raw:${css.length}:${css.slice(0, 64)}`;
+    const key = `raw:${hashString(css)}`;
     ssrCollector.collectRawCSS(key, css);
     return;
   }
 
-  if (isRSCEnvironment()) {
+  if (isServerEnvironment()) {
     const rscCache = getRSCCache();
-    const key = opts?.id
-      ? `__raw:${opts.id}`
-      : `__raw:${css.length}:${css.slice(0, 64)}`;
+    const key = opts?.id ? `__raw:${opts.id}` : `__raw:${hashString(css)}`;
     pushRSCCSS(rscCache, key, css);
     return;
   }
 
   // Client path
+  if (deps) {
+    clientDepsCache.add(JSON.stringify(deps));
+  }
+
   const id = opts?.id;
 
   if (id) {

@@ -1,6 +1,6 @@
 import { keyframes } from '../injector';
 import type { KeyframesSteps } from '../injector/types';
-import { getRSCCache, isRSCEnvironment, pushRSCCSS } from '../rsc-cache';
+import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
@@ -10,10 +10,12 @@ interface UseKeyframesOptions {
 }
 
 const clientContentToName = new Map<string, string>();
+const clientDepsCache = new Map<string, string>();
 
 /* @internal — used only for tests */
 export function _resetKeyframesCache(): void {
   clientContentToName.clear();
+  clientDepsCache.clear();
 }
 
 /**
@@ -84,9 +86,18 @@ export function useKeyframes(
 ): string {
   const isFactory = typeof stepsOrFactory === 'function';
 
+  const deps =
+    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseKeyframesOptions | undefined);
+
+  // Fast path: if deps haven't changed, return cached result
+  if (deps) {
+    const depsKey = JSON.stringify(deps);
+    const cached = clientDepsCache.get(depsKey);
+    if (cached !== undefined) return cached;
+  }
 
   const steps = isFactory
     ? (stepsOrFactory as () => KeyframesSteps)()
@@ -105,10 +116,10 @@ export function useKeyframes(
     return actualName;
   }
 
-  if (isRSCEnvironment()) {
+  if (isServerEnvironment()) {
     const rscCache = getRSCCache();
     const contentHash = JSON.stringify(steps);
-    const key = `__kf:${contentHash}`;
+    const key = `__kf:${opts?.name ?? ''}:${contentHash}`;
 
     const existingName = rscCache.generatedNames.get(key);
     if (existingName) return existingName;
@@ -122,8 +133,9 @@ export function useKeyframes(
 
   // Client path: stable name via content-based dedup
   const contentHash = JSON.stringify(steps);
+  const cacheKey = `${opts?.name ?? ''}:${contentHash}`;
 
-  const cachedName = clientContentToName.get(contentHash);
+  const cachedName = clientContentToName.get(cacheKey);
   if (cachedName) {
     return cachedName;
   }
@@ -134,7 +146,11 @@ export function useKeyframes(
   });
 
   const name = result.toString();
-  clientContentToName.set(contentHash, name);
+  clientContentToName.set(cacheKey, name);
+
+  if (deps) {
+    clientDepsCache.set(JSON.stringify(deps), name);
+  }
 
   return name;
 }

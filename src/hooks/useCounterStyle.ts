@@ -1,7 +1,7 @@
 import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
-import { getRSCCache, isRSCEnvironment, pushRSCCSS } from '../rsc-cache';
+import { getRSCCache, isServerEnvironment, pushRSCCSS } from '../rsc-cache';
 import { getRegisteredSSRCollector } from '../ssr/ssr-collector-ref';
 
 interface UseCounterStyleOptions {
@@ -12,6 +12,14 @@ interface UseCounterStyleOptions {
 let clientCounterStyleCounter = 0;
 
 const clientContentToName = new Map<string, string>();
+const clientDepsCache = new Map<string, string>();
+
+/* @internal — used only for tests */
+export function _resetCounterStyleCache(): void {
+  clientContentToName.clear();
+  clientDepsCache.clear();
+  clientCounterStyleCounter = 0;
+}
 
 /**
  * Inject a CSS @counter-style rule and return the generated name.
@@ -77,9 +85,18 @@ export function useCounterStyle(
 ): string {
   const isFactory = typeof descriptorsOrFactory === 'function';
 
+  const deps =
+    isFactory && Array.isArray(depsOrOptions) ? depsOrOptions : undefined;
   const opts = isFactory
     ? options
     : (depsOrOptions as UseCounterStyleOptions | undefined);
+
+  // Fast path: if deps haven't changed, return cached result
+  if (deps) {
+    const depsKey = JSON.stringify(deps);
+    const cached = clientDepsCache.get(depsKey);
+    if (cached !== undefined) return cached;
+  }
 
   const descriptors = isFactory
     ? (descriptorsOrFactory as () => CounterStyleDescriptors)()
@@ -98,10 +115,10 @@ export function useCounterStyle(
     return actualName;
   }
 
-  if (isRSCEnvironment()) {
+  if (isServerEnvironment()) {
     const rscCache = getRSCCache();
     const contentKey = JSON.stringify(descriptors);
-    const key = `__cs:${contentKey}`;
+    const key = `__cs:${opts?.name ?? ''}:${contentKey}`;
 
     const existingName = rscCache.generatedNames.get(key);
     if (existingName) return existingName;
@@ -115,23 +132,22 @@ export function useCounterStyle(
 
   // Client path: stable name via content-based dedup
   const contentKey = JSON.stringify(descriptors);
+  const cacheKey = `${opts?.name ?? ''}:${contentKey}`;
 
-  if (opts?.name) {
-    const injector = getGlobalInjector();
-    injector.counterStyle(opts.name, descriptors, { root: opts?.root });
-    return opts.name;
-  }
-
-  const existingName = clientContentToName.get(contentKey);
+  const existingName = clientContentToName.get(cacheKey);
   if (existingName) {
     return existingName;
   }
 
-  const name = `cs${clientCounterStyleCounter++}`;
-  clientContentToName.set(contentKey, name);
+  const name = opts?.name ?? `cs${clientCounterStyleCounter++}`;
+  clientContentToName.set(cacheKey, name);
 
   const injector = getGlobalInjector();
   injector.counterStyle(name, descriptors, { root: opts?.root });
+
+  if (deps) {
+    clientDepsCache.set(JSON.stringify(deps), name);
+  }
 
   return name;
 }

@@ -1,5 +1,40 @@
 # @tenphi/tasty
 
+## 2.0.0
+
+### Major Changes
+
+- [#123](https://github.com/tenphi/tasty/pull/123) [`f26409e`](https://github.com/tenphi/tasty/commit/f26409e5dfc1efaa1cd81be520cdfb4edae37884) Thanks [@tenphi](https://github.com/tenphi)! - Unified hash-based class names across RSC, SSR, and client. Same cache key now produces the same class name in all environments, enabling cross-environment style deduplication. Replaces the heavy SSRCacheState transfer with a lightweight class-name-list via `window.__TASTY__`.
+
+  **SSR/RSC fixes included:**
+  - Fix missing tokens on pages without RSC-rendered tasty components. The `globalThis.__tasty_rsc_internals_emitted__` flag leaked across requests in the same Node.js process; internals (tokens, `@property`, `@font-face`, `@counter-style`) are now emitted exclusively by the SSR collector.
+  - Fix duplicate global CSS when RSC and SSR paths both emit internals in Next.js App Router. The SSR collector now skips internals already emitted by the RSC inline-style path.
+  - Fix CSS class name collisions during client-side navigation in Next.js App Router. RSC inline styles used sequential counters (`r0`, `r1`, …) that reset on every request; replaced with content-based hashing (djb2) so identical content always maps to the same name.
+  - Auto-skip global CSS injection on client when `<style data-tasty-ssr>` is detected, eliminating the need for `typeof window === 'undefined'` guards in `configure()` calls.
+
+  **Internal SSR API changes (not part of the public API):**
+  - `SSRCacheState` type removed — replaced by plain `string[]` class lists.
+  - `ServerStyleCollector.getCacheState()` replaced by `getRenderedClassNames()`.
+  - `window.__TASTY_SSR_CACHE__` replaced by `window.__TASTY__`.
+  - `hydrateTastyCache()` deprecated in favor of `hydrateTastyClasses()` (the old function still works as a compat shim).
+  - Class name format changed from `t{number}` to `t{base36hash}`.
+
+### Minor Changes
+
+- [#119](https://github.com/tenphi/tasty/pull/119) [`af8bf8a`](https://github.com/tenphi/tasty/commit/af8bf8a966e0655f61ad83565bde538364d0131b) Thanks [@tenphi](https://github.com/tenphi)! - Add `presets` and `globalStyles` options to `configure()`. `presets` is a shorthand for `generateTypographyTokens()` that merges generated tokens under explicit `tokens`. `globalStyles` is a `Record<string, Styles>` that applies Tasty styles to arbitrary CSS selectors across all rendering modes. Both options are also available in plugins and zero-runtime config. Typography preset fields now accept state maps for responsive/theme-aware values.
+
+### Patch Changes
+
+- [#119](https://github.com/tenphi/tasty/pull/119) [`8a7a342`](https://github.com/tenphi/tasty/commit/8a7a342f8c456c80dd35da3c882eb566f5255f28) Thanks [@tenphi](https://github.com/tenphi)! - Derive `TastyZeroConfig` from `TastyConfig` via `Omit` to keep the two types in sync automatically. This also widens `TastyZeroConfig` to accept `colorSpace`, `properties`, and `boolean` values in `replaceTokens` — options that were previously only available in the runtime config.
+
+- [#123](https://github.com/tenphi/tasty/pull/123) [`841767c`](https://github.com/tenphi/tasty/commit/841767c5b382bdf085e9a2c7fad8741dc43789b8) Thanks [@tenphi](https://github.com/tenphi)! - Fix overlapping and duplicate CSS selectors produced by the condition simplifier.
+  - Fix overlapping selectors when default and custom-state token values coincide but other state values differ.
+  - Fix overlapping selectors for compound state tokens by adding consensus resolution and making inner OR branches exclusive during CSS materialization.
+  - Fix complementary factoring for compound state conditions, eliminating duplicate selectors when token values match across state combinations.
+  - Eliminate duplicate token CSS rules when multiple states map to the same value. Tokens now generate a single rule instead of redundant duplicates. Also fixes absorption law so `A | (A & B)` correctly simplifies to `A` regardless of condition complexity.
+
+- [#119](https://github.com/tenphi/tasty/pull/119) [`a642337`](https://github.com/tenphi/tasty/commit/a642337c7a7cf804b1474aa482868e7a3a094d5a) Thanks [@tenphi](https://github.com/tenphi)! - Change default `letterSpacing` in typography presets from `'0'` to `'normal'`. The previous default could override inherited letter-spacing; `'normal'` matches the browser default.
+
 ## 1.5.4
 
 ### Patch Changes

@@ -3572,4 +3572,157 @@ describe('Token CSS deduplication with compound states', () => {
       ).not.toContain('data-contrast');
     }
   });
+
+  it('should factor (A & B) | (A & !B) → A when B is a compound parsed state', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const A = parseStateKey('@dark-root', { context: ctx });
+    const B = parseStateKey('@high-contrast-root', { context: ctx });
+
+    const condition = or(and(A, B), and(A, not(B)));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(A));
+  });
+
+  it('should factor (!A & B) | (!A & !B) → !A when both are compound parsed states', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const A = parseStateKey('@dark-root', { context: ctx });
+    const B = parseStateKey('@high-contrast-root', { context: ctx });
+    const notA = not(A);
+
+    const condition = or(and(notA, B), and(notA, not(B)));
+    const simplified = simplifyCondition(condition);
+
+    const notASimplified = simplifyCondition(notA);
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(notASimplified),
+    );
+  });
+
+  it('should merge default and HC entries when values match (same string)', () => {
+    const tokens = {
+      '#surface': {
+        '': 'rgb(255 255 255)',
+        '@dark-root': 'rgb(30 30 30)',
+        '@high-contrast-root': 'rgb(255 255 255)',
+        '@dark-root & @high-contrast-root': 'rgb(10 10 10)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorCounts = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorCounts.set(key, (selectorCounts.get(key) ?? 0) + 1);
+    }
+    for (const [key, count] of selectorCounts) {
+      expect(count, `Duplicate rule: ${key}`).toBe(1);
+    }
+
+    // The default and HC values are merged by mergeEntriesByValue, so we
+    // should have exactly 3 distinct declaration groups (not 4).
+    const declGroups = new Set(result.map((r) => r.declarations));
+    expect(declGroups.size).toBeLessThanOrEqual(3);
+  });
+
+  it('should produce non-overlapping selectors when handler output matches for default and HC', () => {
+    const tokens = {
+      '#border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(50 50 50)',
+        '@high-contrast-root': 'rgb(200 200 200)',
+        '@dark-root & @high-contrast-root': 'rgb(50 50 50)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorKeys = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorKeys.set(key, (selectorKeys.get(key) ?? 0) + 1);
+    }
+    for (const [key, count] of selectorKeys) {
+      expect(count, `Duplicate rule: ${key}`).toBe(1);
+    }
+
+    // Default-value rules should not reference data-contrast
+    const defaultRules = result.filter(
+      (r) =>
+        r.declarations.includes('200 200 200') &&
+        !r.declarations.includes('50 50 50'),
+    );
+    for (const rule of defaultRules) {
+      expect(
+        rule.selector,
+        'Default-value rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+
+    // Dark-value rules should not reference data-contrast
+    const darkRules = result.filter(
+      (r) =>
+        r.declarations.includes('50 50 50') &&
+        !r.declarations.includes('200 200 200'),
+    );
+    for (const rule of darkRules) {
+      expect(
+        rule.selector,
+        'Dark-value rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+  });
+
+  it('should not produce overlapping selectors with identical declarations', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Group by declarations (ignoring selector) to find rules that set the
+    // same CSS properties. Rules in the same group should not have selectors
+    // that can both match simultaneously (they should be exclusive).
+    const byDecl = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.declarations}`;
+      const group = byDecl.get(key);
+      if (group) group.push(rule);
+      else byDecl.set(key, [rule]);
+    }
+
+    // For each group, selectors must be distinct
+    for (const [, group] of byDecl) {
+      const selectors = group.map((r) => r.selector);
+      const uniqueSelectors = new Set(selectors);
+      expect(
+        uniqueSelectors.size,
+        `Duplicate selectors for same declarations: ${selectors.join(', ')}`,
+      ).toBe(selectors.length);
+    }
+  });
 });

@@ -23,6 +23,7 @@ import {
   and,
   falseCondition,
   getConditionUniqueId,
+  not,
   trueCondition,
 } from './conditions';
 
@@ -1028,7 +1029,21 @@ function tryFactorPair(
     children: [restA, restB],
   });
 
-  if (combined.kind !== 'true') return null;
+  if (combined.kind !== 'true') {
+    // Direct complement check for compound conditions.
+    // hasTautology only detects leaf-level A/!A pairs, so compound
+    // complements like @hc / !@hc (which expand via De Morgan into
+    // structurally different trees) are missed. Compare the simplified
+    // negation of one rest against the simplified other rest instead.
+    const simplifiedRestB = simplifyInner(restB);
+    const negRestA = simplifyInner(not(restA));
+
+    if (
+      getConditionUniqueId(negRestA) !== getConditionUniqueId(simplifiedRestB)
+    ) {
+      return null;
+    }
+  }
 
   // restA | restB = TRUE → (common & restA) | (common & restB) = common
   const common = commonIndicesA.map((i) => aChildren[i]);

@@ -2,6 +2,7 @@ import { getGlobalInjector } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
+import { hashString } from '../utils/hash';
 
 interface UseCounterStyleOptions {
   name?: string;
@@ -67,8 +68,7 @@ export function useCounterStyle(
     const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName =
-      options?.name ?? `cs${target.cache.counterStyleCounter++}`;
+    const actualName = options?.name ?? `cs${hashString(serializedContent)}`;
     const css = formatCounterStyleRule(actualName, descriptors);
     pushRSCCSS(target.cache, key, css);
     target.cache.generatedNames.set(key, actualName);

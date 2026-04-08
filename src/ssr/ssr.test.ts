@@ -412,23 +412,19 @@ describe('ServerStyleCollector', () => {
 });
 
 // ============================================================================
-// RSC / SSR dedup coordination
+// SSR internals emission
 // ============================================================================
 
-describe('RSC / SSR internals dedup', () => {
-  const FLAG_KEY = '__tasty_rsc_internals_emitted__';
-
+describe('SSR internals emission', () => {
   beforeEach(() => {
     resetConfig();
-    delete (globalThis as Record<string, unknown>)[FLAG_KEY];
   });
 
   afterEach(() => {
     resetConfig();
-    delete (globalThis as Record<string, unknown>)[FLAG_KEY];
   });
 
-  it('collectInternals emits tokens and @property when flag is not set', () => {
+  it('collectInternals emits tokens and @property', () => {
     configure({
       tokens: { $gap: '8px' },
       presets: {
@@ -446,26 +442,7 @@ describe('RSC / SSR internals dedup', () => {
     expect(css).toContain('--h1-font-size');
   });
 
-  it('collectInternals skips tokens and @property when RSC flag is set', () => {
-    configure({
-      tokens: { $gap: '8px' },
-      presets: {
-        h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
-      },
-    });
-
-    (globalThis as Record<string, unknown>)[FLAG_KEY] = true;
-
-    const collector = new ServerStyleCollector();
-    collector.collectInternals();
-
-    const css = collector.getCSS();
-    expect(css).not.toContain('--gap');
-    expect(css).not.toContain('--h1-font-size');
-    expect(css).not.toContain('@property');
-  });
-
-  it('collectInternals still emits globalStyles when RSC flag is set', () => {
+  it('collectInternals emits both tokens and globalStyles', () => {
     configure({
       tokens: { $gap: '8px' },
       globalStyles: {
@@ -473,15 +450,11 @@ describe('RSC / SSR internals dedup', () => {
       },
     });
 
-    (globalThis as Record<string, unknown>)[FLAG_KEY] = true;
-
     const collector = new ServerStyleCollector();
     collector.collectInternals();
 
     const css = collector.getCSS();
-    // Tokens should be skipped
-    expect(css).not.toContain('--gap');
-    // Global styles should still be present
+    expect(css).toContain('--gap: 8px');
     expect(css).toContain('body');
     expect(css).toContain('red');
   });

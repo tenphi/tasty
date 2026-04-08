@@ -54,65 +54,55 @@ export class ServerStyleCollector {
    * Collect internal @property rules and :root token defaults.
    * Mirrors markStylesGenerated() from the client-side injector.
    * Called automatically on first chunk collection; idempotent.
+   *
+   * Internals are always emitted here — the RSC path deliberately
+   * defers to SSR so that tokens appear exactly once per page in
+   * <style data-tasty-ssr> (avoiding duplication of large token sets).
    */
   collectInternals(): void {
     if (this.internalsCollected) return;
     this.internalsCollected = true;
 
-    // In Next.js App Router the RSC module graph may have already emitted
-    // @property rules, token CSS, @font-face, and @counter-style via
-    // collectInternalsRSC(). Skip them here to avoid duplicate CSS.
-    const rscHandledInternals =
-      (globalThis as Record<string, unknown>)
-        .__tasty_rsc_internals_emitted__ === true;
+    for (const [token, definition] of Object.entries(
+      getEffectiveProperties(),
+    )) {
+      const css = formatPropertyCSS(token, definition);
+      if (css) {
+        this.collectProperty(`__prop:${token}`, css);
+      }
+    }
 
-    if (!rscHandledInternals) {
-      for (const [token, definition] of Object.entries(
-        getEffectiveProperties(),
-      )) {
-        const css = formatPropertyCSS(token, definition);
+    const tokenStyles = getGlobalConfigTokens();
+    if (tokenStyles && Object.keys(tokenStyles).length > 0) {
+      const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
+      if (tokenRules.length > 0) {
+        const css = formatGlobalRules(tokenRules);
         if (css) {
-          this.collectProperty(`__prop:${token}`, css);
-        }
-      }
-
-      // Inject configured tokens as :root CSS custom properties
-      const tokenStyles = getGlobalConfigTokens();
-      if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-        const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
-        if (tokenRules.length > 0) {
-          const css = formatGlobalRules(tokenRules);
-          if (css) {
-            this.collectGlobalStyles('__global:tokens', css);
-          }
-        }
-      }
-
-      // Inject global @font-face rules (mirrors markStylesGenerated)
-      const globalFF = getGlobalFontFace();
-      if (globalFF) {
-        for (const [family, input] of Object.entries(globalFF)) {
-          const descriptors = Array.isArray(input) ? input : [input];
-          for (const desc of descriptors) {
-            const hash = fontFaceContentHash(family, desc);
-            const css = formatFontFaceRule(family, desc);
-            this.collectFontFace(hash, css);
-          }
-        }
-      }
-
-      // Inject global @counter-style rules (mirrors markStylesGenerated)
-      const globalCS = getGlobalCounterStyle();
-      if (globalCS) {
-        for (const [name, descriptors] of Object.entries(globalCS)) {
-          const css = formatCounterStyleRule(name, descriptors);
-          this.collectCounterStyle(name, css);
+          this.collectGlobalStyles('__global:tokens', css);
         }
       }
     }
 
-    // Global styles are always emitted here — the RSC path does not
-    // cover them, so this is the only place they get injected.
+    const globalFF = getGlobalFontFace();
+    if (globalFF) {
+      for (const [family, input] of Object.entries(globalFF)) {
+        const descriptors = Array.isArray(input) ? input : [input];
+        for (const desc of descriptors) {
+          const hash = fontFaceContentHash(family, desc);
+          const css = formatFontFaceRule(family, desc);
+          this.collectFontFace(hash, css);
+        }
+      }
+    }
+
+    const globalCS = getGlobalCounterStyle();
+    if (globalCS) {
+      for (const [name, descriptors] of Object.entries(globalCS)) {
+        const css = formatCounterStyleRule(name, descriptors);
+        this.collectCounterStyle(name, css);
+      }
+    }
+
     const globalStyles = getGlobalStyles();
     if (globalStyles) {
       for (const [selector, styles] of Object.entries(globalStyles)) {

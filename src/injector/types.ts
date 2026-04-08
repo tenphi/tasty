@@ -1,6 +1,12 @@
 import type { StyleResult } from '../pipeline';
 import type { PropertyTypeResolver } from '../properties/property-type-resolver';
 
+declare global {
+  interface Window {
+    __TASTY__?: string[];
+  }
+}
+
 export interface InjectResult {
   className: string;
   dispose: () => void;
@@ -73,6 +79,11 @@ export interface GCOptions {
   force?: boolean;
 }
 
+/** Sentinel for hydrated (server-rendered) rules not yet backed by a real sheet entry. */
+export const HYDRATED_RULE_INDEX = -2;
+/** Sentinel for pre-allocated class names whose CSS hasn't been injected yet. */
+export const PLACEHOLDER_RULE_INDEX = -1;
+
 export interface RuleInfo {
   className: string;
   ruleIndex: number;
@@ -142,6 +153,8 @@ export interface RootRegistry {
   usageMap: Map<string, StyleUsage>;
   /** Touch counter for scheduling GC (per-root) */
   touchCount: number;
+  /** How many entries from `window.__TASTY__` have been synced into this registry */
+  serverClassSyncIndex: number;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

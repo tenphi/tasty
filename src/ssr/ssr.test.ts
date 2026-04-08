@@ -593,13 +593,20 @@ describe('hydrateTastyClasses', () => {
 
   it('RSC and client produce the same class name for the same cache key', () => {
     const cacheKey = 'appearance\0fill:"#purple"';
-    const rscClassName = `t${hashString(cacheKey)}`;
-    const clientClassName = `t${hashString(cacheKey)}`;
 
-    expect(rscClassName).toBe(clientClassName);
+    // Allocate on the server side
+    const collector = new ServerStyleCollector();
+    const serverAlloc = collector.allocateClassName(cacheKey);
 
-    hydrateTastyClasses([rscClassName]);
+    // Simulate hydration with the server's class list
+    hydrateTastyClasses([serverAlloc.className]);
 
+    // Client allocates for the same cache key — should match
+    const clientAlloc = injector.instance.allocateClassName(cacheKey);
+    expect(clientAlloc.className).toBe(serverAlloc.className);
+    expect(clientAlloc.isNewAllocation).toBe(false);
+
+    // inject() also reuses the hydrated class
     const result = inject(
       [
         {
@@ -611,7 +618,7 @@ describe('hydrateTastyClasses', () => {
       { cacheKey },
     );
 
-    expect(result.className).toBe(rscClassName);
+    expect(result.className).toBe(serverAlloc.className);
   });
 });
 

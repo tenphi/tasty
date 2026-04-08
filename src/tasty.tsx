@@ -28,6 +28,7 @@ import { isSelector } from './pipeline';
 import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
+import { getConfig } from './config';
 import { touch } from './injector';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
@@ -839,16 +840,19 @@ function tastyElement<
     if (stylesResult.css) {
       const newClasses = stylesResult.newClassNames;
       const classListJSON = newClasses?.map((n) => `"${n}"`).join(',');
+      const nonce = getConfig().nonce;
 
       return createElement(
         Fragment,
         null,
         createElement('style', {
           'data-tasty-rsc': '',
+          nonce,
           dangerouslySetInnerHTML: { __html: stylesResult.css },
         }),
         classListJSON
           ? createElement('script', {
+              nonce,
               dangerouslySetInnerHTML: {
                 __html: `(window.__TASTY__=window.__TASTY__||[]).push(${classListJSON})`,
               },

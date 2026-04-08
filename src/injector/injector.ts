@@ -16,6 +16,7 @@ import { parseStyle } from '../utils/styles';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
 import { formatCounterStyleDeclarations } from '../counter-style';
+import { HYDRATED_RULE_INDEX, PLACEHOLDER_RULE_INDEX } from './types';
 import type {
   CacheMetrics,
   CounterStyleDescriptors,
@@ -40,14 +41,6 @@ function generateClassName(cacheKey: string): string {
   return `t${hashString(cacheKey)}`;
 }
 
-declare global {
-  interface Window {
-    __TASTY__?: string[];
-  }
-}
-
-let syncedUpTo = 0;
-
 /**
  * Lazily sync server-rendered class names from the global `window.__TASTY__`
  * array into the client registry. Called inside `inject()` to pick up
@@ -56,19 +49,19 @@ let syncedUpTo = 0;
 function syncServerClasses(registry: RootRegistry): void {
   if (typeof window === 'undefined') return;
   const classes = window.__TASTY__;
-  if (!classes || classes.length <= syncedUpTo) return;
-  for (let i = syncedUpTo; i < classes.length; i++) {
+  if (!classes || classes.length <= registry.serverClassSyncIndex) return;
+  for (let i = registry.serverClassSyncIndex; i < classes.length; i++) {
     const cls = classes[i];
     if (!registry.rules.has(cls)) {
       registry.rules.set(cls, {
         className: cls,
-        ruleIndex: -2,
-        sheetIndex: -2,
+        ruleIndex: HYDRATED_RULE_INDEX,
+        sheetIndex: HYDRATED_RULE_INDEX,
       });
       registry.refCounts.set(cls, 0);
     }
   }
-  syncedUpTo = classes.length;
+  registry.serverClassSyncIndex = classes.length;
 }
 
 export class StyleInjector {
@@ -85,6 +78,28 @@ export class StyleInjector {
   constructor(config: StyleInjectorConfig = {}) {
     this.config = config;
     this.sheetManager = new SheetManager(config);
+  }
+
+  /**
+   * Check if `className` was hydrated from server-rendered styles and,
+   * if so, wire the cacheKey mapping. Returns true on hit.
+   */
+  private tryHydratedHit(
+    registry: RootRegistry,
+    cacheKey: string,
+    className: string,
+  ): boolean {
+    syncServerClasses(registry);
+    const rule = registry.rules.get(className);
+    if (
+      rule &&
+      rule.ruleIndex === HYDRATED_RULE_INDEX &&
+      rule.sheetIndex === HYDRATED_RULE_INDEX
+    ) {
+      registry.cacheKeyToClassName.set(cacheKey, className);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -111,13 +126,19 @@ export class StyleInjector {
     const className = generateClassName(cacheKey);
 
     // Check if this className was hydrated from server-rendered styles
-    syncServerClasses(registry);
-    const hydratedRule = registry.rules.get(className);
-    if (
-      hydratedRule &&
-      hydratedRule.ruleIndex === -2 &&
-      hydratedRule.sheetIndex === -2
-    ) {
+    if (this.tryHydratedHit(registry, cacheKey, className)) {
+      return { className, isNewAllocation: false };
+    }
+
+    // Hash collision guard: another cache key already owns this class name
+    const existingRule = registry.rules.get(className);
+    if (existingRule) {
+      if (isDevEnv()) {
+        console.warn(
+          `[tasty] Hash collision: cache keys produce the same class "${className}". Styles may be incorrect.`,
+        );
+      }
+      // Treat as already allocated to avoid overwriting
       registry.cacheKeyToClassName.set(cacheKey, className);
       return { className, isNewAllocation: false };
     }
@@ -125,8 +146,8 @@ export class StyleInjector {
     // Create placeholder RuleInfo to reserve the className
     const placeholderRuleInfo = {
       className,
-      ruleIndex: -1, // Placeholder - will be set during actual injection
-      sheetIndex: -1, // Placeholder - will be set during actual injection
+      ruleIndex: PLACEHOLDER_RULE_INDEX,
+      sheetIndex: PLACEHOLDER_RULE_INDEX,
     };
 
     // Store RuleInfo only once by className, and map cacheKey separately
@@ -172,7 +193,8 @@ export class StyleInjector {
 
       // Check if this is a placeholder (pre-allocated but not yet injected)
       isPreAllocated =
-        existingRuleInfo.ruleIndex === -1 && existingRuleInfo.sheetIndex === -1;
+        existingRuleInfo.ruleIndex === PLACEHOLDER_RULE_INDEX &&
+        existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
       if (!isPreAllocated) {
         // Already injected - just increment refCount
@@ -193,16 +215,8 @@ export class StyleInjector {
       // Generate deterministic className from cache key
       className = generateClassName(cacheKey);
 
-      // Check if this className was hydrated from server-rendered styles.
-      // Hydrated entries have ruleIndex/sheetIndex of -2.
-      syncServerClasses(registry);
-      const hydratedRule = registry.rules.get(className);
-      if (
-        hydratedRule &&
-        hydratedRule.ruleIndex === -2 &&
-        hydratedRule.sheetIndex === -2
-      ) {
-        registry.cacheKeyToClassName.set(cacheKey, className);
+      // Check if this className was hydrated from server-rendered styles
+      if (this.tryHydratedHit(registry, cacheKey, className)) {
         registry.refCounts.set(
           className,
           (registry.refCounts.get(className) || 0) + 1,
@@ -219,7 +233,8 @@ export class StyleInjector {
       }
     } else {
       // No cache key — generate from rules content
-      className = `t${hashString(JSON.stringify(rules))}`;
+      const parts = rules.map((r) => `${r.selector}\0${r.declarations}`);
+      className = `t${hashString(parts.join('\n'))}`;
     }
 
     // Process rules: handle needsClassName flag and apply specificity

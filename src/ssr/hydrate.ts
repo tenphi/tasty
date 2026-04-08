@@ -8,12 +8,7 @@
  */
 
 import { getGlobalInjector } from '../config';
-
-declare global {
-  interface Window {
-    __TASTY__?: string[];
-  }
-}
+import { HYDRATED_RULE_INDEX } from '../injector/types';
 
 /**
  * Pre-populate the client-side style registry from the server's class name list.
@@ -40,8 +35,8 @@ export function hydrateTastyClasses(classes?: string[]): void {
     if (!registry.rules.has(cls)) {
       registry.rules.set(cls, {
         className: cls,
-        ruleIndex: -2,
-        sheetIndex: -2,
+        ruleIndex: HYDRATED_RULE_INDEX,
+        sheetIndex: HYDRATED_RULE_INDEX,
       });
       registry.refCounts.set(cls, 0);
     }
@@ -52,6 +47,12 @@ export function hydrateTastyClasses(classes?: string[]): void {
  * @deprecated Use `hydrateTastyClasses()` instead. This alias exists
  * for backwards compatibility and will be removed in a future major version.
  */
-export function hydrateTastyCache(): void {
-  hydrateTastyClasses();
+export function hydrateTastyCache(state?: {
+  entries?: Record<string, string>;
+}): void {
+  if (state?.entries) {
+    hydrateTastyClasses(Object.values(state.entries));
+  } else {
+    hydrateTastyClasses();
+  }
 }

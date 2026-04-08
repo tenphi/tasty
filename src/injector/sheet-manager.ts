@@ -75,6 +75,7 @@ export class SheetManager {
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),
         touchCount: 0,
+        serverClassSyncIndex: 0,
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);

@@ -16,7 +16,13 @@ import type {
   StateCondition,
   SupportsCondition,
 } from './conditions';
-import { getConditionUniqueId } from './conditions';
+import {
+  and,
+  getConditionUniqueId,
+  isCompoundCondition,
+  not,
+} from './conditions';
+import { simplifyCondition } from './simplify';
 
 // ============================================================================
 // Types
@@ -1708,10 +1714,14 @@ function dedupeVariants(variants: SelectorVariant[]): SelectorVariant[] {
  * are filtered out.
  */
 function andToCSS(children: ConditionNode[]): CSSComponents {
+  // Make inner OR branches exclusive before materializing so the
+  // Cartesian product produces non-overlapping CSS variants.
+  const exclusiveChildren = makeOrBranchesExclusive(children);
+
   // Start with a single empty variant
   let currentVariants: SelectorVariant[] = [emptyVariant()];
 
-  for (const child of children) {
+  for (const child of exclusiveChildren) {
     const childCSS = conditionToCSSInner(child);
 
     if (childCSS.isImpossible || childCSS.variants.length === 0) {
@@ -1742,6 +1752,82 @@ function andToCSS(children: ConditionNode[]): CSSComponents {
     variants: currentVariants,
     isImpossible: false,
   };
+}
+
+/**
+ * Make OR branches within AND children mutually exclusive.
+ *
+ * For an AND child that is OR(A, B), transforms it to OR(A, B & !A)
+ * so that when andToCSS does a Cartesian product, the resulting
+ * CSS variants don't overlap.
+ *
+ * Only transforms OR children whose branches actually produce
+ * different at-rule contexts when materialized. This avoids
+ * breaking cases where contradiction detection in the Cartesian
+ * product naturally handles deduplication.
+ */
+function makeOrBranchesExclusive(children: ConditionNode[]): ConditionNode[] {
+  return children.map((child) => {
+    if (!isCompoundCondition(child) || child.operator !== 'OR') return child;
+    if (child.children.length <= 1) return child;
+
+    // Only apply when branches produce different at-rule contexts.
+    // Materialize each branch and compare context keys. If all branches
+    // produce the same context key, the :is() merging handles it.
+    if (!branchesProduceDifferentContexts(child.children)) return child;
+
+    const exclusiveBranches: ConditionNode[] = [];
+    const priorBranches: ConditionNode[] = [];
+
+    for (const branch of child.children) {
+      if (priorBranches.length === 0) {
+        exclusiveBranches.push(branch);
+      } else {
+        let exclusive: ConditionNode = branch;
+        for (const prior of priorBranches) {
+          exclusive = and(exclusive, not(prior));
+        }
+        const simplified = simplifyCondition(exclusive);
+        if (simplified.kind !== 'false') {
+          exclusiveBranches.push(simplified);
+        }
+      }
+      priorBranches.push(branch);
+    }
+
+    if (exclusiveBranches.length === 0) {
+      return child;
+    }
+    if (exclusiveBranches.length === 1) {
+      return exclusiveBranches[0];
+    }
+
+    return {
+      kind: 'compound' as const,
+      operator: 'OR' as const,
+      children: exclusiveBranches,
+    };
+  });
+}
+
+/**
+ * Check if OR branches produce different at-rule contexts when
+ * materialized. If so, the Cartesian product in andToCSS will
+ * create overlapping CSS variants that need exclusive expansion.
+ */
+function branchesProduceDifferentContexts(branches: ConditionNode[]): boolean {
+  const contextKeys = new Set<string>();
+
+  for (const branch of branches) {
+    const css = conditionToCSSInner(branch);
+    if (css.isImpossible) continue;
+
+    for (const v of css.variants) {
+      contextKeys.add(getVariantContextKey(v));
+    }
+  }
+
+  return contextKeys.size > 1;
 }
 
 /**

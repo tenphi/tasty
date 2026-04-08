@@ -1521,7 +1521,12 @@ describe('Complex OR conditions with mixed types', () => {
     const darkRules = result.filter((r) => r.declarations.includes('dark'));
     expect(darkRules.length).toBeGreaterThanOrEqual(3);
 
-    // Check that white (default) condition has root prefix variants
+    // Check that white (default) condition has root prefix variants.
+    // After DNF distribution, the two branches are made exclusive:
+    //   branch0: !root(schema=light)  → :root:not([data-prefers-schema="light"])
+    //   branch1: root(schema=light) & !root(schema=system)
+    //            → optimized to :root[data-prefers-schema="light"]
+    //            (the :not(system) is subsumed by the positive value)
     const whiteRules = result.filter((r) => r.declarations.includes('white'));
     expect(whiteRules.length).toBeGreaterThanOrEqual(2);
     expect(
@@ -1531,7 +1536,7 @@ describe('Complex OR conditions with mixed types', () => {
     ).toBe(true);
     expect(
       whiteRules.some((r) =>
-        r.selector.includes(':root:not([data-prefers-schema="system"])'),
+        r.selector.includes(':root[data-prefers-schema="light"]'),
       ),
     ).toBe(true);
   });
@@ -3724,5 +3729,96 @@ describe('Token CSS deduplication with compound states', () => {
         `Duplicate selectors for same declarations: ${selectors.join(', ')}`,
       ).toBe(selectors.length);
     }
+  });
+
+  it('should produce non-overlapping selectors for compound state tokens', () => {
+    clearPipelineCache();
+
+    const tokens = {
+      '#accent-text': {
+        '': 'okhsl(340 45% 51.12%)',
+        '@dark-root': 'okhsl(340 45% 58.72%)',
+        '@high-contrast-root': 'okhsl(340 45% 39.07%)',
+        '@dark-root & @high-contrast-root': 'okhsl(340 45% 63.33%)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Every rule should have an @media wrapper — bare selector-only rules
+    // overlap with @media-wrapped rules of the same value.
+    for (const rule of result) {
+      expect(
+        rule.atRules && rule.atRules.length > 0,
+        `Rule should have @media context: ${rule.selector}`,
+      ).toBe(true);
+    }
+
+    // No two rules with the same value should share the same @media context
+    const byValue = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const val =
+        rule.declarations.match(/okhsl\([^)]+\)/)?.[0] ?? rule.declarations;
+      if (!byValue.has(val)) byValue.set(val, []);
+      byValue.get(val)!.push(rule);
+    }
+
+    for (const [, rules] of byValue) {
+      const mediaKeys = rules.map((r) =>
+        r.atRules ? r.atRules.sort().join(' && ') : '(none)',
+      );
+      const uniqueMedia = new Set(mediaKeys);
+      expect(uniqueMedia.size, `Same-value rules share @media context`).toBe(
+        mediaKeys.length,
+      );
+    }
+  });
+});
+
+describe('Consensus/resolution simplification', () => {
+  const emptyCtx = {
+    localPredefinedStates: {},
+    globalPredefinedStates: {},
+  };
+
+  it('should simplify (A|B) & (A|!B) → A', () => {
+    clearPipelineCache();
+
+    const a = parseStateKey(':hover', { context: emptyCtx });
+    const b = parseStateKey(':focus', { context: emptyCtx });
+
+    const condition = and(or(a, b), or(a, not(b)));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(a));
+  });
+
+  it('should simplify (!A|!B) & (!B|A) → !B', () => {
+    clearPipelineCache();
+
+    const a = parseStateKey(':hover', { context: emptyCtx });
+    const b = parseStateKey(':focus', { context: emptyCtx });
+
+    const condition = and(or(not(a), not(b)), or(not(b), a));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(not(b)));
+  });
+
+  it('should resolve De Morgan ORs from compound negation', () => {
+    clearPipelineCache();
+
+    const sup = parseStateKey('@supports($, :has(*))', {
+      context: emptyCtx,
+    });
+    const has = parseStateKey(':has(> Icon)', { context: emptyCtx });
+
+    // !(supports & has) & !(supports & !has) should simplify to !supports
+    const condition = and(not(and(sup, has)), not(and(sup, not(has))));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(not(sup)),
+    );
   });
 });

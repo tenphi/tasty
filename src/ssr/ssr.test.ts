@@ -412,6 +412,82 @@ describe('ServerStyleCollector', () => {
 });
 
 // ============================================================================
+// RSC / SSR dedup coordination
+// ============================================================================
+
+describe('RSC / SSR internals dedup', () => {
+  const FLAG_KEY = '__tasty_rsc_internals_emitted__';
+
+  beforeEach(() => {
+    resetConfig();
+    delete (globalThis as Record<string, unknown>)[FLAG_KEY];
+  });
+
+  afterEach(() => {
+    resetConfig();
+    delete (globalThis as Record<string, unknown>)[FLAG_KEY];
+  });
+
+  it('collectInternals emits tokens and @property when flag is not set', () => {
+    configure({
+      tokens: { $gap: '8px' },
+      presets: {
+        h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    expect(css).toContain('@property --gap');
+    expect(css).toContain(':root');
+    expect(css).toContain('--gap: 8px');
+    expect(css).toContain('--h1-font-size');
+  });
+
+  it('collectInternals skips tokens and @property when RSC flag is set', () => {
+    configure({
+      tokens: { $gap: '8px' },
+      presets: {
+        h1: { fontSize: '32px', lineHeight: '1.2', fontWeight: '700' },
+      },
+    });
+
+    (globalThis as Record<string, unknown>)[FLAG_KEY] = true;
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    expect(css).not.toContain('--gap');
+    expect(css).not.toContain('--h1-font-size');
+    expect(css).not.toContain('@property');
+  });
+
+  it('collectInternals still emits globalStyles when RSC flag is set', () => {
+    configure({
+      tokens: { $gap: '8px' },
+      globalStyles: {
+        body: { color: 'red', padding: '0' },
+      },
+    });
+
+    (globalThis as Record<string, unknown>)[FLAG_KEY] = true;
+
+    const collector = new ServerStyleCollector();
+    collector.collectInternals();
+
+    const css = collector.getCSS();
+    // Tokens should be skipped
+    expect(css).not.toContain('--gap');
+    // Global styles should still be present
+    expect(css).toContain('body');
+    expect(css).toContain('red');
+  });
+});
+
+// ============================================================================
 // SSR collector with pipeline (end-to-end without React rendering)
 // ============================================================================
 

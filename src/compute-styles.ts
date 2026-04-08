@@ -105,6 +105,13 @@ function collectInternalsRSC(rscCache: RSCStyleCache): string {
   if (rscCache.internalsEmitted) return '';
   rscCache.internalsEmitted = true;
 
+  // Signal to SSR collector that RSC has already emitted internals.
+  // In Next.js App Router, RSC and SSR run in separate module graphs
+  // but share globalThis. Without this flag, collectInternals() in
+  // ServerStyleCollector would emit the same @property + token CSS.
+  (globalThis as Record<string, unknown>).__tasty_rsc_internals_emitted__ =
+    true;
+
   const parts: string[] = [];
 
   for (const [token, definition] of Object.entries(getEffectiveProperties())) {

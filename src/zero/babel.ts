@@ -26,7 +26,7 @@ import { createJiti } from 'jiti';
 
 import {
   configure,
-  getGlobalBodyStyles,
+  getGlobalStyles,
   getGlobalConfigTokens,
   resetConfig,
 } from '../config';
@@ -297,14 +297,19 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     const newWriter = new CSSWriter(outputPath, { devMode });
 
-    // Emit configured tokens and body styles (file mode only;
+    // Emit configured tokens and global styles (file mode only;
     // inject mode handles injection per-file in the post hook).
     if (mode !== 'inject') {
       const tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
       if (tokenCSS) newWriter.add(':root:tokens', tokenCSS);
 
-      const bodyCSS = extractCSSFromStyles('body', getGlobalBodyStyles());
-      if (bodyCSS) newWriter.add('body:styles', bodyCSS);
+      const globalStyles = getGlobalStyles();
+      if (globalStyles) {
+        for (const [selector, styles] of Object.entries(globalStyles)) {
+          const css = extractCSSFromStyles(selector, styles);
+          if (css) newWriter.add(`global:${selector}`, css);
+        }
+      }
     }
 
     writerCache.set(resolvedOutputPath, {
@@ -321,12 +326,20 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const config = entry.config;
   const devMode = config.devMode ?? false;
 
-  // Precompute token CSS and body CSS for inject mode
+  // Precompute token CSS and global styles CSS for inject mode
   let tokenCSS: string | undefined;
-  let bodyCSS: string | undefined;
+  let globalStylesCSS: Map<string, string> | undefined;
   if (mode === 'inject') {
     tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
-    bodyCSS = extractCSSFromStyles('body', getGlobalBodyStyles());
+    const gs = getGlobalStyles();
+    if (gs) {
+      globalStylesCSS = new Map();
+      for (const [selector, styles] of Object.entries(gs)) {
+        const css = extractCSSFromStyles(selector, styles);
+        if (css) globalStylesCSS.set(selector, css);
+      }
+      if (globalStylesCSS.size === 0) globalStylesCSS = undefined;
+    }
   }
 
   return {
@@ -485,9 +498,9 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     post(this: PluginState) {
       if (mode === 'inject') {
-        // In inject mode, inject token/body CSS as top-level statements
+        // In inject mode, inject token/global CSS as top-level statements
         // when this file had tastyStatic calls and config CSS exists.
-        if (this._fileAddedCSS && (tokenCSS || bodyCSS)) {
+        if (this._fileAddedCSS && (tokenCSS || globalStylesCSS)) {
           const program = this.file.ast.program;
 
           // Find the position after the inject import
@@ -508,13 +521,16 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             insertIndex++;
           }
 
-          if (bodyCSS) {
-            const injectCall = createInjectCallAST('body', bodyCSS);
-            program.body.splice(
-              insertIndex,
-              0,
-              t.expressionStatement(injectCall),
-            );
+          if (globalStylesCSS) {
+            for (const [selector, css] of globalStylesCSS) {
+              const injectCall = createInjectCallAST(selector, css);
+              program.body.splice(
+                insertIndex,
+                0,
+                t.expressionStatement(injectCall),
+              );
+              insertIndex++;
+            }
           }
         }
         return;

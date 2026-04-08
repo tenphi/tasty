@@ -343,25 +343,22 @@ export interface TastyConfig {
    */
   presets?: Record<string, TypographyPreset>;
   /**
-   * Tasty styles applied to the `body` tag.
-   * Supports the full Tasty style syntax including style properties,
-   * tokens, state maps, and selector-based sub-styling
-   * (e.g. `$: '> .app'` for elements outside React scope).
+   * Global Tasty styles keyed by CSS selector.
+   * Each entry applies the full Tasty style syntax (style properties,
+   * tokens, state maps, selector-based sub-styling) to the given selector.
    * Injected alongside `:root` tokens when the first style is rendered.
    *
    * @example
    * ```ts
    * configure({
-   *   bodyStyles: {
-   *     fill: '#surface',
-   *     color: '#text',
-   *     preset: 't2',
-   *     margin: 0,
+   *   globalStyles: {
+   *     body: { fill: '#surface', color: '#text', preset: 't2', margin: 0 },
+   *     html: { overflow: 'hidden' },
    *   },
    * });
    * ```
    */
-  bodyStyles?: Styles;
+  globalStyles?: Record<string, Styles>;
 }
 
 // Warnings tracking to avoid duplicates
@@ -407,8 +404,8 @@ let globalRecipes: Record<string, RecipeStyles> | null = null;
 // Global token styles storage (injected as :root CSS custom properties)
 let globalConfigTokens: ConfigTokens | null = null;
 
-// Global body styles storage (injected as body CSS)
-let globalBodyStyles: Styles | null = null;
+// Global styles storage (injected as CSS for configured selectors)
+let globalStyles: Record<string, Styles> | null = null;
 
 // ============================================================================
 // Cross-module config sharing via globalThis
@@ -424,7 +421,7 @@ const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
 const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
-const GTKEY_BODY_STYLES = '__tasty_cfg_body_styles__';
+const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
 
 function setOnGlobalThis(key: string, value: unknown): void {
   (globalThis as Record<string, unknown>)[key] = value;
@@ -440,7 +437,7 @@ function clearGlobalThisConfig(): void {
   delete g[GTKEY_FONT_FACE];
   delete g[GTKEY_COUNTER_STYLE];
   delete g[GTKEY_PROPERTIES];
-  delete g[GTKEY_BODY_STYLES];
+  delete g[GTKEY_GLOBAL_STYLES];
 }
 
 /**
@@ -649,11 +646,15 @@ export function markStylesGenerated(): void {
     }
   }
 
-  // Inject configured body styles
-  if (globalBodyStyles && Object.keys(globalBodyStyles).length > 0) {
-    const bodyRules = renderStyles(globalBodyStyles, 'body') as StyleResult[];
-    if (bodyRules.length > 0) {
-      injector.injectGlobal(bodyRules);
+  // Inject configured global styles
+  if (globalStyles) {
+    for (const [selector, styles] of Object.entries(globalStyles)) {
+      if (Object.keys(styles).length > 0) {
+        const rules = renderStyles(styles, selector) as StyleResult[];
+        if (rules.length > 0) {
+          injector.injectGlobal(rules);
+        }
+      }
     }
   }
 }
@@ -948,37 +949,45 @@ function setGlobalConfigTokens(styles: ConfigTokens): void {
 }
 
 // ============================================================================
-// Global Body Styles Management
+// Global Styles Management
 // ============================================================================
 
 /**
- * Get global body styles for injection.
- * Returns null if no body styles configured.
+ * Get configured global styles for injection.
+ * Returns null if no global styles configured.
  * Reads from globalThis first for cross-module SSR support.
  */
-export function getGlobalBodyStyles(): Styles | null {
+export function getGlobalStyles(): Record<string, Styles> | null {
   return (
-    globalBodyStyles ?? getFromGlobalThis<Styles>(GTKEY_BODY_STYLES) ?? null
+    globalStyles ??
+    getFromGlobalThis<Record<string, Styles>>(GTKEY_GLOBAL_STYLES) ??
+    null
   );
 }
 
 /**
- * Set global body styles (called from configure).
+ * Set configured global styles (called from configure).
  * Internal use only.
  */
-function setGlobalBodyStyles(styles: Styles): void {
+function setGlobalStyles(styles: Record<string, Styles>): void {
   if (stylesGenerated) {
     warnOnce(
-      'bodyStyles-after-styles',
-      `[Tasty] Cannot update bodyStyles after styles have been generated.\n` +
-        `The new body styles will be ignored.`,
+      'globalStyles-after-styles',
+      `[Tasty] Cannot update globalStyles after styles have been generated.\n` +
+        `The new global styles will be ignored.`,
     );
     return;
   }
-  globalBodyStyles = globalBodyStyles
-    ? { ...globalBodyStyles, ...styles }
-    : styles;
-  setOnGlobalThis(GTKEY_BODY_STYLES, globalBodyStyles);
+  if (globalStyles) {
+    for (const [selector, selectorStyles] of Object.entries(styles)) {
+      globalStyles[selector] = globalStyles[selector]
+        ? { ...globalStyles[selector], ...selectorStyles }
+        : selectorStyles;
+    }
+  } else {
+    globalStyles = { ...styles };
+  }
+  setOnGlobalThis(GTKEY_GLOBAL_STYLES, globalStyles);
 }
 
 /**
@@ -1032,7 +1041,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
   let mergedRecipes: Record<string, RecipeStyles> = {};
   let mergedPresets: Record<string, TypographyPreset> = {};
-  let mergedBodyStyles: Styles | undefined;
+  const mergedGlobalStyles: Record<string, Styles> = {};
 
   // Process plugins in order
   if (config.plugins) {
@@ -1064,10 +1073,12 @@ export function configure(config: Partial<TastyConfig> = {}): void {
       if (plugin.presets) {
         mergedPresets = { ...mergedPresets, ...plugin.presets };
       }
-      if (plugin.bodyStyles) {
-        mergedBodyStyles = mergedBodyStyles
-          ? { ...mergedBodyStyles, ...plugin.bodyStyles }
-          : plugin.bodyStyles;
+      if (plugin.globalStyles) {
+        for (const [sel, styles] of Object.entries(plugin.globalStyles)) {
+          mergedGlobalStyles[sel] = mergedGlobalStyles[sel]
+            ? { ...mergedGlobalStyles[sel], ...styles }
+            : styles;
+        }
       }
     }
   }
@@ -1107,10 +1118,12 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   if (config.recipes) {
     mergedRecipes = { ...mergedRecipes, ...config.recipes };
   }
-  if (config.bodyStyles) {
-    mergedBodyStyles = mergedBodyStyles
-      ? { ...mergedBodyStyles, ...config.bodyStyles }
-      : config.bodyStyles;
+  if (config.globalStyles) {
+    for (const [sel, styles] of Object.entries(config.globalStyles)) {
+      mergedGlobalStyles[sel] = mergedGlobalStyles[sel]
+        ? { ...mergedGlobalStyles[sel], ...styles }
+        : styles;
+    }
   }
 
   // Warn on tokens/replaceTokens key conflicts
@@ -1218,9 +1231,9 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalRecipes(mergedRecipes);
   }
 
-  // Handle body styles
-  if (mergedBodyStyles && Object.keys(mergedBodyStyles).length > 0) {
-    setGlobalBodyStyles(mergedBodyStyles);
+  // Handle global styles
+  if (Object.keys(mergedGlobalStyles).length > 0) {
+    setGlobalStyles(mergedGlobalStyles);
   }
 
   const {
@@ -1239,7 +1252,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     recipes: _recipes,
     colorSpace: _colorSpace,
     presets: _presets,
-    bodyStyles: _bodyStyles,
+    globalStyles: _globalStyles,
     ...injectorConfig
   } = config;
 
@@ -1298,7 +1311,7 @@ export function resetConfig(): void {
   globalCounterStyle = null;
   globalRecipes = null;
   globalConfigTokens = null;
-  globalBodyStyles = null;
+  globalStyles = null;
   clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
   resetHandlers();

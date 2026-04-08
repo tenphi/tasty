@@ -5,7 +5,7 @@ import {
   configure,
   resetConfig,
   getGlobalConfigTokens,
-  getGlobalBodyStyles,
+  getGlobalStyles,
 } from './config';
 
 describe('configure() presets', () => {
@@ -112,7 +112,7 @@ describe('configure() presets', () => {
   });
 });
 
-describe('configure() bodyStyles', () => {
+describe('configure() globalStyles', () => {
   beforeEach(() => {
     resetConfig();
   });
@@ -121,55 +121,75 @@ describe('configure() bodyStyles', () => {
     resetConfig();
   });
 
-  it('should store body styles', () => {
+  it('should store global styles for a single selector', () => {
     configure({
-      bodyStyles: {
-        color: 'red',
-        padding: '2x',
+      globalStyles: {
+        body: {
+          color: 'red',
+          padding: '2x',
+        },
       },
     });
 
-    const styles = getGlobalBodyStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
-    expect(styles!.color).toBe('red');
-    expect(styles!.padding).toBe('2x');
+    expect(styles!.body.color).toBe('red');
+    expect(styles!.body.padding).toBe('2x');
   });
 
-  it('should merge plugin bodyStyles with config bodyStyles', () => {
+  it('should merge plugin globalStyles with config globalStyles per selector', () => {
     configure({
       plugins: [
         {
           name: 'test-plugin',
-          bodyStyles: {
-            color: 'blue',
-            margin: 0,
+          globalStyles: {
+            body: {
+              color: 'blue',
+              margin: 0,
+            },
           },
         },
       ],
-      bodyStyles: {
-        color: 'red',
-        padding: '2x',
+      globalStyles: {
+        body: {
+          color: 'red',
+          padding: '2x',
+        },
       },
     });
 
-    const styles = getGlobalBodyStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
-    expect(styles!.color).toBe('red');
-    expect(styles!.padding).toBe('2x');
-    expect(styles!.margin).toBe(0);
+    expect(styles!.body.color).toBe('red');
+    expect(styles!.body.padding).toBe('2x');
+    expect(styles!.body.margin).toBe(0);
   });
 
-  it('should return null when no bodyStyles configured', () => {
+  it('should support multiple selectors in one call', () => {
+    configure({
+      globalStyles: {
+        body: { color: 'red' },
+        html: { overflow: 'hidden' },
+      },
+    });
+
+    const styles = getGlobalStyles();
+    expect(styles).toBeDefined();
+    expect(styles!.body.color).toBe('red');
+    expect(styles!.html.overflow).toBe('hidden');
+  });
+
+  it('should return null when no globalStyles configured', () => {
     configure({});
 
-    const styles = getGlobalBodyStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeNull();
   });
 
-  it('should ignore empty bodyStyles object', () => {
-    configure({ bodyStyles: {} });
+  it('should ignore empty globalStyles object', () => {
+    configure({ globalStyles: {} });
 
-    expect(getGlobalBodyStyles()).toBeNull();
+    expect(getGlobalStyles()).toBeNull();
   });
 
   it('should work with preset reference when presets defined in same configure call', () => {
@@ -177,9 +197,11 @@ describe('configure() bodyStyles', () => {
       presets: {
         t2: { fontSize: '16px', lineHeight: '1.5', fontWeight: '400' },
       },
-      bodyStyles: {
-        preset: 't2',
-        margin: 0,
+      globalStyles: {
+        body: {
+          preset: 't2',
+          margin: 0,
+        },
       },
     });
 
@@ -189,9 +211,9 @@ describe('configure() bodyStyles', () => {
     expect(tokens!['$t2-line-height']).toBe('1.5');
     expect(tokens!['$t2-font-weight']).toBe('400');
 
-    const styles = getGlobalBodyStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
-    expect(styles!.preset).toBe('t2');
-    expect(styles!.margin).toBe(0);
+    expect(styles!.body.preset).toBe('t2');
+    expect(styles!.body.margin).toBe(0);
   });
 });

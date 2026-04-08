@@ -366,11 +366,13 @@ describe('ServerStyleCollector', () => {
     expect(flush2).not.toContain('--my-gap');
   });
 
-  it('collectInternals includes configured bodyStyles', () => {
+  it('collectInternals includes configured globalStyles', () => {
     configure({
-      bodyStyles: {
-        color: 'red',
-        padding: '0',
+      globalStyles: {
+        body: {
+          color: 'red',
+          padding: '0',
+        },
       },
     });
 

@@ -56,10 +56,10 @@ export interface TastyPlugin {
    */
   presets?: Record<string, TypographyPreset>;
   /**
-   * Tasty styles applied to the `body` tag.
+   * Global Tasty styles keyed by CSS selector.
    * Supports the full Tasty style syntax.
    */
-  bodyStyles?: Styles;
+  globalStyles?: Record<string, Styles>;
 }
 
 /**

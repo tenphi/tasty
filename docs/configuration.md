@@ -59,7 +59,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
-| `bodyStyles` | `Styles` | - | Tasty styles applied to the `body` tag |
+| `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
 
 ---
@@ -261,25 +261,30 @@ The generated tokens are merged **under** explicit `tokens` — if both `presets
 
 ---
 
-## Body Styles
+## Global Styles
 
-Apply Tasty styles to the `body` element via configuration, without needing `useGlobalStyles('body', ...)` at runtime:
+Apply Tasty styles to any selector via configuration, without needing `useGlobalStyles(selector, ...)` at runtime:
 
 ```jsx
 configure({
-  bodyStyles: {
-    fill: '#surface',
-    color: '#text',
-    preset: 't2',
-    margin: 0,
-    fontFamily: 'system-ui, sans-serif',
+  globalStyles: {
+    body: {
+      fill: '#surface',
+      color: '#text',
+      preset: 't2',
+      margin: 0,
+      fontFamily: 'system-ui, sans-serif',
+    },
+    html: {
+      overflow: 'hidden',
+    },
   },
 });
 ```
 
-Body styles support the full Tasty style syntax including style properties, tokens, state maps, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). They are injected alongside `:root` tokens when the first style is rendered.
+Each key is a CSS selector, and each value is a Tasty `Styles` object supporting the full style syntax including style properties, tokens, state maps, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). Global styles are injected alongside `:root` tokens when the first style is rendered.
 
-Body styles are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin). Plugins can also provide `bodyStyles`; they are merged with config body styles (config wins on conflict).
+Global styles are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin). Plugins can also provide `globalStyles`; they are merged per selector with config global styles (config wins on conflict).
 
 ---
 

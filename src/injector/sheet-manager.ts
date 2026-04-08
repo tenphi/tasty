@@ -76,6 +76,7 @@ export class SheetManager {
         usageMap: new Map(),
         touchCount: 0,
         serverClassSyncIndex: 0,
+        rscStylesScanned: false,
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);

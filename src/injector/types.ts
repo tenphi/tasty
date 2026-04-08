@@ -155,6 +155,8 @@ export interface RootRegistry {
   touchCount: number;
   /** How many entries from `window.__TASTY__` have been synced into this registry */
   serverClassSyncIndex: number;
+  /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */
+  rscStylesScanned: boolean;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

@@ -836,10 +836,10 @@ function tastyElement<
       elementProps,
     );
 
-    // RSC mode: wrap element with inline <style> and class-list <script>
+    // RSC mode: wrap element with inline <style> tag.
+    // Class names are extracted from these tags on the client via
+    // the doubled-specificity pattern (.tXXX.tXXX), so no <script> is needed.
     if (stylesResult.css) {
-      const newClasses = stylesResult.newClassNames;
-      const classListJSON = newClasses?.map((n) => `"${n}"`).join(',');
       const nonce = getConfig().nonce;
 
       return createElement(
@@ -850,14 +850,6 @@ function tastyElement<
           nonce,
           dangerouslySetInnerHTML: { __html: stylesResult.css },
         }),
-        classListJSON
-          ? createElement('script', {
-              nonce,
-              dangerouslySetInnerHTML: {
-                __html: `(window.__TASTY__=window.__TASTY__||[]).push(${classListJSON})`,
-              },
-            })
-          : null,
         el,
       );
     }

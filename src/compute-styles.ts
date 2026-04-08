@@ -77,8 +77,6 @@ export interface ComputeStylesResult {
   className: string;
   /** CSS text to emit as an inline <style> tag (RSC mode only). */
   css?: string;
-  /** Class names newly allocated in this call (RSC mode only, for deduped script emission). */
-  newClassNames?: string[];
 }
 
 export interface ComputeStylesOptions {
@@ -223,7 +221,6 @@ function computeStylesRSC(
   const rscCache = getRSCCache();
   const cssParts: string[] = [];
   const classNames: string[] = [];
-  const newClassNames: string[] = [];
 
   // Flush CSS accumulated by standalone style functions
   const pendingCSS = flushPendingCSS(rscCache);
@@ -240,7 +237,6 @@ function computeStylesRSC(
     classNames.push(className);
 
     if (isNew) {
-      newClassNames.push(className);
       const renderResult = renderStylesForChunk(
         styles,
         chunkName,
@@ -263,7 +259,6 @@ function computeStylesRSC(
   return {
     className: classNames.join(' '),
     css: css || undefined,
-    newClassNames: newClassNames.length > 0 ? newClassNames : undefined,
   };
 }
 

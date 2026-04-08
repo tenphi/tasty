@@ -41,27 +41,72 @@ function generateClassName(cacheKey: string): string {
   return `t${hashString(cacheKey)}`;
 }
 
+const RSC_CLASS_RE = /\.(t[a-z0-9]+)\.\1/g;
+
 /**
- * Lazily sync server-rendered class names from the global `window.__TASTY__`
- * array into the client registry. Called inside `inject()` to pick up
- * class names pushed during SPA navigation.
+ * Extract class names from `<style data-tasty-rsc>` tags.
+ * The doubled-specificity pattern `.tXXX.tXXX` makes extraction reliable.
+ */
+function extractRSCClassNames(): string[] {
+  if (typeof document === 'undefined') return [];
+  const styles = document.querySelectorAll('style[data-tasty-rsc]');
+  if (styles.length === 0) return [];
+
+  const classSet = new Set<string>();
+  for (const style of styles) {
+    const text = style.textContent;
+    if (!text) continue;
+    let match: RegExpExecArray | null;
+    RSC_CLASS_RE.lastIndex = 0;
+    while ((match = RSC_CLASS_RE.exec(text)) !== null) {
+      classSet.add(match[1]);
+    }
+  }
+  return Array.from(classSet);
+}
+
+/**
+ * Lazily sync server-rendered class names into the client registry.
+ *
+ * Sources:
+ * 1. `window.__TASTY__` — pushed by SSR/RSC streaming scripts
+ * 2. `<style data-tasty-rsc>` tags — inline CSS emitted by RSC components
+ *
+ * Called inside `inject()` / `allocateClassName()` to pick up
+ * class names rendered on the server (including during SPA navigation).
  */
 function syncServerClasses(registry: RootRegistry): void {
   if (typeof window === 'undefined') return;
+
+  // Source 1: window.__TASTY__ (SSR streaming scripts)
   const classes = window.__TASTY__;
-  if (!classes || classes.length <= registry.serverClassSyncIndex) return;
-  for (let i = registry.serverClassSyncIndex; i < classes.length; i++) {
-    const cls = classes[i];
-    if (!registry.rules.has(cls)) {
-      registry.rules.set(cls, {
-        className: cls,
-        ruleIndex: HYDRATED_RULE_INDEX,
-        sheetIndex: HYDRATED_RULE_INDEX,
-      });
-      registry.refCounts.set(cls, 0);
+  if (classes && classes.length > registry.serverClassSyncIndex) {
+    for (let i = registry.serverClassSyncIndex; i < classes.length; i++) {
+      registerHydratedClass(registry, classes[i]);
+    }
+    registry.serverClassSyncIndex = classes.length;
+  }
+
+  // Source 2: <style data-tasty-rsc> tags (RSC inline styles)
+  if (!registry.rscStylesScanned) {
+    registry.rscStylesScanned = true;
+    for (const cls of extractRSCClassNames()) {
+      registerHydratedClass(registry, cls);
     }
   }
-  registry.serverClassSyncIndex = classes.length;
+}
+
+function registerHydratedClass(
+  registry: RootRegistry,
+  className: string,
+): void {
+  if (registry.rules.has(className)) return;
+  registry.rules.set(className, {
+    className,
+    ruleIndex: HYDRATED_RULE_INDEX,
+    sheetIndex: HYDRATED_RULE_INDEX,
+  });
+  registry.refCounts.set(className, 0);
 }
 
 export class StyleInjector {

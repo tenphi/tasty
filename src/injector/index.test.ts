@@ -296,6 +296,44 @@ describe('Global Style Injector API', () => {
       expect(allCssText).toContain('--gap');
       expect(allCssText).toContain('8px');
     });
+
+    it('should skip global CSS injection when SSR styles are present', () => {
+      // Simulate SSR by adding a <style data-tasty-ssr> element
+      const ssrStyle = document.createElement('style');
+      ssrStyle.setAttribute('data-tasty-ssr', '');
+      ssrStyle.textContent = ':root { --my-token: 8px; }';
+      document.head.appendChild(ssrStyle);
+
+      configure({
+        forceTextInjection: true,
+        tokens: {
+          '$my-token': '8px',
+        },
+        globalStyles: {
+          body: {
+            margin: '0',
+          },
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      // Collect all CSS from tasty-managed style elements (not the SSR one)
+      const tastyElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(tastyElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      // Token and global style injection should have been skipped
+      expect(allCssText).not.toContain('--my-token');
+      expect(allCssText).not.toContain('margin');
+
+      // Component styles should still work
+      expect(allCssText).toContain('color: red');
+
+      // Clean up the SSR style element
+      ssrStyle.remove();
+    });
   });
 
   describe('inject', () => {

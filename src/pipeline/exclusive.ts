@@ -191,12 +191,19 @@ export function mergeEntriesByValue(
     // Combine state keys for debugging
     const combinedStateKey = group.entries.map((e) => e.stateKey).join(' | ');
 
+    // When a group contains the default (true) entry, use minPriority.
+    // true|X = true, so the merged condition is unconditional; at elevated
+    // priority it would shadow entries between the default and the
+    // highest-priority member, breaking exclusivity.
+    const hasDefault = group.entries.some((e) => e.condition.kind === 'true');
+    const minPriority = Math.min(...group.entries.map((e) => e.priority));
+
     merged.push({
       styleKey: group.entries[0].styleKey,
       stateKey: combinedStateKey,
       value: group.entries[0].value,
       condition: combinedCondition,
-      priority: group.maxPriority,
+      priority: hasDefault ? minPriority : group.maxPriority,
     });
   }
 

@@ -3773,6 +3773,57 @@ describe('Token CSS deduplication with compound states', () => {
       );
     }
   });
+
+  it('should not overlap when default and HC values match but dark differs', () => {
+    clearPipelineCache();
+
+    const tokens = {
+      '#surface': {
+        '': 'rgb(255 255 255)',
+        '@dark-root': 'rgb(37 34 31)',
+        '@high-contrast-root': 'rgb(255 255 255)',
+        '@dark-root & @high-contrast-root': 'rgb(40 40 40)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Group rules by @media context
+    const byMedia = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const key = rule.atRules ? rule.atRules.sort().join(' && ') : '(none)';
+      if (!byMedia.has(key)) byMedia.set(key, []);
+      byMedia.get(key)!.push(rule);
+    }
+
+    // Within each @media group, no selector should be a superset of another.
+    // A dark-specific selector like :root[data-schema="dark"]:not(...)
+    // must not coexist with a bare :root:not(...) under the same @media.
+    for (const [media, rules] of byMedia) {
+      for (let i = 0; i < rules.length; i++) {
+        for (let j = i + 1; j < rules.length; j++) {
+          const a = rules[i].selector;
+          const b = rules[j].selector;
+
+          // Simple superset check: if one selector string is contained
+          // in the other (after stripping the common :root prefix),
+          // they likely overlap.
+          const aParts = a.replace(/:root/g, '').trim();
+          const bParts = b.replace(/:root/g, '').trim();
+
+          if (aParts && bParts && (a.includes(b) || b.includes(a))) {
+            // Same declarations = harmless duplicate, different = conflict
+            if (rules[i].declarations !== rules[j].declarations) {
+              expect.unreachable(
+                `Overlapping selectors with different values under ${media}:\n` +
+                  `  "${a}" vs "${b}"`,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
 });
 
 describe('Consensus/resolution simplification', () => {

@@ -59,7 +59,12 @@ function assertRootCondition(node: ConditionNode): RootCondition {
   return node;
 }
 
+import { getConditionUniqueId } from './conditions';
 import { clearPipelineCache, renderStyles } from './index';
+import { clearSimplifyCache } from './simplify';
+import { clearConditionCache } from './materialize';
+import { configure, resetConfig } from '../config';
+import type { StyleResult } from './index';
 
 describe('ConditionNode operations', () => {
   describe('and()', () => {
@@ -1516,7 +1521,12 @@ describe('Complex OR conditions with mixed types', () => {
     const darkRules = result.filter((r) => r.declarations.includes('dark'));
     expect(darkRules.length).toBeGreaterThanOrEqual(3);
 
-    // Check that white (default) condition has root prefix variants
+    // Check that white (default) condition has root prefix variants.
+    // After DNF distribution, the two branches are made exclusive:
+    //   branch0: !root(schema=light)  → :root:not([data-prefers-schema="light"])
+    //   branch1: root(schema=light) & !root(schema=system)
+    //            → optimized to :root[data-prefers-schema="light"]
+    //            (the :not(system) is subsumed by the positive value)
     const whiteRules = result.filter((r) => r.declarations.includes('white'));
     expect(whiteRules.length).toBeGreaterThanOrEqual(2);
     expect(
@@ -1526,7 +1536,7 @@ describe('Complex OR conditions with mixed types', () => {
     ).toBe(true);
     expect(
       whiteRules.some((r) =>
-        r.selector.includes(':root:not([data-prefers-schema="system"])'),
+        r.selector.includes(':root[data-prefers-schema="light"]'),
       ),
     ).toBe(true);
   });
@@ -3379,5 +3389,487 @@ describe('Value mod partial-match operators', () => {
       );
       expect(rule).toBeDefined();
     });
+  });
+});
+
+describe('Token CSS deduplication with compound states', () => {
+  beforeEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+
+    configure({
+      colorSpace: 'rgb',
+      states: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    });
+  });
+
+  afterEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+  });
+
+  it('should not produce duplicate :root rules when dark == dark+HC', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorCounts = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorCounts.set(key, (selectorCounts.get(key) ?? 0) + 1);
+    }
+
+    for (const [key, count] of selectorCounts) {
+      expect(count, `Duplicate rule detected for selector: ${key}`).toBe(1);
+    }
+
+    // All dark-value rules (containing '11 52 59') should not also
+    // contain 'data-contrast', since that dimension is irrelevant
+    // when dark and dark+HC have the same value.
+    const darkValueRules = result.filter(
+      (r) =>
+        r.declarations.includes('11 52 59') &&
+        !r.declarations.includes('180 180 180') &&
+        !r.declarations.includes('200 200 200'),
+    );
+    for (const rule of darkValueRules) {
+      expect(
+        rule.selector,
+        'Dark-only rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+  });
+
+  it('should simplify (A & B) | (A & !B) to A', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const B = createModifierCondition('data-contrast', 'more');
+    const notB = not(B);
+
+    // (A & B) | (A & !B) should simplify to A
+    const condition = or(and(A, B), and(A, notB));
+    const simplified = simplifyCondition(condition);
+
+    expect(simplified.kind).toBe('state');
+    if (simplified.kind === 'state') {
+      expect(simplified.attribute).toBe('data-schema');
+      expect(simplified.value).toBe('dark');
+    }
+  });
+
+  it('should absorb A | (A & B) where A is simple', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const B = createModifierCondition('data-contrast', 'more');
+    const result = simplifyCondition(or(A, and(A, B)));
+    expect(result).toEqual(A);
+  });
+
+  it('should absorb A | (A & B) where A is compound OR', () => {
+    const X = createModifierCondition('data-schema', 'dark');
+    const Y = createModifierCondition('data-foo', 'bar');
+    const A = or(X, Y); // A = X | Y
+    const B = createModifierCondition('data-contrast', 'more');
+    const result = simplifyCondition(or(A, and(A, B)));
+    // After flattening: or(X, Y, and(or(X,Y), B))
+    // A = or(X, Y) should be reconstructed and absorb and(A, B)
+    expect(getConditionUniqueId(result)).toBe(getConditionUniqueId(A));
+  });
+
+  it('should simplify A | (A & B) via absorption with parsed states', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const darkRoot = parseStateKey('@dark-root', { context: ctx });
+    const hcRoot = parseStateKey('@high-contrast-root', { context: ctx });
+
+    // Verify the structure before combining
+    const andAB = and(darkRoot, hcRoot);
+
+    // Check if `and()` returns the same node or builds an AND compound
+    expect(andAB.kind).toBe('compound');
+    if (andAB.kind === 'compound') {
+      expect(andAB.operator).toBe('AND');
+      // The AND should have darkRoot and hcRoot as children
+      // Check if A (darkRoot) is still a child by uniqueId
+      const childIds = andAB.children.map(getConditionUniqueId);
+      const darkId = getConditionUniqueId(darkRoot);
+      expect(childIds).toContain(darkId);
+    }
+
+    // A | (A & B) should simplify to A
+    const combined = or(darkRoot, andAB);
+    const simplified = simplifyCondition(combined);
+
+    const simplifiedId = getConditionUniqueId(simplified);
+    const darkId = getConditionUniqueId(darkRoot);
+    expect(simplifiedId).toBe(darkId);
+  });
+
+  it('should simplify compound OR with nested complementary AND terms', () => {
+    // Simulates the actual condition produced by:
+    //   @dark-root = schema=dark | (!schema & @media(prefers-color-scheme: dark))
+    //   @high-contrast-root = contrast=more | (!contrast & @media(prefers-contrast: more))
+    //
+    // When dark == dark+HC, mergeByValue produces:
+    //   (dark_branch0 & hc_branch0) | (dark_branch0 & !hc_branch0_not_hc_branch1)
+    // which should simplify back to dark_branch0.
+    const darkAttr = createModifierCondition('data-schema', 'dark');
+    const hcAttr = createModifierCondition('data-contrast', 'more');
+    const notHcAttr = not(hcAttr);
+
+    // (dark & hc) | (dark & !hc) → dark
+    const cond = or(and(darkAttr, hcAttr), and(darkAttr, notHcAttr));
+    const simplified = simplifyCondition(cond);
+
+    expect(simplified.kind).toBe('state');
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(darkAttr),
+    );
+  });
+
+  it('should merge dark and dark+HC into a single dark rule when values match', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    const darkRules = result.filter(
+      (r) =>
+        r.declarations.includes('11 52 59') &&
+        !r.declarations.includes('180 180 180') &&
+        !r.declarations.includes('200 200 200'),
+    );
+
+    for (const rule of darkRules) {
+      expect(
+        rule.selector,
+        'Dark-only rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+  });
+
+  it('should factor (A & B) | (A & !B) → A when B is a compound parsed state', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const A = parseStateKey('@dark-root', { context: ctx });
+    const B = parseStateKey('@high-contrast-root', { context: ctx });
+
+    const condition = or(and(A, B), and(A, not(B)));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(A));
+  });
+
+  it('should factor (!A & B) | (!A & !B) → !A when both are compound parsed states', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const A = parseStateKey('@dark-root', { context: ctx });
+    const B = parseStateKey('@high-contrast-root', { context: ctx });
+    const notA = not(A);
+
+    const condition = or(and(notA, B), and(notA, not(B)));
+    const simplified = simplifyCondition(condition);
+
+    const notASimplified = simplifyCondition(notA);
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(notASimplified),
+    );
+  });
+
+  it('should merge default and HC entries when values match (same string)', () => {
+    const tokens = {
+      '#surface': {
+        '': 'rgb(255 255 255)',
+        '@dark-root': 'rgb(30 30 30)',
+        '@high-contrast-root': 'rgb(255 255 255)',
+        '@dark-root & @high-contrast-root': 'rgb(10 10 10)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorCounts = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorCounts.set(key, (selectorCounts.get(key) ?? 0) + 1);
+    }
+    for (const [key, count] of selectorCounts) {
+      expect(count, `Duplicate rule: ${key}`).toBe(1);
+    }
+
+    // The default and HC values are merged by mergeEntriesByValue, so we
+    // should have exactly 3 distinct declaration groups (not 4).
+    const declGroups = new Set(result.map((r) => r.declarations));
+    expect(declGroups.size).toBeLessThanOrEqual(3);
+  });
+
+  it('should produce non-overlapping selectors when handler output matches for default and HC', () => {
+    const tokens = {
+      '#border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(50 50 50)',
+        '@high-contrast-root': 'rgb(200 200 200)',
+        '@dark-root & @high-contrast-root': 'rgb(50 50 50)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorKeys = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorKeys.set(key, (selectorKeys.get(key) ?? 0) + 1);
+    }
+    for (const [key, count] of selectorKeys) {
+      expect(count, `Duplicate rule: ${key}`).toBe(1);
+    }
+
+    // Default-value rules should not reference data-contrast
+    const defaultRules = result.filter(
+      (r) =>
+        r.declarations.includes('200 200 200') &&
+        !r.declarations.includes('50 50 50'),
+    );
+    for (const rule of defaultRules) {
+      expect(
+        rule.selector,
+        'Default-value rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+
+    // Dark-value rules should not reference data-contrast
+    const darkRules = result.filter(
+      (r) =>
+        r.declarations.includes('50 50 50') &&
+        !r.declarations.includes('200 200 200'),
+    );
+    for (const rule of darkRules) {
+      expect(
+        rule.selector,
+        'Dark-value rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+  });
+
+  it('should not produce overlapping selectors with identical declarations', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Group by declarations (ignoring selector) to find rules that set the
+    // same CSS properties. Rules in the same group should not have selectors
+    // that can both match simultaneously (they should be exclusive).
+    const byDecl = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.declarations}`;
+      const group = byDecl.get(key);
+      if (group) group.push(rule);
+      else byDecl.set(key, [rule]);
+    }
+
+    // For each group, selectors must be distinct
+    for (const [, group] of byDecl) {
+      const selectors = group.map((r) => r.selector);
+      const uniqueSelectors = new Set(selectors);
+      expect(
+        uniqueSelectors.size,
+        `Duplicate selectors for same declarations: ${selectors.join(', ')}`,
+      ).toBe(selectors.length);
+    }
+  });
+
+  it('should produce non-overlapping selectors for compound state tokens', () => {
+    clearPipelineCache();
+
+    const tokens = {
+      '#accent-text': {
+        '': 'okhsl(340 45% 51.12%)',
+        '@dark-root': 'okhsl(340 45% 58.72%)',
+        '@high-contrast-root': 'okhsl(340 45% 39.07%)',
+        '@dark-root & @high-contrast-root': 'okhsl(340 45% 63.33%)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Every rule should have an @media wrapper — bare selector-only rules
+    // overlap with @media-wrapped rules of the same value.
+    for (const rule of result) {
+      expect(
+        rule.atRules && rule.atRules.length > 0,
+        `Rule should have @media context: ${rule.selector}`,
+      ).toBe(true);
+    }
+
+    // No two rules with the same value should share the same @media context
+    const byValue = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const val =
+        rule.declarations.match(/okhsl\([^)]+\)/)?.[0] ?? rule.declarations;
+      if (!byValue.has(val)) byValue.set(val, []);
+      byValue.get(val)!.push(rule);
+    }
+
+    for (const [, rules] of byValue) {
+      const mediaKeys = rules.map((r) =>
+        r.atRules ? r.atRules.sort().join(' && ') : '(none)',
+      );
+      const uniqueMedia = new Set(mediaKeys);
+      expect(uniqueMedia.size, `Same-value rules share @media context`).toBe(
+        mediaKeys.length,
+      );
+    }
+  });
+
+  it('should not overlap when default and HC values match but dark differs', () => {
+    clearPipelineCache();
+
+    const tokens = {
+      '#surface': {
+        '': 'rgb(255 255 255)',
+        '@dark-root': 'rgb(37 34 31)',
+        '@high-contrast-root': 'rgb(255 255 255)',
+        '@dark-root & @high-contrast-root': 'rgb(40 40 40)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Group rules by @media context
+    const byMedia = new Map<string, StyleResult[]>();
+    for (const rule of result) {
+      const key = rule.atRules ? rule.atRules.sort().join(' && ') : '(none)';
+      if (!byMedia.has(key)) byMedia.set(key, []);
+      byMedia.get(key)!.push(rule);
+    }
+
+    // Within each @media group, no selector should be a superset of another.
+    // A dark-specific selector like :root[data-schema="dark"]:not(...)
+    // must not coexist with a bare :root:not(...) under the same @media.
+    for (const [media, rules] of byMedia) {
+      for (let i = 0; i < rules.length; i++) {
+        for (let j = i + 1; j < rules.length; j++) {
+          const a = rules[i].selector;
+          const b = rules[j].selector;
+
+          // Simple superset check: if one selector string is contained
+          // in the other (after stripping the common :root prefix),
+          // they likely overlap.
+          const aParts = a.replace(/:root/g, '').trim();
+          const bParts = b.replace(/:root/g, '').trim();
+
+          if (aParts && bParts && (a.includes(b) || b.includes(a))) {
+            // Same declarations = harmless duplicate, different = conflict
+            if (rules[i].declarations !== rules[j].declarations) {
+              expect.unreachable(
+                `Overlapping selectors with different values under ${media}:\n` +
+                  `  "${a}" vs "${b}"`,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('Consensus/resolution simplification', () => {
+  const emptyCtx = {
+    localPredefinedStates: {},
+    globalPredefinedStates: {},
+  };
+
+  it('should simplify (A|B) & (A|!B) → A', () => {
+    clearPipelineCache();
+
+    const a = parseStateKey(':hover', { context: emptyCtx });
+    const b = parseStateKey(':focus', { context: emptyCtx });
+
+    const condition = and(or(a, b), or(a, not(b)));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(a));
+  });
+
+  it('should simplify (!A|!B) & (!B|A) → !B', () => {
+    clearPipelineCache();
+
+    const a = parseStateKey(':hover', { context: emptyCtx });
+    const b = parseStateKey(':focus', { context: emptyCtx });
+
+    const condition = and(or(not(a), not(b)), or(not(b), a));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(getConditionUniqueId(not(b)));
+  });
+
+  it('should resolve De Morgan ORs from compound negation', () => {
+    clearPipelineCache();
+
+    const sup = parseStateKey('@supports($, :has(*))', {
+      context: emptyCtx,
+    });
+    const has = parseStateKey(':has(> Icon)', { context: emptyCtx });
+
+    // !(supports & has) & !(supports & !has) should simplify to !supports
+    const condition = and(not(and(sup, has)), not(and(sup, not(has))));
+    const simplified = simplifyCondition(condition);
+
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(not(sup)),
+    );
   });
 });

@@ -136,7 +136,7 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
     const attr = el.getAttribute('class');
     if (attr) {
       for (const cls of attr.split(/\s+/)) {
-        if (/^t\d+$/.test(cls)) classes.add(cls);
+        if (/^t[a-z0-9]+$/.test(cls)) classes.add(cls);
       }
     }
   });
@@ -431,7 +431,7 @@ export const tastyDebug = {
     } = opts || {};
     let css = '';
 
-    if (source && typeof target === 'string' && /^t\d+$/.test(target)) {
+    if (source && typeof target === 'string' && /^t[a-z0-9]+$/.test(target)) {
       const src = getSourceCssForClasses([target], root);
       if (src) {
         css = src;
@@ -469,7 +469,7 @@ export const tastyDebug = {
         css = injector.instance.getCssTextForClasses(unused, { root });
       } else if (target === 'page') {
         css = getPageCSS(root);
-      } else if (/^t\d+$/.test(target)) {
+      } else if (/^t[a-z0-9]+$/.test(target)) {
         css = injector.instance.getCssTextForClasses([target], { root });
       } else {
         const el = (root as Document).querySelector?.(target);
@@ -517,7 +517,7 @@ export const tastyDebug = {
     const classList = element.getAttribute('class') || '';
     const tastyClasses = classList
       .split(/\s+/)
-      .filter((cls) => /^t\d+$/.test(cls));
+      .filter((cls) => /^t[a-z0-9]+$/.test(cls));
 
     const chunks: ChunkInfo[] = tastyClasses.map((className) => ({
       className,

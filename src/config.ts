@@ -611,6 +611,21 @@ export function markStylesGenerated(): void {
 
   stylesGenerated = true;
 
+  // When SSR styles are already in the document, the SSR collector's
+  // collectInternals() already rendered tokens, @property, globalStyles,
+  // @font-face, and @counter-style. Skip client-side injection to avoid
+  // duplicate CSS rules.
+  if (
+    typeof document !== 'undefined' &&
+    document.querySelector('style[data-tasty-ssr]')
+  ) {
+    warnOnce(
+      'ssr-globals-skip',
+      '[Tasty] SSR styles detected — skipping client-side global CSS injection to avoid duplicates.',
+    );
+    return;
+  }
+
   const injector = getGlobalInjector();
 
   // Inject all properties (defaults merged with user-configured overrides)

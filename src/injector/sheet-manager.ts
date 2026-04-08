@@ -65,7 +65,6 @@ export class SheetManager {
         cacheKeyToClassName: new Map(),
         ruleTextSet: new Set<string>(),
         metrics,
-        classCounter: 0,
         keyframesCache: new Map(),
         keyframesNameToContent: new Map(),
         keyframesCounter: 0,
@@ -76,6 +75,8 @@ export class SheetManager {
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),
         touchCount: 0,
+        serverClassSyncIndex: 0,
+        rscStylesScanned: false,
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);

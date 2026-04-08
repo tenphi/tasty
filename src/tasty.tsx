@@ -28,6 +28,7 @@ import { isSelector } from './pipeline';
 import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
+import { getConfig } from './config';
 import { touch } from './injector';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
@@ -835,13 +836,18 @@ function tastyElement<
       elementProps,
     );
 
-    // RSC mode: wrap element with inline <style> for server-rendered CSS
+    // RSC mode: wrap element with inline <style> tag.
+    // Class names are extracted from these tags on the client via
+    // the doubled-specificity pattern (.tXXX.tXXX), so no <script> is needed.
     if (stylesResult.css) {
+      const nonce = getConfig().nonce;
+
       return createElement(
         Fragment,
         null,
         createElement('style', {
           'data-tasty-rsc': '',
+          nonce,
           dangerouslySetInnerHTML: { __html: stylesResult.css },
         }),
         el,

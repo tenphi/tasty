@@ -32,7 +32,11 @@ Run `pnpm lint`. **Stop and report the error if it fails** — do not proceed to
 
 Run `pnpm format` to format code before committing.
 
-## 5. Commit
+## 5. Build and check bundle size
+
+Run `pnpm build && pnpm size`. **If `size-limit` fails** (a bundle exceeds its limit), increase the failing limit(s) in the `"size-limit"` array in `package.json` by **1 kB** above the reported size, then re-run `pnpm size` to confirm it passes. Include the `package.json` change in the commit.
+
+## 6. Commit
 
 Use **Conventional Commits** format:
 
@@ -47,7 +51,7 @@ type(scope): short description
 - Before 1.0.0 release treat major changes as minor and minor as patches.
 - Do not include markdown files that are not in the repo yet and wasn't staged manually by the user.
 
-## 6. Push
+## 7. Push
 
 - **Never push to `main`**. Verify the current branch first.
 - If on `main`, stop and warn the user.

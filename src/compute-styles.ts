@@ -16,15 +16,7 @@ import {
   generateChunkCacheKey,
   renderStylesForChunk,
 } from './chunks';
-import {
-  getConfig,
-  getGlobalConfigTokens,
-  getGlobalCounterStyle,
-  getEffectiveProperties,
-  getGlobalFontFace,
-  getGlobalKeyframes,
-  hasGlobalKeyframes,
-} from './config';
+import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from './config';
 import {
   counterStyle,
   fontFace,
@@ -54,7 +46,6 @@ import {
   replaceAnimationNames,
 } from './keyframes';
 import type { RenderResult, StyleResult } from './pipeline';
-import { renderStyles } from './pipeline';
 import {
   flushPendingCSS,
   getRSCCache,
@@ -64,7 +55,6 @@ import type { RSCStyleCache } from './rsc-cache';
 import { extractLocalProperties, hasLocalProperties } from './properties';
 import { collectAutoInferredProperties } from './ssr/collect-auto-properties';
 import type { ServerStyleCollector } from './ssr/collector';
-import { formatGlobalRules } from './ssr/format-global-rules';
 import { formatKeyframesCSS } from './ssr/format-keyframes';
 import { formatPropertyCSS } from './ssr/format-property';
 import { formatRules } from './ssr/format-rules';
@@ -98,49 +88,23 @@ const EMPTY_RESULT: ComputeStylesResult = { className: '' };
 // ---------------------------------------------------------------------------
 
 /**
- * Collect internals CSS for RSC — mirrors ServerStyleCollector.collectInternals().
- * Emitted once per request (tracked via rscCache.internalsEmitted).
+ * Mark internals as emitted for this RSC request.
+ *
+ * Internals (tokens, @property, @font-face, @counter-style) are emitted
+ * exclusively by the SSR collector via ServerStyleCollector.collectInternals().
+ * The SSR path is reliable because TastyRegistry is always present as a
+ * client component in the root layout, guaranteeing SSR runs for every page.
+ *
+ * Previously this function also emitted internals and coordinated with SSR
+ * via a globalThis flag, but that flag leaked across requests in the same
+ * Node.js process, causing pages without RSC-rendered tasty components
+ * (e.g. the playground route) to lose all token CSS.
  */
 function collectInternalsRSC(rscCache: RSCStyleCache): string {
   if (rscCache.internalsEmitted) return '';
   rscCache.internalsEmitted = true;
 
-  const parts: string[] = [];
-
-  for (const [token, definition] of Object.entries(getEffectiveProperties())) {
-    const css = formatPropertyCSS(token, definition);
-    if (css) parts.push(css);
-  }
-
-  const tokenStyles = getGlobalConfigTokens();
-  if (tokenStyles && Object.keys(tokenStyles).length > 0) {
-    const tokenRules = renderStyles(tokenStyles, ':root') as StyleResult[];
-    if (tokenRules.length > 0) {
-      const css = formatGlobalRules(tokenRules);
-      if (css) parts.push(css);
-    }
-  }
-
-  const globalFF = getGlobalFontFace();
-  if (globalFF) {
-    for (const [family, input] of Object.entries(globalFF)) {
-      const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-        ? input
-        : [input];
-      for (const desc of descriptors) {
-        parts.push(formatFontFaceRule(family, desc));
-      }
-    }
-  }
-
-  const globalCS = getGlobalCounterStyle();
-  if (globalCS) {
-    for (const [name, descriptors] of Object.entries(globalCS)) {
-      parts.push(formatCounterStyleRule(name, descriptors));
-    }
-  }
-
-  return parts.join('\n');
+  return '';
 }
 
 /**

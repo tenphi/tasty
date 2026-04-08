@@ -422,7 +422,9 @@ Class names are deterministic for the same render order. If you see mismatches, 
 
 ### Styles duplicated after hydration
 
-This is expected and harmless. SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, call `cleanupSSRStyles()` after hydration:
+**Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`) configured via `configure()` is automatically deduplicated. When Tasty detects `<style data-tasty-ssr>` in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
+
+**Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, call `cleanupSSRStyles()` after hydration:
 
 ```tsx
 import { hydrateTastyCache } from '@tenphi/tasty/ssr';

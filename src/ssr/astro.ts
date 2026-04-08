@@ -21,8 +21,10 @@ registerSSRCollectorGetterGlobal(getSSRCollector);
 
 export interface TastyMiddlewareOptions {
   /**
-   * Whether to embed the cache state script for client hydration.
-   * Set to false to skip cache transfer. Default: true.
+   * Whether to embed the class-list script for client hydration.
+   * Set to false to skip class transfer (e.g. for CSP restrictions).
+   * Without it, client components may re-inject CSS that already exists
+   * in server-rendered `<style>` tags. Default: true.
    */
   transferCache?: boolean;
 }
@@ -112,10 +114,10 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
 
     let cacheTag = '';
     if (transferCache) {
-      const cacheState = collector.getCacheState();
-      const hasHydratableStyles = Object.keys(cacheState.entries).length > 0;
-      if (hasHydratableStyles) {
-        cacheTag = `<script data-tasty-cache type="application/json"${nonceAttr}>${JSON.stringify(cacheState)}</script>`;
+      const classNames = collector.getRenderedClassNames();
+      if (classNames.length > 0) {
+        const classListJSON = classNames.map((n) => `"${n}"`).join(',');
+        cacheTag = `<script${nonceAttr}>(window.__TASTY__=window.__TASTY__||[]).push(${classListJSON})</script>`;
       }
     }
 

@@ -8,6 +8,7 @@ import {
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
+import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
@@ -15,6 +16,7 @@ import { parseStyle } from '../utils/styles';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
 import { formatCounterStyleDeclarations } from '../counter-style';
+import { HYDRATED_RULE_INDEX, PLACEHOLDER_RULE_INDEX } from './types';
 import type {
   CacheMetrics,
   CounterStyleDescriptors,
@@ -32,10 +34,79 @@ import type {
 } from './types';
 
 /**
- * Generate sequential class name with format t{number}
+ * Generate a deterministic class name from a cache key using content hash.
+ * The same cache key always produces the same class name across environments.
  */
-function generateClassName(counter: number): string {
-  return `t${counter}`;
+function generateClassName(cacheKey: string): string {
+  return `t${hashString(cacheKey)}`;
+}
+
+const RSC_CLASS_RE = /\.(t[a-z0-9]+)\.\1/g;
+
+/**
+ * Extract class names from `<style data-tasty-rsc>` tags.
+ * The doubled-specificity pattern `.tXXX.tXXX` makes extraction reliable.
+ */
+function extractRSCClassNames(): string[] {
+  if (typeof document === 'undefined') return [];
+  const styles = document.querySelectorAll('style[data-tasty-rsc]');
+  if (styles.length === 0) return [];
+
+  const classSet = new Set<string>();
+  for (const style of styles) {
+    const text = style.textContent;
+    if (!text) continue;
+    let match: RegExpExecArray | null;
+    RSC_CLASS_RE.lastIndex = 0;
+    while ((match = RSC_CLASS_RE.exec(text)) !== null) {
+      classSet.add(match[1]);
+    }
+  }
+  return Array.from(classSet);
+}
+
+/**
+ * Lazily sync server-rendered class names into the client registry.
+ *
+ * Sources:
+ * 1. `window.__TASTY__` — pushed by SSR/RSC streaming scripts
+ * 2. `<style data-tasty-rsc>` tags — inline CSS emitted by RSC components
+ *
+ * Called inside `inject()` / `allocateClassName()` to pick up
+ * class names rendered on the server (including during SPA navigation).
+ */
+function syncServerClasses(registry: RootRegistry): void {
+  if (typeof window === 'undefined') return;
+
+  // Source 1: window.__TASTY__ (SSR streaming scripts)
+  const classes = window.__TASTY__;
+  if (classes && classes.length > registry.serverClassSyncIndex) {
+    for (let i = registry.serverClassSyncIndex; i < classes.length; i++) {
+      registerHydratedClass(registry, classes[i]);
+    }
+    registry.serverClassSyncIndex = classes.length;
+  }
+
+  // Source 2: <style data-tasty-rsc> tags (RSC inline styles)
+  if (!registry.rscStylesScanned) {
+    registry.rscStylesScanned = true;
+    for (const cls of extractRSCClassNames()) {
+      registerHydratedClass(registry, cls);
+    }
+  }
+}
+
+function registerHydratedClass(
+  registry: RootRegistry,
+  className: string,
+): void {
+  if (registry.rules.has(className)) return;
+  registry.rules.set(className, {
+    className,
+    ruleIndex: HYDRATED_RULE_INDEX,
+    sheetIndex: HYDRATED_RULE_INDEX,
+  });
+  registry.refCounts.set(className, 0);
 }
 
 export class StyleInjector {
@@ -52,6 +123,28 @@ export class StyleInjector {
   constructor(config: StyleInjectorConfig = {}) {
     this.config = config;
     this.sheetManager = new SheetManager(config);
+  }
+
+  /**
+   * Check if `className` was hydrated from server-rendered styles and,
+   * if so, wire the cacheKey mapping. Returns true on hit.
+   */
+  private tryHydratedHit(
+    registry: RootRegistry,
+    cacheKey: string,
+    className: string,
+  ): boolean {
+    syncServerClasses(registry);
+    const rule = registry.rules.get(className);
+    if (
+      rule &&
+      rule.ruleIndex === HYDRATED_RULE_INDEX &&
+      rule.sheetIndex === HYDRATED_RULE_INDEX
+    ) {
+      registry.cacheKeyToClassName.set(cacheKey, className);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -74,14 +167,32 @@ export class StyleInjector {
       };
     }
 
-    // Generate new className and reserve it
-    const className = generateClassName(registry.classCounter++);
+    // Generate deterministic className from cache key
+    const className = generateClassName(cacheKey);
+
+    // Check if this className was hydrated from server-rendered styles
+    if (this.tryHydratedHit(registry, cacheKey, className)) {
+      return { className, isNewAllocation: false };
+    }
+
+    // Hash collision guard: another cache key already owns this class name
+    const existingRule = registry.rules.get(className);
+    if (existingRule) {
+      if (isDevEnv()) {
+        console.warn(
+          `[tasty] Hash collision: cache keys produce the same class "${className}". Styles may be incorrect.`,
+        );
+      }
+      // Treat as already allocated to avoid overwriting
+      registry.cacheKeyToClassName.set(cacheKey, className);
+      return { className, isNewAllocation: false };
+    }
 
     // Create placeholder RuleInfo to reserve the className
     const placeholderRuleInfo = {
       className,
-      ruleIndex: -1, // Placeholder - will be set during actual injection
-      sheetIndex: -1, // Placeholder - will be set during actual injection
+      ruleIndex: PLACEHOLDER_RULE_INDEX,
+      sheetIndex: PLACEHOLDER_RULE_INDEX,
     };
 
     // Store RuleInfo only once by className, and map cacheKey separately
@@ -127,7 +238,8 @@ export class StyleInjector {
 
       // Check if this is a placeholder (pre-allocated but not yet injected)
       isPreAllocated =
-        existingRuleInfo.ruleIndex === -1 && existingRuleInfo.sheetIndex === -1;
+        existingRuleInfo.ruleIndex === PLACEHOLDER_RULE_INDEX &&
+        existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
       if (!isPreAllocated) {
         // Already injected - just increment refCount
@@ -144,9 +256,30 @@ export class StyleInjector {
           dispose: () => this.dispose(className, registry),
         };
       }
+    } else if (cacheKey) {
+      // Generate deterministic className from cache key
+      className = generateClassName(cacheKey);
+
+      // Check if this className was hydrated from server-rendered styles
+      if (this.tryHydratedHit(registry, cacheKey, className)) {
+        registry.refCounts.set(
+          className,
+          (registry.refCounts.get(className) || 0) + 1,
+        );
+
+        if (registry.metrics) {
+          registry.metrics.hits++;
+        }
+
+        return {
+          className,
+          dispose: () => this.dispose(className, registry),
+        };
+      }
     } else {
-      // Generate new className
-      className = generateClassName(registry.classCounter++);
+      // No cache key — generate from rules content
+      const parts = rules.map((r) => `${r.selector}\0${r.declarations}`);
+      className = `t${hashString(parts.join('\n'))}`;
     }
 
     // Process rules: handle needsClassName flag and apply specificity
@@ -812,7 +945,7 @@ export class StyleInjector {
   // GC: touch-count-driven garbage collection with DOM safety guard
   // =========================================================================
 
-  private static readonly TASTY_CLASS_RE = /^t\d+$/;
+  private static readonly TASTY_CLASS_RE = /^t[a-z0-9]+$/;
 
   /**
    * Record a render-time usage hit for one or more classNames.

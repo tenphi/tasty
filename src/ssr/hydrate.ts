@@ -1,63 +1,58 @@
 /**
- * Client-side cache hydration for SSR.
+ * Client-side cache hydration for SSR/RSC.
  *
- * Pre-populates the client injector's cacheKeyToClassName map from the
- * server's serialized state. This ensures that useStyles() returns
- * cache hits during hydration, skipping the entire rendering pipeline.
+ * Pre-populates the client injector's rules map with class names
+ * rendered on the server. With hash-based naming, the client derives
+ * the same class name from the same cache key, so only the class name
+ * list needs to cross the wire — no cache keys or counters.
  */
 
 import { getGlobalInjector } from '../config';
-import type { SSRCacheState } from './collector';
-
-declare global {
-  interface Window {
-    __TASTY_SSR_CACHE__?: SSRCacheState;
-  }
-}
+import { HYDRATED_RULE_INDEX } from '../injector/types';
 
 /**
- * Pre-populate the client-side style cache from the server's SSR state.
+ * Pre-populate the client-side style registry from the server's class name list.
  *
  * Call this before ReactDOM.hydrateRoot() or ensure it runs before
  * any tasty() component renders on the client.
  *
- * When called without arguments, reads state from:
- * 1. `window.__TASTY_SSR_CACHE__` (streaming — populated by inline scripts)
- * 2. `<script data-tasty-cache>` (non-streaming — JSON payload)
+ * When called without arguments, reads the class list from `window.__TASTY__`
+ * (populated by inline scripts emitted during SSR/RSC streaming).
  */
-export function hydrateTastyCache(state?: SSRCacheState): void {
+export function hydrateTastyClasses(classes?: string[]): void {
   if (typeof document === 'undefined') return;
 
-  if (!state) {
-    state =
-      (typeof window !== 'undefined' ? window.__TASTY_SSR_CACHE__ : null) ??
-      undefined;
-    if (!state) {
-      const script = document.querySelector('script[data-tasty-cache]');
-      if (script) {
-        try {
-          state = JSON.parse(script.textContent!) as SSRCacheState;
-        } catch {
-          return;
-        }
-      }
-    }
+  if (!classes) {
+    classes = typeof window !== 'undefined' ? window.__TASTY__ : undefined;
   }
 
-  if (!state) return;
+  if (!classes?.length) return;
 
   const injector = getGlobalInjector();
   const registry = injector._sheetManager.getRegistry(document);
 
-  registry.classCounter = Math.max(registry.classCounter, state.classCounter);
+  for (const cls of classes) {
+    if (!registry.rules.has(cls)) {
+      registry.rules.set(cls, {
+        className: cls,
+        ruleIndex: HYDRATED_RULE_INDEX,
+        sheetIndex: HYDRATED_RULE_INDEX,
+      });
+      registry.refCounts.set(cls, 0);
+    }
+  }
+}
 
-  for (const [cacheKey, className] of Object.entries(state.entries)) {
-    registry.cacheKeyToClassName.set(cacheKey, className);
-    registry.rules.set(className, {
-      className,
-      ruleIndex: -2,
-      sheetIndex: -2,
-    });
-    registry.refCounts.set(className, 0);
+/**
+ * @deprecated Use `hydrateTastyClasses()` instead. This alias exists
+ * for backwards compatibility and will be removed in a future major version.
+ */
+export function hydrateTastyCache(state?: {
+  entries?: Record<string, string>;
+}): void {
+  if (state?.entries) {
+    hydrateTastyClasses(Object.values(state.entries));
+  } else {
+    hydrateTastyClasses();
   }
 }

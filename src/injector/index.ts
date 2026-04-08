@@ -199,7 +199,7 @@ export function getCssTextForNode(
     const cls = el.getAttribute('class');
     if (!cls) return;
     for (const token of cls.split(/\s+/)) {
-      if (/^t\d+$/.test(token)) classSet.add(token);
+      if (/^t[a-z0-9]+$/.test(token)) classSet.add(token);
     }
   };
 

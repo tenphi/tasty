@@ -86,7 +86,7 @@ describe('StyleInjector', () => {
       const css = '&{ color: red; padding: 10px; }';
       const result = injector.inject(cssToStyleResults(css));
 
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
       // Check that style was injected
@@ -108,8 +108,8 @@ describe('StyleInjector', () => {
       const result2 = injector.inject(cssToStyleResults(css));
 
       // Class names may differ when no active cache is enabled
-      expect(result1.className).toMatch(/^t\d+$/);
-      expect(result2.className).toMatch(/^t\d+$/);
+      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result2.className).toMatch(/^t[a-z0-9]+$/);
 
       // Should still only have one style element
       const styleElements = document.head.querySelectorAll('[data-tasty]');
@@ -135,7 +135,7 @@ describe('StyleInjector', () => {
     `;
 
       const result = injector.inject(cssToStyleResults(css));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       // The flattening should work correctly now
       // We can verify the className is generated even if DOM insertion has test issues
@@ -150,7 +150,7 @@ describe('StyleInjector', () => {
       `;
 
       const result = injector.inject(cssToStyleResults(css));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       // The flattening should work correctly now
       // We can verify the className is generated even if DOM insertion has test issues
@@ -168,7 +168,7 @@ describe('StyleInjector', () => {
         root: shadowRoot,
       });
 
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       // Should not be in document head
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(0);
@@ -198,7 +198,7 @@ describe('StyleInjector', () => {
       const result = injector.inject(globalRules);
 
       // Should generate a className for tracking but selectors remain as-is
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
       // Check that global selectors are preserved in DOM
@@ -231,7 +231,7 @@ describe('StyleInjector', () => {
       ];
 
       const result = injector.inject(globalRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -258,7 +258,7 @@ describe('StyleInjector', () => {
       ];
 
       const result = injector.inject(mixedRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -285,10 +285,10 @@ describe('StyleInjector', () => {
       const result1 = injector.inject(globalRules);
       const result2 = injector.inject(globalRules);
 
-      // Should generate different class names since global rules are not deduplicated by selector
-      expect(result1.className).toMatch(/^t\d+$/);
-      expect(result2.className).toMatch(/^t\d+$/);
-      expect(result1.className).not.toBe(result2.className);
+      // With hash-based naming, identical content produces the same class name (dedup)
+      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result2.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result1.className).toBe(result2.className);
     });
 
     it('should dispose global rules correctly', () => {
@@ -324,7 +324,7 @@ describe('StyleInjector', () => {
       );
 
       const result = injector.inject(componentRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -351,7 +351,7 @@ describe('StyleInjector', () => {
       ];
 
       const result = injector.inject(globalRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -382,7 +382,7 @@ describe('StyleInjector', () => {
       ];
 
       const result = injector.inject(mixedRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -404,7 +404,7 @@ describe('StyleInjector', () => {
       const css = '&{ color: red; }';
 
       const result = injector.inject(cssToStyleResults(css));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       // Style should exist in DOM
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
@@ -416,7 +416,7 @@ describe('StyleInjector', () => {
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
     });
 
-    it('should generate new class names for the same styles', () => {
+    it('should reuse hash-based class name for the same styles after dispose', () => {
       const css = '&{ color: red; }';
 
       const result1 = injector.inject(cssToStyleResults(css, 't123'));
@@ -425,14 +425,11 @@ describe('StyleInjector', () => {
       // Dispose the style
       result1.dispose();
 
-      // Inject the same style again (should get a new class name)
+      // Inject the same style again — hash-based naming produces the same class
       const result2 = injector.inject(cssToStyleResults(css, 't123'));
 
-      // Should get a different className (no reuse)
-      expect(result2.className).not.toBe(className1);
+      expect(result2.className).toBe(className1);
 
-      // Style sheet count depends on cleanup - first style is marked as unused
-      // but not immediately removed from DOM
       const styleSheets = document.head.querySelectorAll('[data-tasty]').length;
       expect(styleSheets).toBeGreaterThanOrEqual(1);
     });
@@ -579,7 +576,7 @@ describe('StyleInjector', () => {
 
       try {
         const result = injector.inject(cssToStyleResults('&{ color: red; }'));
-        expect(result.className).toMatch(/^t\d+$/); // Still generates className
+        expect(result.className).toMatch(/^t[a-z0-9]+$/); // Still generates className
         expect(typeof result.dispose).toBe('function');
       } finally {
         document.createElement = originalCreateElement;

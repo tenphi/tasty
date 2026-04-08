@@ -122,8 +122,6 @@ export interface RootRegistry {
   ruleTextSet: Set<string>;
   /** Performance metrics (optional) */
   metrics?: CacheMetrics;
-  /** Counter for generating sequential class names like t0, t1, t2... */
-  classCounter: number;
   /** Keyframes cache by content hash -> entry */
   keyframesCache: Map<string, KeyframesCacheEntry>;
   /** Keyframes name to content hash mapping for collision detection */

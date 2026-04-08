@@ -8,6 +8,7 @@ import {
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
+import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
@@ -32,10 +33,42 @@ import type {
 } from './types';
 
 /**
- * Generate sequential class name with format t{number}
+ * Generate a deterministic class name from a cache key using content hash.
+ * The same cache key always produces the same class name across environments.
  */
-function generateClassName(counter: number): string {
-  return `t${counter}`;
+function generateClassName(cacheKey: string): string {
+  return `t${hashString(cacheKey)}`;
+}
+
+declare global {
+  interface Window {
+    __TASTY__?: string[];
+  }
+}
+
+let syncedUpTo = 0;
+
+/**
+ * Lazily sync server-rendered class names from the global `window.__TASTY__`
+ * array into the client registry. Called inside `inject()` to pick up
+ * class names pushed during SPA navigation.
+ */
+function syncServerClasses(registry: RootRegistry): void {
+  if (typeof window === 'undefined') return;
+  const classes = window.__TASTY__;
+  if (!classes || classes.length <= syncedUpTo) return;
+  for (let i = syncedUpTo; i < classes.length; i++) {
+    const cls = classes[i];
+    if (!registry.rules.has(cls)) {
+      registry.rules.set(cls, {
+        className: cls,
+        ruleIndex: -2,
+        sheetIndex: -2,
+      });
+      registry.refCounts.set(cls, 0);
+    }
+  }
+  syncedUpTo = classes.length;
 }
 
 export class StyleInjector {
@@ -74,8 +107,20 @@ export class StyleInjector {
       };
     }
 
-    // Generate new className and reserve it
-    const className = generateClassName(registry.classCounter++);
+    // Generate deterministic className from cache key
+    const className = generateClassName(cacheKey);
+
+    // Check if this className was hydrated from server-rendered styles
+    syncServerClasses(registry);
+    const hydratedRule = registry.rules.get(className);
+    if (
+      hydratedRule &&
+      hydratedRule.ruleIndex === -2 &&
+      hydratedRule.sheetIndex === -2
+    ) {
+      registry.cacheKeyToClassName.set(cacheKey, className);
+      return { className, isNewAllocation: false };
+    }
 
     // Create placeholder RuleInfo to reserve the className
     const placeholderRuleInfo = {
@@ -144,9 +189,37 @@ export class StyleInjector {
           dispose: () => this.dispose(className, registry),
         };
       }
+    } else if (cacheKey) {
+      // Generate deterministic className from cache key
+      className = generateClassName(cacheKey);
+
+      // Check if this className was hydrated from server-rendered styles.
+      // Hydrated entries have ruleIndex/sheetIndex of -2.
+      syncServerClasses(registry);
+      const hydratedRule = registry.rules.get(className);
+      if (
+        hydratedRule &&
+        hydratedRule.ruleIndex === -2 &&
+        hydratedRule.sheetIndex === -2
+      ) {
+        registry.cacheKeyToClassName.set(cacheKey, className);
+        registry.refCounts.set(
+          className,
+          (registry.refCounts.get(className) || 0) + 1,
+        );
+
+        if (registry.metrics) {
+          registry.metrics.hits++;
+        }
+
+        return {
+          className,
+          dispose: () => this.dispose(className, registry),
+        };
+      }
     } else {
-      // Generate new className
-      className = generateClassName(registry.classCounter++);
+      // No cache key — generate from rules content
+      className = `t${hashString(JSON.stringify(rules))}`;
     }
 
     // Process rules: handle needsClassName flag and apply specificity
@@ -812,7 +885,7 @@ export class StyleInjector {
   // GC: touch-count-driven garbage collection with DOM safety guard
   // =========================================================================
 
-  private static readonly TASTY_CLASS_RE = /^t\d+$/;
+  private static readonly TASTY_CLASS_RE = /^t[a-z0-9]+$/;
 
   /**
    * Record a render-time usage hit for one or more classNames.

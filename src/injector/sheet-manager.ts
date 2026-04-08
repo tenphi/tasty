@@ -65,7 +65,6 @@ export class SheetManager {
         cacheKeyToClassName: new Map(),
         ruleTextSet: new Set<string>(),
         metrics,
-        classCounter: 0,
         keyframesCache: new Map(),
         keyframesNameToContent: new Map(),
         keyframesCounter: 0,

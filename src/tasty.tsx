@@ -835,8 +835,11 @@ function tastyElement<
       elementProps,
     );
 
-    // RSC mode: wrap element with inline <style> for server-rendered CSS
+    // RSC mode: wrap element with inline <style> and class-list <script>
     if (stylesResult.css) {
+      const newClasses = stylesResult.newClassNames;
+      const classListJSON = newClasses?.map((n) => `"${n}"`).join(',');
+
       return createElement(
         Fragment,
         null,
@@ -844,6 +847,13 @@ function tastyElement<
           'data-tasty-rsc': '',
           dangerouslySetInnerHTML: { __html: stylesResult.css },
         }),
+        classListJSON
+          ? createElement('script', {
+              dangerouslySetInnerHTML: {
+                __html: `(window.__TASTY__=window.__TASTY__||[]).push(${classListJSON})`,
+              },
+            })
+          : null,
         el,
       );
     }

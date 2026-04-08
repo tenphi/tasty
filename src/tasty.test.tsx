@@ -480,7 +480,7 @@ describe('style order consistency', () => {
     // Get all tasty class names and sort them for consistent comparison
     const classes = element?.className
       ?.split(' ')
-      .filter((cls) => /^t\d+$/.test(cls))
+      .filter((cls) => /^t[a-z0-9]+$/.test(cls))
       .sort()
       .join(' ');
     return classes || '';

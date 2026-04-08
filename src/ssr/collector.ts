@@ -3,8 +3,8 @@
  *
  * Accumulates CSS rules and cache metadata during server rendering.
  * This is the server-side counterpart to StyleInjector: it allocates
- * sequential class names (t0, t1, …), formats CSS rules into text,
- * and serializes the cache state for client hydration.
+ * hash-based class names (`t${hash}`), formats CSS rules into text,
+ * and tracks rendered class names for lightweight client transfer.
  *
  * One instance is created per HTTP request. Concurrent requests
  * each get their own collector (via AsyncLocalStorage or React context).
@@ -21,28 +21,18 @@ import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
+import { hashString } from '../utils/hash';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
 import { formatRules } from './format-rules';
 
-/**
- * Cache state serialized to the client for hydration.
- */
-export interface SSRCacheState {
-  /** cacheKey → className map, to pre-populate the client registry */
-  entries: Record<string, string>;
-  /** Counter value so client allocations don't collide with server ones */
-  classCounter: number;
-}
-
-function generateClassName(counter: number): string {
-  return `t${counter}`;
+function generateClassName(cacheKey: string): string {
+  return `t${hashString(cacheKey)}`;
 }
 
 export class ServerStyleCollector {
   private chunks = new Map<string, string>();
   private cacheKeyToClassName = new Map<string, string>();
-  private classCounter = 0;
   private flushedKeys = new Set<string>();
   private propertyRules = new Map<string, string>();
   private flushedPropertyKeys = new Set<string>();
@@ -142,7 +132,7 @@ export class ServerStyleCollector {
       return { className: existing, isNewAllocation: false };
     }
 
-    const className = generateClassName(this.classCounter++);
+    const className = generateClassName(cacheKey);
     this.cacheKeyToClassName.set(cacheKey, className);
 
     return { className, isNewAllocation: true };
@@ -330,14 +320,20 @@ export class ServerStyleCollector {
     return parts.join('\n');
   }
 
+  private flushedClassNames = new Set<string>();
+
   /**
-   * Serialize the cache state for client hydration.
+   * Return class names rendered since the last call (for streaming).
+   * Used to emit lightweight class-list scripts for client hydration.
    */
-  getCacheState(): SSRCacheState {
-    const entries: Record<string, string> = {};
-    for (const [cacheKey, className] of this.cacheKeyToClassName) {
-      entries[cacheKey] = className;
+  getRenderedClassNames(): string[] {
+    const names: string[] = [];
+    for (const className of this.cacheKeyToClassName.values()) {
+      if (!this.flushedClassNames.has(className)) {
+        this.flushedClassNames.add(className);
+        names.push(className);
+      }
     }
-    return { entries, classCounter: this.classCounter };
+    return names;
   }
 }

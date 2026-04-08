@@ -45,9 +45,9 @@ export function rscAllocateClassName(
   const existing = rscCache.cacheKeyToClassName.get(cacheKey);
   if (existing) return { className: existing, isNew: false };
 
-  // Content-hash ensures stable names across requests, preventing
-  // class collisions during client-side navigation in Next.js App Router.
-  const className = `r${hashString(cacheKey)}`;
+  // Content-hash ensures stable names across all environments (RSC, SSR, client),
+  // enabling cross-environment dedup and preventing class collisions.
+  const className = `t${hashString(cacheKey)}`;
   rscCache.cacheKeyToClassName.set(cacheKey, className);
   return { className, isNew: true };
 }

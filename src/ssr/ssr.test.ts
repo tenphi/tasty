@@ -8,7 +8,8 @@ import { ServerStyleCollector } from './collector';
 import { formatRules } from './format-rules';
 import { formatKeyframesCSS } from './format-keyframes';
 import { formatPropertyCSS } from './format-property';
-import { hydrateTastyCache } from './hydrate';
+import { hashString } from '../utils/hash';
+import { hydrateTastyClasses } from './hydrate';
 
 // ============================================================================
 // formatRules
@@ -187,14 +188,17 @@ describe('ServerStyleCollector', () => {
     resetConfig();
   });
 
-  it('allocates sequential class names', () => {
+  it('allocates deterministic hash-based class names', () => {
     const collector = new ServerStyleCollector();
 
     const a = collector.allocateClassName('key-a');
     const b = collector.allocateClassName('key-b');
 
-    expect(a).toEqual({ className: 't0', isNewAllocation: true });
-    expect(b).toEqual({ className: 't1', isNewAllocation: true });
+    expect(a.className).toBe(`t${hashString('key-a')}`);
+    expect(a.isNewAllocation).toBe(true);
+    expect(b.className).toBe(`t${hashString('key-b')}`);
+    expect(b.isNewAllocation).toBe(true);
+    expect(a.className).not.toBe(b.className);
   });
 
   it('reuses class names for same cacheKey', () => {
@@ -203,9 +207,9 @@ describe('ServerStyleCollector', () => {
     const first = collector.allocateClassName('shared-key');
     const second = collector.allocateClassName('shared-key');
 
-    expect(first.className).toBe('t0');
+    expect(first.className).toBe(`t${hashString('shared-key')}`);
     expect(first.isNewAllocation).toBe(true);
-    expect(second.className).toBe('t0');
+    expect(second.className).toBe(first.className);
     expect(second.isNewAllocation).toBe(false);
   });
 
@@ -222,7 +226,7 @@ describe('ServerStyleCollector', () => {
     ]);
 
     const css = collector.getCSS();
-    expect(css).toContain('.t0.t0');
+    expect(css).toContain(`.${className}.${className}`);
     expect(css).toContain('display: flex');
   });
 
@@ -316,18 +320,22 @@ describe('ServerStyleCollector', () => {
     expect(css1).toBe(css2);
   });
 
-  it('getCacheState serializes entries and counter', () => {
+  it('getRenderedClassNames returns flushed class names', () => {
     const collector = new ServerStyleCollector();
 
     collector.allocateClassName('key-a');
     collector.allocateClassName('key-b');
 
-    const state = collector.getCacheState();
-    expect(state.entries).toEqual({
-      'key-a': 't0',
-      'key-b': 't1',
-    });
-    expect(state.classCounter).toBe(2);
+    const names = collector.getRenderedClassNames();
+    expect(names).toEqual([
+      `t${hashString('key-a')}`,
+      `t${hashString('key-b')}`,
+    ]);
+
+    // Second call returns only new names
+    collector.allocateClassName('key-c');
+    const names2 = collector.getRenderedClassNames();
+    expect(names2).toEqual([`t${hashString('key-c')}`]);
   });
 
   it('collectInternals includes configured tokens as :root CSS custom properties', () => {
@@ -425,6 +433,7 @@ describe('ServerStyleCollector with pipeline', () => {
     const styles = { display: 'flex', padding: '2x' } as any;
 
     const chunkMap = categorizeStyleKeys(styles);
+    const classNames: string[] = [];
 
     for (const [chunkName, styleKeys] of chunkMap) {
       if (styleKeys.length === 0) continue;
@@ -432,6 +441,8 @@ describe('ServerStyleCollector with pipeline', () => {
       const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
       const { className, isNewAllocation } =
         collector.allocateClassName(cacheKey);
+
+      classNames.push(className);
 
       if (isNewAllocation) {
         const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
@@ -443,11 +454,12 @@ describe('ServerStyleCollector with pipeline', () => {
 
     const css = collector.getCSS();
     expect(css.length).toBeGreaterThan(0);
-    expect(css).toContain('.t0.t0');
+    expect(classNames.length).toBeGreaterThan(0);
+    expect(css).toContain(`.${classNames[0]}.${classNames[0]}`);
     expect(css).toMatch(/display:\s*flex/);
 
-    const state = collector.getCacheState();
-    expect(Object.keys(state.entries).length).toBeGreaterThan(0);
+    const renderedNames = collector.getRenderedClassNames();
+    expect(renderedNames.length).toBeGreaterThan(0);
   });
 
   it('deduplicates chunks with same styles', async () => {
@@ -480,77 +492,53 @@ describe('ServerStyleCollector with pipeline', () => {
     }
 
     const css = collector.getCSS();
-    const matches = css.match(/\.t0\.t0/g);
+    const renderedNames = collector.getRenderedClassNames();
+    expect(renderedNames).toHaveLength(1);
+    const cls = renderedNames[0];
+    const re = new RegExp(`\\.${cls}\\.${cls}`, 'g');
+    const matches = css.match(re);
     expect(matches).toHaveLength(1);
-    expect(collector.getCacheState().classCounter).toBe(1);
   });
 });
 
 // ============================================================================
-// hydrateTastyCache
+// hydrateTastyClasses
 // ============================================================================
 
-describe('hydrateTastyCache', () => {
+describe('hydrateTastyClasses', () => {
   beforeEach(() => {
     resetConfig();
   });
 
   afterEach(() => {
     resetConfig();
-    delete (window as any).__TASTY_SSR_CACHE__;
-    document
-      .querySelectorAll('script[data-tasty-cache]')
-      .forEach((el) => el.remove());
+    delete (window as any).__TASTY__;
   });
 
-  it('pre-populates cache from explicit state', () => {
-    hydrateTastyCache({
-      entries: { 'APPEARANCE:fill=#purple': 't0' },
-      classCounter: 1,
-    });
+  it('pre-populates rules from explicit class list', () => {
+    const className = `t${hashString('APPEARANCE:fill=#purple')}`;
+    hydrateTastyClasses([className]);
 
-    const result = injector.instance.allocateClassName(
-      'APPEARANCE:fill=#purple',
-    );
-    expect(result.className).toBe('t0');
-    expect(result.isNewAllocation).toBe(false);
+    const registry = injector.instance._sheetManager.getRegistry(document);
+    expect(registry.rules.has(className)).toBe(true);
+    expect(registry.rules.get(className)!.ruleIndex).toBe(-2);
   });
 
-  it('reads from window.__TASTY_SSR_CACHE__', () => {
-    (window as any).__TASTY_SSR_CACHE__ = {
-      entries: { 'DIMENSION:padding=2x': 't5' },
-      classCounter: 6,
-    };
+  it('reads from window.__TASTY__', () => {
+    const className = `t${hashString('DIMENSION:padding=2x')}`;
+    (window as any).__TASTY__ = [className];
 
-    hydrateTastyCache();
+    hydrateTastyClasses();
 
-    const result = injector.instance.allocateClassName('DIMENSION:padding=2x');
-    expect(result.className).toBe('t5');
-    expect(result.isNewAllocation).toBe(false);
-  });
-
-  it('reads from <script data-tasty-cache>', () => {
-    const script = document.createElement('script');
-    script.setAttribute('data-tasty-cache', '');
-    script.setAttribute('type', 'application/json');
-    script.textContent = JSON.stringify({
-      entries: { 'LAYOUT:flow=column': 't2' },
-      classCounter: 3,
-    });
-    document.head.appendChild(script);
-
-    hydrateTastyCache();
-
-    const result = injector.instance.allocateClassName('LAYOUT:flow=column');
-    expect(result.className).toBe('t2');
-    expect(result.isNewAllocation).toBe(false);
+    const registry = injector.instance._sheetManager.getRegistry(document);
+    expect(registry.rules.has(className)).toBe(true);
   });
 
   it('inject() treats hydrated entries as already injected', () => {
-    hydrateTastyCache({
-      entries: { 'APPEARANCE:fill=#blue': 't0' },
-      classCounter: 1,
-    });
+    const cacheKey = 'APPEARANCE:fill=#blue';
+    const expectedClassName = `t${hashString(cacheKey)}`;
+
+    hydrateTastyClasses([expectedClassName]);
 
     const result = inject(
       [
@@ -560,26 +548,11 @@ describe('hydrateTastyCache', () => {
           needsClassName: true,
         },
       ],
-      { cacheKey: 'APPEARANCE:fill=#blue' },
+      { cacheKey },
     );
 
-    expect(result.className).toBe('t0');
+    expect(result.className).toBe(expectedClassName);
     expect(typeof result.dispose).toBe('function');
-  });
-
-  it('trackRef increments refCount for hydrated entries', () => {
-    hydrateTastyCache({
-      entries: { 'DIMENSION:padding=2x': 't3' },
-      classCounter: 4,
-    });
-
-    const result = injector.instance.trackRef('DIMENSION:padding=2x');
-    expect(result).not.toBeNull();
-    expect(result!.className).toBe('t3');
-    expect(typeof result!.dispose).toBe('function');
-
-    // Calling dispose should not throw
-    result!.dispose();
   });
 
   it('trackRef returns null for unknown cacheKey', () => {
@@ -588,20 +561,17 @@ describe('hydrateTastyCache', () => {
   });
 
   it('post-hydration: inject() reuses SSR className without re-inserting CSS', () => {
-    hydrateTastyCache({
-      entries: { 'APPEARANCE:fill=#purple': 't0' },
-      classCounter: 1,
-    });
+    const cacheKey = 'APPEARANCE:fill=#purple';
+    const expectedClassName = `t${hashString(cacheKey)}`;
 
-    // allocateClassName finds the SSR entry
-    const alloc = injector.instance.allocateClassName(
-      'APPEARANCE:fill=#purple',
-    );
-    expect(alloc.className).toBe('t0');
+    hydrateTastyClasses([expectedClassName]);
+
+    // allocateClassName finds the SSR entry via hash match
+    const alloc = injector.instance.allocateClassName(cacheKey);
+    expect(alloc.className).toBe(expectedClassName);
     expect(alloc.isNewAllocation).toBe(false);
 
     // inject() with the same cacheKey hits the "already injected" path
-    // (ruleIndex -2 is not a placeholder) — increments refCount, no CSS insertion
     const result = inject(
       [
         {
@@ -610,15 +580,38 @@ describe('hydrateTastyCache', () => {
           needsClassName: true,
         },
       ],
-      { cacheKey: 'APPEARANCE:fill=#purple' },
+      { cacheKey },
     );
-    expect(result.className).toBe('t0');
+    expect(result.className).toBe(expectedClassName);
     expect(typeof result.dispose).toBe('function');
 
-    // New className allocations produce a fresh class
+    // New className allocations produce a hash-based class
     const newAlloc = injector.instance.allocateClassName('NEW:chunk');
     expect(newAlloc.isNewAllocation).toBe(true);
-    expect(newAlloc.className).toMatch(/^t\d+$/);
+    expect(newAlloc.className).toMatch(/^t[a-z0-9]+$/);
+  });
+
+  it('RSC and client produce the same class name for the same cache key', () => {
+    const cacheKey = 'appearance\0fill:"#purple"';
+    const rscClassName = `t${hashString(cacheKey)}`;
+    const clientClassName = `t${hashString(cacheKey)}`;
+
+    expect(rscClassName).toBe(clientClassName);
+
+    hydrateTastyClasses([rscClassName]);
+
+    const result = inject(
+      [
+        {
+          selector: '',
+          declarations: 'background: purple',
+          needsClassName: true,
+        },
+      ],
+      { cacheKey },
+    );
+
+    expect(result.className).toBe(rscClassName);
   });
 });
 

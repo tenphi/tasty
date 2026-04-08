@@ -17,22 +17,22 @@ import { useServerInsertedHTML } from 'next/navigation';
 import { getConfig } from '../config';
 import { ServerStyleCollector } from './collector';
 import { TastySSRContext } from './context';
-import { hydrateTastyCache } from './hydrate';
+import { hydrateTastyClasses } from './hydrate';
 import { registerSSRCollectorGetter } from './ssr-collector-ref';
 
 // Auto-hydrate on module load (client only).
-// When this module is imported by the TastyRegistry client component,
-// the streaming cache scripts have already populated __TASTY_SSR_CACHE__.
-if (typeof window !== 'undefined' && window.__TASTY_SSR_CACHE__) {
-  hydrateTastyCache(window.__TASTY_SSR_CACHE__);
+// Reads the class name list from `window.__TASTY__` populated by streaming scripts.
+if (typeof window !== 'undefined') {
+  hydrateTastyClasses();
 }
 
 export interface TastyRegistryProps {
   children: ReactNode;
   /**
-   * Whether to embed the cache state script for client hydration.
-   * Set to false to skip cache transfer (useful when cache size
-   * exceeds the hydration benefit). Default: true.
+   * Whether to embed the class-list script for client hydration.
+   * Set to false to skip class transfer (e.g. for CSP restrictions).
+   * Without it, client components may re-inject CSS that already exists
+   * in server-rendered `<style>` tags. Default: true.
    */
   transferCache?: boolean;
 }
@@ -82,7 +82,7 @@ export function TastyRegistry({
     if (!collector) return null;
 
     const css = collector.flushCSS();
-    const cacheState = collector.getCacheState();
+    const classNames = collector.getRenderedClassNames();
 
     if (!css) return null;
 
@@ -93,16 +93,15 @@ export function TastyRegistry({
       dangerouslySetInnerHTML: { __html: css },
     });
 
-    if (!transferCache) return styleEl;
+    if (!transferCache || classNames.length === 0) return styleEl;
+
+    const classListJSON = classNames.map((n) => `"${n}"`).join(',');
 
     const scriptEl = createElement('script', {
       key: 'tasty-ssr-cache',
       nonce,
       dangerouslySetInnerHTML: {
-        __html:
-          `(window.__TASTY_SSR_CACHE__=window.__TASTY_SSR_CACHE__||{entries:{},classCounter:0});` +
-          `Object.assign(window.__TASTY_SSR_CACHE__.entries,${JSON.stringify(cacheState.entries)});` +
-          `window.__TASTY_SSR_CACHE__.classCounter=${cacheState.classCounter};`,
+        __html: `(window.__TASTY__=window.__TASTY__||[]).push(${classListJSON})`,
       },
     });
 

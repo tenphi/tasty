@@ -80,7 +80,7 @@ describe('Global Style Injector API', () => {
 
       // Should be able to use injector after configuration
       const result = inject(cssToStyleResults('&{ color: red; }'));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
     });
 
     it('should configure global injector with custom values', () => {
@@ -89,7 +89,7 @@ describe('Global Style Injector API', () => {
       });
 
       const result = inject(cssToStyleResults('&{ color: red; }'));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElement = document.head.querySelector(
         '[data-tasty]',
@@ -101,8 +101,8 @@ describe('Global Style Injector API', () => {
       const result1 = inject(cssToStyleResults('&{ color: red; }'));
       const result2 = inject(cssToStyleResults('&{ color: blue; }'));
 
-      expect(result1.className).toMatch(/^t\d+$/);
-      expect(result2.className).toMatch(/^t\d+$/);
+      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result2.className).toMatch(/^t[a-z0-9]+$/);
     });
 
     it('should configure predefined replaceTokens', () => {
@@ -303,7 +303,7 @@ describe('Global Style Injector API', () => {
       const css = '&{ color: red; padding: 10px; }';
       const result = inject(cssToStyleResults(css));
 
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
@@ -314,7 +314,7 @@ describe('Global Style Injector API', () => {
       // Don't call configure() first
       const result = inject(cssToStyleResults('&{ color: red; }'));
 
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
     });
 
     it('should support custom root', () => {
@@ -326,7 +326,7 @@ describe('Global Style Injector API', () => {
         root: shadowRoot,
       });
 
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
       // Internal properties (@property rules) are always injected into document.head
       // because they are global CSS rules, but component styles go to the custom root
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
@@ -348,7 +348,7 @@ describe('Global Style Injector API', () => {
       ];
 
       const result = inject(globalRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
       // Check that global selectors are preserved
@@ -386,7 +386,7 @@ describe('Global Style Injector API', () => {
       ];
 
       const result = inject(globalRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -418,7 +418,7 @@ describe('Global Style Injector API', () => {
       ];
 
       const result = inject(globalRules);
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -497,15 +497,15 @@ describe('Global Style Injector API', () => {
       const result1 = injector1.inject(cssToStyleResults('&{ color: red; }'));
       const result2 = injector2.inject(cssToStyleResults('&{ color: blue; }'));
 
-      expect(result1.className).toMatch(/^t\d+$/);
-      expect(result2.className).toMatch(/^t\d+$/);
+      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result2.className).toMatch(/^t[a-z0-9]+$/);
     });
 
     it('should use default config when no config provided', () => {
       const injector = createInjector();
 
       const result = injector.inject(cssToStyleResults('&{ color: red; }'));
-      expect(result.className).toMatch(/^t\d+$/);
+      expect(result.className).toMatch(/^t[a-z0-9]+$/);
     });
 
     it('should not affect global injector', () => {
@@ -517,8 +517,8 @@ describe('Global Style Injector API', () => {
         cssToStyleResults('&{ color: blue; }'),
       );
 
-      expect(globalResult.className).toMatch(/^t\d+$/);
-      expect(isolatedResult.className).toMatch(/^t\d+$/);
+      expect(globalResult.className).toMatch(/^t[a-z0-9]+$/);
+      expect(isolatedResult.className).toMatch(/^t[a-z0-9]+$/);
     });
   });
 
@@ -737,8 +737,8 @@ describe('Global Style Injector API', () => {
       const result3 = inject(cssToStyleResults(css1)); // Duplicate
 
       // Without active cache, duplicates may produce new classes
-      expect(result1.className).toMatch(/^t\d+$/);
-      expect(result3.className).toMatch(/^t\d+$/);
+      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
+      expect(result3.className).toMatch(/^t[a-z0-9]+$/);
 
       // All should be injected
       const styleElements = document.head.querySelectorAll('[data-tasty]');

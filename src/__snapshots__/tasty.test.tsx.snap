@@ -1,105 +1,105 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`modProps > should work with style state maps via modProps 1`] = `
-".t1.t1[data-is-active] { background-color: var(--purple-color); }
-.t1.t1:not([data-is-active]) { background-color: var(--white-color); }"
+".tzl9xo5.tzl9xo5[data-is-active] { background-color: var(--purple-color); }
+.tzl9xo5.tzl9xo5:not([data-is-active]) { background-color: var(--white-color); }"
 `;
 
 exports[`tasty() API > should allow multiple wrapping 1`] = `
-".t16.t16 { border: var(--border-width) solid var(--black-color); color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
-.t17.t17 { padding: 16px 0px 0px; }
-.t18.t18 { display: flex; }
-.t19.t19 { position: static; }"
+".t1hp9mfm.t1hp9mfm { border: var(--border-width) solid var(--black-color); color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+.t5bmail.t5bmail { padding: 16px 0px 0px; }
+.t17a57by.t17a57by { display: flex; }
+.t143yv91.t143yv91 { position: static; }"
 `;
 
 exports[`tasty() API > should allow nested modifiers 1`] = `
-".t20.t20:not(:first-child) { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }
-.t20.t20:first-child { color: var(--clear-color); --current-color: var(--clear-color); --current-color-oklch: var(--clear-color-oklch); }"
+".t1flirgv.t1flirgv:not(:first-child) { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }
+.t1flirgv.t1flirgv:first-child { color: var(--clear-color); --current-color: var(--clear-color); --current-color-oklch: var(--clear-color-oklch); }"
 `;
 
 exports[`tasty() API > should apply extend-mode base styles on top of variant 1`] = `
-".t10.t10:is([data-disabled]:not([data-type="primary"]), [data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
-.t10.t10[data-pressed]:not([data-disabled]):not([data-type="primary"]) { border: var(--border-width) solid var(--primary-text-color); }
-.t10.t10:not([data-disabled]):not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--white-color-oklch) / .2); }
-.t10.t10[data-hovered] { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
-.t10.t10:not([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
-.t11.t11 { padding: 16px; }"
+".t13tun0x.t13tun0x:is([data-disabled]:not([data-type="primary"]), [data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
+.t13tun0x.t13tun0x[data-pressed]:not([data-disabled]):not([data-type="primary"]) { border: var(--border-width) solid var(--primary-text-color); }
+.t13tun0x.t13tun0x:not([data-disabled]):not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--white-color-oklch) / .2); }
+.t13tun0x.t13tun0x[data-hovered] { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t13tun0x.t13tun0x:not([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
 exports[`tasty() API > should apply extend-mode base styles on top of variant 2`] = `
-".t12.t12[data-type="primary"] { border: var(--border-width) solid var(--clear-color); }
-.t12.t12[data-pressed]:not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .3); }
-.t12.t12:not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .15); }
-.t12.t12 { background-color: oklch(var(--primary-color-oklch) / .10); }
-.t11.t11 { padding: 16px; }"
+".tmipikk.tmipikk[data-type="primary"] { border: var(--border-width) solid var(--clear-color); }
+.tmipikk.tmipikk[data-pressed]:not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .3); }
+.tmipikk.tmipikk:not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .15); }
+.tmipikk.tmipikk { background-color: oklch(var(--primary-color-oklch) / .10); }
+.t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
-exports[`tasty() API > should be able to override styles 1`] = `".t7.t7 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch)/.1); --current-color-oklch: var(--black-color-oklch); }"`;
+exports[`tasty() API > should be able to override styles 1`] = `".tdiafv5.tdiafv5 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch)/.1); --current-color-oklch: var(--black-color-oklch); }"`;
 
 exports[`tasty() API > should create element styles 1`] = `
-".t13.t13[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t13.t13:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".tt6i54n.tt6i54n[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.tt6i54n.tt6i54n:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
-exports[`tasty() API > should define style props 1`] = `".t15.t15 { border: 1px solid var(--border-color, currentColor); }"`;
+exports[`tasty() API > should define style props 1`] = `".tms9l71.tms9l71 { border: 1px solid var(--border-color, currentColor); }"`;
 
-exports[`tasty() API > should fallback to default variant 1`] = `".t9.t9 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }"`;
+exports[`tasty() API > should fallback to default variant 1`] = `".t1qyzno6.t1qyzno6 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }"`;
 
-exports[`tasty() API > should handle color fallback syntax 1`] = `".t0.t0 { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color,var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch,var(--dark-04-color-oklch)); }"`;
+exports[`tasty() API > should handle color fallback syntax 1`] = `".t1x40q7f.t1x40q7f { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color,var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch,var(--dark-04-color-oklch)); }"`;
 
-exports[`tasty() API > should handle fill fallback syntax 1`] = `".t1.t1 { background-color: var(--surface-color, var(--white-color)); }"`;
+exports[`tasty() API > should handle fill fallback syntax 1`] = `".th5j7l3.th5j7l3 { background-color: var(--surface-color, var(--white-color)); }"`;
 
 exports[`tasty() API > should merge element styles 1`] = `
-".t14.t14[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t14.t14:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t14.t14 [data-element="Element"] { background-color: var(--black-color); }"
+".t2tusuk.t2tusuk[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t2tusuk.t2tusuk:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t2tusuk.t2tusuk [data-element="Element"] { background-color: var(--black-color); }"
 `;
 
 exports[`tasty() API > should merge styles 1`] = `
-".t6.t6[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t6.t6:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t6.t6 { background-color: var(--black-color); }"
+".t1rf8zks.t1rf8zks[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t1rf8zks.t1rf8zks:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t1rf8zks.t1rf8zks { background-color: var(--black-color); }"
 `;
 
 exports[`tasty() API > should merge styles in custom prop 1`] = `
-".t6.t6[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t6.t6:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t6.t6 { background-color: var(--black-color); }"
+".t1rf8zks.t1rf8zks[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t1rf8zks.t1rf8zks:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t1rf8zks.t1rf8zks { background-color: var(--black-color); }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 1`] = `
-".t21.t21[data-size="large"] { padding: 24px 0px 0px; }
-.t21.t21[data-size="medium"] { padding: 16px 0px 0px; }
-.t21.t21:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".tbbb46d.tbbb46d[data-size="large"] { padding: 24px 0px 0px; }
+.tbbb46d.tbbb46d[data-size="medium"] { padding: 16px 0px 0px; }
+.tbbb46d.tbbb46d:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 2`] = `
-".t22.t22[data-size="large"] { padding: 24px 0px 0px; }
-.t22.t22[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
-.t22.t22:not([data-size="large"]):is(:not([data-selected]), :not([data-size="medium"])) { padding: 8px 0px 0px; }"
+".tmkx54k.tmkx54k[data-size="large"] { padding: 24px 0px 0px; }
+.tmkx54k.tmkx54k[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
+.tmkx54k.tmkx54k:not([data-size="large"]):is(:not([data-selected]), :not([data-size="medium"])) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
-".t23.t23[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t23.t23:is([data-selected]:not([data-size="large"]):not([data-size="medium"]), [data-size="medium"]) { padding: 16px 0px 0px; }
-.t23.t23:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".t1c00a7t.t1c00a7t[data-selected][data-size="large"] { padding: 24px 0px 0px; }
+.t1c00a7t.t1c00a7t:is([data-selected]:not([data-size="large"]):not([data-size="medium"]), [data-size="medium"]) { padding: 16px 0px 0px; }
+.t1c00a7t.t1c00a7t:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
-exports[`tasty() API > should pass styles from tasty 1`] = `".t2.t2 { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch)/.1); --current-color-oklch: var(--clear-color-oklch); }"`;
+exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch)/.1); --current-color-oklch: var(--clear-color-oklch); }"`;
 
 exports[`tasty() API > should support camelCase modifiers 1`] = `
-".t5.t5[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t5.t5:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".t10vr46x.t10vr46x[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t10vr46x.t10vr46x:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`tasty() API > should support kebab-case modifiers 1`] = `
-".t4.t4[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t4.t4:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".tosqocm.tosqocm[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.tosqocm.tosqocm:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
 exports[`tasty() API > should support modifiers 1`] = `
-".t3.t3[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t3.t3:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".t9xq1h3.t9xq1h3[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
+.t9xq1h3.t9xq1h3:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
 `;
 
-exports[`tasty() API > should support variants 1`] = `".t8.t8 { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }"`;
+exports[`tasty() API > should support variants 1`] = `".t1dgbtn6.t1dgbtn6 { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }"`;

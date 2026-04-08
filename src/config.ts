@@ -405,7 +405,7 @@ let globalRecipes: Record<string, RecipeStyles> | null = null;
 let globalConfigTokens: ConfigTokens | null = null;
 
 // Global styles storage (injected as CSS for configured selectors)
-let configGlobalStyles: Record<string, Styles> | null = null;
+let globalStyles: Record<string, Styles> | null = null;
 
 // ============================================================================
 // Cross-module config sharing via globalThis
@@ -647,8 +647,8 @@ export function markStylesGenerated(): void {
   }
 
   // Inject configured global styles
-  if (configGlobalStyles) {
-    for (const [selector, styles] of Object.entries(configGlobalStyles)) {
+  if (globalStyles) {
+    for (const [selector, styles] of Object.entries(globalStyles)) {
       if (Object.keys(styles).length > 0) {
         const rules = renderStyles(styles, selector) as StyleResult[];
         if (rules.length > 0) {
@@ -957,9 +957,9 @@ function setGlobalConfigTokens(styles: ConfigTokens): void {
  * Returns null if no global styles configured.
  * Reads from globalThis first for cross-module SSR support.
  */
-export function getConfigGlobalStyles(): Record<string, Styles> | null {
+export function getGlobalStyles(): Record<string, Styles> | null {
   return (
-    configGlobalStyles ??
+    globalStyles ??
     getFromGlobalThis<Record<string, Styles>>(GTKEY_GLOBAL_STYLES) ??
     null
   );
@@ -969,7 +969,7 @@ export function getConfigGlobalStyles(): Record<string, Styles> | null {
  * Set configured global styles (called from configure).
  * Internal use only.
  */
-function setConfigGlobalStyles(styles: Record<string, Styles>): void {
+function setGlobalStyles(styles: Record<string, Styles>): void {
   if (stylesGenerated) {
     warnOnce(
       'globalStyles-after-styles',
@@ -978,16 +978,16 @@ function setConfigGlobalStyles(styles: Record<string, Styles>): void {
     );
     return;
   }
-  if (configGlobalStyles) {
+  if (globalStyles) {
     for (const [selector, selectorStyles] of Object.entries(styles)) {
-      configGlobalStyles[selector] = configGlobalStyles[selector]
-        ? { ...configGlobalStyles[selector], ...selectorStyles }
+      globalStyles[selector] = globalStyles[selector]
+        ? { ...globalStyles[selector], ...selectorStyles }
         : selectorStyles;
     }
   } else {
-    configGlobalStyles = { ...styles };
+    globalStyles = { ...styles };
   }
-  setOnGlobalThis(GTKEY_GLOBAL_STYLES, configGlobalStyles);
+  setOnGlobalThis(GTKEY_GLOBAL_STYLES, globalStyles);
 }
 
 /**
@@ -1233,7 +1233,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
 
   // Handle global styles
   if (Object.keys(mergedGlobalStyles).length > 0) {
-    setConfigGlobalStyles(mergedGlobalStyles);
+    setGlobalStyles(mergedGlobalStyles);
   }
 
   const {
@@ -1311,7 +1311,7 @@ export function resetConfig(): void {
   globalCounterStyle = null;
   globalRecipes = null;
   globalConfigTokens = null;
-  configGlobalStyles = null;
+  globalStyles = null;
   clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
   resetHandlers();

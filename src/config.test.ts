@@ -5,7 +5,7 @@ import {
   configure,
   resetConfig,
   getGlobalConfigTokens,
-  getConfigGlobalStyles,
+  getGlobalStyles,
 } from './config';
 
 describe('configure() presets', () => {
@@ -131,7 +131,7 @@ describe('configure() globalStyles', () => {
       },
     });
 
-    const styles = getConfigGlobalStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
     expect(styles!.body.color).toBe('red');
     expect(styles!.body.padding).toBe('2x');
@@ -158,7 +158,7 @@ describe('configure() globalStyles', () => {
       },
     });
 
-    const styles = getConfigGlobalStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
     expect(styles!.body.color).toBe('red');
     expect(styles!.body.padding).toBe('2x');
@@ -173,7 +173,7 @@ describe('configure() globalStyles', () => {
       },
     });
 
-    const styles = getConfigGlobalStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
     expect(styles!.body.color).toBe('red');
     expect(styles!.html.overflow).toBe('hidden');
@@ -182,14 +182,14 @@ describe('configure() globalStyles', () => {
   it('should return null when no globalStyles configured', () => {
     configure({});
 
-    const styles = getConfigGlobalStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeNull();
   });
 
   it('should ignore empty globalStyles object', () => {
     configure({ globalStyles: {} });
 
-    expect(getConfigGlobalStyles()).toBeNull();
+    expect(getGlobalStyles()).toBeNull();
   });
 
   it('should work with preset reference when presets defined in same configure call', () => {
@@ -211,7 +211,7 @@ describe('configure() globalStyles', () => {
     expect(tokens!['$t2-line-height']).toBe('1.5');
     expect(tokens!['$t2-font-weight']).toBe('400');
 
-    const styles = getConfigGlobalStyles();
+    const styles = getGlobalStyles();
     expect(styles).toBeDefined();
     expect(styles!.body.preset).toBe('t2');
     expect(styles!.body.margin).toBe(0);

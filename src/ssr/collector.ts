@@ -12,7 +12,7 @@
 
 import {
   getEffectiveProperties,
-  getConfigGlobalStyles,
+  getGlobalStyles,
   getGlobalCounterStyle,
   getGlobalFontFace,
   getGlobalConfigTokens,
@@ -91,7 +91,7 @@ export class ServerStyleCollector {
     }
 
     // Inject configured global styles
-    const globalStyles = getConfigGlobalStyles();
+    const globalStyles = getGlobalStyles();
     if (globalStyles) {
       for (const [selector, styles] of Object.entries(globalStyles)) {
         if (Object.keys(styles).length > 0) {

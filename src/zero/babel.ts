@@ -26,7 +26,7 @@ import { createJiti } from 'jiti';
 
 import {
   configure,
-  getConfigGlobalStyles,
+  getGlobalStyles,
   getGlobalConfigTokens,
   resetConfig,
 } from '../config';
@@ -303,7 +303,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       const tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
       if (tokenCSS) newWriter.add(':root:tokens', tokenCSS);
 
-      const globalStyles = getConfigGlobalStyles();
+      const globalStyles = getGlobalStyles();
       if (globalStyles) {
         for (const [selector, styles] of Object.entries(globalStyles)) {
           const css = extractCSSFromStyles(selector, styles);
@@ -331,7 +331,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   let globalStylesCSS: Map<string, string> | undefined;
   if (mode === 'inject') {
     tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
-    const gs = getConfigGlobalStyles();
+    const gs = getGlobalStyles();
     if (gs) {
       globalStylesCSS = new Map();
       for (const [selector, styles] of Object.entries(gs)) {

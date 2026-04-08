@@ -59,7 +59,12 @@ function assertRootCondition(node: ConditionNode): RootCondition {
   return node;
 }
 
+import { getConditionUniqueId } from './conditions';
 import { clearPipelineCache, renderStyles } from './index';
+import { clearSimplifyCache } from './simplify';
+import { clearConditionCache } from './materialize';
+import { configure, resetConfig } from '../config';
+import type { StyleResult } from './index';
 
 describe('ConditionNode operations', () => {
   describe('and()', () => {
@@ -3379,5 +3384,192 @@ describe('Value mod partial-match operators', () => {
       );
       expect(rule).toBeDefined();
     });
+  });
+});
+
+describe('Token CSS deduplication with compound states', () => {
+  beforeEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+
+    configure({
+      colorSpace: 'rgb',
+      states: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    });
+  });
+
+  afterEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+  });
+
+  it('should not produce duplicate :root rules when dark == dark+HC', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // Verify no duplicate selector+atRules combinations
+    const selectorCounts = new Map<string, number>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}`;
+      selectorCounts.set(key, (selectorCounts.get(key) ?? 0) + 1);
+    }
+
+    for (const [key, count] of selectorCounts) {
+      expect(count, `Duplicate rule detected for selector: ${key}`).toBe(1);
+    }
+
+    // All dark-value rules (containing '11 52 59') should not also
+    // contain 'data-contrast', since that dimension is irrelevant
+    // when dark and dark+HC have the same value.
+    const darkValueRules = result.filter(
+      (r) =>
+        r.declarations.includes('11 52 59') &&
+        !r.declarations.includes('180 180 180') &&
+        !r.declarations.includes('200 200 200'),
+    );
+    for (const rule of darkValueRules) {
+      expect(
+        rule.selector,
+        'Dark-only rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
+  });
+
+  it('should simplify (A & B) | (A & !B) to A', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const B = createModifierCondition('data-contrast', 'more');
+    const notB = not(B);
+
+    // (A & B) | (A & !B) should simplify to A
+    const condition = or(and(A, B), and(A, notB));
+    const simplified = simplifyCondition(condition);
+
+    expect(simplified.kind).toBe('state');
+    if (simplified.kind === 'state') {
+      expect(simplified.attribute).toBe('data-schema');
+      expect(simplified.value).toBe('dark');
+    }
+  });
+
+  it('should absorb A | (A & B) where A is simple', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const B = createModifierCondition('data-contrast', 'more');
+    const result = simplifyCondition(or(A, and(A, B)));
+    expect(result).toEqual(A);
+  });
+
+  it('should absorb A | (A & B) where A is compound OR', () => {
+    const X = createModifierCondition('data-schema', 'dark');
+    const Y = createModifierCondition('data-foo', 'bar');
+    const A = or(X, Y); // A = X | Y
+    const B = createModifierCondition('data-contrast', 'more');
+    const result = simplifyCondition(or(A, and(A, B)));
+    // After flattening: or(X, Y, and(or(X,Y), B))
+    // A = or(X, Y) should be reconstructed and absorb and(A, B)
+    expect(getConditionUniqueId(result)).toBe(getConditionUniqueId(A));
+  });
+
+  it('should simplify A | (A & B) via absorption with parsed states', () => {
+    const ctx = {
+      localPredefinedStates: {},
+      globalPredefinedStates: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    };
+    const darkRoot = parseStateKey('@dark-root', { context: ctx });
+    const hcRoot = parseStateKey('@high-contrast-root', { context: ctx });
+
+    // Verify the structure before combining
+    const andAB = and(darkRoot, hcRoot);
+
+    // Check if `and()` returns the same node or builds an AND compound
+    expect(andAB.kind).toBe('compound');
+    if (andAB.kind === 'compound') {
+      expect(andAB.operator).toBe('AND');
+      // The AND should have darkRoot and hcRoot as children
+      // Check if A (darkRoot) is still a child by uniqueId
+      const childIds = andAB.children.map(getConditionUniqueId);
+      const darkId = getConditionUniqueId(darkRoot);
+      expect(childIds).toContain(darkId);
+    }
+
+    // A | (A & B) should simplify to A
+    const combined = or(darkRoot, andAB);
+    const simplified = simplifyCondition(combined);
+
+    const simplifiedId = getConditionUniqueId(simplified);
+    const darkId = getConditionUniqueId(darkRoot);
+    expect(simplifiedId).toBe(darkId);
+  });
+
+  it('should simplify compound OR with nested complementary AND terms', () => {
+    // Simulates the actual condition produced by:
+    //   @dark-root = schema=dark | (!schema & @media(prefers-color-scheme: dark))
+    //   @high-contrast-root = contrast=more | (!contrast & @media(prefers-contrast: more))
+    //
+    // When dark == dark+HC, mergeByValue produces:
+    //   (dark_branch0 & hc_branch0) | (dark_branch0 & !hc_branch0_not_hc_branch1)
+    // which should simplify back to dark_branch0.
+    const darkAttr = createModifierCondition('data-schema', 'dark');
+    const hcAttr = createModifierCondition('data-contrast', 'more');
+    const notHcAttr = not(hcAttr);
+
+    // (dark & hc) | (dark & !hc) → dark
+    const cond = or(and(darkAttr, hcAttr), and(darkAttr, notHcAttr));
+    const simplified = simplifyCondition(cond);
+
+    expect(simplified.kind).toBe('state');
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(darkAttr),
+    );
+  });
+
+  it('should merge dark and dark+HC into a single dark rule when values match', () => {
+    const tokens = {
+      '#shadow-border': {
+        '': 'rgb(200 200 200)',
+        '@dark-root': 'rgb(11 52 59)',
+        '@high-contrast-root': 'rgb(180 180 180)',
+        '@dark-root & @high-contrast-root': 'rgb(11 52 59)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    const darkRules = result.filter(
+      (r) =>
+        r.declarations.includes('11 52 59') &&
+        !r.declarations.includes('180 180 180') &&
+        !r.declarations.includes('200 200 200'),
+    );
+
+    for (const rule of darkRules) {
+      expect(
+        rule.selector,
+        'Dark-only rule should not reference data-contrast',
+      ).not.toContain('data-contrast');
+    }
   });
 });

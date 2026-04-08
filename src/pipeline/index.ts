@@ -38,6 +38,7 @@ import {
   expandExclusiveOrs,
   expandOrConditions,
   isValueMapping,
+  mergeEntriesByValue,
   parseStyleEntries,
 } from './exclusive';
 import type { CSSRule, SelectorVariant } from './materialize';
@@ -293,10 +294,15 @@ function processStyles(
           parseStateKey(stateKey, { context: parserContext }),
         );
 
+        // Merge entries that share the same value before exclusive
+        // expansion. This prevents combinatorial blowup when e.g.
+        // @dark and @dark & @high-contrast map to the same color.
+        const merged = mergeEntriesByValue(parsed);
+
         // Expand OR conditions into exclusive branches
         // This ensures OR branches like `A | B | C` become:
         //   A, B & !A, C & !A & !B
-        const expanded = expandOrConditions(parsed);
+        const expanded = expandOrConditions(merged);
 
         // Build exclusive conditions across all entries
         const exclusive = buildExclusiveConditions(expanded);

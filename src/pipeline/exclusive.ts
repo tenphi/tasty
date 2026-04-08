@@ -9,7 +9,7 @@
 import type { StyleValue } from '../utils/styles';
 
 import type { ConditionNode } from './conditions';
-import { and, isCompoundCondition, not, trueCondition } from './conditions';
+import { and, isCompoundCondition, not, or, trueCondition } from './conditions';
 import { simplifyCondition } from './simplify';
 
 // ============================================================================
@@ -136,6 +136,82 @@ export function parseStyleEntries(
   entries.reverse();
 
   return entries;
+}
+
+/**
+ * Merge parsed entries that share the same value.
+ *
+ * When multiple state keys map to the same value, their conditions can
+ * be combined with OR and treated as a single entry. This must happen
+ * **before** exclusive expansion and OR branch splitting to avoid
+ * combinatorial explosion and duplicate CSS output.
+ *
+ * Example: `{ '@dark': 'red', '@dark & @hc': 'red' }` merges into a
+ * single entry with condition `@dark | (@dark & @hc)` = `@dark`.
+ *
+ * Entries are ordered highest-priority-first. The merged entry keeps the
+ * highest priority of the group.
+ */
+export function mergeEntriesByValue(
+  entries: ParsedStyleEntry[],
+): ParsedStyleEntry[] {
+  if (entries.length <= 1) return entries;
+
+  const groups = new Map<
+    string,
+    { entries: ParsedStyleEntry[]; maxPriority: number }
+  >();
+
+  for (const entry of entries) {
+    const valueKey = serializeValue(entry.value);
+    const group = groups.get(valueKey);
+    if (group) {
+      group.entries.push(entry);
+      group.maxPriority = Math.max(group.maxPriority, entry.priority);
+    } else {
+      groups.set(valueKey, { entries: [entry], maxPriority: entry.priority });
+    }
+  }
+
+  // If no merges possible, return as-is
+  if (groups.size === entries.length) return entries;
+
+  const merged: ParsedStyleEntry[] = [];
+  for (const [, group] of groups) {
+    if (group.entries.length === 1) {
+      merged.push(group.entries[0]);
+      continue;
+    }
+
+    // Combine conditions with OR, then simplify
+    const combinedCondition = simplifyCondition(
+      or(...group.entries.map((e) => e.condition)),
+    );
+
+    // Combine state keys for debugging
+    const combinedStateKey = group.entries.map((e) => e.stateKey).join(' | ');
+
+    merged.push({
+      styleKey: group.entries[0].styleKey,
+      stateKey: combinedStateKey,
+      value: group.entries[0].value,
+      condition: combinedCondition,
+      priority: group.maxPriority,
+    });
+  }
+
+  // Re-sort by priority (highest first)
+  merged.sort((a, b) => b.priority - a.priority);
+
+  return merged;
+}
+
+function serializeValue(value: StyleValue): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'string' || typeof value === 'number') {
+    return String(value);
+  }
+  return JSON.stringify(value);
 }
 
 /**

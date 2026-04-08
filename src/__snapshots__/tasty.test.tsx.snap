@@ -18,7 +18,7 @@ exports[`tasty() API > should allow nested modifiers 1`] = `
 `;
 
 exports[`tasty() API > should apply extend-mode base styles on top of variant 1`] = `
-".t13tun0x.t13tun0x:is([data-disabled]:not([data-type="primary"]), [data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
+".t13tun0x.t13tun0x:is([data-disabled], [data-type="primary"]:not([data-disabled])) { border: var(--border-width) solid var(--clear-color); }
 .t13tun0x.t13tun0x[data-pressed]:not([data-disabled]):not([data-type="primary"]) { border: var(--border-width) solid var(--primary-text-color); }
 .t13tun0x.t13tun0x:not([data-disabled]):not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--white-color-oklch) / .2); }
 .t13tun0x.t13tun0x[data-hovered] { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }

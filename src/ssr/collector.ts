@@ -12,7 +12,7 @@
 
 import {
   getEffectiveProperties,
-  getGlobalBodyStyles,
+  getConfigGlobalStyles,
   getGlobalCounterStyle,
   getGlobalFontFace,
   getGlobalConfigTokens,
@@ -90,14 +90,18 @@ export class ServerStyleCollector {
       }
     }
 
-    // Inject configured body styles
-    const bodyStyles = getGlobalBodyStyles();
-    if (bodyStyles && Object.keys(bodyStyles).length > 0) {
-      const bodyRules = renderStyles(bodyStyles, 'body') as StyleResult[];
-      if (bodyRules.length > 0) {
-        const css = formatGlobalRules(bodyRules);
-        if (css) {
-          this.collectGlobalStyles('__global:bodyStyles', css);
+    // Inject configured global styles
+    const globalStyles = getConfigGlobalStyles();
+    if (globalStyles) {
+      for (const [selector, styles] of Object.entries(globalStyles)) {
+        if (Object.keys(styles).length > 0) {
+          const rules = renderStyles(styles, selector) as StyleResult[];
+          if (rules.length > 0) {
+            const css = formatGlobalRules(rules);
+            if (css) {
+              this.collectGlobalStyles(`__global:styles:${selector}`, css);
+            }
+          }
         }
       }
     }

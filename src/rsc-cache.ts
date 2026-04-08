@@ -12,14 +12,12 @@ import { cache } from 'react';
 
 import type { ServerStyleCollector } from './ssr/collector';
 import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
+import { hashString } from './utils/hash';
 
 export interface RSCStyleCache {
   cacheKeyToClassName: Map<string, string>;
-  classCounter: number;
   emittedKeys: Set<string>;
   internalsEmitted: boolean;
-  keyframesCounter: number;
-  counterStyleCounter: number;
   pendingCSS: string[];
   /** Maps dedup key -> generated name for keyframes and counter-styles in RSC mode. */
   generatedNames: Map<string, string>;
@@ -33,11 +31,8 @@ export interface RSCStyleCache {
 export const getRSCCache = cache(
   (): RSCStyleCache => ({
     cacheKeyToClassName: new Map(),
-    classCounter: 0,
     emittedKeys: new Set(),
     internalsEmitted: false,
-    keyframesCounter: 0,
-    counterStyleCounter: 0,
     pendingCSS: [],
     generatedNames: new Map(),
   }),
@@ -50,8 +45,9 @@ export function rscAllocateClassName(
   const existing = rscCache.cacheKeyToClassName.get(cacheKey);
   if (existing) return { className: existing, isNew: false };
 
-  // Use 'r' prefix to avoid collisions with SSR collector's 't' prefix
-  const className = `r${rscCache.classCounter++}`;
+  // Content-hash ensures stable names across requests, preventing
+  // class collisions during client-side navigation in Next.js App Router.
+  const className = `r${hashString(cacheKey)}`;
   rscCache.cacheKeyToClassName.set(cacheKey, className);
   return { className, isNew: true };
 }

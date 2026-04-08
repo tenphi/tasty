@@ -3,6 +3,7 @@ import type { KeyframesSteps } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
 import { depsEqual } from '../utils/deps-equal';
+import { hashString } from '../utils/hash';
 
 interface UseKeyframesOptions {
   name?: string;
@@ -130,7 +131,7 @@ export function useKeyframes(
     const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName = opts?.name ?? `k${target.cache.keyframesCounter++}`;
+    const actualName = opts?.name ?? `k${hashString(serializedContent)}`;
     const css = formatKeyframesCSS(actualName, steps);
     pushRSCCSS(target.cache, key, css);
     target.cache.generatedNames.set(key, actualName);

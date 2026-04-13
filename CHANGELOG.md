@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.0.1
+
+### Patch Changes
+
+- [`bf19368`](https://github.com/tenphi/tasty/commit/bf19368e093f66111b3834305b9383e2015c0f6a) Thanks [@tenphi](https://github.com/tenphi)! - Fix `tastyDebug` sorting of class names. The internal `sortTastyClasses` helper still parsed class names as decimal integers, which silently produced unsorted output for the 2.0.0 base36 hash format (e.g. `t3a5f`). It now sorts lexicographically, restoring stable ordering in `tastyDebug.cache()`, `tastyDebug.summary()`, and related outputs.
+
 ## 2.0.0
 
 ### Major Changes

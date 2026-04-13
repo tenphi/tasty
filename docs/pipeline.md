@@ -6,56 +6,109 @@ This document describes the style rendering pipeline that transforms style objec
 
 ## Overview
 
-The pipeline takes a `Styles` object and produces an array of `CSSRule` objects ready for injection into the DOM. Entry points include `renderStylesPipeline` (full pipeline + optional class-name prefixing) and `renderStyles` (direct selector/class mode). The per-handler flow has seven main stages:
+The pipeline takes a `Styles` object and produces an array of `CSSRule` objects ready for injection into the DOM. Entry points include `renderStylesPipeline` (full pipeline + optional class-name prefixing) and `renderStyles` (direct selector/class mode). The per-handler flow is:
 
 ```
 Input: Styles Object
          ↓
-    ┌─────────────────────────────────────┐
-    │  1. PARSE CONDITIONS                │
-    │     parseStyleEntries + parseStateKey│
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  0. PRE-PARSE NORMALIZATION              │
+    │     extractCompoundStates                │
+    │     (drop don't-care AND atoms)          │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  2. BUILD EXCLUSIVE CONDITIONS      │
-    │     Negate higher-priority entries  │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  1. PARSE CONDITIONS                     │
+    │     parseStyleEntries + parseStateKey    │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  3. EXPAND AT-RULE OR BRANCHES       │
-    │     expandExclusiveOrs (when needed)│
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  1b. MERGE ENTRIES BY VALUE              │
+    │     mergeEntriesByValue                  │
+    │     (collapse same-value non-defaults)   │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  4. COMPUTE STATE COMBINATIONS      │
-    │     Cartesian product across styles │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  2a. EXPAND USER OR BRANCHES             │
+    │     expandOrConditions                   │
+    │     (A | B | C → A, B&!A, C&!A&!B)       │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  5. CALL HANDLERS                   │
-    │     Compute CSS declarations        │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  2b. BUILD EXCLUSIVE CONDITIONS          │
+    │     Negate higher-priority entries       │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  6. MERGE BY VALUE                  │
-    │     Combine rules with same output  │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  3. EXPAND DE MORGAN OR BRANCHES         │
+    │     expandExclusiveOrs                   │
+    │     (only for at-rule ORs from negation) │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  7. MATERIALIZE CSS                 │
-    │     Condition → selectors + at-rules│
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  4. COMPUTE STATE COMBINATIONS           │
+    │     Cartesian product across styles      │
+    └──────────────────────────────────────────┘
          ↓
-    ┌─────────────────────────────────────┐
-    │  runPipeline: dedupe identical rules │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  5. CALL HANDLERS                        │
+    │     Compute CSS declarations             │
+    └──────────────────────────────────────────┘
+         ↓
+    ┌──────────────────────────────────────────┐
+    │  6. MERGE BY VALUE                       │
+    │     Combine rules with same output       │
+    └──────────────────────────────────────────┘
+         ↓
+    ┌──────────────────────────────────────────┐
+    │  7. MATERIALIZE CSS                      │
+    │     Condition → selectors + at-rules     │
+    └──────────────────────────────────────────┘
+         ↓
+    ┌──────────────────────────────────────────┐
+    │  runPipeline post-pass:                  │
+    │  - dedupe identical rules                │
+    │  - emit @starting-style rules last       │
+    └──────────────────────────────────────────┘
          ↓
 Output: CSSRule[]
 ```
 
-**Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization as needed.
+**Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside OR expansion, exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization. Every call is cached by condition unique-id, so the repetition is cheap.
 
-**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle` so identical emitted rules appear once.
+**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts:188`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle` and then reorders rules so every `@starting-style` rule is emitted **after** all normal rules. This ordering is cascade-critical: `@starting-style` rules share specificity with their normal counterparts, and source order decides which value wins.
+
+---
+
+## Stage 0: Pre-parse Normalization
+
+**File:** `exclusive.ts` (`extractCompoundStates`)
+
+### What It Does
+
+Runs on each style's value map **before** any parsing. If a compound AND state key shares a value with the "atom absent" variant, the atom is a don't-care and every key is simplified by dropping it. Duplicate keys collapse.
+
+### How It Works
+
+1. Gather the unique set of top-level AND atoms across all keys.
+2. An atom is **redundant** when every entry that contains it has a same-value partner with the atom absent and the rest of the atoms identical.
+3. Keys containing `|`, `^`, or `,` at top level are treated as opaque single atoms (they don't participate in atom-level extraction).
+4. Drop redundant atoms from every key; collapse duplicates.
+
+### Why
+
+Removing don't-care dimensions before parsing prevents combinatorial blowup in later stages. `mergeEntriesByValue`, `buildExclusiveConditions`, and materialization all see fewer entries and fewer spurious conditions. Implemented as part of the Apr 2026 fix for overlapping CSS rules (commit 7cd9dbe).
+
+### Example
+
+```typescript
+// Input (value map)
+{ '': 'A', '@dark': 'B', '@hc': 'A', '@dark & @hc': 'B' }
+// @hc is a don't-care: its presence never changes the value.
+
+// Output
+{ '': 'A', '@dark': 'B' }
+```
 
 ---
 
@@ -120,7 +173,75 @@ The condition tree representation enables:
 
 ---
 
-## Stage 2: Build Exclusive Conditions
+## Stage 1b: Merge Entries By Value
+
+**File:** `exclusive.ts` (`mergeEntriesByValue`)
+
+### What It Does
+
+Collapses parsed entries that share the same value. Only **non-default** entries are merged — an entry with the default state (`''` → `TrueCondition`) is never merged with a non-default entry.
+
+### How It Works
+
+1. Group entries by serialized value.
+2. Within each group, split out default (TRUE) entries.
+3. Keep default entries as-is; they must retain TRUE so they participate correctly in exclusive building.
+4. Combine non-default entries into a single entry with condition `OR(e1.condition, e2.condition, …)`, simplified via `simplifyCondition`. The merged entry keeps the **highest** priority in the group.
+5. Re-sort by priority (highest first).
+
+### Why
+
+Without this, a value map like `{ '@dark': 'red', '@dark & @hc': 'red' }` would create two separate entries that later produce two CSS rules with identical output. Merging before exclusive building keeps the exclusive condition algebra small and avoids duplicate CSS.
+
+**Why defaults are kept separate:** merging `TRUE | X` collapses to `TRUE`, destroying X's participation in the exclusive cascade. Intermediate-priority states would then lose their `:not(X)` negation, producing overlapping CSS rules. See `exclusive.ts:140-160` for the rationale.
+
+### Example
+
+```typescript
+// Input entries (highest priority first)
+[
+  { stateKey: '@dark & @hc', value: 'red', condition: dark & hc },
+  { stateKey: '@dark',       value: 'red', condition: dark     },
+]
+
+// Output: one merged entry
+[
+  { stateKey: '@dark & @hc | @dark', value: 'red',
+    condition: simplify((dark & hc) | dark) = dark }
+]
+```
+
+---
+
+## Stage 2a: Expand User OR Branches
+
+**File:** `exclusive.ts` (`expandOrConditions`)
+
+### What It Does
+
+Runs **before** `buildExclusiveConditions`. Splits any user-authored OR in a parsed entry's condition into multiple sibling entries, each made exclusive against the OR branches that come before it.
+
+### How It Works
+
+For an entry with condition `A | B | C`:
+
+```
+A            (first branch, no prior)
+B & !A       (second branch exclusive from first)
+C & !A & !B  (third branch exclusive from first two)
+```
+
+Each expanded branch gets a `stateKey` suffix like `[0]`, `[1]`, `[2]`. Branches that simplify to `FALSE` are dropped. Branches inherit the original entry's priority.
+
+This pass does **not** sort branches — user ORs are authored in the natural order they appear and aren't the product of De Morgan negation, so at-rule-aware sorting isn't required here (that's Stage 3's job).
+
+### Why
+
+Running this before exclusive building means the Stage 2b negation cascade sees one branch per entry and never has to reason about nested ORs while computing `!prior`. It also avoids emitting overlapping CSS rules: `{ 'compact | @media(dark)': 'red' }` becomes two mutually exclusive entries rather than one rule whose two branches could both match simultaneously.
+
+---
+
+## Stage 2b: Build Exclusive Conditions
 
 **File:** `exclusive.ts` (`buildExclusiveConditions`)
 
@@ -167,28 +288,41 @@ This eliminates CSS specificity wars. Instead of relying on cascade order, each 
 
 ---
 
-## Stage 3: Expand At-Rule OR Branches
+## Stage 3: Expand De Morgan OR Branches
 
-**File:** `exclusive.ts` (`expandExclusiveOrs`)
+**File:** `exclusive.ts` (`expandExclusiveOrs`, `sortOrBranchesForExpansion`)
 
 ### What It Does
 
-Runs **after** `buildExclusiveConditions`. When an entry’s **exclusive** condition contains a top-level OR that mixes **at-rule** context (`media`, `container`, `supports`, `starting`) with other branches, those ORs are split into mutually exclusive branches so each branch keeps the correct at-rule wrapping (e.g. after De Morgan: `!(A & B)` → `!A | !B`).
+Runs **after** `buildExclusiveConditions`. Handles ORs that arise **during** exclusive building from De Morgan negation — e.g. when a higher-priority condition `A & B` gets negated into the next entry's exclusive as `!(A & B) = !A | !B`. When such an OR mixes **at-rule** context (`media`, `container`, `supports`, `starting`) with other branches, each branch needs to keep its own at-rule wrapping.
+
+This is the companion to **Stage 2a** (user-OR expansion). The split exists because the two passes have different data and different correctness needs:
+
+| Stage | Runs on | Sees ORs from | Sorts branches? |
+|---|---|---|---|
+| 2a `expandOrConditions` | `ParsedStyleEntry.condition` | User-authored `|` in state keys | No — user order is stable |
+| 3 `expandExclusiveOrs` | `ExclusiveStyleEntry.exclusiveCondition` | De Morgan negation inside `buildExclusiveConditions` | Yes — at-rule branches first |
 
 ### How It Works
 
 1. Collect top-level OR branches of `exclusiveCondition`.
-2. If there is no OR, or **no** branch involves at-rule context, the entry is unchanged (pure selector ORs are handled later via `:is()` / variant merging in materialization).
-3. Otherwise, branches are sorted with `sortOrBranchesForExpansion` so at-rule-heavy branches come first, then each branch is made exclusive against prior branches: `branch & !prior[0] & !prior[1] & ...`, then simplified.
-4. Impossible branches are dropped; expanded entries get a synthetic `stateKey` suffix like `[or:0]`.
+2. If there is no OR (single branch), the entry is unchanged. Pure selector ORs with no at-rule context are also left alone (materialization handles them via `:is()` / variant merging).
+3. Otherwise `sortOrBranchesForExpansion` reorders branches so at-rule-heavy branches come first. This is load-bearing for correctness (see below).
+4. Each branch is made exclusive against prior branches: `branch & !prior[0] & !prior[1] & ...`, then simplified.
+5. Impossible branches are dropped; expanded entries get a synthetic `stateKey` suffix like `[or:0]`.
 
-### Why
+### Why the sort matters
 
-Without this pass, a condition like `!(@supports & :has)` could produce one rule missing the `@supports` wrapper. Exclusive OR expansion ensures negated at-rule groups still nest modifiers correctly.
+Consider `!A | !B` where A is an at-rule (e.g. `@supports(grid)`) and B is a modifier (e.g. `:has(foo)`):
+
+- **With at-rule-first sort** (`!A`, then `!B & A`): the first branch emits "outside `@supports`", the second emits "inside `@supports` with `:not(:has(foo))`". Full coverage.
+- **Without the sort** (`!B`, then `!A & B`): the first branch emits `:not(:has(foo))` as a bare selector with no at-rule context — leaking the rule outside `@supports`. The second is incomplete.
+
+The pre-build Stage 2a pass doesn't need this because user-authored ORs aren't produced by negation and their branches are expected to apply in each branch's own scope.
 
 ### Example (conceptual)
 
-See the comment block in `exclusive.ts` (~195–206): a default value’s exclusive condition can become `!@supports | !:has`; expansion yields one branch under `@supports (not …)` and another under `@supports (…) { :not(:has()) }` instead of a bare `:not(:has())` rule.
+See the comment block in `exclusive.ts:500-523`: a default value whose higher-priority sibling is `@supports(...) & :has(...)` gets an exclusive of `!@supports | !:has`. Expansion yields one branch under `@supports (not ...)` and another under `@supports (...) { :not(:has()) }` instead of a bare `:not(:has())` rule.
 
 ---
 
@@ -402,16 +536,20 @@ Applies boolean algebra rules to reduce condition complexity and detect impossib
    - `A & (A | B) = A`
    - `A | (A & B) = A`
 
-7. **Range intersection**: For **media and container** dimension queries, impossible ranges simplify to `FALSE` (e.g. `@media(w > 400px) & @media(w < 300px)`).
+7. **Range intersection**: For **media and container** dimension queries, impossible ranges simplify to `FALSE` (e.g. `@media(w > 400px) & @media(w < 300px)`). Ranges with compatible bounds are also merged in place (`w >= 400 & w <= 800` → a single bounded range).
 
 8. **Container style queries**: Conflicting or redundant `@container` style conditions on the same property can be reduced (see `simplify.ts` around the container-style conflict pass).
 
 9. **Attribute conflict detection**:
    - `[data-theme="dark"] & [data-theme="light"] = FALSE`
 
+10. **Complementary factoring** (OR context): `(A & B) | (A & !B) = A`. Also works on **compound complements** — if two AND-clauses differ only by a child that is a compound negation of the other (e.g. `X` vs `!X` where X is itself `(P & Q)`), the clauses factor correctly.
+
+11. **Consensus / resolution** (AND context, dual of #10): `(A | B) & (A | !B) = A`. Added in commit f9038bd to eliminate overlapping CSS selectors from compound-state OR branches.
+
 ### Why
 
-Simplification reduces CSS output size and catches impossible combinations early, preventing invalid CSS rules from being generated.
+Simplification reduces CSS output size and catches impossible combinations early, preventing invalid CSS rules from being generated. Every `simplifyCondition` call is memoized by the condition's unique id, so the cost of running it many times across stages is negligible after the first hit.
 
 ---
 
@@ -452,7 +590,15 @@ const styles = {
 'hovered' → ModifierCondition(attribute: 'data-hovered')
 ```
 
-### Stages 2–3: Exclusive conditions + expand OR
+### Stage 0 + 1b: Normalization
+
+No compound AND keys, no same-value duplicates — the value map is unchanged.
+
+### Stage 1 + 2a: Parse and expand user ORs
+
+No user ORs — three entries pass through unchanged.
+
+### Stage 2b + 3: Exclusive conditions + De Morgan expansion
 
 Processing order (highest priority first): `hovered`, `@media(dark)`, default.
 
@@ -462,7 +608,7 @@ hovered: [data-hovered]
 !hovered & !@media(dark): :not([data-hovered]) & not @media(dark)
 ```
 
-No at-rule OR expansion needed on these exclusives.
+The default entry's exclusive is `!hovered & !@media(dark)` — no top-level OR, so Stage 3 expansion does nothing. If a higher-priority entry had been `@media(dark) & :has(foo)`, the default's exclusive would have expanded via De Morgan into two at-rule-aware branches (see Stage 3 for that scenario).
 
 ### Stages 4–5: Compute combinations and call handler
 
@@ -506,9 +652,17 @@ Using `renderStyles(styles, '.t1')` (single class prefix; `renderStylesPipeline`
 
 Rather than relying on CSS cascade rules, we generate mutually exclusive selectors. This makes styling predictable and debuggable.
 
-### 2. OR Handling: DNF, `:is()`, and `expandExclusiveOrs`
+### 2. OR Handling in Three Layers
 
-OR of conditions is ultimately expressed as DNF (OR of ANDs) for CSS—comma-separated selectors, multiple rules, or `:is()` / `:not()` groups. **User-authored** ORs on pure selector conditions are handled in materialization. **`expandExclusiveOrs`** is an additional, **post-exclusive** pass for ORs that appear on **exclusive** conditions and involve **at-rule** branches (often from De Morgan on `@supports` / `@media` / `@container` / `@starting`), so each branch keeps correct at-rule nesting.
+Boolean OR appears in three different shapes during the pipeline, and each is handled where it's cheapest to get right:
+
+1. **User-authored ORs in state keys** (Stage 2a, `expandOrConditions`): A user-authored condition like `'compact | @media(w < 768px)'` is split into multiple exclusive entries **before** exclusive building so the negation cascade doesn't have to reason about nested ORs.
+
+2. **De Morgan ORs from negation** (Stage 3, `expandExclusiveOrs`): When `buildExclusiveConditions` negates a higher-priority compound like `A & B`, the result is `!A | !B`. If branches involve at-rules, they're split with `sortOrBranchesForExpansion` so at-rule context is preserved per branch.
+
+3. **Pure selector ORs** (materialization): ORs that only mention modifiers/pseudos are kept intact until the `conditionToCSS` layer, where they're merged into `:is()` / `:not()` groups or emitted as comma-separated selectors. There's no gain from expanding these earlier — CSS already has compact syntax for selector-only disjunction.
+
+Ultimately every emitted CSS rule corresponds to one conjunctive clause (DNF), produced by whichever of the three paths handled the OR.
 
 ### 3. Early Contradiction Detection
 

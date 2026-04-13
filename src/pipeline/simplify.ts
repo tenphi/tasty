@@ -110,7 +110,8 @@ function simplifyInner(node: ConditionNode): ConditionNode {
 function simplifyAnd(children: ConditionNode[]): ConditionNode {
   let terms: ConditionNode[] = [];
 
-  // Flatten nested ANDs and handle TRUE/FALSE
+  // ─── Pass 1: flatten + identity/annihilator ────────────────────────────
+  // Flatten nested ANDs, drop TRUE children, short-circuit on any FALSE.
   for (const child of children) {
     if (child.kind === 'false') {
       // AND with FALSE → FALSE
@@ -138,6 +139,9 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     return terms[0];
   }
 
+  // ─── Pass 2: filter contradictions ─────────────────────────────────────
+  // Any of these indicates the conjunction can never be satisfied.
+
   // Check for contradictions
   if (hasContradiction(terms)) {
     return falseCondition();
@@ -158,6 +162,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     return falseCondition();
   }
 
+  // ─── Pass 3: redundancy elimination + canonicalization ─────────────────
+
   // Remove redundant negations implied by positive terms
   // e.g., style(--variant: danger) implies NOT style(--variant: success)
   // and style(--variant: danger) implies style(--variant) (existence)
@@ -171,6 +177,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
 
   // Sort for canonical form
   terms = sortTerms(terms);
+
+  // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
 
   // Apply absorption: A & (A | B) → A
   terms = applyAbsorptionAnd(terms);
@@ -199,7 +207,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
 function simplifyOr(children: ConditionNode[]): ConditionNode {
   let terms: ConditionNode[] = [];
 
-  // Flatten nested ORs and handle TRUE/FALSE
+  // ─── Pass 1: flatten + identity/annihilator ────────────────────────────
+  // Flatten nested ORs, drop FALSE children, short-circuit on any TRUE.
   for (const child of children) {
     if (child.kind === 'true') {
       // OR with TRUE → TRUE
@@ -227,16 +236,21 @@ function simplifyOr(children: ConditionNode[]): ConditionNode {
     return terms[0];
   }
 
-  // Check for tautologies (A | !A)
+  // ─── Pass 2: filter tautologies ────────────────────────────────────────
+  // A | !A means the disjunction is always satisfied.
   if (hasTautology(terms)) {
     return trueCondition();
   }
+
+  // ─── Pass 3: redundancy elimination + canonicalization ─────────────────
 
   // Deduplicate
   terms = deduplicateTerms(terms);
 
   // Sort for canonical form
   terms = sortTerms(terms);
+
+  // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
 
   // Apply absorption: A | (A & B) → A
   terms = applyAbsorptionOr(terms);

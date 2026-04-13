@@ -23,198 +23,43 @@ import {
   not,
 } from './conditions';
 import { simplifyCondition } from './simplify';
+import {
+  dedupeContainerConditions,
+  dedupeMediaConditions,
+  dedupeSupportsConditions,
+  hasContainerStyleContradiction,
+  hasMediaContradiction,
+  hasSupportsContradiction,
+} from './materialize-contradictions';
+import type {
+  CSSComponents,
+  CSSRule,
+  ParentGroup,
+  ParsedContainerCondition,
+  ParsedMediaCondition,
+  ParsedModifierCondition,
+  ParsedPseudoCondition,
+  ParsedSelectorCondition,
+  ParsedSupportsCondition,
+  SelectorGroup,
+  SelectorVariant,
+} from './materialize-types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * Parsed media condition for structured analysis and combination
- */
-export interface ParsedMediaCondition {
-  /** Subtype for structured analysis */
-  subtype: 'dimension' | 'feature' | 'type';
-  /** Whether this is a negated condition */
-  negated: boolean;
-  /** The condition part for CSS output (e.g., "(width < 600px)", "print") */
-  condition: string;
-  /** For dimension queries: dimension name */
-  dimension?: 'width' | 'height' | 'inline-size' | 'block-size';
-  /** For dimension queries: lower bound value */
-  lowerBound?: {
-    value: string;
-    valueNumeric: number | null;
-    inclusive: boolean;
-  };
-  /** For dimension queries: upper bound value */
-  upperBound?: {
-    value: string;
-    valueNumeric: number | null;
-    inclusive: boolean;
-  };
-  /** For feature queries: feature name */
-  feature?: string;
-  /** For feature queries: feature value */
-  featureValue?: string;
-  /** For type queries: media type */
-  mediaType?: 'print' | 'screen' | 'all' | 'speech';
-}
-
-/**
- * Parsed container condition for structured analysis and combination
- */
-export interface ParsedContainerCondition {
-  /** Container name (undefined = unnamed/nearest container) */
-  name?: string;
-  /** The condition part (e.g., "(width < 600px)" or "style(--variant: danger)") */
-  condition: string;
-  /** Whether this is a negated condition */
-  negated: boolean;
-  /** Subtype for structured analysis */
-  subtype: 'dimension' | 'style' | 'raw';
-  /** For style queries: property name (without --) */
-  property?: string;
-  /** For style queries: property value (undefined = existence check) */
-  propertyValue?: string;
-}
-
-/**
- * Parsed supports condition for structured analysis and combination
- */
-export interface ParsedSupportsCondition {
-  /** Subtype: 'feature' for property support, 'selector' for selector() support */
-  subtype: 'feature' | 'selector';
-  /** The condition string (e.g., "display: grid" or ":has(*)") */
-  condition: string;
-  /** Whether this is a negated condition */
-  negated: boolean;
-}
-
-/**
- * Parsed modifier condition for structured analysis
- */
-export interface ParsedModifierCondition {
-  /** Attribute name (e.g., 'data-hovered', 'data-size') */
-  attribute: string;
-  /** Value if present (e.g., 'large', 'danger') */
-  value?: string;
-  /** Operator for value matching (default '=') */
-  operator?: '=' | '^=' | '$=' | '*=';
-  /** Whether this is negated (:not(...)) */
-  negated: boolean;
-}
-
-/**
- * Parsed pseudo-class condition for structured analysis
- */
-export interface ParsedPseudoCondition {
-  /** The pseudo-class (e.g., ':hover', ':focus-visible', ':has(> Icon)') */
-  pseudo: string;
-  /** Whether this is negated (:not(...)) */
-  negated: boolean;
-}
-
-/** Modifier or pseudo condition (shared across own/root/parent) */
-type ParsedSelectorCondition = ParsedModifierCondition | ParsedPseudoCondition;
-
-/**
- * A group of selector conditions that produces an :is() or :not() wrapper.
- *
- * Each branch is an AND conjunction of conditions (one selector fragment).
- * Multiple branches are OR'd together inside the :is()/:not() wrapper.
- *
- * Example: size=small | size=medium
- *   branches: [[size=small], [size=medium]]
- *   renders:  :is([data-size="small"], [data-size="medium"])
- *
- * When negated, :is() becomes :not():
- *   :not([data-size="small"], [data-size="medium"])
- *
- * Single-branch groups are unwrapped (no :is() wrapper):
- *   branches: [[size=small]]
- *   renders:  [data-size="small"]
- */
-export interface SelectorGroup {
-  branches: ParsedSelectorCondition[][];
-  negated: boolean;
-}
-
-/**
- * A group of parent conditions originating from a single @parent() call.
- * Each group produces its own :is()/:not() wrapper in the final CSS.
- * Separate @parent() calls = separate groups = can match different ancestors.
- *
- * Extends SelectorGroup with a `direct` flag for ancestor combinator:
- *   direct = false → ` *` (any ancestor)
- *   direct = true  → ` > *` (direct parent only)
- *
- * Example: @parent(hovered & pressed | active)
- *   branches: [[hovered, pressed], [active]]
- *   renders:  :is([data-hovered][data-pressed] *, [data-active] *)
- */
-export interface ParentGroup extends SelectorGroup {
-  direct: boolean;
-}
-
-/**
- * A single selector variant (one term in a DNF expression)
- */
-export interface SelectorVariant {
-  /** Structured modifier conditions (flat AND) */
-  modifierConditions: ParsedModifierCondition[];
-
-  /** Structured pseudo conditions (flat AND) */
-  pseudoConditions: ParsedPseudoCondition[];
-
-  /** Selector groups — :is()/:not() wrappers for OR branches on the element */
-  selectorGroups: SelectorGroup[];
-
-  /** Own groups — :is()/:not() wrappers for @own() OR branches on sub-elements */
-  ownGroups: SelectorGroup[];
-
-  /** Parsed media conditions for structured combination */
-  mediaConditions: ParsedMediaCondition[];
-
-  /** Parsed container conditions for structured combination */
-  containerConditions: ParsedContainerCondition[];
-
-  /** Parsed supports conditions for @supports at-rules */
-  supportsConditions: ParsedSupportsCondition[];
-
-  /** Root groups — :is()/:not() wrappers for @root() OR branches */
-  rootGroups: SelectorGroup[];
-
-  /** Parent condition groups — each @parent() call is a separate group */
-  parentGroups: ParentGroup[];
-
-  /** Whether to wrap in @starting-style */
-  startingStyle: boolean;
-}
-
-/**
- * CSS output components extracted from a condition
- * Supports multiple variants for OR conditions (DNF form)
- */
-export interface CSSComponents {
-  /** Selector variants - OR means multiple variants, AND means single variant with combined selectors */
-  variants: SelectorVariant[];
-
-  /** Whether condition is impossible (should skip) */
-  isImpossible: boolean;
-}
-
-/**
- * Final CSS rule output
- */
-export interface CSSRule {
-  /** Single selector or array of selector fragments (for OR conditions) */
-  selector: string | string[];
-  declarations: string;
-  atRules?: string[];
-  rootPrefix?: string;
-  /** When true, declarations are wrapped in @starting-style { ... } inside the selector rule */
-  startingStyle?: boolean;
-}
+// Re-export types so existing `import { ... } from './materialize'` keeps
+// working without callers needing to chase the new file layout.
+export type {
+  CSSComponents,
+  CSSRule,
+  ParentGroup,
+  ParsedContainerCondition,
+  ParsedMediaCondition,
+  ParsedModifierCondition,
+  ParsedPseudoCondition,
+  ParsedSelectorCondition,
+  ParsedSupportsCondition,
+  SelectorGroup,
+  SelectorVariant,
+};
 
 // ============================================================================
 // Caching
@@ -1214,231 +1059,10 @@ function mergeVariants(
   };
 }
 
-/**
- * Generic deduplication by a key extraction function.
- * Preserves insertion order, keeping the first occurrence of each key.
- */
-function dedupeByKey<T>(items: T[], getKey: (item: T) => string): T[] {
-  const seen = new Set<string>();
-  const result: T[] = [];
-  for (const item of items) {
-    const key = getKey(item);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(item);
-    }
-  }
-  return result;
-}
-
-function dedupeMediaConditions(
-  conditions: ParsedMediaCondition[],
-): ParsedMediaCondition[] {
-  return dedupeByKey(
-    conditions,
-    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
-  );
-}
-
-function dedupeContainerConditions(
-  conditions: ParsedContainerCondition[],
-): ParsedContainerCondition[] {
-  return dedupeByKey(
-    conditions,
-    (c) => `${c.name ?? ''}|${c.condition}|${c.negated}`,
-  );
-}
-
-function dedupeSupportsConditions(
-  conditions: ParsedSupportsCondition[],
-): ParsedSupportsCondition[] {
-  return dedupeByKey(
-    conditions,
-    (c) => `${c.subtype}|${c.condition}|${c.negated}`,
-  );
-}
-
-/**
- * Check if supports conditions contain contradictions
- * e.g., @supports(display: grid) AND NOT @supports(display: grid)
- */
-function hasSupportsContradiction(
-  conditions: ParsedSupportsCondition[],
-): boolean {
-  const conditionMap = new Map<string, boolean>(); // key -> isPositive
-
-  for (const cond of conditions) {
-    const key = `${cond.subtype}|${cond.condition}`;
-    const existing = conditionMap.get(key);
-    if (existing !== undefined && existing !== !cond.negated) {
-      return true; // Contradiction: positive AND negated
-    }
-    conditionMap.set(key, !cond.negated);
-  }
-
-  return false;
-}
-
-/**
- * Check if a set of media conditions contains contradictions
- * e.g., (prefers-color-scheme: light) AND NOT (prefers-color-scheme: light)
- * or (width >= 900px) AND (width < 600px)
- *
- * Uses parsed media conditions for efficient analysis without regex parsing.
- */
-function hasMediaContradiction(conditions: ParsedMediaCondition[]): boolean {
-  // Track conditions by their key (condition string) to detect A and NOT A
-  const featureConditions = new Map<string, boolean>(); // key -> isPositive
-  const typeConditions = new Map<string, boolean>(); // mediaType -> isPositive
-  const dimensionConditions = new Map<string, boolean>(); // condition -> isPositive
-
-  // Track dimension conditions for range contradiction detection (non-negated only)
-  const dimensionsByDim = new Map<
-    string,
-    { lowerBound: number | null; upperBound: number | null }
-  >();
-
-  for (const cond of conditions) {
-    if (cond.subtype === 'type') {
-      // Type query: check for direct contradiction (print AND NOT print)
-      const key = cond.mediaType || 'all';
-      const existing = typeConditions.get(key);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      typeConditions.set(key, !cond.negated);
-    } else if (cond.subtype === 'feature') {
-      // Feature query: check for direct contradiction
-      const key = cond.condition;
-      const existing = featureConditions.get(key);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      featureConditions.set(key, !cond.negated);
-    } else if (cond.subtype === 'dimension') {
-      // First, check for direct contradiction: (width < 600px) AND NOT (width < 600px)
-      const condKey = cond.condition;
-      const existing = dimensionConditions.get(condKey);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      dimensionConditions.set(condKey, !cond.negated);
-
-      // For range analysis, only consider non-negated conditions
-      // Negated conditions are handled via the direct contradiction check above
-      if (!cond.negated) {
-        const dim = cond.dimension || 'width';
-        let bounds = dimensionsByDim.get(dim);
-        if (!bounds) {
-          bounds = { lowerBound: null, upperBound: null };
-          dimensionsByDim.set(dim, bounds);
-        }
-
-        // Track the effective bounds
-        if (cond.lowerBound?.valueNumeric != null) {
-          const value = cond.lowerBound.valueNumeric;
-          if (bounds.lowerBound === null || value > bounds.lowerBound) {
-            bounds.lowerBound = value;
-          }
-        }
-        if (cond.upperBound?.valueNumeric != null) {
-          const value = cond.upperBound.valueNumeric;
-          if (bounds.upperBound === null || value < bounds.upperBound) {
-            bounds.upperBound = value;
-          }
-        }
-
-        // Check for impossible range
-        if (
-          bounds.lowerBound !== null &&
-          bounds.upperBound !== null &&
-          bounds.lowerBound >= bounds.upperBound
-        ) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Check if container conditions contain contradictions in style queries
- * e.g., style(--variant: danger) and style(--variant: success) together
- * Same property with different values = always false
- *
- * Uses parsed container conditions for efficient analysis without regex parsing.
- */
-function hasContainerStyleContradiction(
-  conditions: ParsedContainerCondition[],
-): boolean {
-  // Track style queries by property name
-  // key: property name, value: { hasExistence: boolean, values: Set<string>, hasNegatedExistence: boolean }
-  const styleQueries = new Map<
-    string,
-    { hasExistence: boolean; values: Set<string>; hasNegatedExistence: boolean }
-  >();
-
-  for (const cond of conditions) {
-    // Only analyze style queries
-    if (cond.subtype !== 'style' || !cond.property) {
-      continue;
-    }
-
-    const property = cond.property;
-    const value = cond.propertyValue;
-
-    if (!styleQueries.has(property)) {
-      styleQueries.set(property, {
-        hasExistence: false,
-        values: new Set(),
-        hasNegatedExistence: false,
-      });
-    }
-
-    const entry = styleQueries.get(property)!;
-
-    if (cond.negated) {
-      if (value === undefined) {
-        // not style(--prop) - negated existence check
-        entry.hasNegatedExistence = true;
-      }
-      // Negated value checks don't contradict positive value checks directly
-      // They just mean "not this value"
-    } else {
-      if (value === undefined) {
-        // style(--prop) - existence check
-        entry.hasExistence = true;
-      } else {
-        // style(--prop: value) - value check
-        entry.values.add(value);
-      }
-    }
-  }
-
-  // Check for contradictions
-  for (const [, entry] of styleQueries) {
-    // Contradiction: existence check + negated existence check
-    if (entry.hasExistence && entry.hasNegatedExistence) {
-      return true;
-    }
-
-    // Contradiction: multiple different values for same property
-    // style(--variant: danger) AND style(--variant: success) is impossible
-    if (entry.values.size > 1) {
-      return true;
-    }
-
-    // Contradiction: negated existence + value check
-    // not style(--variant) AND style(--variant: danger) is impossible
-    if (entry.hasNegatedExistence && entry.values.size > 0) {
-      return true;
-    }
-  }
-
-  return false;
-}
+// Contradiction-detection helpers (`hasMediaContradiction`,
+// `hasContainerStyleContradiction`, `hasSupportsContradiction`) and the
+// matching `dedupe*Conditions` helpers live in `./materialize-contradictions`.
+// They're imported at the top of this file.
 
 const variantKeyCache = new WeakMap<SelectorVariant, string>();
 

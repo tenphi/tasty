@@ -1,17 +1,25 @@
 /**
  * Tasty Style Rendering Pipeline
  *
- * This is the main entrypoint for the new pipeline implementation.
- * It implements the complete flow from style objects to CSS rules.
+ * Main entrypoint for the style rendering pipeline. Transforms a `Styles`
+ * object into an array of `CSSRule` objects ready for DOM injection.
  *
- * Pipeline stages:
- * 1. PARSE CONDITIONS - Parse state keys into ConditionNode trees
- * 2. BUILD EXCLUSIVE CONDITIONS - AND with negation of higher-priority conditions
- * 3. SIMPLIFY CONDITIONS - Apply boolean algebra, detect contradictions
- * 4. GROUP BY HANDLER - Collect styles per handler, compute combinations
- * 5. COMPUTE CSS VALUES - Call handlers to get CSS declarations
- * 6. MERGE BY VALUE - Merge rules with identical CSS output
- * 7. MATERIALIZE CSS - Convert conditions to CSS selectors + at-rules
+ * Per-handler stages (see docs/pipeline.md for full detail):
+ *   0.  PRE-PARSE NORMALIZATION    - extractCompoundStates (exclusive.ts)
+ *   1.  PARSE CONDITIONS           - parseStyleEntries + parseStateKey
+ *   1b. MERGE ENTRIES BY VALUE     - mergeEntriesByValue (exclusive.ts)
+ *   2a. EXPAND USER OR BRANCHES    - expandOrConditions (exclusive.ts)
+ *   2b. BUILD EXCLUSIVE CONDITIONS - buildExclusiveConditions
+ *   3.  EXPAND DE MORGAN ORs       - expandExclusiveOrs (exclusive.ts)
+ *   4.  COMPUTE STATE COMBINATIONS - computeStateCombinations
+ *   5.  CALL HANDLERS              - run style handlers for each snapshot
+ *   6.  MERGE BY VALUE             - mergeByValue (index.ts)
+ *   7.  MATERIALIZE CSS            - conditionToCSS + materializeComputedRule
+ *
+ * Simplification (`simplifyCondition`) runs inside most stages; calls are
+ * memoized by condition unique-id. The post-pass in `runPipeline` dedupes
+ * identical rules and emits all `@starting-style` rules last so they win
+ * the cascade over their equal-specificity normal counterparts.
  */
 
 import { Lru } from '../parser/lru';
@@ -222,7 +230,11 @@ function runPipeline(
 }
 
 /**
- * Process styles at a given nesting level
+ * Process styles at a given nesting level.
+ *
+ * Splits keys into nested-selector keys and style-handler keys, recurses
+ * into nested selectors, then runs the per-handler stages 1–7 over the
+ * style keys.
  */
 function processStyles(
   styles: Styles,
@@ -232,14 +244,40 @@ function processStyles(
 ): void {
   const keys = Object.keys(styles);
 
-  // Separate selector keys from style keys
-  // Skip @keyframes (processed separately) and other @ prefixed keys (predefined states)
+  // Separate selector keys from style keys.
+  // Skip @keyframes (processed separately) and other @-prefixed keys
+  // (predefined states), which are not handler entries.
   const selectorKeys = keys.filter((key) => isSelector(key));
   const styleKeys = keys.filter(
     (key) => !isSelector(key) && !key.startsWith('@'),
   );
 
   // Process nested selectors first
+  processNestedSelectors(
+    styles,
+    selectorKeys,
+    selectorSuffix,
+    parserContext,
+    allRules,
+  );
+
+  // Process the handler queue for this level's style keys
+  const handlerQueue = buildHandlerQueue(styleKeys, styles);
+  processHandlerQueue(handlerQueue, selectorSuffix, parserContext, allRules);
+}
+
+/**
+ * Recurse into nested selector keys. Each nested key may expand into multiple
+ * suffixes (comma-separated patterns); each suffix is processed independently
+ * with the parent's parser context augmented for sub-element scope.
+ */
+function processNestedSelectors(
+  styles: Styles,
+  selectorKeys: string[],
+  selectorSuffix: string,
+  parserContext: StateParserContext,
+  allRules: CSSRule[],
+): void {
   for (const key of selectorKeys) {
     const nestedStyles = styles[key] as Styles;
     if (!nestedStyles || typeof nestedStyles !== 'object') continue;
@@ -272,68 +310,29 @@ function processStyles(
       );
     }
   }
+}
 
-  // Build handler queue
-  const handlerQueue = buildHandlerQueue(styleKeys, styles);
-
-  // Process each handler
+/**
+ * Run the per-handler pipeline (stages 1–7) over a handler queue and append
+ * the resulting CSS rules to `allRules`.
+ */
+function processHandlerQueue(
+  handlerQueue: ReturnType<typeof buildHandlerQueue>,
+  selectorSuffix: string,
+  parserContext: StateParserContext,
+  allRules: CSSRule[],
+): void {
   for (const { handler, styleMap } of handlerQueue) {
     const lookupStyles = handler.__lookupStyles;
 
-    // Stage 1 & 2: Parse and build exclusive conditions for each style
-    // Exclusive conditions ensure each CSS rule applies to exactly one state.
-    // OR conditions in exclusives are properly expanded to DNF (multiple CSS selectors).
-    const exclusiveByStyle = new Map<string, ExclusiveStyleEntry[]>();
-
-    for (const styleName of lookupStyles) {
-      const value = styleMap[styleName];
-      if (value === undefined) continue;
-
-      if (isValueMapping(value)) {
-        // Eliminate redundant compound state dimensions before parsing.
-        // E.g. { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
-        // reduces to { '': A, '@dark': B } because @hc is irrelevant.
-        const reduced = extractCompoundStates(
-          value as Record<string, StyleValue>,
-        );
-
-        // Parse entries from value mapping
-        const parsed = parseStyleEntries(styleName, reduced, (stateKey) =>
-          parseStateKey(stateKey, { context: parserContext }),
-        );
-
-        // Merge entries that share the same value before exclusive
-        // expansion. This prevents combinatorial blowup when e.g.
-        // @dark and @dark & @high-contrast map to the same color.
-        const merged = mergeEntriesByValue(parsed);
-
-        // Expand OR conditions into exclusive branches
-        // This ensures OR branches like `A | B | C` become:
-        //   A, B & !A, C & !A & !B
-        const expanded = expandOrConditions(merged);
-
-        // Build exclusive conditions across all entries
-        const exclusive = buildExclusiveConditions(expanded);
-
-        // Expand ORs from De Morgan negation into exclusive branches
-        // This transforms: !A | !B  →  !A, (A & !B)
-        // Ensures each CSS rule has proper at-rule context
-        const fullyExpanded = expandExclusiveOrs(exclusive);
-        exclusiveByStyle.set(styleName, fullyExpanded);
-      } else {
-        // Simple value - single entry with TRUE condition
-        exclusiveByStyle.set(styleName, [
-          {
-            styleKey: styleName,
-            stateKey: '',
-            value,
-            condition: trueCondition(),
-            priority: 0,
-            exclusiveCondition: trueCondition(),
-          },
-        ]);
-      }
-    }
+    // Stages 0–3: build exclusive conditions for each style this handler
+    // depends on (extractCompoundStates → parse → mergeEntriesByValue →
+    // expandOrConditions → buildExclusiveConditions → expandExclusiveOrs).
+    const exclusiveByStyle = buildExclusivesForHandler(
+      lookupStyles,
+      styleMap,
+      parserContext,
+    );
 
     // Stage 4: Compute all valid state combinations
     const stateSnapshots = computeStateCombinations(
@@ -342,45 +341,7 @@ function processStyles(
     );
 
     // Stage 5: Call handler for each snapshot
-    const computedRules: ComputedRule[] = [];
-
-    for (const snapshot of stateSnapshots) {
-      const result = handler(snapshot.values as StyleValueStateMap);
-      if (!result) continue;
-
-      // Handler may return single or array
-      const results = Array.isArray(result) ? result : [result];
-
-      for (const r of results) {
-        if (!r || typeof r !== 'object') continue;
-
-        const { $, ...styleProps } = r;
-        const declarations: Record<string, string> = {};
-
-        for (const [prop, val] of Object.entries(styleProps)) {
-          if (val != null && val !== '') {
-            declarations[prop] = String(val);
-          }
-        }
-
-        if (Object.keys(declarations).length === 0) continue;
-
-        // Handle $ suffixes
-        const suffixes = $
-          ? (Array.isArray($) ? $ : [$]).map(
-              (s) => selectorSuffix + normalizeSelectorSuffix(String(s)),
-            )
-          : [selectorSuffix];
-
-        for (const suffix of suffixes) {
-          computedRules.push({
-            condition: snapshot.condition,
-            declarations,
-            selectorSuffix: suffix,
-          });
-        }
-      }
-    }
+    const computedRules = invokeHandler(handler, stateSnapshots, selectorSuffix);
 
     // Stage 6: Merge rules with identical CSS output
     const mergedRules = mergeByValue(computedRules);
@@ -391,6 +352,123 @@ function processStyles(
       allRules.push(...cssRules);
     }
   }
+}
+
+/**
+ * Stages 0–3 for a single handler: take the handler's looked-up style names,
+ * resolve each style's value map into a list of mutually-exclusive entries.
+ * Simple non-mapping values produce a single TRUE-conditioned entry.
+ */
+function buildExclusivesForHandler(
+  lookupStyles: readonly string[],
+  styleMap: StyleMap,
+  parserContext: StateParserContext,
+): Map<string, ExclusiveStyleEntry[]> {
+  const exclusiveByStyle = new Map<string, ExclusiveStyleEntry[]>();
+
+  for (const styleName of lookupStyles) {
+    const value = styleMap[styleName];
+    if (value === undefined) continue;
+
+    if (isValueMapping(value)) {
+      // Stage 0: Eliminate redundant compound state dimensions before parsing.
+      // E.g. { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
+      // reduces to { '': A, '@dark': B } because @hc is irrelevant.
+      const reduced = extractCompoundStates(
+        value as Record<string, StyleValue>,
+      );
+
+      // Stage 1: Parse entries from value mapping.
+      const parsed = parseStyleEntries(styleName, reduced, (stateKey) =>
+        parseStateKey(stateKey, { context: parserContext }),
+      );
+
+      // Stage 1b: Merge entries that share the same value before exclusive
+      // expansion. Prevents combinatorial blowup when e.g. @dark and
+      // @dark & @high-contrast map to the same color.
+      const merged = mergeEntriesByValue(parsed);
+
+      // Stage 2a: Expand user OR conditions into exclusive branches
+      // (`A | B | C` becomes `A`, `B & !A`, `C & !A & !B`).
+      const expanded = expandOrConditions(merged);
+
+      // Stage 2b: Build exclusive conditions across all entries.
+      const exclusive = buildExclusiveConditions(expanded);
+
+      // Stage 3: Expand De Morgan ORs from negation into at-rule-aware
+      // exclusive branches. `!A | !B` → `!A`, `A & !B`. Each branch keeps
+      // the correct at-rule context.
+      const fullyExpanded = expandExclusiveOrs(exclusive);
+      exclusiveByStyle.set(styleName, fullyExpanded);
+    } else {
+      // Simple value — single entry with TRUE condition.
+      exclusiveByStyle.set(styleName, [
+        {
+          styleKey: styleName,
+          stateKey: '',
+          value,
+          condition: trueCondition(),
+          priority: 0,
+          exclusiveCondition: trueCondition(),
+        },
+      ]);
+    }
+  }
+
+  return exclusiveByStyle;
+}
+
+/**
+ * Stage 5: invoke the handler for each state snapshot and translate its
+ * return value into ComputedRule entries (one per declaration set, fanned
+ * out across any `$` selector suffixes the handler returns).
+ */
+function invokeHandler(
+  handler: StyleHandler,
+  stateSnapshots: ReturnType<typeof computeStateCombinations>,
+  selectorSuffix: string,
+): ComputedRule[] {
+  const computedRules: ComputedRule[] = [];
+
+  for (const snapshot of stateSnapshots) {
+    const result = handler(snapshot.values as StyleValueStateMap);
+    if (!result) continue;
+
+    // Handler may return single or array
+    const results = Array.isArray(result) ? result : [result];
+
+    for (const r of results) {
+      if (!r || typeof r !== 'object') continue;
+
+      const { $, ...styleProps } = r;
+      const declarations: Record<string, string> = {};
+
+      for (const [prop, val] of Object.entries(styleProps)) {
+        if (val != null && val !== '') {
+          declarations[prop] = String(val);
+        }
+      }
+
+      if (Object.keys(declarations).length === 0) continue;
+
+      // Handle $ suffixes
+      const suffixes = $
+        ? (Array.isArray($) ? $ : [$]).map(
+            (s) => selectorSuffix + normalizeSelectorSuffix(String(s)),
+          )
+        : [selectorSuffix];
+
+      for (const suffix of suffixes) {
+        computedRules.push({
+          condition: snapshot.condition,
+          declarations,
+          selectorSuffix: suffix,
+        });
+      }
+    }
+  }
+
+  return computedRules;
 }
 
 // ============================================================================

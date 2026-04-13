@@ -3939,3 +3939,220 @@ describe('Consensus/resolution simplification', () => {
     );
   });
 });
+
+describe('Boolean algebra laws (explicit)', () => {
+  it('identity: A & TRUE → A', () => {
+    const a = createModifierCondition('data-hovered');
+    const result = simplifyCondition(and(a, trueCondition()));
+    expect(getConditionUniqueId(result)).toBe(getConditionUniqueId(a));
+  });
+
+  it('identity: A | FALSE → A', () => {
+    const a = createModifierCondition('data-hovered');
+    const result = simplifyCondition(or(a, falseCondition()));
+    expect(getConditionUniqueId(result)).toBe(getConditionUniqueId(a));
+  });
+
+  it('annihilator: A & FALSE → FALSE', () => {
+    const a = createModifierCondition('data-hovered');
+    const result = simplifyCondition(and(a, falseCondition()));
+    expect(result.kind).toBe('false');
+  });
+
+  it('annihilator: A | TRUE → TRUE', () => {
+    const a = createModifierCondition('data-hovered');
+    const result = simplifyCondition(or(a, trueCondition()));
+    expect(result.kind).toBe('true');
+  });
+
+  it('consensus with 4 variables: (A|B) & (A|!B) & (C|D) → A & (C|D)', () => {
+    const a = createModifierCondition('data-hovered');
+    const b = createModifierCondition('data-focused');
+    const c = createModifierCondition('data-pressed');
+    const d = createModifierCondition('data-disabled');
+
+    const condition = and(or(a, b), or(a, not(b)), or(c, d));
+    const simplified = simplifyCondition(condition);
+    const expected = simplifyCondition(and(a, or(c, d)));
+
+    expect(getConditionUniqueId(simplified)).toBe(
+      getConditionUniqueId(expected),
+    );
+  });
+});
+
+describe('Container style query rendering', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  // `#name` color tokens are rewritten to `var(--name-color)` by the color
+  // handler, so substring assertions look for the resolved CSS variable.
+
+  it('should render @(card, style(--theme: dark)) as @container card style()', () => {
+    const styles = {
+      color: {
+        '': '#light',
+        '@(card, style(--theme: dark))': '#dark',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const darkRule = result.find((r) =>
+      r.atRules?.some((ar) => ar.includes('style(--theme: dark)')),
+    );
+    expect(darkRule).toBeDefined();
+    expect(darkRule!.atRules![0]).toContain('@container card');
+    expect(darkRule!.declarations).toContain('var(--dark-color)');
+  });
+
+  it('should render unnamed @(style(--variant: primary)) as @container style()', () => {
+    const styles = {
+      color: {
+        '': '#gray',
+        '@(style(--variant: primary))': '#blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const primary = result.find((r) =>
+      r.atRules?.some((ar) => ar.includes('style(--variant: primary)')),
+    );
+    expect(primary).toBeDefined();
+    expect(primary!.atRules![0]).toMatch(/^@container style\(/);
+    expect(primary!.declarations).toContain('var(--blue-color)');
+  });
+
+  it('should combine a style query with a dimension query on the same container', () => {
+    const styles = {
+      color: {
+        '': '#gray',
+        '@(card, style(--theme: dark)) & @(card, w < 400px)': '#dark',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    // Both the style query and the dimension query should appear as part of
+    // a single @container card at-rule (one rule, two conditions ANDed).
+    const dark = result.find((r) =>
+      r.declarations.includes('var(--dark-color)'),
+    );
+    expect(dark).toBeDefined();
+    const containerRule = dark!.atRules!.find((ar) =>
+      ar.startsWith('@container card'),
+    );
+    expect(containerRule).toBeDefined();
+    expect(containerRule!).toContain('style(--theme: dark)');
+    expect(containerRule!).toContain('width < 400px');
+  });
+
+  it('should combine a style query with a modifier into nested selector under @container', () => {
+    const styles = {
+      color: {
+        '': '#gray',
+        '@(card, style(--theme: dark)) & hovered': '#highlight',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const hl = result.find((r) =>
+      r.declarations.includes('var(--highlight-color)'),
+    );
+    expect(hl).toBeDefined();
+    expect(hl!.atRules!.some((ar) => ar.includes('style(--theme: dark)'))).toBe(
+      true,
+    );
+    expect(hl!.selector).toContain('[data-hovered]');
+  });
+});
+
+describe('expandExclusiveOrs: mixed at-rule types', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('handles De Morgan of @supports & @container as at-rule-aware branches', () => {
+    // Higher priority: @supports(grid) & @(card, w < 400px).
+    // Default's exclusive becomes !(@supports & @container) = !@supports | !@container.
+    // Both branches involve at-rules; Stage 3 must keep each under its
+    // correct at-rule wrapping (not as a bare base rule).
+    const styles = {
+      display: {
+        '': 'block',
+        '@supports(display: grid) & @(card, w < 400px)': 'grid',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    // The `grid` rule is wrapped in BOTH @supports and @container.
+    const grid = result.find((r) => r.declarations.includes('display: grid'));
+    expect(grid).toBeDefined();
+    expect(grid!.atRules!.some((ar) => ar.startsWith('@supports'))).toBe(true);
+    expect(grid!.atRules!.some((ar) => ar.startsWith('@container'))).toBe(
+      true,
+    );
+
+    // The `block` default fans out into branches. None of the emitted
+    // `block` rules should escape without an at-rule wrapping — every
+    // default rule must be scoped by at least one at-rule negation.
+    const blockRules = result.filter((r) =>
+      r.declarations.includes('display: block'),
+    );
+    expect(blockRules.length).toBeGreaterThan(0);
+    for (const r of blockRules) {
+      const atRules = r.atRules ?? [];
+      const hasAtRuleWrap = atRules.some(
+        (ar) =>
+          ar.includes('not (display: grid)') ||
+          ar.includes('not selector(') ||
+          ar.includes('(not style') ||
+          ar.includes('not (width <') ||
+          ar.includes('width >=') ||
+          ar.includes('width <'),
+      );
+      expect(hasAtRuleWrap).toBe(true);
+    }
+  });
+});
+
+describe('Edge cases: empty and impossible styles', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('should return no rules for an empty styles object', () => {
+    const result = renderStyles({}, '.component');
+    expect(result).toEqual([]);
+  });
+
+  // Locks in current behavior. The simplifier detects same-attribute
+  // value conflicts at the *modifier* level (`hasAttributeConflict`), but it
+  // does NOT propagate that detection through `@root(...)` wrappers — so
+  // `@root(schema=dark) & @root(schema=light)` is currently emitted as a
+  // CSS-impossible selector (`:root[data-schema="dark"][data-schema="light"]`)
+  // instead of being eliminated. The selector cannot match anything at runtime
+  // so this is a CSS-bloat issue, not a correctness bug — but it is a known
+  // simplification gap worth fixing in a future pass.
+  it('emits @root with conflicting attribute values (known simplification gap)', () => {
+    const styles = {
+      color: {
+        '': '#gray',
+        '@root(schema=dark) & @root(schema=light)': '#red',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+    const red = result.find((r) => r.declarations.includes('var(--red-color)'));
+
+    // Current behavior: the impossible rule is emitted but is unreachable.
+    expect(red).toBeDefined();
+    expect(red!.selector).toContain(':root');
+    expect(red!.selector).toContain('[data-schema="dark"]');
+    expect(red!.selector).toContain('[data-schema="light"]');
+  });
+});

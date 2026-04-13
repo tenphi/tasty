@@ -912,6 +912,71 @@ describe('buildExclusiveConditions()', () => {
   });
 });
 
+describe('mergeEntriesByValue with default + same-value state', () => {
+  it('should preserve pressed state when its value matches default', () => {
+    const styles = {
+      fill: {
+        '': '#white #primary',
+        hovered: '#white #primary-text',
+        pressed: '#white #primary',
+        disabled: '#white #primary-disabled',
+      },
+    };
+
+    const result = renderStyles(styles, '.test') as StyleResult[];
+
+    // pressed has the same value as default, but it must still
+    // participate in exclusive conditions so that hovered is negated
+    // by pressed (pressed has higher priority than hovered).
+    const hoveredRule = result.find(
+      (r) =>
+        r.selector.includes('[data-hovered]') &&
+        r.declarations.includes('primary-text'),
+    );
+    expect(hoveredRule).toBeDefined();
+    expect(
+      hoveredRule!.selector,
+      'hovered selector must exclude pressed for mutual exclusivity',
+    ).toContain(':not([data-pressed])');
+  });
+
+  it('should produce mutually exclusive selectors for all states', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        hovered: 'blue',
+        pressed: 'red',
+        disabled: 'gray',
+      },
+    };
+
+    const result = renderStyles(styles, '.test') as StyleResult[];
+
+    // disabled: highest priority, no negations needed
+    const disabledRule = result.find((r) => r.declarations.includes('gray'));
+    expect(disabledRule).toBeDefined();
+    expect(disabledRule!.selector).toContain('[data-disabled]');
+
+    // hovered: must negate both disabled AND pressed
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(hoveredRule).toBeDefined();
+    expect(hoveredRule!.selector).toContain(':not([data-disabled])');
+    expect(hoveredRule!.selector).toContain(':not([data-pressed])');
+
+    // pressed + default merged (same CSS output): must negate disabled
+    // but NOT hovered (pressed wins over hovered, and default covers
+    // the remaining case)
+    const defaultRule = result.find(
+      (r) =>
+        r.declarations.includes('red') &&
+        !r.declarations.includes('gray') &&
+        !r.declarations.includes('blue'),
+    );
+    expect(defaultRule).toBeDefined();
+    expect(defaultRule!.selector).toContain(':not([data-disabled])');
+  });
+});
+
 describe('conditionToCSS()', () => {
   it('should convert modifier to attribute selector', () => {
     const mod = createModifierCondition('data-hovered');
@@ -3642,8 +3707,9 @@ describe('Token CSS deduplication with compound states', () => {
       expect(count, `Duplicate rule: ${key}`).toBe(1);
     }
 
-    // The default and HC values are merged by mergeEntriesByValue, so we
-    // should have exactly 3 distinct declaration groups (not 4).
+    // Default and HC have the same value but are kept separate during
+    // exclusive building. Stage 6 mergeByValue combines them after
+    // exclusive conditions are built, so we still get at most 3 groups.
     const declGroups = new Set(result.map((r) => r.declarations));
     expect(declGroups.size).toBeLessThanOrEqual(3);
   });

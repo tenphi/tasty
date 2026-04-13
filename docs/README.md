@@ -6,7 +6,7 @@ Tasty is a styling engine for design systems that turns component state into det
 
 - **New to Tasty**: [Getting Started](getting-started.md) for installation, the first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection.
 - **Learning the component model**: [Methodology](methodology.md) for root + sub-elements, `styleProps`, tokens, extension, and recommended boundaries between `styles`, `style`, and wrappers.
-- **Evaluating the selector model**: [Style rendering pipeline](PIPELINE.md) for how mutually exclusive selectors make stateful styling deterministic.
+- **Evaluating the selector model**: [Style rendering pipeline](pipeline.md) for how mutually exclusive selectors make stateful styling deterministic.
 - **Evaluating fit**: [Comparison](comparison.md) for tool-selection context, then [Adoption Guide](adoption.md) for audience fit and rollout strategy inside a design system.
 
 ## By Role
@@ -27,5 +27,5 @@ Tasty is a styling engine for design systems that turns component state into det
 - **Look up a property handler**: [Style Properties](styles.md)
 - **Define tokens, units, recipes, keyframes, or properties globally**: [Configuration](configuration.md)
 - **Debug generated CSS or cache behavior**: [Debug Utilities](debug.md)
-- **Understand how selector generation works internally**: [Style rendering pipeline](PIPELINE.md)
+- **Understand how selector generation works internally**: [Style rendering pipeline](pipeline.md)
 - **Understand runtime injection internals**: [Style Injector](injector.md)

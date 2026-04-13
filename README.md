@@ -79,7 +79,7 @@ For the fuller docs map beyond the quick routes above, start here:
 - **[Comparison](docs/comparison.md)** — read this first if you are evaluating whether Tasty fits your team's styling model
 - **[Adoption Guide](docs/adoption.md)** — understand who Tasty is for, where it fits, and how to introduce it incrementally
 - **[Getting Started](docs/getting-started.md)** — the canonical onboarding path: install, first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection
-- **[Style rendering pipeline](docs/PIPELINE.md)** — see the selector model behind deterministic style resolution
+- **[Style rendering pipeline](docs/pipeline.md)** — see the selector model behind deterministic style resolution
 - **[Docs Hub](docs/README.md)** — choose docs by role and task: runtime, zero-runtime, runtime SSR integration, design-system authoring, internals, and debugging
 - **[Methodology](docs/methodology.md)** — the recommended component model and public API conventions for design-system code
 
@@ -206,7 +206,7 @@ All `tasty()` components are hook-free and work as React Server Components. In s
 
 This is the core idea that makes everything else possible.
 
-For the end-to-end architecture — parsing state keys, building exclusive conditions, merging by output, and materializing selectors and at-rules — see **[Style rendering pipeline](docs/PIPELINE.md)**.
+For the end-to-end architecture — parsing state keys, building exclusive conditions, merging by output, and materializing selectors and at-rules — see **[Style rendering pipeline](docs/pipeline.md)**.
 
 ### The structural problem with normal CSS
 
@@ -622,7 +622,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 
 ### Internals
 
-- **[Style rendering pipeline](docs/PIPELINE.md)** — How `Styles` become mutually exclusive CSS rules: parse → exclusives → combinations → handlers → merge → materialize (`src/pipeline/`)
+- **[Style rendering pipeline](docs/pipeline.md)** — How `Styles` become mutually exclusive CSS rules: parse → exclusives → combinations → handlers → merge → materialize (`src/pipeline/`)
 - **[Style Injector](docs/injector.md)** — Internal CSS injection engine: `inject()`, `injectGlobal()`, `injectRawCSS()`, `keyframes()`, deduplication, reference counting, cleanup, SSR support, and Shadow DOM
 - **[Debug Utilities](docs/debug.md)** — Runtime CSS inspection via `tastyDebug`: CSS extraction, element inspection, cache metrics, chunk breakdown, and performance monitoring
 

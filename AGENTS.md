@@ -86,7 +86,7 @@ src/
   injector/              Runtime CSS injection engine
     injector.ts          Core injector (hash dedup, ref counting, cleanup)
     sheet-manager.ts     CSSStyleSheet management
-  pipeline/              Style rendering pipeline (parse → exclusives → materialize); see docs/PIPELINE.md
+  pipeline/              Style rendering pipeline (parse → exclusives → materialize); see docs/pipeline.md
   parser/                Style value parser & tokenizer (custom DSL)
   styles/                Style property handlers (fill, padding, border, etc.)
   chunks/                Style chunking system
@@ -121,7 +121,7 @@ src/
 | [`docs/configuration.md`](docs/configuration.md) | Global configuration via `configure()` — CSP nonce, custom state aliases, parser cache size, custom units, custom functions, design tokens (`:root` CSS variables), replace tokens (parse-time substitution), recipes, and plugins. |
 | [`docs/styles.md`](docs/styles.md) | Style properties reference — documents all custom style handlers (`fill`, `padding`, `margin`, `border`, `radius`, `flow`, `preset`, `shadow`, `outline`, `display`, `width`/`height`, `gap`, `inset`, `fade`, `scrollbar`) with their enhanced syntax and modifiers. |
 | [`docs/tasty-static.md`](docs/tasty-static.md) | Zero-runtime mode (`tastyStatic`) — build-time CSS generation for static sites and performance-critical pages. Covers Babel plugin setup, Next.js integration, static config files, and limitations. |
-| [`docs/PIPELINE.md`](docs/PIPELINE.md) | Style rendering pipeline — stages from parsed state keys through exclusive conditions, handler snapshots, merge-by-value, and CSS materialization; condition types, simplification, and caching. Implementation in `src/pipeline/`. |
+| [`docs/pipeline.md`](docs/pipeline.md) | Style rendering pipeline — stages from parsed state keys through exclusive conditions, handler snapshots, merge-by-value, and CSS materialization; condition types, simplification, and caching. Implementation in `src/pipeline/`. |
 | [`docs/injector.md`](docs/injector.md) | Internal style injector architecture — hash-based deduplication, reference counting, CSS nesting flattening, keyframes injection, sheet management, SSR support, and Shadow DOM roots. Low-level infrastructure doc. |
 | [`docs/debug.md`](docs/debug.md) | Debug utilities (`tastyDebug`) — runtime CSS inspection, cache performance metrics, style chunk analysis, and troubleshooting via browser console. Development-only diagnostics. |
 | [`docs/ssr.md`](docs/ssr.md) | Server-side rendering guide — zero-cost hydration, `ServerStyleCollector`, framework integrations (Next.js App Router, Astro), streaming compatibility. Requires React 18+. |

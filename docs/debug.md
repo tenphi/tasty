@@ -12,6 +12,8 @@ In development mode (`isDevEnv()` returns `true`), `tastyDebug` is automatically
 
 All methods **log to the console by default**. Pass `{ raw: true }` to suppress logging and only return data.
 
+> **Note (2.0.0+):** Class names use a content-addressed base36 hash format (e.g. `t3a5f`) instead of the previous sequential `t{number}` format. Cross-environment hydration reads the rendered class list from `window.__TASTY__` (the legacy `window.__TASTY_SSR_CACHE__` global was removed in 2.0.0).
+
 ---
 
 ## Quick Start
@@ -69,8 +71,8 @@ Retrieves CSS text for a given target. Logs the result with rule count and size.
 | `'unused'` | CSS with refCount = 0 (cached but not used) |
 | `'global'` | Only global CSS (from `injectGlobal`) |
 | `'page'` | All CSS on the page (including non-tasty) |
-| `'t42'` | CSS for a specific tasty class |
-| `['t0', 't5']` | CSS for multiple tasty classes |
+| `'t3a5f'` | CSS for a specific tasty class (class names are `t` + base36 hash) |
+| `['t3a5f', 't9k2']` | CSS for multiple tasty classes |
 | `'.my-button'` | CSS affecting a DOM element (by selector) |
 | `element` | CSS affecting a DOM element (by reference) |
 
@@ -88,11 +90,11 @@ interface CssOptions extends DebugOptions {
 tastyDebug.css('active');
 
 // Specific class, silent
-const css = tastyDebug.css('t42', { raw: true });
+const css = tastyDebug.css('t3a5f', { raw: true });
 
 // Compare original vs browser-parsed CSS (dev mode only)
-tastyDebug.css('t42');                    // live CSSOM
-tastyDebug.css('t42', { source: true }); // original output
+tastyDebug.css('t3a5f');                    // live CSSOM
+tastyDebug.css('t3a5f', { source: true }); // original output
 
 // Shadow DOM
 tastyDebug.css('all', { root: shadowRoot });
@@ -125,11 +127,11 @@ interface ChunkInfo {
 ```typescript
 tastyDebug.inspect('.my-card');
 // Logs: inspect div — 3 classes, 5 rules, 1.2KB
-//       Chunks: t3→appearance, t7→font, t12→dimension
+//       Chunks: t3a5f→appearance, t9k2→font, tb71→dimension
 
 // Silent
 const result = tastyDebug.inspect('.my-card', { raw: true });
-console.log(result.classes);  // ['t3', 't7', 't12']
+console.log(result.classes);  // ['t3a5f', 't9k2', 'tb71']
 console.log(result.rules);    // 5
 ```
 
@@ -291,10 +293,10 @@ tastyDebug.summary({ root: shadowRoot });
 tastyDebug.inspect('.my-button');
 
 // 2. See CSS for a specific class
-tastyDebug.css('t3');
+tastyDebug.css('t3a5f');
 
 // 3. Compare original vs browser-parsed (dev mode)
-tastyDebug.css('t3', { source: true });
+tastyDebug.css('t3a5f', { source: true });
 ```
 
 ### Checking cache efficiency

@@ -108,9 +108,8 @@ function countRules(css: string): number {
 }
 
 function sortTastyClasses(classes: Iterable<string>): string[] {
-  return Array.from(classes).sort(
-    (a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)),
-  );
+  // Class names use a base36 hash format (e.g. `t3a5f`), so sort lexicographically.
+  return Array.from(classes).sort((a, b) => a.localeCompare(b));
 }
 
 function getRegistry(

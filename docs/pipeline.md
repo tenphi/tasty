@@ -55,7 +55,7 @@ Output: CSSRule[]
 
 **Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization as needed.
 
-**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` filters duplicates using a key of `selector|declarations|atRules|rootPrefix` so identical emitted rules appear once.
+**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle` so identical emitted rules appear once.
 
 ---
 

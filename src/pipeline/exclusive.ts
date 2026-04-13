@@ -141,10 +141,18 @@ export function parseStyleEntries(
 /**
  * Merge parsed entries that share the same value.
  *
- * When multiple state keys map to the same value, their conditions can
- * be combined with OR and treated as a single entry. This must happen
- * **before** exclusive expansion and OR branch splitting to avoid
- * combinatorial explosion and duplicate CSS output.
+ * When multiple **non-default** state keys map to the same value, their
+ * conditions can be combined with OR and treated as a single entry.
+ * This must happen **before** exclusive expansion and OR branch splitting
+ * to avoid combinatorial explosion and duplicate CSS output.
+ *
+ * Default (TRUE) entries are **never** merged with non-default entries.
+ * Merging `TRUE | X` collapses to `TRUE`, destroying the non-default
+ * condition's participation in exclusive building. That causes
+ * intermediate-priority states to lose their `:not(X)` negation,
+ * breaking mutual exclusivity when X and an intermediate state are
+ * both active. Stage 6 `mergeByValue` handles combining rules with
+ * identical CSS output after exclusive conditions are correctly built.
  *
  * Example: `{ '@dark': 'red', '@dark & @hc': 'red' }` merges into a
  * single entry with condition `@dark | (@dark & @hc)` = `@dark`.
@@ -183,28 +191,41 @@ export function mergeEntriesByValue(
       continue;
     }
 
-    // Combine conditions with OR, then simplify
-    const combinedCondition = simplifyCondition(
-      or(...group.entries.map((e) => e.condition)),
+    // Separate default (TRUE) entries from non-default entries.
+    // Default entries must stay separate so that non-default conditions
+    // participate in exclusive building and block intermediate states.
+    const defaultEntries = group.entries.filter(
+      (e) => e.condition.kind === 'true',
+    );
+    const nonDefaultEntries = group.entries.filter(
+      (e) => e.condition.kind !== 'true',
     );
 
-    // Combine state keys for debugging
-    const combinedStateKey = group.entries.map((e) => e.stateKey).join(' | ');
+    // Keep default entries as-is
+    for (const entry of defaultEntries) {
+      merged.push(entry);
+    }
 
-    // When a group contains the default (true) entry, use minPriority.
-    // true|X = true, so the merged condition is unconditional; at elevated
-    // priority it would shadow entries between the default and the
-    // highest-priority member, breaking exclusivity.
-    const hasDefault = group.entries.some((e) => e.condition.kind === 'true');
-    const minPriority = Math.min(...group.entries.map((e) => e.priority));
+    // Merge only non-default entries
+    if (nonDefaultEntries.length === 1) {
+      merged.push(nonDefaultEntries[0]);
+    } else if (nonDefaultEntries.length >= 2) {
+      const combinedCondition = simplifyCondition(
+        or(...nonDefaultEntries.map((e) => e.condition)),
+      );
 
-    merged.push({
-      styleKey: group.entries[0].styleKey,
-      stateKey: combinedStateKey,
-      value: group.entries[0].value,
-      condition: combinedCondition,
-      priority: hasDefault ? minPriority : group.maxPriority,
-    });
+      const combinedStateKey = nonDefaultEntries
+        .map((e) => e.stateKey)
+        .join(' | ');
+
+      merged.push({
+        styleKey: nonDefaultEntries[0].styleKey,
+        stateKey: combinedStateKey,
+        value: nonDefaultEntries[0].value,
+        condition: combinedCondition,
+        priority: group.maxPriority,
+      });
+    }
   }
 
   // Re-sort by priority (highest first)
@@ -219,6 +240,141 @@ function serializeValue(value: StyleValue): string {
     return String(value);
   }
   return JSON.stringify(value);
+}
+
+// ============================================================================
+// Compound State Extraction
+// ============================================================================
+
+/**
+ * Eliminate redundant state dimensions from a value map.
+ *
+ * When a value map contains compound AND state keys (e.g. `@dark & @hc`),
+ * checks whether any state atom is a "don't-care" variable — i.e. the
+ * value is the same whether that atom is present or absent. Redundant
+ * atoms are removed from all keys and duplicate entries are collapsed.
+ *
+ * This runs **before** condition parsing so that downstream stages
+ * (`mergeEntriesByValue`, `buildExclusiveConditions`, materialization)
+ * never see the irrelevant dimension, producing simpler, smaller CSS.
+ *
+ * Only pure top-level AND combinations are eligible. Keys that contain
+ * `|`, `^`, or `,` at the top level are treated as opaque single atoms.
+ *
+ * @example
+ *   { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
+ *   // @hc is redundant → { '': A, '@dark': B }
+ */
+export function extractCompoundStates(
+  valueMap: Record<string, StyleValue>,
+): Record<string, StyleValue> {
+  const keys = Object.keys(valueMap);
+
+  if (keys.length < 3 || !keys.some((k) => k.includes('&'))) {
+    return valueMap;
+  }
+
+  const entries = keys.map((key) => {
+    const atoms = splitTopLevelAnd(key);
+    return {
+      // null means the key has non-AND operators; treat the whole key
+      // as a single opaque atom so it never matches partial pairs.
+      atoms: atoms ?? [key],
+      value: valueMap[key],
+    };
+  });
+
+  const allAtoms = new Set<string>();
+  for (const e of entries) {
+    for (const a of e.atoms) allAtoms.add(a);
+  }
+
+  const redundant = new Set<string>();
+  for (const atom of allAtoms) {
+    if (isAtomRedundant(entries, atom)) {
+      redundant.add(atom);
+    }
+  }
+
+  if (redundant.size === 0) return valueMap;
+
+  const newMap: Record<string, StyleValue> = {};
+  for (const e of entries) {
+    const filtered = e.atoms.filter((a) => !redundant.has(a));
+    const newKey = filtered.join(' & ');
+    if (!(newKey in newMap)) {
+      newMap[newKey] = e.value;
+    }
+  }
+
+  return newMap;
+}
+
+/**
+ * Split a state key by top-level `&` operators.
+ *
+ * Returns `null` if the key contains `|`, `^`, or `,` at the top level
+ * (making it ineligible for atom-level extraction).
+ * Returns `[]` for the empty string (default key).
+ */
+function splitTopLevelAnd(key: string): string[] | null {
+  if (key === '') return [];
+
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+
+  for (const ch of key) {
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+
+    if (depth === 0) {
+      if (ch === '&') {
+        const trimmed = current.trim();
+        if (trimmed) parts.push(trimmed);
+        current = '';
+        continue;
+      }
+      if (ch === '|' || ch === '^' || ch === ',') {
+        return null;
+      }
+    }
+
+    current += ch;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) parts.push(trimmed);
+
+  return parts;
+}
+
+/**
+ * An atom is redundant when every entry that contains it has a matching
+ * partner (same remaining atoms, atom absent) with the same value.
+ */
+function isAtomRedundant(
+  entries: { atoms: string[]; value: StyleValue }[],
+  atom: string,
+): boolean {
+  const withAtom = entries.filter((e) => e.atoms.includes(atom));
+  if (withAtom.length === 0) return false;
+
+  for (const wa of withAtom) {
+    const remaining = wa.atoms.filter((a) => a !== atom);
+
+    const pair = entries.find(
+      (e) =>
+        !e.atoms.includes(atom) &&
+        e.atoms.length === remaining.length &&
+        remaining.every((r) => e.atoms.includes(r)),
+    );
+
+    if (!pair) return false;
+    if (serializeValue(wa.value) !== serializeValue(pair.value)) return false;
+  }
+
+  return true;
 }
 
 /**

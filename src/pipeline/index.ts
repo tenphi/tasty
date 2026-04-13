@@ -37,6 +37,7 @@ import {
   buildExclusiveConditions,
   expandExclusiveOrs,
   expandOrConditions,
+  extractCompoundStates,
   isValueMapping,
   mergeEntriesByValue,
   parseStyleEntries,
@@ -289,8 +290,15 @@ function processStyles(
       if (value === undefined) continue;
 
       if (isValueMapping(value)) {
+        // Eliminate redundant compound state dimensions before parsing.
+        // E.g. { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
+        // reduces to { '': A, '@dark': B } because @hc is irrelevant.
+        const reduced = extractCompoundStates(
+          value as Record<string, StyleValue>,
+        );
+
         // Parse entries from value mapping
-        const parsed = parseStyleEntries(styleName, value, (stateKey) =>
+        const parsed = parseStyleEntries(styleName, reduced, (stateKey) =>
           parseStateKey(stateKey, { context: parserContext }),
         );
 

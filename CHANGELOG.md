@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.0.2
+
+### Patch Changes
+
+- [#133](https://github.com/tenphi/tasty/pull/133) [`7cd9dbe`](https://github.com/tenphi/tasty/commit/7cd9dbe2eb0844e6c9a31b05a1df9a5b39c73d84) Thanks [@tenphi](https://github.com/tenphi)! - Fix missing state selectors when a non-default state maps to the same value as the default in a style map. Redundant compound state dimensions are now eliminated early in the pipeline.
+
 ## 2.0.1
 
 ### Patch Changes

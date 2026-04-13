@@ -18,9 +18,14 @@ import type {
   MediaCondition,
   ModifierCondition,
   NumericBound,
+  OwnCondition,
+  RootCondition,
 } from './conditions';
 import {
   and,
+  createOwnCondition,
+  createParentCondition,
+  createRootCondition,
   falseCondition,
   getConditionUniqueId,
   not,
@@ -82,8 +87,33 @@ function simplifyInner(node: ConditionNode): ConditionNode {
     return node;
   }
 
-  // State conditions - return as-is (they're already leaf nodes)
+  // State conditions: most are leaves, but @root / @own / @parent wrap a
+  // nested condition that benefits from the same simplification (e.g.
+  // `@root(schema=dark & schema=light)` → inner is FALSE → wrapper is FALSE).
+  // Only descend on non-negated wrappers; negated wrappers would need
+  // additional reasoning (`!@root(FALSE)` = TRUE) that isn't worth the
+  // surface area for the current bug.
   if (node.kind === 'state') {
+    if (
+      (node.type === 'root' || node.type === 'own' || node.type === 'parent') &&
+      !node.negated
+    ) {
+      const simplifiedInner = simplifyInner(node.innerCondition);
+      if (simplifiedInner.kind === 'false') return falseCondition();
+      if (simplifiedInner === node.innerCondition) return node;
+      if (node.type === 'root') {
+        return createRootCondition(simplifiedInner, false, node.raw);
+      }
+      if (node.type === 'own') {
+        return createOwnCondition(simplifiedInner, false, node.raw);
+      }
+      return createParentCondition(
+        simplifiedInner,
+        node.direct,
+        false,
+        node.raw,
+      );
+    }
     return node;
   }
 
@@ -629,12 +659,75 @@ function hasGroupedValueConflict<T extends { negated: boolean }>(
 }
 
 function hasAttributeConflict(terms: ConditionNode[]): boolean {
+  // Top-level modifiers: `schema=dark & schema=light`.
+  if (
+    hasGroupedValueConflict<ModifierCondition>(
+      terms,
+      (t) => (t.kind === 'state' && t.type === 'modifier' ? t : null),
+      (t) => t.attribute,
+      (t) => t.value,
+    )
+  ) {
+    return true;
+  }
+
+  // @root scope (single :root element):
+  // `@root(schema=dark) & @root(schema=light)` cannot match anything because
+  // there is only one document root.
+  if (hasNestedModifierConflict(terms, 'root')) return true;
+
+  // @own scope (single sub-element / styled element under `&`):
+  // `@own(schema=dark) & @own(schema=light)` is impossible for the same
+  // reason — both refer to the same element.
+  if (hasNestedModifierConflict(terms, 'own')) return true;
+
+  // NOTE: @parent is intentionally NOT checked. Different ancestor elements
+  // can hold different attribute values, so two `@parent(schema=...)` calls
+  // can both match (different ancestors), even when the values differ.
+
+  return false;
+}
+
+/**
+ * Collect modifier conditions inside non-negated state wrappers of `kind`
+ * and check for the same value-conflict pattern as the top-level pass.
+ *
+ * Modifiers from multiple sibling wrappers are combined — both wrappers
+ * scope to the same element (one :root, one own scope), so an attribute
+ * conflict across wrappers is still impossible.
+ */
+function hasNestedModifierConflict(
+  terms: ConditionNode[],
+  wrapperType: 'root' | 'own',
+): boolean {
+  const innerTerms: ConditionNode[] = [];
+  for (const term of terms) {
+    if (term.kind === 'state' && term.type === wrapperType && !term.negated) {
+      flattenAndIntoArray(
+        (term as RootCondition | OwnCondition).innerCondition,
+        innerTerms,
+      );
+    }
+  }
+  if (innerTerms.length < 2) return false;
   return hasGroupedValueConflict<ModifierCondition>(
-    terms,
+    innerTerms,
     (t) => (t.kind === 'state' && t.type === 'modifier' ? t : null),
     (t) => t.attribute,
     (t) => t.value,
   );
+}
+
+/**
+ * Flatten a top-level AND tree into a flat list of conjuncts. Non-AND nodes
+ * are pushed as-is.
+ */
+function flattenAndIntoArray(node: ConditionNode, into: ConditionNode[]): void {
+  if (node.kind === 'compound' && node.operator === 'AND') {
+    for (const child of node.children) flattenAndIntoArray(child, into);
+  } else {
+    into.push(node);
+  }
 }
 
 function hasContainerStyleConflict(terms: ConditionNode[]): boolean {

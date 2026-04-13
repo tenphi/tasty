@@ -341,7 +341,11 @@ function processHandlerQueue(
     );
 
     // Stage 5: Call handler for each snapshot
-    const computedRules = invokeHandler(handler, stateSnapshots, selectorSuffix);
+    const computedRules = invokeHandler(
+      handler,
+      stateSnapshots,
+      selectorSuffix,
+    );
 
     // Stage 6: Merge rules with identical CSS output
     const mergedRules = mergeByValue(computedRules);

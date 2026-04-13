@@ -1572,10 +1572,15 @@ describe('Complex OR conditions with mixed types', () => {
     // Clear cache to ensure fresh computation
     clearPipelineCache();
 
+    // The third OR branch combines TWO @root attribute checks on DIFFERENT
+    // attributes — both can be true simultaneously (one element, two
+    // attributes). Two checks on the SAME attribute with different values
+    // would (correctly) simplify to FALSE since :root has one value per
+    // attribute; that's covered by a separate test below.
     const styles = {
       color: {
         '': '#white',
-        '(@media(prefers-color-scheme: light) | @media(prefers-color-scheme: no-preference)) | (@root(prefers-schema=light) & @root(prefers-schema=system))':
+        '(@media(prefers-color-scheme: light) | @media(prefers-color-scheme: no-preference)) | (@root(prefers-schema=light) & @root(prefers-contrast=more))':
           '#dark',
       },
     };
@@ -1586,24 +1591,29 @@ describe('Complex OR conditions with mixed types', () => {
     const darkRules = result.filter((r) => r.declarations.includes('dark'));
     expect(darkRules.length).toBeGreaterThanOrEqual(3);
 
-    // Check that white (default) condition has root prefix variants.
-    // After DNF distribution, the two branches are made exclusive:
-    //   branch0: !root(schema=light)  → :root:not([data-prefers-schema="light"])
-    //   branch1: root(schema=light) & !root(schema=system)
-    //            → optimized to :root[data-prefers-schema="light"]
-    //            (the :not(system) is subsumed by the positive value)
+    // Check that white (default) condition fans out into at-rule-wrapped
+    // branches that negate the @root(schema=light) & @root(contrast=more)
+    // compound. DNF order is implementation-defined — either `!schema` or
+    // `!contrast` can be the first branch — so we check for structural
+    // presence, not exact branch order.
     const whiteRules = result.filter((r) => r.declarations.includes('white'));
     expect(whiteRules.length).toBeGreaterThanOrEqual(2);
-    expect(
-      whiteRules.some((r) =>
-        r.selector.includes(':root:not([data-prefers-schema="light"])'),
-      ),
-    ).toBe(true);
-    expect(
-      whiteRules.some((r) =>
-        r.selector.includes(':root[data-prefers-schema="light"]'),
-      ),
-    ).toBe(true);
+
+    // Every white rule must be under the "neither media matches" context.
+    for (const r of whiteRules) {
+      const hasMediaNegation = (r.atRules ?? []).some(
+        (ar) =>
+          ar.includes('not (prefers-color-scheme: light)') &&
+          ar.includes('not (prefers-color-scheme: no-preference)'),
+      );
+      expect(hasMediaNegation).toBe(true);
+    }
+
+    // White rules collectively cover the negation of (schema=light & contrast=more):
+    // there must be at least one rule that negates each half independently.
+    const joinedSelectors = whiteRules.map((r) => r.selector).join('\n');
+    expect(joinedSelectors).toContain(':not([data-prefers-schema="light"])');
+    expect(joinedSelectors).toContain(':not([data-prefers-contrast="more"])');
   });
 
   it('should not produce redundant :not() when boolean root subsumes valued root', () => {
@@ -4093,9 +4103,7 @@ describe('expandExclusiveOrs: mixed at-rule types', () => {
     const grid = result.find((r) => r.declarations.includes('display: grid'));
     expect(grid).toBeDefined();
     expect(grid!.atRules!.some((ar) => ar.startsWith('@supports'))).toBe(true);
-    expect(grid!.atRules!.some((ar) => ar.startsWith('@container'))).toBe(
-      true,
-    );
+    expect(grid!.atRules!.some((ar) => ar.startsWith('@container'))).toBe(true);
 
     // The `block` default fans out into branches. None of the emitted
     // `block` rules should escape without an at-rule wrapping — every
@@ -4118,6 +4126,193 @@ describe('expandExclusiveOrs: mixed at-rule types', () => {
       expect(hasAtRuleWrap).toBe(true);
     }
   });
+
+  it('sorts @supports before modifier so modifier branch inherits at-rule context', () => {
+    const styles = {
+      display: {
+        '': 'block',
+        '@supports(display: grid) & hovered': 'grid',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const grid = result.find((r) => r.declarations.includes('display: grid'));
+    expect(grid).toBeDefined();
+    expect(grid!.atRules!.some((ar) => ar.startsWith('@supports'))).toBe(true);
+    expect(grid!.selector).toContain('[data-hovered]');
+
+    const blockRules = result.filter((r) =>
+      r.declarations.includes('display: block'),
+    );
+    expect(blockRules.length).toBeGreaterThan(0);
+    for (const r of blockRules) {
+      const atRules = r.atRules ?? [];
+      const hasAtRuleOrNot =
+        atRules.some((ar) => ar.includes('@supports')) ||
+        r.selector.includes(':not(');
+      expect(
+        hasAtRuleOrNot,
+        `block rule must have at-rule wrap or :not() selector: ${JSON.stringify({ selector: r.selector, atRules })}`,
+      ).toBe(true);
+    }
+  });
+
+  it('sorts @media before modifier so modifier branch inherits at-rule context', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        '@media(w < 600px) & pressed': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const blue = result.find((r) => r.declarations.includes('blue'));
+    expect(blue).toBeDefined();
+    expect(blue!.atRules!.some((ar) => ar.includes('width'))).toBe(true);
+    expect(blue!.selector).toContain('[data-pressed]');
+
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBeGreaterThan(0);
+    for (const r of redRules) {
+      const atRules = r.atRules ?? [];
+      const hasAtRuleOrNot =
+        atRules.some((ar) => ar.includes('width')) ||
+        r.selector.includes(':not(');
+      expect(
+        hasAtRuleOrNot,
+        `red rule must have at-rule wrap or :not() selector: ${JSON.stringify({ selector: r.selector, atRules })}`,
+      ).toBe(true);
+    }
+  });
+
+  it('handles reversed source order: modifier & @supports — sort still puts at-rule first', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        'focused & @supports(display: grid)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const blue = result.find((r) => r.declarations.includes('blue'));
+    expect(blue).toBeDefined();
+    expect(blue!.atRules!.some((ar) => ar.startsWith('@supports'))).toBe(true);
+    expect(blue!.selector).toContain('[data-focused]');
+
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBeGreaterThan(0);
+    for (const r of redRules) {
+      const atRules = r.atRules ?? [];
+      const hasAtRuleOrNot =
+        atRules.some((ar) => ar.includes('@supports')) ||
+        r.selector.includes(':not(');
+      expect(
+        hasAtRuleOrNot,
+        `red rule must have at-rule wrap or :not() selector: ${JSON.stringify({ selector: r.selector, atRules })}`,
+      ).toBe(true);
+    }
+  });
+
+  it('handles two at-rules (@media & @container): both branches keep at-rule context', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        '@media(w < 600px) & @(card, w < 400px)': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const blue = result.find((r) => r.declarations.includes('blue'));
+    expect(blue).toBeDefined();
+    expect(blue!.atRules!.some((ar) => ar.includes('width'))).toBe(true);
+    expect(blue!.atRules!.some((ar) => ar.startsWith('@container'))).toBe(true);
+
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBeGreaterThan(0);
+    for (const r of redRules) {
+      const atRules = r.atRules ?? [];
+      expect(
+        atRules.length,
+        `red rule must have at-rule wrapping: ${JSON.stringify({ selector: r.selector, atRules })}`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it('handles modifier & modifier: no at-rules, sort is no-op, uses :not() selectors', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        'hovered & pressed': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const blue = result.find((r) => r.declarations.includes('blue'));
+    expect(blue).toBeDefined();
+    expect(blue!.selector).toContain('[data-hovered]');
+    expect(blue!.selector).toContain('[data-pressed]');
+
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBeGreaterThan(0);
+    for (const r of redRules) {
+      expect(r.atRules ?? []).toEqual([]);
+      expect(
+        r.selector.includes(':not('),
+        `modifier-only default must use :not() selector: ${r.selector}`,
+      ).toBe(true);
+    }
+  });
+
+  it('handles three-way compound: @supports & @media & modifier — at-rules sort first', () => {
+    const styles = {
+      color: {
+        '': 'red',
+        '@supports(display: grid) & @media(w < 600px) & focused': 'blue',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    const blue = result.find((r) => r.declarations.includes('blue'));
+    expect(blue).toBeDefined();
+    expect(blue!.atRules!.some((ar) => ar.startsWith('@supports'))).toBe(true);
+    expect(blue!.atRules!.some((ar) => ar.includes('width'))).toBe(true);
+    expect(blue!.selector).toContain('[data-focused]');
+
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBeGreaterThan(0);
+    for (const r of redRules) {
+      const atRules = r.atRules ?? [];
+      const hasAtRuleOrNot =
+        atRules.some(
+          (ar) => ar.includes('@supports') || ar.includes('width'),
+        ) || r.selector.includes(':not(');
+      expect(
+        hasAtRuleOrNot,
+        `red rule must have at-rule wrap or :not() selector: ${JSON.stringify({ selector: r.selector, atRules })}`,
+      ).toBe(true);
+    }
+
+    // The focused-negation branch must carry both at-rule contexts
+    const focusedNegBranch = redRules.find(
+      (r) =>
+        r.selector.includes(':not([data-focused])') ||
+        r.selector.includes(':not('),
+    );
+    if (focusedNegBranch && (focusedNegBranch.atRules ?? []).length > 0) {
+      expect(
+        focusedNegBranch.atRules!.some((ar) => ar.startsWith('@supports')),
+      ).toBe(true);
+      expect(focusedNegBranch.atRules!.some((ar) => ar.includes('width'))).toBe(
+        true,
+      );
+    }
+  });
 });
 
 describe('Edge cases: empty and impossible styles', () => {
@@ -4130,15 +4325,10 @@ describe('Edge cases: empty and impossible styles', () => {
     expect(result).toEqual([]);
   });
 
-  // Locks in current behavior. The simplifier detects same-attribute
-  // value conflicts at the *modifier* level (`hasAttributeConflict`), but it
-  // does NOT propagate that detection through `@root(...)` wrappers — so
-  // `@root(schema=dark) & @root(schema=light)` is currently emitted as a
-  // CSS-impossible selector (`:root[data-schema="dark"][data-schema="light"]`)
-  // instead of being eliminated. The selector cannot match anything at runtime
-  // so this is a CSS-bloat issue, not a correctness bug — but it is a known
-  // simplification gap worth fixing in a future pass.
-  it('emits @root with conflicting attribute values (known simplification gap)', () => {
+  it('eliminates @root(attr=A) & @root(attr=B) on the same attribute', () => {
+    // Two separate @root() wrappers both refer to the single :root element,
+    // so two different values on the same attribute can never both match.
+    // hasNestedModifierConflict catches this across sibling wrappers.
     const styles = {
       color: {
         '': '#gray',
@@ -4147,12 +4337,59 @@ describe('Edge cases: empty and impossible styles', () => {
     };
 
     const result = renderStyles(styles, '.component');
-    const red = result.find((r) => r.declarations.includes('var(--red-color)'));
+    expect(
+      result.find((r) => r.declarations.includes('var(--red-color)')),
+    ).toBeUndefined();
+  });
 
-    // Current behavior: the impossible rule is emitted but is unreachable.
-    expect(red).toBeDefined();
-    expect(red!.selector).toContain(':root');
-    expect(red!.selector).toContain('[data-schema="dark"]');
-    expect(red!.selector).toContain('[data-schema="light"]');
+  it('eliminates @root(...) when the inner condition is impossible', () => {
+    // A single @root() wrapping a same-attribute conflict is also caught:
+    // simplifyInner descends into the wrapper, the inner contradicts to
+    // FALSE, and the wrapper collapses with it.
+    const styles = {
+      color: {
+        '': '#gray',
+        '@root(schema=dark & schema=light)': '#red',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+    expect(
+      result.find((r) => r.declarations.includes('var(--red-color)')),
+    ).toBeUndefined();
+  });
+
+  it('eliminates @own(attr=A) & @own(attr=B) on the same attribute', () => {
+    // Same logic as @root but for the single own/sub-element scope.
+    const styles = {
+      Label: {
+        color: {
+          '': '#gray',
+          '@own(schema=dark) & @own(schema=light)': '#red',
+        },
+      },
+    };
+
+    const result = renderStyles(styles as any, '.component');
+    expect(
+      result.find((r) => r.declarations.includes('var(--red-color)')),
+    ).toBeUndefined();
+  });
+
+  it('does NOT eliminate @parent(attr=A) & @parent(attr=B)', () => {
+    // Different ancestors can hold different attribute values, so two
+    // @parent(...) calls with conflicting values can both match (against
+    // different ancestors). The rule is still emitted.
+    const styles = {
+      color: {
+        '': '#gray',
+        '@parent(schema=dark) & @parent(schema=light)': '#red',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+    expect(
+      result.find((r) => r.declarations.includes('var(--red-color)')),
+    ).toBeDefined();
   });
 });

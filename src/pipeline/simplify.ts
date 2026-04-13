@@ -18,9 +18,14 @@ import type {
   MediaCondition,
   ModifierCondition,
   NumericBound,
+  OwnCondition,
+  RootCondition,
 } from './conditions';
 import {
   and,
+  createOwnCondition,
+  createParentCondition,
+  createRootCondition,
   falseCondition,
   getConditionUniqueId,
   not,
@@ -82,8 +87,33 @@ function simplifyInner(node: ConditionNode): ConditionNode {
     return node;
   }
 
-  // State conditions - return as-is (they're already leaf nodes)
+  // State conditions: most are leaves, but @root / @own / @parent wrap a
+  // nested condition that benefits from the same simplification (e.g.
+  // `@root(schema=dark & schema=light)` → inner is FALSE → wrapper is FALSE).
+  // Only descend on non-negated wrappers; negated wrappers would need
+  // additional reasoning (`!@root(FALSE)` = TRUE) that isn't worth the
+  // surface area for the current bug.
   if (node.kind === 'state') {
+    if (
+      (node.type === 'root' || node.type === 'own' || node.type === 'parent') &&
+      !node.negated
+    ) {
+      const simplifiedInner = simplifyInner(node.innerCondition);
+      if (simplifiedInner.kind === 'false') return falseCondition();
+      if (simplifiedInner === node.innerCondition) return node;
+      if (node.type === 'root') {
+        return createRootCondition(simplifiedInner, false, node.raw);
+      }
+      if (node.type === 'own') {
+        return createOwnCondition(simplifiedInner, false, node.raw);
+      }
+      return createParentCondition(
+        simplifiedInner,
+        node.direct,
+        false,
+        node.raw,
+      );
+    }
     return node;
   }
 
@@ -110,7 +140,8 @@ function simplifyInner(node: ConditionNode): ConditionNode {
 function simplifyAnd(children: ConditionNode[]): ConditionNode {
   let terms: ConditionNode[] = [];
 
-  // Flatten nested ANDs and handle TRUE/FALSE
+  // ─── Pass 1: flatten + identity/annihilator ────────────────────────────
+  // Flatten nested ANDs, drop TRUE children, short-circuit on any FALSE.
   for (const child of children) {
     if (child.kind === 'false') {
       // AND with FALSE → FALSE
@@ -138,6 +169,9 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     return terms[0];
   }
 
+  // ─── Pass 2: filter contradictions ─────────────────────────────────────
+  // Any of these indicates the conjunction can never be satisfied.
+
   // Check for contradictions
   if (hasContradiction(terms)) {
     return falseCondition();
@@ -158,6 +192,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     return falseCondition();
   }
 
+  // ─── Pass 3: redundancy elimination + canonicalization ─────────────────
+
   // Remove redundant negations implied by positive terms
   // e.g., style(--variant: danger) implies NOT style(--variant: success)
   // and style(--variant: danger) implies style(--variant) (existence)
@@ -171,6 +207,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
 
   // Sort for canonical form
   terms = sortTerms(terms);
+
+  // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
 
   // Apply absorption: A & (A | B) → A
   terms = applyAbsorptionAnd(terms);
@@ -199,7 +237,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
 function simplifyOr(children: ConditionNode[]): ConditionNode {
   let terms: ConditionNode[] = [];
 
-  // Flatten nested ORs and handle TRUE/FALSE
+  // ─── Pass 1: flatten + identity/annihilator ────────────────────────────
+  // Flatten nested ORs, drop FALSE children, short-circuit on any TRUE.
   for (const child of children) {
     if (child.kind === 'true') {
       // OR with TRUE → TRUE
@@ -227,16 +266,21 @@ function simplifyOr(children: ConditionNode[]): ConditionNode {
     return terms[0];
   }
 
-  // Check for tautologies (A | !A)
+  // ─── Pass 2: filter tautologies ────────────────────────────────────────
+  // A | !A means the disjunction is always satisfied.
   if (hasTautology(terms)) {
     return trueCondition();
   }
+
+  // ─── Pass 3: redundancy elimination + canonicalization ─────────────────
 
   // Deduplicate
   terms = deduplicateTerms(terms);
 
   // Sort for canonical form
   terms = sortTerms(terms);
+
+  // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
 
   // Apply absorption: A | (A & B) → A
   terms = applyAbsorptionOr(terms);
@@ -615,12 +659,75 @@ function hasGroupedValueConflict<T extends { negated: boolean }>(
 }
 
 function hasAttributeConflict(terms: ConditionNode[]): boolean {
+  // Top-level modifiers: `schema=dark & schema=light`.
+  if (
+    hasGroupedValueConflict<ModifierCondition>(
+      terms,
+      (t) => (t.kind === 'state' && t.type === 'modifier' ? t : null),
+      (t) => t.attribute,
+      (t) => t.value,
+    )
+  ) {
+    return true;
+  }
+
+  // @root scope (single :root element):
+  // `@root(schema=dark) & @root(schema=light)` cannot match anything because
+  // there is only one document root.
+  if (hasNestedModifierConflict(terms, 'root')) return true;
+
+  // @own scope (single sub-element / styled element under `&`):
+  // `@own(schema=dark) & @own(schema=light)` is impossible for the same
+  // reason — both refer to the same element.
+  if (hasNestedModifierConflict(terms, 'own')) return true;
+
+  // NOTE: @parent is intentionally NOT checked. Different ancestor elements
+  // can hold different attribute values, so two `@parent(schema=...)` calls
+  // can both match (different ancestors), even when the values differ.
+
+  return false;
+}
+
+/**
+ * Collect modifier conditions inside non-negated state wrappers of `kind`
+ * and check for the same value-conflict pattern as the top-level pass.
+ *
+ * Modifiers from multiple sibling wrappers are combined — both wrappers
+ * scope to the same element (one :root, one own scope), so an attribute
+ * conflict across wrappers is still impossible.
+ */
+function hasNestedModifierConflict(
+  terms: ConditionNode[],
+  wrapperType: 'root' | 'own',
+): boolean {
+  const innerTerms: ConditionNode[] = [];
+  for (const term of terms) {
+    if (term.kind === 'state' && term.type === wrapperType && !term.negated) {
+      flattenAndIntoArray(
+        (term as RootCondition | OwnCondition).innerCondition,
+        innerTerms,
+      );
+    }
+  }
+  if (innerTerms.length < 2) return false;
   return hasGroupedValueConflict<ModifierCondition>(
-    terms,
+    innerTerms,
     (t) => (t.kind === 'state' && t.type === 'modifier' ? t : null),
     (t) => t.attribute,
     (t) => t.value,
   );
+}
+
+/**
+ * Flatten a top-level AND tree into a flat list of conjuncts. Non-AND nodes
+ * are pushed as-is.
+ */
+function flattenAndIntoArray(node: ConditionNode, into: ConditionNode[]): void {
+  if (node.kind === 'compound' && node.operator === 'AND') {
+    for (const child of node.children) flattenAndIntoArray(child, into);
+  } else {
+    into.push(node);
+  }
 }
 
 function hasContainerStyleConflict(terms: ConditionNode[]): boolean {

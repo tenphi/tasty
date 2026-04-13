@@ -423,7 +423,14 @@ export function expandOrConditions(
 }
 
 /**
- * Expand a single entry's OR condition into multiple exclusive entries
+ * Expand a single entry's OR condition into multiple exclusive entries.
+ *
+ * Note: branches are NOT sorted by at-rule context here (unlike the
+ * `expandExclusiveOrs` pass below). User-authored ORs in state keys aren't
+ * the product of De Morgan negation, so each branch is expected to render
+ * independently in its own scope and at-rule sort isn't load-bearing.
+ * The post-build pass needs the sort because it has to preserve at-rule
+ * wrapping across branches that came from negating a compound at-rule.
  */
 function expandSingleEntry(entry: ParsedStyleEntry): ParsedStyleEntry[] {
   const orBranches = collectOrBranches(entry.condition);

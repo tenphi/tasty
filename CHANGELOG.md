@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.0.3
+
+### Patch Changes
+
+- [#135](https://github.com/tenphi/tasty/pull/135) [`fa72fe1`](https://github.com/tenphi/tasty/commit/fa72fe190be7dd8cf489cdf05bc730cd0d3f8644) Thanks [@tenphi](https://github.com/tenphi)! - Internal pipeline cleanup: refactor `processStyles` into named per-stage helpers, split `materialize.ts` (types + contradiction detection extracted to `materialize-types.ts` and `materialize-contradictions.ts`), document the actual stage flow in `docs/pipeline.md` and the `index.ts` header (Stage 0 normalization, user-OR vs De Morgan-OR expansion, consensus rule, `@starting-style` cascade ordering), and add tests for container style query rendering, explicit boolean-algebra laws, multi-variable consensus, De Morgan with mixed `@supports`/`@container`, empty-styles, and a known simplification gap for conflicting `@root(schema=…)` attribute values. No behavior change.
+
 ## 2.0.2
 
 ### Patch Changes

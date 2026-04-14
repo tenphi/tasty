@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 
 import { computeStyles } from '../compute-styles';
-import { TastySSRContext } from '../ssr/context';
+import { getTastySSRContext } from '../ssr/context';
 import type { Styles } from '../styles/types';
 
 /**
@@ -40,5 +40,7 @@ export interface UseStylesResult {
  * ```
  */
 export function useStyles(styles: UseStylesOptions): UseStylesResult {
-  return computeStyles(styles, { ssrCollector: useContext(TastySSRContext) });
+  return computeStyles(styles, {
+    ssrCollector: useContext(getTastySSRContext()),
+  });
 }

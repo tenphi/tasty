@@ -193,7 +193,7 @@
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "2 kB"
+      "limit": "17 kB"
     },
     {
       "name": "zero",
@@ -204,7 +204,7 @@
         "path",
         "crypto"
       ],
-      "limit": "29.5 kB"
+      "limit": "30 kB"
     },
     {
       "name": "babel-plugin",

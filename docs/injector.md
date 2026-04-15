@@ -224,7 +224,7 @@ configure({
 
 **Auto-Detection Features:**
 - `devMode`: Automatically enabled in development environments (detected via `isDevEnv()`)
-- `forceTextInjection`: Automatically enabled in test environments (Jest, Vitest, Mocha, jsdom)
+- `forceTextInjection`: Automatically enabled in test environments (Jest, Vitest, Mocha, happy-dom, jsdom)
 
 **Configuration Notes:**
 - Most options have sensible defaults and auto-detection
@@ -366,7 +366,7 @@ const componentCSS = getCssTextForNode(container);
 // Automatically detected test environments:
 // - NODE_ENV === 'test'
 // - Jest globals (jest, describe, it, expect)
-// - jsdom user agent
+// - jsdom / HappyDOM user agent
 // - Vitest globals (vitest)
 // - Mocha globals (mocha)
 

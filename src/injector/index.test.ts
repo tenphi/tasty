@@ -1,5 +1,5 @@
 /**
- * @vitest-environment jsdom
+ * @vitest-environment happy-dom
  */
 import { configure, resetConfig } from '../config';
 import type { StyleResult } from '../pipeline';
@@ -40,7 +40,6 @@ function cssToStyleResults(css: string, className = 'test'): StyleResult[] {
   }
 
   // For complex CSS, just return a simple valid CSS rule for testing
-  // We don't need full CSS parsing in tests, just valid CSS that won't break JSDOM
   return [
     {
       selector: `.${className}`,
@@ -52,7 +51,7 @@ function cssToStyleResults(css: string, className = 'test'): StyleResult[] {
 
 /**
  * Comprehensive tests for the Global Style Injector API.
- * Uses forceTextInjection mode for reliable DOM testing in Jest/JSDOM environment.
+ * Uses forceTextInjection mode so assertions can read textContent.
  */
 
 describe('Global Style Injector API', () => {

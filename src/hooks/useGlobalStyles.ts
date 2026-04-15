@@ -20,6 +20,8 @@ interface UseGlobalStylesOptions {
    * In RSC mode, renders are single-pass so update tracking does not apply.
    */
   id?: string;
+  /** Shadow root or document to inject into (client only). */
+  root?: Document | ShadowRoot;
 }
 
 interface ClientGlobalEntry {
@@ -145,7 +147,7 @@ export function useGlobalStyles(
     existing.dispose();
   }
 
-  const { dispose } = injectGlobal(styleResults);
+  const { dispose } = injectGlobal(styleResults, { root: options?.root });
   clientGlobalEntries.set(slotKey, {
     stylesKey: JSON.stringify(styles),
     dispose,

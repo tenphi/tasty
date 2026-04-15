@@ -307,8 +307,9 @@ function getGlobalTypeCSS(
   if (type === 'keyframes') {
     for (const [, entry] of registry.keyframesCache) {
       const info = entry.info;
-      const sheet = registry.sheets[info.sheetIndex];
-      const ss = sheet?.sheet?.sheet;
+      const sheetInfo = registry.sheets[info.sheetIndex];
+      const sm = injector.instance._sheetManager;
+      const ss = sheetInfo && sm ? sm.getCSSSheet(sheetInfo) : null;
       if (ss && info.ruleIndex < ss.cssRules.length) {
         const rule = ss.cssRules[info.ruleIndex];
         if (rule) {
@@ -325,8 +326,9 @@ function getGlobalTypeCSS(
       type === 'global' ? 'global:' : type === 'raw' ? 'raw:' : 'property:';
     for (const [key, ri] of registry.globalRules) {
       if (!key.startsWith(prefix)) continue;
-      const sheet = registry.sheets[ri.sheetIndex];
-      const ss = sheet?.sheet?.sheet;
+      const sheetInfo = registry.sheets[ri.sheetIndex];
+      const sm = injector.instance._sheetManager;
+      const ss = sheetInfo && sm ? sm.getCSSSheet(sheetInfo) : null;
       if (ss) {
         const start = Math.max(0, ri.ruleIndex);
         const end = Math.min(

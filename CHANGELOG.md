@@ -1,5 +1,17 @@
 # @tenphi/tasty
 
+## 2.1.0
+
+### Minor Changes
+
+- [#139](https://github.com/tenphi/tasty/pull/139) [`025dd2c`](https://github.com/tenphi/tasty/commit/025dd2c6c0cb27d5ae7375d396631466cb098f9f) Thanks [@tenphi](https://github.com/tenphi)! - Add Shadow DOM support: `useStyles`, `useGlobalStyles`, and `computeStyles` now accept a `root` option (`Document | ShadowRoot`) to inject styles into a specific shadow root. Styles are injected via `adoptedStyleSheets` when targeting a shadow root, with a shared `ChunkSheetRegistry` for deduplication across multiple shadow roots.
+
+### Patch Changes
+
+- [#139](https://github.com/tenphi/tasty/pull/139) [`4b8bd9d`](https://github.com/tenphi/tasty/commit/4b8bd9d85cafafee41ea1764dee829061ec8e90f) Thanks [@tenphi](https://github.com/tenphi)! - Use happy-dom for injector tests, removing mock CSSStyleSheet and adoptedStyleSheets shims
+
+- [#139](https://github.com/tenphi/tasty/pull/139) [`8f6c8fe`](https://github.com/tenphi/tasty/commit/8f6c8fe22be4f39500020ec377af4e4eaddca351) Thanks [@tenphi](https://github.com/tenphi)! - Make `SheetInfo.sheet` nullable to accurately represent adopted mode where no HTMLStyleElement exists
+
 ## 2.0.4
 
 ### Patch Changes

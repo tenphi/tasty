@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.0.4
+
+### Patch Changes
+
+- [#137](https://github.com/tenphi/tasty/pull/137) [`0fcb9d9`](https://github.com/tenphi/tasty/commit/0fcb9d975cbd179aacfe0657329d99adfd3acf63) Thanks [@tenphi](https://github.com/tenphi)! - Switch from unbundled to bundled output, reducing publish size by ~74% (from 2.05 MB to ~530 KB) and file count from 313 to 63.
+
 ## 2.0.3
 
 ### Patch Changes

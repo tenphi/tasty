@@ -1,5 +1,5 @@
 /**
- * @vitest-environment jsdom
+ * @vitest-environment happy-dom
  */
 import type { StyleResult } from '../pipeline';
 
@@ -26,14 +26,11 @@ function cssToStyleResults(css: string, className = 'test'): StyleResult[] {
     ];
   }
 
-  // For complex nested CSS, we need to flatten it properly using the flattening logic
-
   // For complex CSS, just return a simple valid CSS rule for testing
-  // We don't need full CSS parsing in tests, just valid CSS that won't break JSDOM
   return [
     {
       selector: `.${className}`,
-      declarations: 'color: red;', // Simple valid CSS for all test cases
+      declarations: 'color: red;',
       atRules: undefined,
     },
   ];
@@ -41,33 +38,10 @@ function cssToStyleResults(css: string, className = 'test'): StyleResult[] {
 
 /**
  * Comprehensive tests for the StyleInjector.
- * Uses forceTextInjection mode for reliable DOM testing in Jest/JSDOM environment.
+ * Uses forceTextInjection mode so assertions can read textContent
+ * (happy-dom's CSSOM works fine, but the textContent path is what
+ *  these tests were written against).
  */
-
-// Mock CSSStyleSheet
-class MockCSSStyleSheet {
-  cssRules: any[] = [];
-
-  insertRule(rule: string, index: number = this.cssRules.length) {
-    this.cssRules.splice(index, 0, { cssText: rule });
-    return index;
-  }
-
-  deleteRule(index: number) {
-    if (index >= 0 && index < this.cssRules.length) {
-      this.cssRules.splice(index, 1);
-    }
-  }
-
-  replaceSync(text: string) {
-    this.cssRules = [];
-    if (text.trim()) {
-      for (const rule of text.split('\n').filter((l) => l.trim())) {
-        this.cssRules.push({ cssText: rule.trim() });
-      }
-    }
-  }
-}
 
 describe('StyleInjector', () => {
   let injector: StyleInjector;
@@ -75,15 +49,11 @@ describe('StyleInjector', () => {
 
   beforeEach(() => {
     config = {
-      forceTextInjection: true, // Enable text injection for reliable DOM testing
+      forceTextInjection: true,
     };
     injector = new StyleInjector(config);
 
-    // Clear existing styles
     document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
-
-    // Mock CSSStyleSheet
-    global.CSSStyleSheet = MockCSSStyleSheet as any;
   });
 
   afterEach(() => {
@@ -98,7 +68,6 @@ describe('StyleInjector', () => {
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
-      // Check that style was injected
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       expect(styleElements.length).toBe(1);
     });
@@ -116,11 +85,9 @@ describe('StyleInjector', () => {
       const result1 = injector.inject(cssToStyleResults(css));
       const result2 = injector.inject(cssToStyleResults(css));
 
-      // Class names may differ when no active cache is enabled
       expect(result1.className).toMatch(/^t[a-z0-9]+$/);
       expect(result2.className).toMatch(/^t[a-z0-9]+$/);
 
-      // Should still only have one style element
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       expect(styleElements.length).toBe(1);
     });
@@ -145,9 +112,6 @@ describe('StyleInjector', () => {
 
       const result = injector.inject(cssToStyleResults(css));
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
-
-      // The flattening should work correctly now
-      // We can verify the className is generated even if DOM insertion has test issues
       expect(result.className).toBeTruthy();
       expect(typeof result.dispose).toBe('function');
     });
@@ -160,9 +124,6 @@ describe('StyleInjector', () => {
 
       const result = injector.inject(cssToStyleResults(css));
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
-
-      // The flattening should work correctly now
-      // We can verify the className is generated even if DOM insertion has test issues
       expect(result.className).toBeTruthy();
       expect(typeof result.dispose).toBe('function');
     });
@@ -179,10 +140,7 @@ describe('StyleInjector', () => {
 
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
-      // Should not be in document head
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(0);
-
-      // Should be in shadow root
       expect(shadowRoot.querySelectorAll('[data-tasty]').length).toBe(1);
     });
   });
@@ -206,11 +164,9 @@ describe('StyleInjector', () => {
 
       const result = injector.inject(globalRules);
 
-      // Should generate a className for tracking but selectors remain as-is
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
       expect(typeof result.dispose).toBe('function');
 
-      // Check that global selectors are preserved in DOM
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       expect(styleElements.length).toBeGreaterThan(0);
 
@@ -274,11 +230,8 @@ describe('StyleInjector', () => {
         .map((el) => el.textContent || '')
         .join('');
 
-      // Global selector should be preserved
       expect(allCssText).toContain('body');
       expect(allCssText).toContain('margin: 0');
-
-      // Component-style selector should be preserved as-is since it's not a generated class
       expect(allCssText).toContain('.t-custom');
       expect(allCssText).toContain('padding: 20px');
     });
@@ -294,7 +247,6 @@ describe('StyleInjector', () => {
       const result1 = injector.inject(globalRules);
       const result2 = injector.inject(globalRules);
 
-      // With hash-based naming, identical content produces the same class name (dedup)
       expect(result1.className).toMatch(/^t[a-z0-9]+$/);
       expect(result2.className).toMatch(/^t[a-z0-9]+$/);
       expect(result1.className).toBe(result2.className);
@@ -310,15 +262,12 @@ describe('StyleInjector', () => {
 
       const result = injector.inject(globalRules);
 
-      // Should have styles injected
       expect(
         document.head.querySelectorAll('[data-tasty]').length,
       ).toBeGreaterThan(0);
 
-      // Dispose the global styles
       result.dispose();
 
-      // Styles should still exist in DOM (marked as unused)
       expect(
         document.head.querySelectorAll('[data-tasty]').length,
       ).toBeGreaterThan(0);
@@ -327,7 +276,6 @@ describe('StyleInjector', () => {
 
   describe('component vs global injection comparison', () => {
     it('should handle component injection (with generated class names)', () => {
-      // Component injection - uses generated tasty class names
       const componentRules = cssToStyleResults(
         '&{ color: red; padding: 10px; }',
       );
@@ -340,14 +288,12 @@ describe('StyleInjector', () => {
         .map((el) => el.textContent || '')
         .join('');
 
-      // Should contain generated class name
-      expect(allCssText).toContain('.test'); // From cssToStyleResults helper
+      expect(allCssText).toContain('.test');
       expect(allCssText).toContain('color: red');
       expect(allCssText).toContain('padding');
     });
 
     it('should handle global injection (with custom selectors)', () => {
-      // Global injection - uses custom selectors
       const globalRules = [
         {
           selector: 'body',
@@ -367,7 +313,6 @@ describe('StyleInjector', () => {
         .map((el) => el.textContent || '')
         .join('');
 
-      // Should preserve original selectors
       expect(allCssText).toContain('body');
       expect(allCssText).toContain('margin: 0');
       expect(allCssText).toContain('.my-component');
@@ -377,15 +322,15 @@ describe('StyleInjector', () => {
     it('should handle mixed injection (component + global selectors)', () => {
       const mixedRules = [
         {
-          selector: '.t123', // Looks like a component class
+          selector: '.t123',
           declarations: 'color: blue;',
         },
         {
-          selector: 'body', // Global selector
+          selector: 'body',
           declarations: 'font-family: sans-serif;',
         },
         {
-          selector: '.custom-class', // Custom class
+          selector: '.custom-class',
           declarations: 'text-align: center;',
         },
       ];
@@ -398,7 +343,6 @@ describe('StyleInjector', () => {
         .map((el) => el.textContent || '')
         .join('');
 
-      // All selectors should be preserved as-is
       expect(allCssText).toContain('.t123');
       expect(allCssText).toContain('color: blue');
       expect(allCssText).toContain('body');
@@ -415,13 +359,10 @@ describe('StyleInjector', () => {
       const result = injector.inject(cssToStyleResults(css));
       expect(result.className).toMatch(/^t[a-z0-9]+$/);
 
-      // Style should exist in DOM
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
 
-      // Dispose the style
       result.dispose();
 
-      // Style should still exist in DOM (just marked as unused)
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
     });
 
@@ -431,10 +372,8 @@ describe('StyleInjector', () => {
       const result1 = injector.inject(cssToStyleResults(css, 't123'));
       const className1 = result1.className;
 
-      // Dispose the style
       result1.dispose();
 
-      // Inject the same style again — hash-based naming produces the same class
       const result2 = injector.inject(cssToStyleResults(css, 't123'));
 
       expect(result2.className).toBe(className1);
@@ -444,18 +383,15 @@ describe('StyleInjector', () => {
     });
 
     it('should handle multiple disposals correctly', () => {
-      // Create and dispose multiple styles
-      const results: any[] = [];
+      const results: { dispose: () => void }[] = [];
       for (let i = 0; i < 10; i++) {
         const css = `&{ color: color${i}; }`;
         const result = injector.inject(cssToStyleResults(css));
         results.push(result);
       }
 
-      // Dispose all
       results.forEach((result) => result.dispose());
 
-      // All styles should still exist in DOM (marked as unused)
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
       expect(results.length).toBe(10);
     });
@@ -465,10 +401,7 @@ describe('StyleInjector', () => {
       const result = injector.inject(cssToStyleResults(css));
       result.dispose();
 
-      // Force bulk cleanup
       injector.cleanup();
-
-      // Cleanup should have been processed immediately
     });
   });
 
@@ -496,10 +429,8 @@ describe('StyleInjector', () => {
         .createElement('div')
         .attachShadow({ mode: 'open' });
 
-      // Inject into document
       injector.inject(cssToStyleResults('&{ color: red; }'));
 
-      // Inject into shadow root
       injector.inject(cssToStyleResults('&{ color: blue; }'), {
         root: shadowRoot,
       });
@@ -534,7 +465,6 @@ describe('StyleInjector', () => {
         .createElement('div')
         .attachShadow({ mode: 'open' });
 
-      // Inject into both roots
       injector.inject(cssToStyleResults('&{ color: red; }'));
       injector.inject(cssToStyleResults('&{ color: blue; }'), {
         root: shadowRoot,
@@ -543,7 +473,6 @@ describe('StyleInjector', () => {
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
       expect(shadowRoot.querySelectorAll('[data-tasty]').length).toBe(1);
 
-      // Destroy shadow root only
       injector.destroy(shadowRoot);
 
       expect(document.head.querySelectorAll('[data-tasty]').length).toBe(1);
@@ -563,7 +492,6 @@ describe('StyleInjector', () => {
     });
 
     it('should handle injection failures gracefully', () => {
-      // Mock insertRule to throw - we need to mock it properly
       const mockSheet = {
         insertRule: vi.fn(() => {
           throw new Error('Mock injection failure');
@@ -577,15 +505,15 @@ describe('StyleInjector', () => {
         sheet: mockSheet,
         setAttribute: vi.fn(),
         style: {},
-      });
+      }) as unknown as typeof document.createElement;
 
-      // Mock appendChild to avoid actual DOM manipulation
       const originalAppendChild = document.head.appendChild;
-      document.head.appendChild = vi.fn();
+      document.head.appendChild =
+        vi.fn() as unknown as typeof document.head.appendChild;
 
       try {
         const result = injector.inject(cssToStyleResults('&{ color: red; }'));
-        expect(result.className).toMatch(/^t[a-z0-9]+$/); // Still generates className
+        expect(result.className).toMatch(/^t[a-z0-9]+$/);
         expect(typeof result.dispose).toBe('function');
       } finally {
         document.createElement = originalCreateElement;
@@ -604,12 +532,10 @@ describe('StyleInjector', () => {
 
       const { dispose } = injector.injectRawCSS(css);
 
-      // Check that CSS was injected
       const rawCSS = injector.getRawCSSText();
       expect(rawCSS).toContain('body { margin: 0; padding: 0; }');
       expect(rawCSS).toContain('.my-class { color: red; }');
 
-      // Dispose and verify CSS is removed
       dispose();
       const afterDispose = injector.getRawCSSText();
       expect(afterDispose).not.toContain('body { margin: 0;');
@@ -628,13 +554,11 @@ describe('StyleInjector', () => {
       expect(rawCSS).toContain('.first { color: blue; }');
       expect(rawCSS).toContain('.second { color: green; }');
 
-      // Dispose first, second should remain
       dispose1();
       const afterFirst = injector.getRawCSSText();
       expect(afterFirst).not.toContain('.first');
       expect(afterFirst).toContain('.second');
 
-      // Dispose second
       dispose2();
       const afterSecond = injector.getRawCSSText();
       expect(afterSecond).not.toContain('.second');
@@ -644,40 +568,35 @@ describe('StyleInjector', () => {
       const injector = new StyleInjector();
       const { dispose } = injector.injectRawCSS('');
       expect(injector.getRawCSSText()).toBe('');
-      dispose(); // Should not throw
+      dispose();
     });
 
     test('handles whitespace-only CSS gracefully', () => {
       const injector = new StyleInjector();
       const { dispose } = injector.injectRawCSS('   \n\t  ');
-      dispose(); // Should not throw
+      dispose();
     });
 
     test('raw CSS is separate from tasty CSS', () => {
       const injector = new StyleInjector();
 
-      // Inject some tasty styles
       const result = injector.inject([
         { selector: '.t-test', declarations: 'color: purple;' },
       ]);
 
-      // Inject raw CSS
       const { dispose: rawDispose } = injector.injectRawCSS(
         '.raw { color: orange; }',
       );
 
-      // Check tasty CSS
       const tastyCSS = injector.getCssText();
       expect(tastyCSS).toContain('.t-test');
       expect(tastyCSS).toContain('color: purple');
       expect(tastyCSS).not.toContain('.raw');
 
-      // Check raw CSS
       const rawCSS = injector.getRawCSSText();
       expect(rawCSS).toContain('.raw { color: orange; }');
       expect(rawCSS).not.toContain('.t-test');
 
-      // Cleanup
       result.dispose();
       rawDispose();
     });
@@ -801,14 +720,12 @@ describe('StyleInjector', () => {
     });
 
     it('should not override explicit @property definitions', () => {
-      // Register explicit property first
       injector.property('$scale', {
         syntax: '<number>',
         inherits: false,
         initialValue: '1',
       });
 
-      // Now inject with a different value
       const rules: StyleResult[] = [
         {
           selector: '.t0',
@@ -817,7 +734,6 @@ describe('StyleInjector', () => {
       ];
       injector.inject(rules);
 
-      // Should still be defined (the explicit one took precedence)
       expect(injector.isPropertyDefined('--scale')).toBe(true);
     });
   });
@@ -915,7 +831,7 @@ describe('StyleInjector', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getCssTextForClasses — adopted mode
+// getCssTextForClasses — adopted mode (real constructable stylesheets)
 // ---------------------------------------------------------------------------
 describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
   let injector: StyleInjector;
@@ -923,22 +839,11 @@ describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
   let host: HTMLDivElement;
 
   beforeEach(() => {
-    // No forceTextInjection → adopted mode for ShadowRoot
     injector = new StyleInjector({});
-
-    global.CSSStyleSheet = MockCSSStyleSheet as any;
 
     host = document.createElement('div');
     document.body.appendChild(host);
     shadowRoot = host.attachShadow({ mode: 'open' });
-
-    if (!('adoptedStyleSheets' in shadowRoot)) {
-      Object.defineProperty(shadowRoot, 'adoptedStyleSheets', {
-        value: [],
-        writable: true,
-        configurable: true,
-      });
-    }
   });
 
   afterEach(() => {

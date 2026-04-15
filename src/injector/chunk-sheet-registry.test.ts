@@ -1,29 +1,7 @@
-import { ChunkSheetRegistry } from './chunk-sheet-registry';
-
 /**
- * Minimal CSSStyleSheet mock for jsdom where the constructor is unavailable.
- * Tests verify the registry's hashing, ref-counting, and dedup logic.
+ * @vitest-environment happy-dom
  */
-class MockCSSStyleSheet {
-  _text = '';
-  replaceSync(text: string) {
-    this._text = text;
-  }
-}
-
-// Patch globalThis so `new CSSStyleSheet()` works in jsdom
-const OriginalCSSStyleSheet = globalThis.CSSStyleSheet;
-
-beforeAll(() => {
-  globalThis.CSSStyleSheet =
-    MockCSSStyleSheet as unknown as typeof CSSStyleSheet;
-});
-
-afterAll(() => {
-  if (OriginalCSSStyleSheet) {
-    globalThis.CSSStyleSheet = OriginalCSSStyleSheet;
-  }
-});
+import { ChunkSheetRegistry } from './chunk-sheet-registry';
 
 describe('ChunkSheetRegistry', () => {
   let registry: ChunkSheetRegistry;
@@ -54,7 +32,6 @@ describe('ChunkSheetRegistry', () => {
     registry.acquire(css);
     registry.acquire(css);
 
-    // Release once — should still be held
     const sheet = registry.acquire(css);
     registry.release(sheet);
     expect(registry.size).toBe(1);
@@ -128,8 +105,10 @@ describe('ChunkSheetRegistry', () => {
 
   it('calls replaceSync with the CSS text', () => {
     const css = '.styled { font-size: 14px; }';
-    const sheet = registry.acquire(css) as unknown as MockCSSStyleSheet;
+    const sheet = registry.acquire(css);
 
-    expect(sheet._text).toBe(css);
+    expect(sheet.cssRules.length).toBe(1);
+    expect(sheet.cssRules[0].cssText).toContain('.styled');
+    expect(sheet.cssRules[0].cssText).toContain('font-size: 14px');
   });
 });

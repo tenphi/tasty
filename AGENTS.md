@@ -37,7 +37,7 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)
 - **Build**: tsdown — ESM, unbundled, dts + sourcemaps, browser + node targets
-- **Test**: Vitest 4, globals enabled, jsdom environment
+- **Test**: Vitest 4, globals enabled, jsdom (default) + happy-dom (injector tests)
 - **Lint**: ESLint 10 + typescript-eslint + prettier
 - **Format**: Prettier — single quotes, semicolons, trailing commas, 80 cols
 - **Versioning**: Changesets

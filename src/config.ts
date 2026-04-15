@@ -567,12 +567,12 @@ export function isTestEnvironment(): boolean {
     }
   }
 
-  // Check for jsdom environment (common in tests)
-  if (
-    typeof window !== 'undefined' &&
-    window.navigator?.userAgent?.includes('jsdom')
-  ) {
-    return true;
+  // Check for simulated DOM environments (common in tests)
+  if (typeof window !== 'undefined') {
+    const ua = window.navigator?.userAgent;
+    if (ua?.includes('jsdom') || ua?.includes('HappyDOM')) {
+      return true;
+    }
   }
 
   // Check for other test runners

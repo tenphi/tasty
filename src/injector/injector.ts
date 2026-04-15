@@ -548,7 +548,7 @@ export class StyleInjector {
       if (info) {
         // Always prefer reading from the live stylesheet, since indices can change
         const sheet = registry.sheets[info.sheetIndex];
-        const styleSheet = sheet?.sheet?.sheet;
+        const styleSheet = sheet ? this.sheetManager.getCSSSheet(sheet) : null;
         if (styleSheet) {
           const start = Math.max(0, info.ruleIndex);
           const end = Math.min(

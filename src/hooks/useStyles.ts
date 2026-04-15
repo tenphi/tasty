@@ -39,8 +39,12 @@ export interface UseStylesResult {
  * }
  * ```
  */
-export function useStyles(styles: UseStylesOptions): UseStylesResult {
+export function useStyles(
+  styles: UseStylesOptions,
+  options?: { root?: Document | ShadowRoot },
+): UseStylesResult {
   return computeStyles(styles, {
     ssrCollector: useContext(getTastySSRContext()),
+    root: options?.root,
   });
 }

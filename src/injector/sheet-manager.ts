@@ -3,6 +3,7 @@ import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 
 import type {
   CacheMetrics,
+  InjectionMode,
   KeyframesInfo,
   KeyframesSteps,
   RawCSSInfo,
@@ -16,6 +17,17 @@ import type {
 
 import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
+const supportsConstructableSheets =
+  typeof CSSStyleSheet !== 'undefined' &&
+  (() => {
+    try {
+      new CSSStyleSheet();
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
   /** Strong set of active roots so background GC can iterate them all */
@@ -26,6 +38,8 @@ export class SheetManager {
     Document | ShadowRoot,
     HTMLStyleElement
   >();
+  /** Constructable sheets for raw CSS in adopted mode */
+  private rawConstructableSheets = new WeakMap<ShadowRoot, CSSStyleSheet>();
   /** Tracking for raw CSS blocks per root */
   private rawCSSBlocks = new WeakMap<
     Document | ShadowRoot,
@@ -36,6 +50,30 @@ export class SheetManager {
 
   constructor(config: StyleInjectorConfig) {
     this.config = config;
+  }
+
+  /**
+   * Resolve the underlying CSSStyleSheet from a SheetInfo,
+   * abstracting away adopted vs style-element modes.
+   */
+  getCSSSheet(sheetInfo: SheetInfo): CSSStyleSheet | null {
+    if (sheetInfo.constructableSheet) return sheetInfo.constructableSheet;
+    return sheetInfo.sheet?.sheet ?? null;
+  }
+
+  /**
+   * Determine the injection mode for a root.
+   * ShadowRoot uses adopted stylesheets when supported; Document uses <style> elements.
+   */
+  private detectInjectionMode(root: Document | ShadowRoot): InjectionMode {
+    if (
+      root instanceof ShadowRoot &&
+      supportsConstructableSheets &&
+      !this.config.forceTextInjection
+    ) {
+      return 'adopted';
+    }
+    return 'style-element';
   }
 
   /**
@@ -77,6 +115,7 @@ export class SheetManager {
         touchCount: 0,
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
+        injectionMode: this.detectInjectionMode(root),
       } as unknown as RootRegistry;
 
       this.rootRegistries.set(root, registry);
@@ -110,9 +149,31 @@ export class SheetManager {
   }
 
   /**
-   * Create a new stylesheet for the registry
+   * Create a new stylesheet for the registry.
+   * In adopted mode (ShadowRoot), creates a constructable CSSStyleSheet and
+   * pushes it to adoptedStyleSheets. Otherwise creates a <style> element.
    */
   createSheet(registry: RootRegistry, root: Document | ShadowRoot): SheetInfo {
+    if (registry.injectionMode === 'adopted') {
+      const constructableSheet = new CSSStyleSheet();
+
+      // Append after any existing raw CSS sheet
+      (root as ShadowRoot).adoptedStyleSheets = [
+        ...(root as ShadowRoot).adoptedStyleSheets,
+        constructableSheet,
+      ];
+
+      const sheetInfo: SheetInfo = {
+        sheet: null as unknown as HTMLStyleElement,
+        constructableSheet,
+        ruleCount: 0,
+        holes: [],
+      };
+
+      registry.sheets.push(sheetInfo);
+      return sheetInfo;
+    }
+
     const sheet = this.createStyleElement(root);
 
     const sheetInfo: SheetInfo = {
@@ -247,9 +308,9 @@ export class SheetManager {
           );
         }
 
-        // Insert individual rule into style element
+        // Insert individual rule
         const styleElement = targetSheet.sheet;
-        const styleSheet = styleElement.sheet;
+        const styleSheet = this.getCSSSheet(targetSheet);
 
         if (styleSheet && !this.config.forceTextInjection) {
           // Calculate index atomically for each rule to prevent concurrent insertion races
@@ -355,7 +416,7 @@ export class SheetManager {
               }
             }
           }
-        } else {
+        } else if (styleElement) {
           // Use textContent (either as fallback or when forceTextInjection is enabled)
           // Calculate index atomically for textContent insertion too
           const atomicRuleIndex = this.findAvailableRuleIndex(targetSheet);
@@ -370,7 +431,11 @@ export class SheetManager {
         }
 
         // CRITICAL DEBUG: Verify the style element is in DOM only if there are issues and we're not using forceTextInjection
-        if (!styleElement.parentNode && !this.config.forceTextInjection) {
+        if (
+          styleElement &&
+          !styleElement.parentNode &&
+          !this.config.forceTextInjection
+        ) {
           console.error(
             'SheetManager: Style element is NOT in DOM! This is the problem!',
             {
@@ -551,8 +616,7 @@ export class SheetManager {
           ? ruleInfo.cssText.slice()
           : [];
 
-      const styleElement = sheet.sheet;
-      const styleSheet = styleElement.sheet;
+      const styleSheet = this.getCSSSheet(sheet);
 
       if (styleSheet) {
         const rules = styleSheet.cssRules;
@@ -753,15 +817,15 @@ export class SheetManager {
           continue;
         }
 
-        // SAFETY 3: Verify the sheet element is still valid and accessible
+        // SAFETY 3: Verify the sheet entry is still valid and accessible
         const sheetInfo = registry.sheets[ruleInfo.sheetIndex];
-        if (!sheetInfo || !sheetInfo.sheet) {
+        if (!sheetInfo || (!sheetInfo.sheet && !sheetInfo.constructableSheet)) {
           // Sheet was removed or corrupted; skip this rule
           continue;
         }
 
         // SAFETY 4: Verify the stylesheet itself is accessible
-        const styleSheet = sheetInfo.sheet.sheet;
+        const styleSheet = this.getCSSSheet(sheetInfo);
         if (!styleSheet) {
           // Stylesheet not available; skip this rule
           continue;
@@ -830,14 +894,19 @@ export class SheetManager {
   getCssText(registry: RootRegistry): string {
     const cssChunks: string[] = [];
 
-    for (const sheet of registry.sheets) {
+    for (const sheetInfo of registry.sheets) {
       try {
-        const styleElement = sheet.sheet;
-        if (styleElement.textContent) {
-          cssChunks.push(styleElement.textContent);
-        } else if (styleElement.sheet) {
-          const rules = Array.from(styleElement.sheet.cssRules);
+        if (sheetInfo.constructableSheet) {
+          const rules = Array.from(sheetInfo.constructableSheet.cssRules);
           cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
+        } else if (sheetInfo.sheet) {
+          const styleElement = sheetInfo.sheet;
+          if (styleElement.textContent) {
+            cssChunks.push(styleElement.textContent);
+          } else if (styleElement.sheet) {
+            const rules = Array.from(styleElement.sheet.cssRules);
+            cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
+          }
         }
       } catch (error) {
         console.warn('Failed to read CSS from sheet:', error);
@@ -996,8 +1065,7 @@ export class SheetManager {
       const { css: cssSteps, declarations } = this.stepsToCSS(steps);
       const fullRule = `@keyframes ${name} { ${cssSteps} }`;
 
-      const styleElement = targetSheet.sheet;
-      const styleSheet = styleElement.sheet;
+      const styleSheet = this.getCSSSheet(targetSheet);
 
       if (styleSheet && !this.config.forceTextInjection) {
         const safeIndex = Math.min(
@@ -1005,9 +1073,9 @@ export class SheetManager {
           styleSheet.cssRules.length,
         );
         styleSheet.insertRule(fullRule, safeIndex);
-      } else {
-        styleElement.textContent =
-          (styleElement.textContent || '') + '\n' + fullRule;
+      } else if (targetSheet.sheet) {
+        targetSheet.sheet.textContent =
+          (targetSheet.sheet.textContent || '') + '\n' + fullRule;
       }
 
       targetSheet.ruleCount++;
@@ -1035,8 +1103,7 @@ export class SheetManager {
     if (!sheet) return;
 
     try {
-      const styleElement = sheet.sheet;
-      const styleSheet = styleElement.sheet;
+      const styleSheet = this.getCSSSheet(sheet);
 
       if (styleSheet) {
         if (
@@ -1080,30 +1147,85 @@ export class SheetManager {
       return;
     }
 
-    // Remove all sheets
-    for (const sheet of registry.sheets) {
-      try {
-        // Remove style element
-        const styleElement = sheet.sheet;
-        if (styleElement.parentNode) {
-          styleElement.parentNode.removeChild(styleElement);
+    if (registry.injectionMode === 'adopted') {
+      // Remove all adopted stylesheets from the shadow root
+      const shadowRoot = root as ShadowRoot;
+
+      // Collect all constructable sheets owned by this registry
+      const ownedSheets = new Set<CSSStyleSheet>();
+      for (const sheetInfo of registry.sheets) {
+        if (sheetInfo.constructableSheet) {
+          ownedSheets.add(sheetInfo.constructableSheet);
         }
-      } catch (error) {
-        console.warn('Failed to cleanup sheet:', error);
       }
+
+      // Also include the raw CSS constructable sheet
+      const rawSheet = this.rawConstructableSheets.get(shadowRoot);
+      if (rawSheet) {
+        ownedSheets.add(rawSheet);
+        this.rawConstructableSheets.delete(shadowRoot);
+      }
+
+      // Remove owned sheets from adoptedStyleSheets
+      if (ownedSheets.size > 0) {
+        shadowRoot.adoptedStyleSheets = shadowRoot.adoptedStyleSheets.filter(
+          (s) => !ownedSheets.has(s),
+        );
+      }
+    } else {
+      // Remove all <style> elements
+      for (const sheet of registry.sheets) {
+        try {
+          const styleElement = sheet.sheet;
+          if (styleElement?.parentNode) {
+            styleElement.parentNode.removeChild(styleElement);
+          }
+        } catch (error) {
+          console.warn('Failed to cleanup sheet:', error);
+        }
+      }
+
+      // Clean up raw CSS style element
+      const rawStyleElement = this.rawStyleElements.get(root);
+      if (rawStyleElement?.parentNode) {
+        rawStyleElement.parentNode.removeChild(rawStyleElement);
+      }
+      this.rawStyleElements.delete(root);
     }
 
     // Clear registry
     this.rootRegistries.delete(root);
     this.activeRoots.delete(root);
-
-    // Clean up raw CSS style element
-    const rawStyleElement = this.rawStyleElements.get(root);
-    if (rawStyleElement?.parentNode) {
-      rawStyleElement.parentNode.removeChild(rawStyleElement);
-    }
-    this.rawStyleElements.delete(root);
     this.rawCSSBlocks.delete(root);
+  }
+
+  /**
+   * Check if a root uses adopted injection mode.
+   */
+  private isAdoptedMode(root: Document | ShadowRoot): boolean {
+    const registry = this.rootRegistries.get(root);
+    if (registry) return registry.injectionMode === 'adopted';
+    return this.detectInjectionMode(root) === 'adopted';
+  }
+
+  /**
+   * Get or create a constructable CSSStyleSheet for raw CSS in adopted mode.
+   * The raw sheet is prepended to adoptedStyleSheets so it precedes tasty rules.
+   */
+  private getOrCreateRawAdoptedSheet(root: ShadowRoot): CSSStyleSheet {
+    let sheet = this.rawConstructableSheets.get(root);
+
+    if (!sheet) {
+      sheet = new CSSStyleSheet();
+      // Prepend raw sheet before any tasty-managed sheets for cascade ordering
+      root.adoptedStyleSheets = [sheet, ...root.adoptedStyleSheets];
+      this.rawConstructableSheets.set(root, sheet);
+      if (!this.rawCSSBlocks.has(root)) {
+        this.rawCSSBlocks.set(root, new Map());
+      }
+    }
+
+    return sheet;
   }
 
   /**
@@ -1155,11 +1277,33 @@ export class SheetManager {
       };
     }
 
-    const styleElement = this.getOrCreateRawStyleElement(root);
-    const blocksMap = this.rawCSSBlocks.get(root)!;
-
     // Generate unique ID for this block
     const id = `raw_${this.rawCSSCounter++}`;
+
+    if (this.isAdoptedMode(root)) {
+      this.getOrCreateRawAdoptedSheet(root as ShadowRoot);
+      const blocksMap = this.rawCSSBlocks.get(root)!;
+
+      const info: RawCSSInfo = {
+        id,
+        css,
+        startOffset: 0,
+        endOffset: css.length,
+      };
+      blocksMap.set(id, info);
+
+      // Rebuild full text and apply via replaceSync
+      this.rebuildRawAdoptedSheet(root as ShadowRoot);
+
+      return {
+        dispose: () => {
+          this.disposeRawCSS(id, root);
+        },
+      };
+    }
+
+    const styleElement = this.getOrCreateRawStyleElement(root);
+    const blocksMap = this.rawCSSBlocks.get(root)!;
 
     // Calculate offsets
     const currentContent = styleElement.textContent || '';
@@ -1187,33 +1331,51 @@ export class SheetManager {
   }
 
   /**
+   * Rebuild the raw CSS constructable sheet from all tracked blocks.
+   */
+  private rebuildRawAdoptedSheet(root: ShadowRoot): void {
+    const sheet = this.rawConstructableSheets.get(root);
+    const blocksMap = this.rawCSSBlocks.get(root);
+    if (!sheet || !blocksMap) return;
+
+    if (blocksMap.size === 0) {
+      sheet.replaceSync('');
+      return;
+    }
+
+    const blocks = Array.from(blocksMap.values());
+    blocks.sort((a, b) => a.startOffset - b.startOffset);
+    const allCSS = blocks.map((b) => b.css).join('\n');
+    sheet.replaceSync(allCSS);
+  }
+
+  /**
    * Remove a raw CSS block by ID
    */
   private disposeRawCSS(id: string, root: Document | ShadowRoot): void {
-    const styleElement = this.rawStyleElements.get(root);
     const blocksMap = this.rawCSSBlocks.get(root);
-
-    if (!styleElement || !blocksMap) {
-      return;
-    }
+    if (!blocksMap) return;
 
     const info = blocksMap.get(id);
-    if (!info) {
+    if (!info) return;
+
+    blocksMap.delete(id);
+
+    // Adopted mode: rebuild via replaceSync
+    if (this.isAdoptedMode(root)) {
+      this.rebuildRawAdoptedSheet(root as ShadowRoot);
       return;
     }
 
-    // Remove from tracking
-    blocksMap.delete(id);
+    // Style-element mode: rebuild textContent
+    const styleElement = this.rawStyleElements.get(root);
+    if (!styleElement) return;
 
-    // Rebuild the CSS content from remaining blocks
-    // This is simpler and more reliable than trying to splice strings
     const remainingBlocks = Array.from(blocksMap.values());
 
     if (remainingBlocks.length === 0) {
       styleElement.textContent = '';
     } else {
-      // Rebuild with remaining CSS blocks in order of their original insertion
-      // Sort by original startOffset to maintain order
       remainingBlocks.sort((a, b) => a.startOffset - b.startOffset);
       const newContent = remainingBlocks.map((block) => block.css).join('\n');
       styleElement.textContent = newContent;
@@ -1229,9 +1391,18 @@ export class SheetManager {
   }
 
   /**
-   * Get the raw CSS content for SSR
+   * Get the raw CSS content
    */
   getRawCSSText(root: Document | ShadowRoot): string {
+    // In adopted mode, read from the blocks map (source of truth)
+    if (this.isAdoptedMode(root)) {
+      const blocksMap = this.rawCSSBlocks.get(root);
+      if (!blocksMap || blocksMap.size === 0) return '';
+      const blocks = Array.from(blocksMap.values());
+      blocks.sort((a, b) => a.startOffset - b.startOffset);
+      return blocks.map((b) => b.css).join('\n');
+    }
+
     const styleElement = this.rawStyleElements.get(root);
     return styleElement?.textContent || '';
   }

@@ -58,6 +58,15 @@ class MockCSSStyleSheet {
       this.cssRules.splice(index, 1);
     }
   }
+
+  replaceSync(text: string) {
+    this.cssRules = [];
+    if (text.trim()) {
+      for (const rule of text.split('\n').filter((l) => l.trim())) {
+        this.cssRules.push({ cssText: rule.trim() });
+      }
+    }
+  }
 }
 
 describe('StyleInjector', () => {
@@ -902,5 +911,56 @@ describe('StyleInjector', () => {
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(2);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCssTextForClasses — adopted mode
+// ---------------------------------------------------------------------------
+describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
+  let injector: StyleInjector;
+  let shadowRoot: ShadowRoot;
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    // No forceTextInjection → adopted mode for ShadowRoot
+    injector = new StyleInjector({});
+
+    global.CSSStyleSheet = MockCSSStyleSheet as any;
+
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    shadowRoot = host.attachShadow({ mode: 'open' });
+
+    if (!('adoptedStyleSheets' in shadowRoot)) {
+      Object.defineProperty(shadowRoot, 'adoptedStyleSheets', {
+        value: [],
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
+  afterEach(() => {
+    injector.destroy(shadowRoot);
+    host.remove();
+  });
+
+  it('reads CSS from constructable sheets in adopted mode', () => {
+    const rules: StyleResult[] = [
+      { selector: '.t0', declarations: 'color: red;' },
+    ];
+
+    const result = injector.inject(rules, {
+      root: shadowRoot,
+      cacheKey: 'adopted-test',
+    });
+
+    const css = injector.getCssTextForClasses(new Set([result.className]), {
+      root: shadowRoot,
+    });
+
+    expect(css).toContain('color: red');
+    result.dispose();
   });
 });

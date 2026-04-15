@@ -12,7 +12,7 @@ function createStyleRule(selector: string, declarations: string): StyleRule {
   };
 }
 
-// Mock CSSStyleSheet for tests
+// Mock CSSStyleSheet for tests (extended with replaceSync for adopted mode)
 class MockCSSStyleSheet {
   cssRules: any[] = [];
 
@@ -24,6 +24,17 @@ class MockCSSStyleSheet {
   deleteRule(index: number) {
     if (index >= 0 && index < this.cssRules.length) {
       this.cssRules.splice(index, 1);
+    }
+  }
+
+  replaceSync(text: string) {
+    this.cssRules = [];
+    if (text.trim()) {
+      // Simple split for test purposes — each non-empty line is a "rule"
+      const rules = text.split('\n').filter((l) => l.trim());
+      for (const rule of rules) {
+        this.cssRules.push({ cssText: rule.trim() });
+      }
     }
   }
 }
@@ -523,5 +534,172 @@ describe('SheetManager', () => {
       const newRegistry = manager.getRegistry(document);
       expect(newRegistry).not.toBe(registry);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adopted-mode tests (ShadowRoot with constructable stylesheets)
+// ---------------------------------------------------------------------------
+describe('SheetManager (adopted mode)', () => {
+  let manager: SheetManager;
+  let shadowRoot: ShadowRoot;
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    // No forceTextInjection → adopted mode for ShadowRoot
+    manager = new SheetManager({ maxRulesPerSheet: 100 });
+
+    // Patch globalThis so constructable sheets work in jsdom
+    global.CSSStyleSheet = MockCSSStyleSheet as any;
+
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    shadowRoot = host.attachShadow({ mode: 'open' });
+
+    // jsdom doesn't implement adoptedStyleSheets natively — shim it
+    if (!('adoptedStyleSheets' in shadowRoot)) {
+      Object.defineProperty(shadowRoot, 'adoptedStyleSheets', {
+        value: [],
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
+  afterEach(() => {
+    manager.cleanup(shadowRoot);
+    host.remove();
+  });
+
+  it('auto-selects adopted mode for ShadowRoot', () => {
+    const registry = manager.getRegistry(shadowRoot);
+    expect(registry.injectionMode).toBe('adopted');
+  });
+
+  it('uses style-element mode for Document', () => {
+    const registry = manager.getRegistry(document);
+    expect(registry.injectionMode).toBe('style-element');
+  });
+
+  it('falls back to style-element when forceTextInjection is set', () => {
+    const forced = new SheetManager({
+      maxRulesPerSheet: 100,
+      forceTextInjection: true,
+    });
+    const registry = forced.getRegistry(shadowRoot);
+    expect(registry.injectionMode).toBe('style-element');
+  });
+
+  it('createSheet pushes a constructable sheet to adoptedStyleSheets', () => {
+    const registry = manager.getRegistry(shadowRoot);
+    manager.createSheet(registry, shadowRoot);
+
+    expect(registry.sheets.length).toBe(1);
+    expect(registry.sheets[0].constructableSheet).toBeInstanceOf(
+      MockCSSStyleSheet,
+    );
+    expect(shadowRoot.adoptedStyleSheets.length).toBe(1);
+  });
+
+  it('insertRule inserts via constructable sheet', () => {
+    const registry = manager.getRegistry(shadowRoot);
+
+    const ruleInfo = manager.insertRule(
+      registry,
+      [createStyleRule('.t0', 'color: red;')],
+      't0',
+      shadowRoot,
+    );
+
+    expect(ruleInfo).not.toBeNull();
+    expect(ruleInfo!.ruleIndex).toBe(0);
+
+    const css = registry.sheets[0]
+      .constructableSheet as unknown as MockCSSStyleSheet;
+    expect(css.cssRules.length).toBe(1);
+    expect(css.cssRules[0].cssText).toContain('.t0');
+  });
+
+  it('deleteRule removes from constructable sheet', () => {
+    const registry = manager.getRegistry(shadowRoot);
+
+    const rule = manager.insertRule(
+      registry,
+      [createStyleRule('.t1', 'color: blue;')],
+      't1',
+      shadowRoot,
+    );
+
+    manager.deleteRule(registry, rule!);
+    expect(registry.sheets[0].ruleCount).toBe(0);
+  });
+
+  it('getCssText reads from constructable sheets', () => {
+    const registry = manager.getRegistry(shadowRoot);
+
+    manager.insertRule(
+      registry,
+      [createStyleRule('.t2', 'display: flex;')],
+      't2',
+      shadowRoot,
+    );
+
+    const cssText = manager.getCssText(registry);
+    expect(cssText).toContain('.t2');
+    expect(cssText).toContain('display: flex');
+  });
+
+  it('cleanup clears adoptedStyleSheets', () => {
+    const registry = manager.getRegistry(shadowRoot);
+    manager.createSheet(registry, shadowRoot);
+
+    expect(shadowRoot.adoptedStyleSheets.length).toBe(1);
+
+    manager.cleanup(shadowRoot);
+
+    expect(shadowRoot.adoptedStyleSheets.length).toBe(0);
+  });
+
+  it('raw CSS injects into a separate constructable sheet in adopted mode', () => {
+    // Ensure the registry is created first (adopted mode)
+    manager.getRegistry(shadowRoot);
+
+    const result = manager.injectRawCSS('body { margin: 0; }', shadowRoot);
+
+    // Raw sheet is prepended → index 0
+    expect(shadowRoot.adoptedStyleSheets.length).toBe(1);
+    const rawSheet = shadowRoot
+      .adoptedStyleSheets[0] as unknown as MockCSSStyleSheet;
+    expect(rawSheet.cssRules.length).toBeGreaterThan(0);
+
+    result.dispose();
+
+    // After dispose the raw sheet should be empty
+    expect(rawSheet.cssRules.length).toBe(0);
+  });
+
+  it('getRawCSSText returns raw content in adopted mode', () => {
+    manager.getRegistry(shadowRoot);
+    manager.injectRawCSS('.reset { padding: 0; }', shadowRoot);
+
+    const text = manager.getRawCSSText(shadowRoot);
+    expect(text).toContain('.reset { padding: 0; }');
+  });
+
+  it('raw CSS sheet precedes main tasty sheets in adoptedStyleSheets', () => {
+    const registry = manager.getRegistry(shadowRoot);
+
+    // Create a main sheet first
+    manager.createSheet(registry, shadowRoot);
+
+    // Then inject raw CSS — raw sheet should be prepended
+    manager.injectRawCSS('.raw { color: red; }', shadowRoot);
+
+    // First adopted sheet should be the raw one, second the main one
+    expect(shadowRoot.adoptedStyleSheets.length).toBe(2);
+    // The raw sheet is the one with replaceSync'd content
+    const firstSheet = shadowRoot
+      .adoptedStyleSheets[0] as unknown as MockCSSStyleSheet;
+    expect(firstSheet.cssRules[0]?.cssText).toContain('.raw');
   });
 });

@@ -71,6 +71,8 @@ export interface ComputeStylesResult {
 
 export interface ComputeStylesOptions {
   ssrCollector?: ServerStyleCollector | null;
+  /** Target root for style injection (client only). Defaults to `document`. */
+  root?: Document | ShadowRoot;
 }
 
 interface ProcessedChunk {
@@ -287,6 +289,7 @@ function processChunkSync(
   styles: Styles,
   chunkName: string,
   styleKeys: string[],
+  root?: Document | ShadowRoot,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
@@ -299,7 +302,7 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
-  const { className } = inject(renderResult.rules, { cacheKey });
+  const { className } = inject(renderResult.rules, { cacheKey, root });
 
   return { name: chunkName, styleKeys, cacheKey, renderResult, className };
 }
@@ -310,11 +313,12 @@ function processChunkSync(
  */
 function injectKeyframesSync(
   usedKeyframes: Record<string, KeyframesSteps>,
+  root?: Document | ShadowRoot,
 ): Map<string, string> | null {
   let nameMap: Map<string, string> | null = null;
 
   for (const [name, steps] of Object.entries(usedKeyframes)) {
-    const result = keyframes(steps, { name });
+    const result = keyframes(steps, { name, root });
     const injectedName = result.toString();
     if (injectedName !== name) {
       if (!nameMap) nameMap = new Map();
@@ -331,6 +335,7 @@ function injectKeyframesSync(
 function injectChunkRulesSync(
   chunks: ProcessedChunk[],
   nameMap: Map<string, string> | null,
+  root?: Document | ShadowRoot,
 ): void {
   for (const chunk of chunks) {
     if (chunk.renderResult.rules.length > 0) {
@@ -341,7 +346,7 @@ function injectChunkRulesSync(
           }))
         : chunk.renderResult.rules;
 
-      inject(rulesToInject, { cacheKey: chunk.cacheKey });
+      inject(rulesToInject, { cacheKey: chunk.cacheKey, root });
     }
   }
 }
@@ -349,12 +354,15 @@ function injectChunkRulesSync(
 /**
  * Inject all ancillary rules (properties, font-faces, counter-styles) synchronously.
  */
-function injectAncillarySync(styles: Styles): void {
+function injectAncillarySync(
+  styles: Styles,
+  root?: Document | ShadowRoot,
+): void {
   if (hasLocalProperties(styles)) {
     const localProperties = extractLocalProperties(styles);
     if (localProperties) {
       for (const [token, definition] of Object.entries(localProperties)) {
-        property(token, definition);
+        property(token, { ...definition, root });
       }
     }
   }
@@ -367,7 +375,7 @@ function injectAncillarySync(styles: Styles): void {
           ? input
           : [input];
         for (const desc of descriptors) {
-          fontFace(family, desc);
+          fontFace(family, desc, { root });
         }
       }
     }
@@ -377,7 +385,7 @@ function injectAncillarySync(styles: Styles): void {
     const localCounterStyle = extractLocalCounterStyle(styles);
     if (localCounterStyle) {
       for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        counterStyle(name, descriptors);
+        counterStyle(name, descriptors, { root });
       }
     }
   }
@@ -496,22 +504,24 @@ export function computeStyles(
     // RSC path: render CSS to strings for inline <style> emission
     return computeStylesRSC(resolved, chunkMap);
   } else {
-    injectAncillarySync(resolved);
+    const root = options?.root;
+
+    injectAncillarySync(resolved, root);
 
     const usedKf = getUsedKeyframes(resolved);
-    const nameMap = usedKf ? injectKeyframesSync(usedKf) : null;
+    const nameMap = usedKf ? injectKeyframesSync(usedKf, root) : null;
 
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
-      const chunk = processChunkSync(resolved, chunkName, chunkStyleKeys);
+      const chunk = processChunkSync(resolved, chunkName, chunkStyleKeys, root);
       if (chunk) chunks.push(chunk);
     }
 
     if (nameMap) {
-      injectChunkRulesSync(chunks, nameMap);
+      injectChunkRulesSync(chunks, nameMap, root);
     }
 
     for (const chunk of chunks) {
-      touch(chunk.className);
+      touch(chunk.className, { root });
     }
   }
 

@@ -96,8 +96,12 @@ export interface RuleInfo {
   indices?: number[];
 }
 
+export type InjectionMode = 'style-element' | 'adopted';
+
 export interface SheetInfo {
   sheet: HTMLStyleElement;
+  /** Constructable CSSStyleSheet used in adopted mode (ShadowRoot targets) */
+  constructableSheet?: CSSStyleSheet;
   ruleCount: number;
   holes: number[]; // Available rule indices from deletions
 }
@@ -157,6 +161,8 @@ export interface RootRegistry {
   serverClassSyncIndex: number;
   /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */
   rscStylesScanned: boolean;
+  /** Whether this root uses adoptedStyleSheets or <style> elements */
+  injectionMode: InjectionMode;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

@@ -99,7 +99,8 @@ export interface RuleInfo {
 export type InjectionMode = 'style-element' | 'adopted';
 
 export interface SheetInfo {
-  sheet: HTMLStyleElement;
+  /** HTMLStyleElement used in style-element mode; null in adopted mode. */
+  sheet: HTMLStyleElement | null;
   /** Constructable CSSStyleSheet used in adopted mode (ShadowRoot targets) */
   constructableSheet?: CSSStyleSheet;
   ruleCount: number;

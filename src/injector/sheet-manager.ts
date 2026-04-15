@@ -164,7 +164,7 @@ export class SheetManager {
       ];
 
       const sheetInfo: SheetInfo = {
-        sheet: null as unknown as HTMLStyleElement,
+        sheet: null,
         constructableSheet,
         ruleCount: 0,
         holes: [],

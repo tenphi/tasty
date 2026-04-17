@@ -489,11 +489,13 @@ All sizes measured with [size-limit](https://github.com/ai/size-limit) — minif
 
 | Entry point | Size |
 |-------------|------|
-| `@tenphi/tasty` (runtime + SSR) | ~44 kB |
-| `@tenphi/tasty/core` (runtime, no SSR) | ~41 kB |
-| `@tenphi/tasty/static` (zero-runtime) | ~1.5 kB |
+| `@tenphi/tasty` (runtime + SSR) | 50.19 kB |
+| `@tenphi/tasty/core` (runtime, no SSR) | 47.76 kB |
+| `@tenphi/tasty/static` (zero-runtime) | 16.43 kB |
+| `@tenphi/tasty/zero` (programmatic extraction) | 29.6 kB |
+| `@tenphi/tasty/babel-plugin` (Babel plugin entry) | 43.7 kB |
 
-Run `pnpm size` for exact up-to-date numbers.
+Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 
 ### Runtime Benchmarks
 

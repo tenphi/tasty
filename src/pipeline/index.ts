@@ -756,7 +756,7 @@ function processSinglePattern(pattern: string, key: string): string {
   }
 
   // Auto-inject key based on pattern ending (see shouldInjectKey for rules)
-  if (shouldInjectKey(normalized)) {
+  if (shouldInjectKey(normalized, key)) {
     result = result + ' ' + `[data-element="${key}"]`;
   }
 
@@ -944,19 +944,24 @@ function transformPattern(pattern: string): string {
  * | Attribute ([type]) | No | `'[type="text"]'` | `[type="text"]` |
  *
  * @param pattern - The normalized pattern (after stripping &)
+ * @param key - The sub-element key being styled. If the trailing element name
+ *              equals this key, it acts as an explicit placeholder for the key
+ *              (same role as `@`) and no auto-injection happens.
  * @returns true if key should be injected, false otherwise
  *
  * @example
- * shouldInjectKey('>')           // → true (trailing combinator)
- * shouldInjectKey('>Body>Row')   // → true (ends with element)
- * shouldInjectKey('h1')          // → false (ends with tag)
- * shouldInjectKey('*')           // → false (universal selector)
- * shouldInjectKey('::before')    // → false (ends with pseudo)
- * shouldInjectKey('.active')     // → false (ends with class)
- * shouldInjectKey('a:hover')     // → false (ends with pseudo)
- * shouldInjectKey('button.primary') // → false (ends with class)
+ * shouldInjectKey('>', 'Key')            // → true (trailing combinator)
+ * shouldInjectKey('>Body>Row', 'Key')    // → true (ends with different element)
+ * shouldInjectKey('>Body>Key', 'Key')    // → false (trailing name === key)
+ * shouldInjectKey('Key', 'Key')          // → false (sole element === key)
+ * shouldInjectKey('h1', 'Key')           // → false (ends with tag)
+ * shouldInjectKey('*', 'Key')            // → false (universal selector)
+ * shouldInjectKey('::before', 'Key')     // → false (ends with pseudo)
+ * shouldInjectKey('.active', 'Key')      // → false (ends with class)
+ * shouldInjectKey('a:hover', 'Key')      // → false (ends with pseudo)
+ * shouldInjectKey('button.primary', 'Key') // → false (ends with class)
  */
-function shouldInjectKey(pattern: string): boolean {
+function shouldInjectKey(pattern: string, key: string): boolean {
   const trimmed = pattern.trim();
 
   // Rule 1: Ends with combinator → inject key after it
@@ -965,12 +970,16 @@ function shouldInjectKey(pattern: string): boolean {
     return true;
   }
 
-  // Rule 2: Ends with uppercase element name → inject key as descendant
-  // The lookbehind ensures we're matching a standalone element name, not
-  // part of a class like .myClass (where C is preceded by lowercase)
-  // e.g., '>Body' → '> [data-element="Body"] [data-element="Key"]'
-  if (/(?:^|[\s>+~\]:])[A-Z][a-zA-Z0-9]*$/.test(trimmed)) {
-    return true;
+  // Rule 2: Ends with uppercase element name. The lookbehind ensures we're
+  // matching a standalone element name, not part of a class like .myClass.
+  // If that trailing name is the sub-element's own key, it already represents
+  // the target element (acts like the `@` placeholder) — no re-injection.
+  // Otherwise inject the key as a descendant of the trailing element.
+  // e.g., '>Body' (key=Cell)  → '> [data-element="Body"] [data-element="Cell"]'
+  //       '>Body>Cell' (key=Cell) → '> [data-element="Body"] > [data-element="Cell"]'
+  const trailingElement = trimmed.match(/(?:^|[\s>+~\]:])([A-Z][a-zA-Z0-9]*)$/);
+  if (trailingElement) {
+    return trailingElement[1] !== key;
   }
 
   // Otherwise (tags, universal *, pseudo, class, attribute) → no injection

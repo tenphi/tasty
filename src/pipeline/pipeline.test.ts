@@ -1765,6 +1765,75 @@ describe('Sub-element selector affix ($) tests', () => {
     });
   });
 
+  describe('Self-name shorthand', () => {
+    it('should treat trailing element name matching the key as the placeholder (with combinator)', () => {
+      const styles = {
+        SubElementName: {
+          $: '> SubElementName',
+          color: 'red',
+        },
+      };
+
+      const result = renderStyles(styles, '.root');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain('> [data-element="SubElementName"]');
+      // No duplicated key injection.
+      expect(result[0].selector).not.toMatch(
+        /\[data-element="SubElementName"\][^,{]*\[data-element="SubElementName"\]/,
+      );
+    });
+
+    it('should treat sole element name matching the key as the placeholder (descendant)', () => {
+      const styles = {
+        SubElementName: {
+          $: 'SubElementName',
+          color: 'red',
+        },
+      };
+
+      const result = renderStyles(styles, '.root');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(' [data-element="SubElementName"]');
+      expect(result[0].selector).not.toMatch(
+        /\[data-element="SubElementName"\][^,{]*\[data-element="SubElementName"\]/,
+      );
+    });
+
+    it('should treat trailing key in chained pattern as the placeholder', () => {
+      const styles = {
+        Cell: {
+          $: '> Body > Cell',
+          padding: '1x',
+        },
+      };
+
+      const result = renderStyles(styles, '.table');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toMatch(
+        /> \[data-element="Body"\] > \[data-element="Cell"\]/,
+      );
+      // Key not duplicated as a descendant.
+      expect(result[0].selector).not.toMatch(
+        /\[data-element="Cell"\][^,{]*\[data-element="Cell"\]/,
+      );
+    });
+
+    it('should still inject the key as a descendant when trailing name differs from the key', () => {
+      const styles = {
+        Cell: {
+          $: '>Body>Row',
+          padding: '1x',
+        },
+      };
+
+      const result = renderStyles(styles, '.table');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toMatch(
+        /> \[data-element="Body"\] > \[data-element="Row"\] \[data-element="Cell"\]/,
+      );
+    });
+  });
+
   describe('Chained selectors', () => {
     it('should handle chained selectors with trailing combinator', () => {
       const styles = {

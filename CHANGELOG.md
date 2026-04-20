@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.1.1
+
+### Patch Changes
+
+- [#148](https://github.com/tenphi/tasty/pull/148) [`a6fffde`](https://github.com/tenphi/tasty/commit/a6fffde058d4fee43af242fcb5cc70a53fe86d7f) Thanks [@tenphi](https://github.com/tenphi)! - Fix `$: '> SubElementName'` selector affix syntax so that when the trailing element name matches the sub-element's own key it acts as a placeholder rather than triggering a duplicate key injection.
+
 ## 2.1.0
 
 ### Minor Changes

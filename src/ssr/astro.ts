@@ -201,7 +201,10 @@ export interface TastyIntegrationOptions {
  * });
  * ```
  */
-export function tastyIntegration(options?: TastyIntegrationOptions) {
+export function tastyIntegration(options?: TastyIntegrationOptions): {
+  name: string;
+  hooks: Record<string, (...args: never[]) => void>;
+} {
   const { islands = true } = options ?? {};
 
   setMiddlewareTransferCache(islands);
@@ -217,7 +220,10 @@ export function tastyIntegration(options?: TastyIntegrationOptions) {
           entrypoint: string | URL;
           order: 'pre' | 'post';
         }) => void;
-        injectScript: (stage: string, content: string) => void;
+        injectScript: (
+          stage: 'head-inline' | 'before-hydration' | 'page' | 'page-ssr',
+          content: string,
+        ) => void;
       }) => {
         addMiddleware({
           entrypoint: new URL('./astro-middleware.js', import.meta.url),

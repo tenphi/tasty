@@ -216,6 +216,12 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
   // Apply consensus/resolution: (A | B) & (A | !B) → A
   terms = applyConsensusAnd(terms);
 
+  // ─── Pass 5: cross-level contradiction pruning ──────────────────────────
+  // A & OR(!A & X, Y) → A & Y
+  // For each OR child, prune branches that are impossible given the other
+  // AND siblings. This catches dead branches left by exclusive negation.
+  terms = pruneContradictedOrBranches(terms);
+
   if (terms.length === 0) {
     return trueCondition();
   }
@@ -772,19 +778,27 @@ function buildImpliedNegationCheck(
   terms: ConditionNode[],
 ): (term: ConditionNode) => boolean {
   const positiveValues = new Map<string, string>();
+  const negatedBooleanAttrs = new Set<string>();
 
   for (const term of terms) {
-    if (term.kind !== 'state' || term.negated) continue;
+    if (term.kind !== 'state') continue;
 
-    if (term.type === 'container' && term.subtype === 'style') {
-      if (term.propertyValue !== undefined) {
-        positiveValues.set(
-          `c:${term.containerName || '_'}:${term.property}`,
-          term.propertyValue,
-        );
+    if (!term.negated) {
+      if (term.type === 'container' && term.subtype === 'style') {
+        if (term.propertyValue !== undefined) {
+          positiveValues.set(
+            `c:${term.containerName || '_'}:${term.property}`,
+            term.propertyValue,
+          );
+        }
+      } else if (term.type === 'modifier' && term.value !== undefined) {
+        positiveValues.set(`m:${term.attribute}`, term.value);
       }
-    } else if (term.type === 'modifier' && term.value !== undefined) {
-      positiveValues.set(`m:${term.attribute}`, term.value);
+    } else {
+      // NOT [data-attr] (boolean negation) implies NOT [data-attr="val"]
+      if (term.type === 'modifier' && term.value === undefined) {
+        negatedBooleanAttrs.add(term.attribute);
+      }
     }
   }
 
@@ -800,6 +814,8 @@ function buildImpliedNegationCheck(
     }
 
     if (term.type === 'modifier' && term.value !== undefined) {
+      // :not([data-attr]) already present → :not([data-attr="val"]) is redundant
+      if (negatedBooleanAttrs.has(term.attribute)) return true;
       const pos = positiveValues.get(`m:${term.attribute}`);
       return pos !== undefined && term.value !== pos;
     }
@@ -1381,4 +1397,80 @@ function tryResolvePair(
     return common[0];
   }
   return or(...common);
+}
+
+// ============================================================================
+// Cross-level Contradiction Pruning
+// ============================================================================
+
+/**
+ * For each OR child of an AND, prune branches that are impossible
+ * given the other AND siblings.
+ *
+ * Example: A & OR(!A & X, Y) → A & Y
+ *
+ * This catches dead OR branches left by exclusive negation (Stage 2b)
+ * where `NOT(combined)` introduces branches contradicting flat siblings.
+ */
+function pruneContradictedOrBranches(terms: ConditionNode[]): ConditionNode[] {
+  const hasOr = terms.some((t) => t.kind === 'compound' && t.operator === 'OR');
+  if (!hasOr) return terms;
+
+  let changed = false;
+  const result: ConditionNode[] = [];
+
+  for (let i = 0; i < terms.length; i++) {
+    const term = terms[i];
+    if (term.kind !== 'compound' || term.operator !== 'OR') {
+      result.push(term);
+      continue;
+    }
+
+    // Gather all siblings (everything except this OR)
+    const siblings = [...terms.slice(0, i), ...terms.slice(i + 1)];
+
+    const surviving: ConditionNode[] = [];
+    for (const branch of term.children) {
+      const test: ConditionNode = {
+        kind: 'compound',
+        operator: 'AND',
+        children: [branch, ...siblings],
+      };
+      const simplified = simplifyInner(test);
+      if (simplified.kind !== 'false') {
+        surviving.push(branch);
+      }
+    }
+
+    if (surviving.length === term.children.length) {
+      result.push(term);
+    } else if (surviving.length === 0) {
+      return [falseCondition()];
+    } else {
+      changed = true;
+      if (surviving.length === 1) {
+        result.push(surviving[0]);
+      } else {
+        result.push({
+          kind: 'compound',
+          operator: 'OR',
+          children: surviving,
+        });
+      }
+    }
+  }
+
+  if (!changed) return terms;
+
+  // Re-flatten after pruning may have unwrapped single-branch ORs
+  const flattened: ConditionNode[] = [];
+  for (const term of result) {
+    if (term.kind === 'compound' && term.operator === 'AND') {
+      flattened.push(...term.children);
+    } else {
+      flattened.push(term);
+    }
+  }
+
+  return flattened;
 }

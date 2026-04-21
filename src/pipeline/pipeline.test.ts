@@ -15,6 +15,7 @@ import {
   and,
   createContainerDimensionCondition,
   createMediaDimensionCondition,
+  createMediaFeatureCondition,
   createModifierCondition,
   createParentCondition,
   falseCondition,
@@ -23,7 +24,12 @@ import {
   trueCondition,
 } from './conditions';
 import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
-import { conditionToCSS, parentGroupsToCSS, pseudoToCSS } from './materialize';
+import {
+  buildAtRulesFromVariant,
+  conditionToCSS,
+  parentGroupsToCSS,
+  pseudoToCSS,
+} from './materialize';
 import { clearParseCache, parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 
@@ -4460,5 +4466,236 @@ describe('Edge cases: empty and impossible styles', () => {
     expect(
       result.find((r) => r.declarations.includes('var(--red-color)')),
     ).toBeDefined();
+  });
+});
+
+describe('Compound state CSS bloat fixes', () => {
+  beforeEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+
+    configure({
+      colorSpace: 'rgb',
+      states: {
+        '@dark-root':
+          'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
+        '@high-contrast-root':
+          'contrast=more | (!contrast & @media(prefers-contrast: more))',
+      },
+    });
+  });
+
+  afterEach(() => {
+    resetConfig();
+    clearPipelineCache();
+    clearParseCache();
+    clearSimplifyCache();
+    clearConditionCache();
+  });
+
+  // Fix 1: Canonical @media condition order
+  it('should produce canonical @media order regardless of condition input order', () => {
+    const variant = {
+      modifierConditions: [],
+      pseudoConditions: [],
+      selectorGroups: [],
+      ownGroups: [],
+      mediaConditions: [
+        {
+          subtype: 'feature' as const,
+          negated: false,
+          condition: '(prefers-color-scheme: dark)',
+        },
+        {
+          subtype: 'feature' as const,
+          negated: false,
+          condition: '(prefers-contrast: more)',
+        },
+      ],
+      containerConditions: [],
+      supportsConditions: [],
+      rootGroups: [],
+      parentGroups: [],
+      startingStyle: false,
+    };
+
+    const variantReversed = {
+      ...variant,
+      mediaConditions: [
+        {
+          subtype: 'feature' as const,
+          negated: false,
+          condition: '(prefers-contrast: more)',
+        },
+        {
+          subtype: 'feature' as const,
+          negated: false,
+          condition: '(prefers-color-scheme: dark)',
+        },
+      ],
+    };
+
+    const atRules1 = buildAtRulesFromVariant(variant);
+    const atRules2 = buildAtRulesFromVariant(variantReversed);
+
+    expect(atRules1).toEqual(atRules2);
+    expect(atRules1[0]).toBe(
+      '@media (prefers-color-scheme: dark) and (prefers-contrast: more)',
+    );
+  });
+
+  // Fix 2: No redundant [data-attr] when [data-attr="val"] present
+  it('should not produce redundant boolean selectors when value selector present', () => {
+    const cond = and(
+      createModifierCondition('data-schema', 'dark'),
+      createModifierCondition('data-contrast', 'more'),
+    );
+
+    const css = conditionToCSS(cond);
+
+    for (const variant of css.variants) {
+      const attrs = variant.modifierConditions;
+      for (const mod of attrs) {
+        if (mod.value !== undefined && !mod.negated) {
+          // There should be no boolean-only modifier for the same attribute
+          const hasBooleanDup = attrs.some(
+            (m) =>
+              m.attribute === mod.attribute &&
+              m.value === undefined &&
+              !m.negated,
+          );
+          expect(
+            hasBooleanDup,
+            `[${mod.attribute}] is redundant alongside [${mod.attribute}="${mod.value}"]`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  // Fix 3: NOT [data-attr] subsumes NOT [data-attr="val"]
+  it('should simplify !attr & !attr=val to just !attr', () => {
+    const boolNeg = not(createModifierCondition('data-schema'));
+    const valNeg = not(createModifierCondition('data-schema', 'dark'));
+
+    const simplified = simplifyCondition(and(boolNeg, valNeg));
+
+    // Should simplify to just !schema (boolean negation)
+    if (simplified.kind === 'state') {
+      expect(simplified.type).toBe('modifier');
+      expect(simplified.attribute).toBe('data-schema');
+      expect(simplified.value).toBeUndefined();
+      expect(simplified.negated).toBe(true);
+    } else if (simplified.kind === 'compound') {
+      // Should not contain the negated value modifier
+      const ids = simplified.children.map(getConditionUniqueId);
+      const valNegId = getConditionUniqueId(valNeg);
+      expect(ids).not.toContain(valNegId);
+    }
+  });
+
+  // Fix 4: Cross-level contradiction pruning
+  it('should simplify A & OR(!A & X, Y) to A & Y', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const X = createMediaFeatureCondition('prefers-color-scheme', 'dark');
+    const Y = createModifierCondition('data-contrast', 'more');
+
+    // A & OR(!A & X, Y) should become A & Y
+    const condition = and(A, or(and(not(A), X), Y));
+    const simplified = simplifyCondition(condition);
+
+    // Should contain A and Y but not !A or X
+    const notAId = getConditionUniqueId(not(A));
+    const xId = getConditionUniqueId(X);
+    const simplifiedId = getConditionUniqueId(simplified);
+
+    expect(simplifiedId).not.toContain(notAId);
+
+    // Verify A and Y are present
+    if (simplified.kind === 'compound') {
+      const childIds = simplified.children.map(getConditionUniqueId);
+      expect(childIds).toContain(getConditionUniqueId(A));
+      expect(childIds).toContain(getConditionUniqueId(Y));
+      expect(childIds).not.toContain(xId);
+    }
+  });
+
+  it('should simplify A & OR(!A, B) to A & B', () => {
+    const A = createModifierCondition('data-schema', 'dark');
+    const B = createModifierCondition('data-contrast', 'more');
+
+    const condition = and(A, or(not(A), B));
+    const simplified = simplifyCondition(condition);
+
+    // !A branch is pruned, leaving A & B
+    if (simplified.kind === 'compound') {
+      const childIds = simplified.children.map(getConditionUniqueId);
+      expect(childIds).toContain(getConditionUniqueId(A));
+      expect(childIds).toContain(getConditionUniqueId(B));
+    }
+  });
+
+  // Integration: compound state tokens produce fewer rules
+  it('should produce compact CSS for compound state tokens (4 values)', () => {
+    clearPipelineCache();
+    clearConditionCache();
+    clearSimplifyCache();
+
+    const tokens = {
+      '#accent-text': {
+        '': 'okhsl(240 75% 51%)',
+        '@dark-root': 'okhsl(240 75% 59%)',
+        '@high-contrast-root': 'okhsl(240 75% 39%)',
+        '@dark-root & @high-contrast-root': 'okhsl(240 75% 63%)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // With all four fixes, we expect significantly fewer than 18 rules
+    expect(
+      result.length,
+      `Expected at most 16 rules, got ${result.length}`,
+    ).toBeLessThanOrEqual(16);
+
+    // Within each selector variant (comma-separated group inside :is()),
+    // no group should contain both a positive [data-attr] and a positive
+    // [data-attr="val"] for the SAME attribute. Negated forms (:not(...))
+    // are fine since [data-attr]:not([data-attr="dark"]) is meaningful.
+    for (const rule of result) {
+      const isMatch = rule.selector.match(/:is\((.+)\)/);
+      const groups = isMatch ? isMatch[1].split(',') : [rule.selector];
+      for (const group of groups) {
+        // Positive boolean attrs: [data-xxx] NOT inside :not()
+        const positiveBools = [
+          ...group.matchAll(/(?<!:not\()(\[data-(\w+)\])(?!=)/g),
+        ];
+        // Positive value attrs: [data-xxx="yyy"] NOT inside :not()
+        const positiveVals = [
+          ...group.matchAll(/(?<!:not\()(\[data-(\w+)="[^"]*"\])/g),
+        ];
+
+        for (const [, , boolAttr] of positiveBools) {
+          const hasPositiveVal = positiveVals.some(
+            ([, , valAttr]) => valAttr === boolAttr,
+          );
+          expect(
+            hasPositiveVal,
+            `Redundant [data-${boolAttr}] alongside positive [data-${boolAttr}="..."] in: ${group.trim()}`,
+          ).toBe(false);
+        }
+      }
+    }
+
+    // No duplicate @media + selector combination
+    const keys = new Set<string>();
+    for (const rule of result) {
+      const key = `${rule.atRules?.sort().join('|') ?? ''}||${rule.selector}`;
+      expect(keys.has(key), `Duplicate rule: ${key}`).toBe(false);
+      keys.add(key);
+    }
   });
 });

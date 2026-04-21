@@ -126,7 +126,7 @@ exports[`@supports queries snapshot tests > should render @supports combined wit
   },
   {
     "atRules": [
-      "@supports (not (display: grid)) and (not (display: flex))",
+      "@supports (not (display: flex)) and (not (display: grid))",
     ],
     "declarations": "display: block;",
     "selector": ".component",

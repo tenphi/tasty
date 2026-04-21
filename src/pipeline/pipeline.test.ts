@@ -27,6 +27,7 @@ import { buildExclusiveConditions, parseStyleEntries } from './exclusive';
 import {
   buildAtRulesFromVariant,
   conditionToCSS,
+  mergeVariantsIntoSelectorGroups,
   parentGroupsToCSS,
   pseudoToCSS,
 } from './materialize';
@@ -4697,5 +4698,109 @@ describe('Compound state CSS bloat fixes', () => {
       expect(keys.has(key), `Duplicate rule: ${key}`).toBe(false);
       keys.add(key);
     }
+  });
+
+  // Dimension factoring: Cartesian-product :is() groups
+  it('should factor 2x2 Cartesian product into independent :is() groups', () => {
+    clearPipelineCache();
+    clearConditionCache();
+    clearSimplifyCache();
+
+    const tokens = {
+      '#accent-text': {
+        '': 'okhsl(240 75% 51%)',
+        '@dark-root': 'okhsl(240 75% 59%)',
+        '@high-contrast-root': 'okhsl(240 75% 39%)',
+        '@dark-root & @high-contrast-root': 'okhsl(240 75% 63%)',
+      },
+    };
+
+    const result = renderStyles(tokens, ':root') as StyleResult[];
+
+    // The combined-media rule should have factored :is() groups
+    const combinedMediaRules = result.filter(
+      (r) =>
+        r.atRules?.some((a) => a.includes('prefers-color-scheme')) &&
+        r.atRules?.some((a) => a.includes('prefers-contrast')) &&
+        !r.atRules?.some((a) => a.startsWith('@media (not')),
+    );
+
+    for (const rule of combinedMediaRules) {
+      // Should have multiple :is() groups (factored) not a single 4-branch one
+      // Factored form: :is(A1, A2):is(B1, B2)
+      const isCount = (rule.selector.match(/:is\(/g) || []).length;
+      if (isCount > 0) {
+        expect(
+          isCount,
+          `Expected multiple independent :is() groups, got ${isCount} in: ${rule.selector}`,
+        ).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it('should produce factored :is() for conditionToCSS with 2 independent modifier dimensions', () => {
+    clearConditionCache();
+
+    // AND of two ORs: each OR has 2 branches for different attributes
+    const schemaOr = or(
+      createModifierCondition('data-schema', 'dark'),
+      not(createModifierCondition('data-schema')),
+    );
+    const contrastOr = or(
+      createModifierCondition('data-contrast', 'more'),
+      not(createModifierCondition('data-contrast')),
+    );
+
+    const css = conditionToCSS(and(schemaOr, contrastOr));
+
+    expect(css.isImpossible).toBe(false);
+    // 4 variants from the Cartesian product
+    expect(css.variants.length).toBe(4);
+
+    // After mergeVariantsIntoSelectorGroups, factoring should produce
+    // 2 independent :is() groups instead of 1 with 4 branches
+    const merged = mergeVariantsIntoSelectorGroups(css.variants);
+    expect(merged.length).toBe(1);
+
+    const variant = merged[0];
+    // Should have 2 selector groups (one per dimension)
+    expect(variant.selectorGroups.length).toBe(2);
+    // Each group should have 2 branches
+    for (const group of variant.selectorGroups) {
+      expect(group.branches.length).toBe(2);
+      expect(group.negated).toBe(false);
+    }
+  });
+
+  it('should not factor when branches do not form a complete Cartesian product', () => {
+    clearConditionCache();
+
+    // 3 variants that are NOT a complete 2x2 product
+    const css = conditionToCSS(
+      or(
+        and(
+          createModifierCondition('data-schema', 'dark'),
+          createModifierCondition('data-contrast', 'more'),
+        ),
+        and(
+          createModifierCondition('data-schema', 'dark'),
+          not(createModifierCondition('data-contrast')),
+        ),
+        and(
+          not(createModifierCondition('data-schema')),
+          createModifierCondition('data-contrast', 'more'),
+        ),
+      ),
+    );
+
+    expect(css.isImpossible).toBe(false);
+
+    const merged = mergeVariantsIntoSelectorGroups(css.variants);
+    expect(merged.length).toBe(1);
+
+    const variant = merged[0];
+    // Should fall back to a single :is() group (3 branches, not factorable)
+    expect(variant.selectorGroups.length).toBe(1);
+    expect(variant.selectorGroups[0].branches.length).toBe(3);
   });
 });

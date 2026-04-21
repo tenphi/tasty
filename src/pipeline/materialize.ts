@@ -1645,6 +1645,24 @@ function factorAndGroup(variants: SelectorVariant[]): SelectorVariant {
     };
   }
 
+  // Try to factor branches into independent :is() groups per attribute
+  // e.g. 4 branches for 2 attrs × 2 values → two :is() groups of 2
+  const factoredGroups = tryFactorIntoDimensions(branches);
+  if (factoredGroups) {
+    return {
+      modifierConditions: commonModifiers,
+      pseudoConditions: commonPseudos,
+      selectorGroups: [...variants[0].selectorGroups, ...factoredGroups],
+      ownGroups: [...variants[0].ownGroups],
+      mediaConditions: [...variants[0].mediaConditions],
+      containerConditions: [...variants[0].containerConditions],
+      supportsConditions: [...variants[0].supportsConditions],
+      rootGroups: [...variants[0].rootGroups],
+      parentGroups: [...variants[0].parentGroups],
+      startingStyle: variants[0].startingStyle,
+    };
+  }
+
   return {
     modifierConditions: commonModifiers,
     pseudoConditions: commonPseudos,
@@ -1660,6 +1678,58 @@ function factorAndGroup(variants: SelectorVariant[]): SelectorVariant {
     parentGroups: [...variants[0].parentGroups],
     startingStyle: variants[0].startingStyle,
   };
+}
+
+/**
+ * Detect when branches form a complete Cartesian product of independent
+ * modifier attribute dimensions and return one SelectorGroup per dimension.
+ *
+ * Example: 4 branches for 2 attributes × 2 values each →
+ *   :is(A1, A2):is(B1, B2)  instead of  :is(A1B1, A1B2, A2B1, A2B2)
+ */
+function tryFactorIntoDimensions(
+  branches: ParsedSelectorCondition[][],
+): SelectorGroup[] | null {
+  if (branches.length < 4) return null;
+
+  // Only factor modifier-only branches
+  const dimensions = new Map<string, Map<string, ParsedModifierCondition>>();
+  for (const branch of branches) {
+    for (const cond of branch) {
+      if (!('attribute' in cond)) return null;
+      if (!dimensions.has(cond.attribute)) {
+        dimensions.set(cond.attribute, new Map());
+      }
+      dimensions.get(cond.attribute)!.set(getModifierKey(cond), cond);
+    }
+  }
+
+  if (dimensions.size < 2) return null;
+
+  // Each branch must have exactly one condition per dimension
+  for (const branch of branches) {
+    const seen = new Set<string>();
+    for (const cond of branch) {
+      const attr = (cond as ParsedModifierCondition).attribute;
+      if (seen.has(attr)) return null;
+      seen.add(attr);
+    }
+    if (seen.size !== dimensions.size) return null;
+  }
+
+  // Branch count must equal product of dimension sizes (complete product)
+  let expectedCount = 1;
+  for (const vals of dimensions.values()) {
+    expectedCount *= vals.size;
+  }
+  if (branches.length !== expectedCount) return null;
+
+  return [...dimensions.values()].map((vals) => ({
+    branches: [...vals.values()].map((cond) => [
+      cond as ParsedSelectorCondition,
+    ]),
+    negated: false,
+  }));
 }
 
 // ============================================================================

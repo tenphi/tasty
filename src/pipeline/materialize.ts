@@ -857,7 +857,16 @@ function dedupeSelectorConditions(
 
   return result.filter((c) => {
     if (!('attribute' in c)) return true;
-    return !isSubsumedNegatedModifier(c, facts);
+    if (isSubsumedNegatedModifier(c, facts)) return false;
+    // [data-attr] is redundant when [data-attr="val"] already present
+    if (
+      !c.negated &&
+      c.value === undefined &&
+      facts.positiveExactValuesByAttr.has(c.attribute)
+    ) {
+      return false;
+    }
+    return true;
   });
 }
 
@@ -1675,7 +1684,7 @@ export function buildAtRulesFromVariant(variant: SelectorVariant): string[] {
         return c.negated ? `(not ${c.condition})` : c.condition;
       }
     });
-    atRules.push(`@media ${conditionParts.join(' and ')}`);
+    atRules.push(`@media ${conditionParts.sort().join(' and ')}`);
   }
 
   // Add container rules - group by container name and combine with "and"

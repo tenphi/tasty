@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 2.1.2
+
+### Patch Changes
+
+- [#150](https://github.com/tenphi/tasty/pull/150) [`f8f0285`](https://github.com/tenphi/tasty/commit/f8f02859f91bbe631f8b8be7fc5d9f052c954704) Thanks [@tenphi](https://github.com/tenphi)! - Fix excessive CSS output for compound root states by canonicalizing @media order, removing redundant boolean selectors, improving negation subsumption, and pruning contradicted OR branches.
+
+- [#152](https://github.com/tenphi/tasty/pull/152) [`856a7ba`](https://github.com/tenphi/tasty/commit/856a7ba54ba97075a8428f71db38e4581d79687d) Thanks [@tenphi](https://github.com/tenphi)! - Factor Cartesian-product `:is()` selector groups into independent per-dimension `:is()` groups for more compact CSS output.
+
 ## 2.1.1
 
 ### Patch Changes

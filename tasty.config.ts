@@ -3,6 +3,7 @@ export default {
     '#white',
     '#black',
     '#current',
+    '#clear',
     '$gap',
     '$radius',
     '$border-width',

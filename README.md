@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Deterministic styling for stateful component systems.</strong><br>
-  A design-system styling engine that compiles component states into mutually exclusive selectors.
+  A design-system styling engine that compiles component states into mutually exclusive selectors, so complex components stay predictable as they evolve.
 </p>
 
 <p align="center">
@@ -23,6 +23,8 @@ It compiles state maps into **mutually exclusive selectors**, so for a given pro
 
 That is the core guarantee: component styling resolves from declared state logic, not from source-order accidents or specificity fights.
 
+The practical payoff shows up later: adding states, variants, and overrides stays inside the state map instead of reopening selector logic by hand.
+
 Tasty fits best when you are building a design system or component library with intersecting states, variants, tokens, sub-elements, responsive rules, and extension semantics that need to stay predictable over time.
 
 On top of that foundation, Tasty gives teams a governed styling model: a CSS-like DSL, tokens, recipes, typed style props, sub-elements, and multiple rendering modes.
@@ -35,6 +37,7 @@ On top of that foundation, Tasty gives teams a governed styling model: a CSS-lik
 ## Why Tasty
 
 - **Deterministic composition, not cascade fights** — Stateful styles resolve from the state map you declared, not from selector competition. See [How It Actually Works](#how-it-actually-works).
+- **Easier to extend over time** — When components gain new states, variants, or overrides, you update declared branches instead of re-deriving selector interactions by hand.
 - **Built for design-system teams** — Best fit for reusable component systems with complex state interactions.
 - **A governed styling model, not just syntax sugar** — Design-system authors define the styling language product teams consume.
 - **DSL that still feels like CSS** — Familiar property names, less selector boilerplate. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.

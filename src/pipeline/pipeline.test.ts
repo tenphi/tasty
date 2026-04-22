@@ -1893,7 +1893,34 @@ describe('Sub-element selector affix ($) tests', () => {
   });
 
   describe('Pseudo-elements on root', () => {
-    it('should handle ::before on root', () => {
+    it('should handle &::before on root', () => {
+      const styles = {
+        Before: {
+          $: '&::before',
+          content: '""',
+        },
+      };
+
+      const result = renderStyles(styles, '.divider');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toBe('.divider::before');
+      expect(result[0].selector).not.toContain('data-element');
+    });
+
+    it('should handle &::after on root', () => {
+      const styles = {
+        After: {
+          $: '&::after',
+          content: '""',
+        },
+      };
+
+      const result = renderStyles(styles, '.divider');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toBe('.divider::after');
+    });
+
+    it('should treat bare ::before as descendant pseudo without &', () => {
       const styles = {
         Before: {
           $: '::before',
@@ -1903,23 +1930,7 @@ describe('Sub-element selector affix ($) tests', () => {
 
       const result = renderStyles(styles, '.divider');
       expect(result.length).toBe(1);
-      // Selectors are NOT doubled by default (use { doubleSelector: true } to double)
-      expect(result[0].selector).toBe('.divider::before');
-      expect(result[0].selector).not.toContain('data-element');
-    });
-
-    it('should handle ::after on root', () => {
-      const styles = {
-        After: {
-          $: '::after',
-          content: '""',
-        },
-      };
-
-      const result = renderStyles(styles, '.divider');
-      expect(result.length).toBe(1);
-      // Selectors are NOT doubled by default (use { doubleSelector: true } to double)
-      expect(result[0].selector).toBe('.divider::after');
+      expect(result[0].selector).toBe('.divider ::before');
     });
   });
 
@@ -2246,50 +2257,18 @@ describe('Sub-element selector affix ($) tests', () => {
       expect(selectors).toContain('[data-element="Body"]');
     });
 
-    it('should handle multiple pseudo patterns', () => {
+    it('should handle multiple pseudo patterns with &', () => {
       const styles = {
         Deco: {
-          $: '::before, ::after',
+          $: '&::before, &::after',
           content: '""',
         },
       };
 
       const result = renderStyles(styles, '.divider');
-      // Both ::before and ::after should be generated
       const selectors = result.map((r) => r.selector);
       expect(selectors.some((s) => s.includes('::before'))).toBe(true);
       expect(selectors.some((s) => s.includes('::after'))).toBe(true);
-    });
-  });
-
-  describe('Pseudo-class on root (no injection)', () => {
-    it('should handle :hover on root', () => {
-      const styles = {
-        Hover: {
-          $: ':hover',
-          fill: 'blue',
-        },
-      };
-
-      const result = renderStyles(styles, '.button');
-      expect(result.length).toBe(1);
-      // Selectors are NOT doubled by default (use { doubleSelector: true } to double)
-      expect(result[0].selector).toBe('.button:hover');
-      expect(result[0].selector).not.toContain('data-element');
-    });
-
-    it('should handle :first-child on root', () => {
-      const styles = {
-        First: {
-          $: ':first-child',
-          marginTop: '0',
-        },
-      };
-
-      const result = renderStyles(styles, '.item');
-      expect(result.length).toBe(1);
-      // Selectors are NOT doubled by default (use { doubleSelector: true } to double)
-      expect(result[0].selector).toBe('.item:first-child');
     });
   });
 
@@ -2310,7 +2289,7 @@ describe('Sub-element selector affix ($) tests', () => {
   });
 
   describe('Edge cases', () => {
-    it('should strip leading & from pattern', () => {
+    it('should attach pseudo to root with & prefix', () => {
       const styles = {
         Before: {
           $: '&::before',

@@ -722,21 +722,22 @@ function validatePattern(pattern: string): AffixResult {
  * processSinglePattern('>Body>Row>', 'Cell')
  * // → '> [data-element="Body"] > [data-element="Row"] > [data-element="Cell"]'
  *
- * processSinglePattern('::before', 'Before')
- * // → '::before' (no key injection for pseudo on root)
+ * processSinglePattern('&::before', 'Before')
+ * // → '::before' (& attaches pseudo directly to root, no key injection)
  *
  * processSinglePattern('>@:hover', 'Item')
  * // → '> [data-element="Item"]:hover'
  */
 function processSinglePattern(pattern: string, key: string): string {
-  // Strip leading & if present (implicit root reference, kept for compat)
-  const normalized = pattern.replace(/^&/, '').trim();
+  // Explicit & means "attach directly to root" (no space prefix)
+  const startsWithAmpersand = pattern.startsWith('&');
+  const normalized = (startsWithAmpersand ? pattern.slice(1) : pattern).trim();
 
   if (!normalized) {
     return ` [data-element="${key}"]`;
   }
 
-  // Pseudo-elements/classes at start apply directly to root (no space prefix)
+  // Pseudo-elements/classes at start (used for @ placeholder branch only)
   const startsWithPseudo = /^::?[a-z]/.test(normalized);
 
   // Transform the pattern: convert element names and normalize spacing
@@ -760,8 +761,8 @@ function processSinglePattern(pattern: string, key: string): string {
     result = result + ' ' + `[data-element="${key}"]`;
   }
 
-  // Add space prefix for selectors targeting inside root (not pseudo on root)
-  if (!startsWithPseudo && !result.startsWith(' ')) {
+  // & prefix skips space so the suffix attaches directly to the root selector
+  if (!startsWithAmpersand && !result.startsWith(' ')) {
     result = ' ' + result;
   }
 

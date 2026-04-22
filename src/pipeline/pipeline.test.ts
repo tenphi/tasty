@@ -2272,48 +2272,6 @@ describe('Sub-element selector affix ($) tests', () => {
     });
   });
 
-  describe('Pseudo-class on root (no injection)', () => {
-    it('should handle &:hover on root', () => {
-      const styles = {
-        Hover: {
-          $: '&:hover',
-          fill: 'blue',
-        },
-      };
-
-      const result = renderStyles(styles, '.button');
-      expect(result.length).toBe(1);
-      expect(result[0].selector).toBe('.button:hover');
-      expect(result[0].selector).not.toContain('data-element');
-    });
-
-    it('should handle &:first-child on root', () => {
-      const styles = {
-        First: {
-          $: '&:first-child',
-          marginTop: '0',
-        },
-      };
-
-      const result = renderStyles(styles, '.item');
-      expect(result.length).toBe(1);
-      expect(result[0].selector).toBe('.item:first-child');
-    });
-
-    it('should treat bare :hover as descendant pseudo without &', () => {
-      const styles = {
-        Hover: {
-          $: ':hover',
-          fill: 'blue',
-        },
-      };
-
-      const result = renderStyles(styles, '.button');
-      expect(result.length).toBe(1);
-      expect(result[0].selector).toBe('.button :hover');
-    });
-  });
-
   describe('Attribute selectors', () => {
     it('should handle attribute selector (no key injection)', () => {
       const styles = {

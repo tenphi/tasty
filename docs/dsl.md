@@ -65,9 +65,7 @@ Control how a sub-element selector attaches to the root selector using the `$` p
 | `h1 *` | ` h1 *` | Any descendant of tag |
 | `*` | ` *` | All descendants |
 | `&::before` | `::before` | Root pseudo (no key); `&` is required |
-| `&:hover` | `:hover` | Root pseudo-class; `&` is required |
 | `@::before` | `[el]::before` | Pseudo on the sub-element |
-| `>@:hover` | `> [el]:hover` | Pseudo-class on the sub-element |
 | `>@.active` | `> [el].active` | Class on the sub-element |
 
 Rules for key injection (`[data-element="..."]`):

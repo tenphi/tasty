@@ -1,5 +1,17 @@
 # @tenphi/tasty
 
+## 2.2.0
+
+### Minor Changes
+
+- [#156](https://github.com/tenphi/tasty/pull/156) [`552c522`](https://github.com/tenphi/tasty/commit/552c522532b5e93465bab6773221dee86f1810ac) Thanks [@tenphi](https://github.com/tenphi)! - Pseudo-element and pseudo-class patterns in the `$` selector affix now require an explicit `&` prefix to attach to the root selector. `$: '::before'` must be written as `$: '&::before'`. Without `&`, pseudo patterns are treated as descendant selectors.
+
+### Patch Changes
+
+- [#154](https://github.com/tenphi/tasty/pull/154) [`b926d10`](https://github.com/tenphi/tasty/commit/b926d10c9007caa3e50e5b74f67caa14a044e7a1) Thanks [@tenphi](https://github.com/tenphi)! - Add explicit return type and narrow `injectScript` stage parameter in `tastyIntegration`.
+
+- [#153](https://github.com/tenphi/tasty/pull/153) [`dbbe9b6`](https://github.com/tenphi/tasty/commit/dbbe9b63a7c74c4364e6a95f20c2ae38f658cd6f) Thanks [@tenphi](https://github.com/tenphi)! - Add #clear color token to the default configuration.
+
 ## 2.1.2
 
 ### Patch Changes

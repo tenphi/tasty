@@ -59,7 +59,7 @@ Control how a sub-element selector attaches to the root selector using the `$` p
 | *(none)* | ` [el]` | Descendant (default) |
 | `>` | `> [el]` | Direct child |
 | `>Body>Row>` | `> [Body] > [Row] > [el]` | Chained elements |
-| `> SubElementName` | `> [SubElementName]` | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
+| `> SubElementName` | `> [data-element="SubElementName"]` | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
 | `h1` | ` h1` | Tag selector (no key injection) |
 | `h1 >` | ` h1 > [el]` | Key is direct child of tag |
 | `h1 *` | ` h1 *` | Any descendant of tag |

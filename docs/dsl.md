@@ -52,21 +52,23 @@ styles: { Title: { preset: 'h3' } }
 
 #### Selector Affix (`$`)
 
-Control how a sub-element selector attaches to the root selector using the `$` property inside the sub-element's styles:
+Control how a sub-element selector attaches to the root selector using the `$` property inside the sub-element's styles.
+
+Examples below assume the sub-element key is **Cell** (i.e. `[data-element="Cell"]` in CSS):
 
 | Pattern | Result | Description |
 |---------|--------|-------------|
-| *(none)* | ` [el]` | Descendant (default) |
-| `>` | `> [el]` | Direct child |
-| `>Body>Row>` | `> [Body] > [Row] > [el]` | Chained elements |
-| `> SubElementName` | `> [data-element="SubElementName"]` | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
-| `h1` | ` h1` | Tag selector (no key injection) |
-| `h1 >` | ` h1 > [el]` | Key is direct child of tag |
-| `h1 *` | ` h1 *` | Any descendant of tag |
-| `*` | ` *` | All descendants |
+| *(none)* | `[data-element="Cell"]` | Descendant (default) |
+| `>` | `> [data-element="Cell"]` | Direct child |
+| `>Body>` | `> [data-element="Body"] > [data-element="Cell"]` | Chained elements |
+| `> Cell` | `> [data-element="Cell"]` | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
+| `h1` | `h1` | Tag selector (no key injection) |
+| `h1 >` | `h1 > [data-element="Cell"]` | Key is direct child of tag |
+| `h1 *` | `h1 *` | Any descendant of tag |
+| `*` | `*` | All descendants |
 | `&::before` | `::before` | Root pseudo (no key); `&` is required |
-| `@::before` | `[el]::before` | Pseudo on the sub-element |
-| `>@.active` | `> [el].active` | Class on the sub-element |
+| `@::before` | `[data-element="Cell"]::before` | Pseudo on the sub-element |
+| `>@.active` | `> [data-element="Cell"].active` | Class on the sub-element |
 
 Rules for key injection (`[data-element="..."]`):
 

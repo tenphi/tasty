@@ -16,6 +16,7 @@ import {
   makeKeyframeName,
   rscClassRegexGlobal,
   tastyClassRegex,
+  validateNamePrefix,
 } from '../utils/name-prefix';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
@@ -124,6 +125,9 @@ export class StyleInjector {
   }
 
   constructor(config: StyleInjectorConfig = {}) {
+    if (config.namePrefix !== undefined) {
+      validateNamePrefix(config.namePrefix);
+    }
     this.config = config;
     this.sheetManager = new SheetManager(config);
     this.namePrefix = config.namePrefix ?? DEFAULT_NAME_PREFIX;

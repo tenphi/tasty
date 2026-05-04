@@ -954,4 +954,60 @@ describe('StyleInjector namePrefix', () => {
     ra.dispose();
     rb.dispose();
   });
+
+  it('GC touch only matches classes starting with the configured prefix', () => {
+    const gcInjector = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'mb',
+      gc: { touchInterval: 100, capacity: 100 },
+    });
+    const { className } = gcInjector.inject(
+      cssToStyleResults('&{ color: red; }'),
+      { cacheKey: 'gc-prefix-test' },
+    );
+
+    expect(className).toMatch(/^mb[a-z0-9]+$/);
+
+    gcInjector.touch(className);
+    // Default-prefix tasty classes must not be picked up by an `mb`-injector
+    gcInjector.touch('t999');
+    // Random tokens must not be picked up either
+    gcInjector.touch('mb-not-a-tasty-class');
+
+    const registry = gcInjector['sheetManager'].getRegistry(document);
+    expect(registry.usageMap.has(className)).toBe(true);
+    expect(registry.usageMap.size).toBe(1);
+
+    gcInjector.destroy();
+  });
+
+  it('extracts hydrated class names from <style data-tasty-rsc> using the prefix', () => {
+    const rscInjector = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'mb',
+    });
+
+    // Simulate an RSC inline style block: doubled-specificity selector for
+    // an `mb`-prefixed class, plus an unrelated keyframe (must not match).
+    const rscStyle = document.createElement('style');
+    rscStyle.setAttribute('data-tasty-rsc', '');
+    rscStyle.textContent =
+      '.mbabc123.mbabc123 { color: red } @keyframes mbk0 { 0%{opacity:0} }';
+    document.head.appendChild(rscStyle);
+
+    try {
+      // Injecting any cacheKey triggers syncServerClasses → RSC scan.
+      rscInjector.inject(cssToStyleResults('&{ color: blue; }'), {
+        cacheKey: 'force-rsc-sync',
+      });
+
+      const registry = rscInjector['sheetManager'].getRegistry(document);
+      expect(registry.rules.has('mbabc123')).toBe(true);
+      // Keyframe name must not be picked up as a hydrated class
+      expect(registry.rules.has('mbk0')).toBe(false);
+    } finally {
+      rscStyle.remove();
+      rscInjector.destroy();
+    }
+  });
 });

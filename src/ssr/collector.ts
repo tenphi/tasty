@@ -3,8 +3,9 @@
  *
  * Accumulates CSS rules and cache metadata during server rendering.
  * This is the server-side counterpart to StyleInjector: it allocates
- * hash-based class names (`t${hash}`), formats CSS rules into text,
- * and tracks rendered class names for lightweight client transfer.
+ * hash-based class names using the configured `namePrefix` (defaults
+ * to `'t'`), formats CSS rules into text, and tracks rendered class
+ * names for lightweight client transfer.
  *
  * One instance is created per HTTP request. Concurrent requests
  * each get their own collector (via AsyncLocalStorage or React context).
@@ -27,6 +28,7 @@ import {
   makeClassName,
   makeCounterStyleName,
   makeKeyframeName,
+  validateNamePrefix,
 } from '../utils/name-prefix';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
@@ -57,9 +59,13 @@ export class ServerStyleCollector {
    * @param namePrefix - Optional override for the configured prefix.
    *   Defaults to the value from `configure({ namePrefix })` (or `'t'`).
    *   Pass an explicit prefix when constructing a collector outside the
-   *   normal configure() lifecycle (e.g. in tests).
+   *   normal configure() lifecycle (e.g. in tests). Validated eagerly
+   *   so misconfiguration fails before any CSS is collected.
    */
   constructor(namePrefix?: string) {
+    if (namePrefix !== undefined) {
+      validateNamePrefix(namePrefix);
+    }
     this.namePrefix = namePrefix ?? getNamePrefix();
   }
 

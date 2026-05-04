@@ -6,6 +6,7 @@ import {
   resetConfig,
   getGlobalConfigTokens,
   getGlobalStyles,
+  getNamePrefix,
 } from './config';
 
 describe('configure() presets', () => {
@@ -215,5 +216,58 @@ describe('configure() globalStyles', () => {
     expect(styles).toBeDefined();
     expect(styles!.body.preset).toBe('t2');
     expect(styles!.body.margin).toBe(0);
+  });
+});
+
+describe('configure() namePrefix', () => {
+  beforeEach(() => {
+    resetConfig();
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
+  it('defaults to "t" when not configured', () => {
+    expect(getNamePrefix()).toBe('t');
+  });
+
+  it('reflects the configured value via getNamePrefix()', () => {
+    configure({ namePrefix: 'mb' });
+    expect(getNamePrefix()).toBe('mb');
+  });
+
+  it('accepts prefixes ending with a separator', () => {
+    configure({ namePrefix: 'myapp-' });
+    expect(getNamePrefix()).toBe('myapp-');
+  });
+
+  it('accepts a leading underscore', () => {
+    configure({ namePrefix: '_app' });
+    expect(getNamePrefix()).toBe('_app');
+  });
+
+  it('rejects an empty prefix', () => {
+    expect(() => configure({ namePrefix: '' })).toThrow(/namePrefix/);
+  });
+
+  it('rejects a prefix starting with a digit', () => {
+    expect(() => configure({ namePrefix: '1foo' })).toThrow(/namePrefix/);
+  });
+
+  it('rejects a prefix containing whitespace', () => {
+    expect(() => configure({ namePrefix: 'my app' })).toThrow(/namePrefix/);
+  });
+
+  it('rejects a non-string prefix', () => {
+    expect(() => configure({ namePrefix: 42 as unknown as string })).toThrow(
+      /namePrefix/,
+    );
+  });
+
+  it('rejects a prefix longer than 32 characters', () => {
+    expect(() => configure({ namePrefix: 'a'.repeat(33) })).toThrow(
+      /namePrefix/,
+    );
   });
 });

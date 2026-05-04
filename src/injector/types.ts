@@ -38,6 +38,13 @@ export interface StyleInjectorConfig {
   autoPropertyTypes?: boolean;
   /** Garbage collection configuration for unused styles */
   gc?: GCConfig;
+  /**
+   * Prefix prepended to every generated identifier.
+   * Mirrors the `namePrefix` field on the public `TastyConfig` so that
+   * standalone injector consumers can configure it directly.
+   * @default 't'
+   */
+  namePrefix?: string;
 }
 
 /**

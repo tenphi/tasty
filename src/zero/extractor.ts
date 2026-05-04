@@ -33,6 +33,12 @@ import { renderStyles } from '../pipeline';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
+import {
+  DEFAULT_ZERO_NAME_PREFIX,
+  makeClassName,
+  makeKeyframeName,
+  validateNamePrefix,
+} from '../utils/name-prefix';
 
 export interface ExtractedChunk {
   className: string;
@@ -57,13 +63,40 @@ export interface KeyframesExtractionResult {
 }
 
 /**
+ * Module-level prefix used by the zero-runtime extractor.
+ * Defaults to `'ts'` so static classes never collide with the runtime
+ * `'t'` classes when both are loaded on the same page. Override via
+ * `setExtractorNamePrefix()` from the Babel plugin so user config flows
+ * into the extractor.
+ */
+let currentNamePrefix: string = DEFAULT_ZERO_NAME_PREFIX;
+
+/**
+ * Set the prefix used by the zero-runtime extractor.
+ * Called by the Babel plugin after resolving user config so that
+ * generated class and keyframe names match the user's configuration.
+ */
+export function setExtractorNamePrefix(prefix: string): void {
+  validateNamePrefix(prefix);
+  currentNamePrefix = prefix;
+}
+
+/**
+ * Get the prefix currently used by the zero-runtime extractor.
+ * Exposed primarily for tests.
+ */
+export function getExtractorNamePrefix(): string {
+  return currentNamePrefix;
+}
+
+/**
  * Generate a deterministic className from a cache key using content hash.
  * This ensures the same styles always produce the same className,
  * regardless of build order or incremental compilation.
  */
 function generateClassName(cacheKey: string): string {
   const hash = createHash('md5').update(cacheKey).digest('hex').slice(0, 6);
-  return `ts${hash}`; // 'ts' prefix for "tasty-static" to distinguish from runtime 't' classes
+  return makeClassName(currentNamePrefix, hash);
 }
 
 /**
@@ -216,11 +249,14 @@ function formatRulesDirectly(rules: StyleResult[]): string {
  * Generate a deterministic keyframes name from content hash.
  * This ensures the same keyframes content always produces the same name,
  * enabling automatic deduplication across elements and files.
+ *
+ * Uses the configured prefix with a `k` discriminator so keyframe names
+ * stay visually distinct from class names sharing the same prefix.
  */
 function generateKeyframesName(steps: KeyframesSteps): string {
   const content = JSON.stringify(steps);
   const hash = createHash('md5').update(content).digest('hex').slice(0, 6);
-  return `kf${hash}`; // 'kf' prefix for "keyframes"
+  return makeKeyframeName(currentNamePrefix, hash);
 }
 
 /**

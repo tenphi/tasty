@@ -10,9 +10,11 @@
 
 import { cache } from 'react';
 
+import { getNamePrefix } from './config';
 import type { ServerStyleCollector } from './ssr/collector';
 import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
 import { hashString } from './utils/hash';
+import { makeClassName } from './utils/name-prefix';
 
 export interface RSCStyleCache {
   cacheKeyToClassName: Map<string, string>;
@@ -47,7 +49,7 @@ export function rscAllocateClassName(
 
   // Content-hash ensures stable names across all environments (RSC, SSR, client),
   // enabling cross-environment dedup and preventing class collisions.
-  const className = `t${hashString(cacheKey)}`;
+  const className = makeClassName(getNamePrefix(), hashString(cacheKey));
   rscCache.cacheKeyToClassName.set(cacheKey, className);
   return { className, isNew: true };
 }

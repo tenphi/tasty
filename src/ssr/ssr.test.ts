@@ -828,3 +828,48 @@ describe('collectAutoInferredProperties', () => {
     resetConfig();
   });
 });
+
+// ============================================================================
+// ServerStyleCollector — namePrefix
+// ============================================================================
+
+describe('ServerStyleCollector namePrefix', () => {
+  beforeEach(() => {
+    resetConfig();
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
+  it('uses the configured namePrefix from configure() by default', () => {
+    configure({ namePrefix: 'mb' });
+    const collector = new ServerStyleCollector();
+    const alloc = collector.allocateClassName('demo:cache:key');
+    expect(alloc.className).toMatch(/^mb[a-z0-9]+$/);
+  });
+
+  it('honors an explicit prefix passed to the constructor', () => {
+    const collector = new ServerStyleCollector('zz');
+    const alloc = collector.allocateClassName('demo:cache:key');
+    expect(alloc.className).toMatch(/^zz[a-z0-9]+$/);
+  });
+
+  it('uses the prefix for keyframe and counter-style names', () => {
+    configure({ namePrefix: 'mb' });
+    const collector = new ServerStyleCollector();
+    const kf = collector.allocateKeyframeName();
+    const cs = collector.allocateCounterStyleName();
+    expect(kf).toMatch(/^mbk\d+$/);
+    expect(cs).toMatch(/^mbc\d+$/);
+  });
+
+  it('matches the runtime injector for the same cacheKey + prefix', () => {
+    configure({ namePrefix: 'mb' });
+    const collector = new ServerStyleCollector();
+    const cacheKey = 'shared:cache:key';
+    const serverAlloc = collector.allocateClassName(cacheKey);
+    const clientAlloc = injector.instance.allocateClassName(cacheKey);
+    expect(serverAlloc.className).toBe(clientAlloc.className);
+  });
+});

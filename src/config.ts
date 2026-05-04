@@ -21,6 +21,7 @@ import {
 } from './styles/predefined';
 import { resetColorSpace, setColorSpace } from './utils/color-space';
 import { isDevEnv } from './utils/is-dev-env';
+import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import {
   CUSTOM_UNITS,
   getGlobalFuncs,
@@ -114,6 +115,28 @@ export interface TastyConfig {
    * ```
    */
   gc?: GCConfig;
+  /**
+   * Prefix prepended to every generated identifier (class names,
+   * keyframe names, counter-style names). The hash is appended verbatim,
+   * so include any separator inside the prefix itself (e.g. `'myapp-'`).
+   *
+   * Discriminator letters are inserted between the prefix and the hash
+   * for non-class names so the three kinds stay visually distinct:
+   * - class:         `${namePrefix}${hash}`        — e.g. `t1a2b3`
+   * - keyframe:      `${namePrefix}k${hash}`       — e.g. `tk1a2b3`
+   * - counter-style: `${namePrefix}c${hash}`       — e.g. `tc1a2b3`
+   *
+   * The runtime, SSR, and RSC paths must agree on this value or
+   * hydration will mismatch. The zero-runtime build path defaults to
+   * `'ts'` (overridable via the same option) so its classes can't
+   * collide with runtime classes when both are loaded on the same page.
+   *
+   * Must match `^[a-zA-Z][a-zA-Z0-9_-]{0,31}$`. Locked once styles
+   * have been generated.
+   *
+   * @default 't'
+   */
+  namePrefix?: string;
   /**
    * Plugins that extend tasty with custom functions, units, or states.
    * Plugins are processed in order, with later plugins overriding earlier ones.
@@ -594,6 +617,7 @@ function createDefaultConfig(isTest?: boolean): TastyConfig {
     maxRulesPerSheet: 8192,
     forceTextInjection: isTest ?? false,
     devMode: isDevEnv(),
+    namePrefix: DEFAULT_NAME_PREFIX,
   };
 }
 
@@ -1047,6 +1071,12 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     return;
   }
 
+  // Validate namePrefix early so misconfiguration fails loudly before any
+  // CSS is generated under a bad prefix.
+  if (config.namePrefix !== undefined) {
+    validateNamePrefix(config.namePrefix);
+  }
+
   // Collect merged values from plugins first, then override with direct config
   let mergedStates: Record<string, string> = {};
   let mergedUnits: Record<string, string | UnitHandler> = {};
@@ -1295,6 +1325,18 @@ export function getConfig(): TastyConfig {
     currentConfig = createDefaultConfig(isTestEnvironment());
   }
   return currentConfig;
+}
+
+/**
+ * Get the configured prefix used for every generated identifier
+ * (class names, keyframe names, counter-style names).
+ *
+ * Falls back to the default prefix (`'t'`) when `configure()` has not
+ * been called yet — this matches the auto-configuration behavior used
+ * by the rest of the system.
+ */
+export function getNamePrefix(): string {
+  return currentConfig?.namePrefix ?? DEFAULT_NAME_PREFIX;
 }
 
 /**

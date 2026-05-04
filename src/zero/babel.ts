@@ -33,6 +33,7 @@ import {
 import type { TastyConfig } from '../config';
 import type { Styles, ConfigTokens } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
+import { DEFAULT_ZERO_NAME_PREFIX } from '../utils/name-prefix';
 import { resolveRecipes } from '../utils/resolve-recipes';
 
 import { CSSWriter } from './css-writer';
@@ -43,6 +44,7 @@ import {
   extractPropertiesFromStyles,
   extractStylesForSelector,
   extractStylesWithChunks,
+  setExtractorNamePrefix,
 } from './extractor';
 import type {
   ExtractedChunk,
@@ -282,7 +284,14 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
         moduleCache: false,
       });
 
-      resolvedConfig = jiti(options.configFile) as TastyZeroConfig;
+      const loaded = jiti(options.configFile) as
+        | TastyZeroConfig
+        | { default: TastyZeroConfig };
+      // jiti returns the ESM namespace, so unwrap `default` when present.
+      resolvedConfig =
+        loaded && typeof loaded === 'object' && 'default' in loaded
+          ? (loaded.default as TastyZeroConfig)
+          : (loaded as TastyZeroConfig);
     } else {
       resolvedConfig = {};
     }
@@ -293,7 +302,17 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       resetConfig();
     }
 
-    configure(resolvedConfig);
+    // Default to the zero-runtime prefix ('ts') unless the user opts out.
+    // Using the same `namePrefix` config entry as the runtime keeps the
+    // API uniform; the different default prevents collisions when both
+    // runtime and zero-runtime classes appear on the same page.
+    const finalConfig: TastyZeroConfig = {
+      namePrefix: DEFAULT_ZERO_NAME_PREFIX,
+      ...resolvedConfig,
+    };
+
+    configure(finalConfig);
+    setExtractorNamePrefix(finalConfig.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
 
     const newWriter = new CSSWriter(outputPath, { devMode });
 
@@ -316,7 +335,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       writer: newWriter,
       configKey,
       registry: {},
-      config: resolvedConfig,
+      config: finalConfig,
     });
   }
 
@@ -325,6 +344,11 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const globalRegistry = entry.registry;
   const config = entry.config;
   const devMode = config.devMode ?? false;
+  // When the writer entry was reused from a previous Babel invocation
+  // (configChanged=false), make sure the extractor's module-level prefix
+  // still matches this build's config — module state can outlive a
+  // single configure() call across worker reuse.
+  setExtractorNamePrefix(config.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
 
   // Precompute token CSS and global styles CSS for inject mode
   let tokenCSS: string | undefined;

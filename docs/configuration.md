@@ -61,6 +61,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
 | `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
+| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). See [Name prefix](#name-prefix). |
 
 ---
 
@@ -81,6 +82,49 @@ configure({
 | `oklch` | `-oklch` | `0.42 0.16 328` | `oklch(var(--name-color-oklch) / .5)` |
 
 The `oklch` color space is the default because it provides perceptually uniform color manipulation — alpha fading and color mixing produce more natural-looking results.
+
+---
+
+## Name Prefix
+
+Every identifier Tasty generates — class names, keyframe names, counter-style names — starts with a configurable prefix. The runtime, SSR, and RSC paths default to `'t'`; the zero-runtime build path (`tastyStatic` via the Babel plugin) defaults to `'ts'` so static-extracted classes can never collide with runtime classes when both are loaded on the same page.
+
+```jsx
+configure({
+  namePrefix: 'mb',
+});
+```
+
+The prefix is prepended verbatim to the hash, so include any separator inside the prefix string itself:
+
+| Setting | Class | Keyframe | Counter-style |
+|---|---|---|---|
+| `'t'` (runtime default) | `t1a2b3` | `tk1a2b3` | `tc1a2b3` |
+| `'ts'` (zero-runtime default) | `ts1a2b3` | `tsk1a2b3` | `tsc1a2b3` |
+| `'mb'` | `mb1a2b3` | `mbk1a2b3` | `mbc1a2b3` |
+| `'myapp-'` | `myapp-1a2b3` | `myapp-k1a2b3` | `myapp-c1a2b3` |
+
+The single-letter discriminators (`k` for keyframes, `c` for counter-styles) keep the three kinds visually distinct in devtools — they are not required for correctness because CSS keeps these in separate namespaces.
+
+### Rules
+
+- Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. Examples that pass: `'t'`, `'ts'`, `'app'`, `'myapp-'`, `'_foo'`. Examples that fail: `''`, `'1foo'`, `'my app'`.
+- Validated at `configure()` time; an invalid prefix throws synchronously rather than silently producing broken hydration.
+- Locked once styles have been generated, like all other config.
+
+### Coexistence with the zero-runtime build
+
+The runtime and zero-runtime builds **must use different prefixes** when both are loaded on the same page. Defaults already guarantee this; if you customize one, customize the other accordingly:
+
+```jsx
+// app config (runtime / SSR / RSC)
+configure({ namePrefix: 'mb' });
+
+// tasty-zero.config.ts (Babel plugin)
+export default { namePrefix: 'mbs' };
+```
+
+If you only use one of the two builds, you only need to set `namePrefix` on that path.
 
 ---
 

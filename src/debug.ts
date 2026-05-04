@@ -1,8 +1,10 @@
 /* eslint-disable no-console */
 import { CHUNK_NAMES } from './chunks/definitions';
+import { getNamePrefix } from './config';
 import { getCssTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
 import { isDevEnv } from './utils/is-dev-env';
+import { tastyClassRegex } from './utils/name-prefix';
 
 declare global {
   interface Window {
@@ -131,11 +133,12 @@ function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
 function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
   const classes = new Set<string>();
   const elements = (root as Document).querySelectorAll?.('[class]') || [];
+  const classRegex = tastyClassRegex(getNamePrefix());
   elements.forEach((el) => {
     const attr = el.getAttribute('class');
     if (attr) {
       for (const cls of attr.split(/\s+/)) {
-        if (/^t[a-z0-9]+$/.test(cls)) classes.add(cls);
+        if (classRegex.test(cls)) classes.add(cls);
       }
     }
   });
@@ -432,7 +435,8 @@ export const tastyDebug = {
     } = opts || {};
     let css = '';
 
-    if (source && typeof target === 'string' && /^t[a-z0-9]+$/.test(target)) {
+    const classRegex = tastyClassRegex(getNamePrefix());
+    if (source && typeof target === 'string' && classRegex.test(target)) {
       const src = getSourceCssForClasses([target], root);
       if (src) {
         css = src;
@@ -470,7 +474,7 @@ export const tastyDebug = {
         css = injector.instance.getCssTextForClasses(unused, { root });
       } else if (target === 'page') {
         css = getPageCSS(root);
-      } else if (/^t[a-z0-9]+$/.test(target)) {
+      } else if (classRegex.test(target)) {
         css = injector.instance.getCssTextForClasses([target], { root });
       } else {
         const el = (root as Document).querySelector?.(target);
@@ -516,9 +520,10 @@ export const tastyDebug = {
     }
 
     const classList = element.getAttribute('class') || '';
+    const classRegex = tastyClassRegex(getNamePrefix());
     const tastyClasses = classList
       .split(/\s+/)
-      .filter((cls) => /^t[a-z0-9]+$/.test(cls));
+      .filter((cls) => classRegex.test(cls));
 
     const chunks: ChunkInfo[] = tastyClasses.map((className) => ({
       className,

@@ -869,3 +869,89 @@ describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
     result.dispose();
   });
 });
+
+// ---------------------------------------------------------------------------
+// namePrefix — custom-prefix injector
+// ---------------------------------------------------------------------------
+describe('StyleInjector namePrefix', () => {
+  let injector: StyleInjector;
+
+  beforeEach(() => {
+    injector = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'mb',
+    });
+    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+  });
+
+  afterEach(() => {
+    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+  });
+
+  it('uses the configured prefix for class names', () => {
+    const result = injector.inject(cssToStyleResults('&{ color: red; }'), {
+      cacheKey: 'name-prefix-test',
+    });
+
+    expect(result.className).toMatch(/^mb[a-z0-9]+$/);
+    expect(result.className).not.toMatch(/^t[a-z0-9]+$/);
+
+    result.dispose();
+  });
+
+  it('uses the configured prefix for keyframe names', () => {
+    const kf = injector.keyframes({
+      from: { opacity: 0 },
+      to: { opacity: 1 },
+    });
+
+    expect(kf.toString()).toMatch(/^mbk\d+$/);
+    kf.dispose();
+  });
+
+  it('produces stable class names across two injectors with the same prefix', () => {
+    const a = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'mb',
+    });
+    const b = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'mb',
+    });
+
+    const ra = a.inject(cssToStyleResults('&{ color: red; }'), {
+      cacheKey: 'shared-key',
+    });
+    const rb = b.inject(cssToStyleResults('&{ color: red; }'), {
+      cacheKey: 'shared-key',
+    });
+
+    expect(ra.className).toBe(rb.className);
+    ra.dispose();
+    rb.dispose();
+  });
+
+  it('produces different class names for the same content under different prefixes', () => {
+    const a = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 't',
+    });
+    const b = new StyleInjector({
+      forceTextInjection: true,
+      namePrefix: 'ts',
+    });
+
+    const ra = a.inject(cssToStyleResults('&{ color: red; }'), {
+      cacheKey: 'shared-key',
+    });
+    const rb = b.inject(cssToStyleResults('&{ color: red; }'), {
+      cacheKey: 'shared-key',
+    });
+
+    expect(ra.className.startsWith('t')).toBe(true);
+    expect(rb.className.startsWith('ts')).toBe(true);
+    expect(ra.className).not.toBe(rb.className);
+    ra.dispose();
+    rb.dispose();
+  });
+});

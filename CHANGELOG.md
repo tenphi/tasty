@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.3.0
+
+### Minor Changes
+
+- [#167](https://github.com/tenphi/tasty/pull/167) [`8395c8e`](https://github.com/tenphi/tasty/commit/8395c8ea17a74e090cd9c5bfecf7ec72362a2d62) Thanks [@tenphi](https://github.com/tenphi)! - Add `namePrefix` option to control the prefix used for every generated identifier (class names, keyframe names, counter-style names). Defaults to `'t'` for the runtime/SSR/RSC paths and `'ts'` for the zero-runtime build path so static-extracted classes can never collide with runtime classes when both are loaded on the same page. Keyframes and counter-styles now consistently use single-letter discriminators (`${prefix}k…`, `${prefix}c…`) so the three name kinds stay visually distinct in devtools (e.g. `tk1a2b3` for a keyframe). Generated keyframe and counter-style names that previously matched `^k\d+$` / `^cs\d+$` are now `^tk\d+$` / `^tc\d+$` by default; class names continue to start with `t…`.
+
 ## 2.2.0
 
 ### Minor Changes

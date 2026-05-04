@@ -566,7 +566,7 @@ describe('Global Style Injector API', () => {
         to: { opacity: 1 },
       });
 
-      expect(fade.toString()).toMatch(/^k\d+$/);
+      expect(fade.toString()).toMatch(/^tk\d+$/);
       expect(typeof fade.dispose).toBe('function');
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
@@ -593,7 +593,7 @@ describe('Global Style Injector API', () => {
         '100%': { transform: 'rotate(360deg)' },
       });
 
-      expect(spin.toString()).toMatch(/^k\d+$/);
+      expect(spin.toString()).toMatch(/^tk\d+$/);
     });
 
     it('should handle empty steps', () => {
@@ -615,7 +615,7 @@ describe('Global Style Injector API', () => {
         },
       });
 
-      expect(animation.toString()).toMatch(/^k\d+$/);
+      expect(animation.toString()).toMatch(/^tk\d+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -654,7 +654,7 @@ describe('Global Style Injector API', () => {
         },
       });
 
-      expect(animation.toString()).toMatch(/^k\d+$/);
+      expect(animation.toString()).toMatch(/^tk\d+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -680,7 +680,7 @@ describe('Global Style Injector API', () => {
         { root: shadowRoot },
       );
 
-      expect(pulse.toString()).toMatch(/^k\d+$/);
+      expect(pulse.toString()).toMatch(/^tk\d+$/);
       expect(shadowRoot.querySelectorAll('[data-tasty]').length).toBe(1);
     });
 
@@ -691,7 +691,7 @@ describe('Global Style Injector API', () => {
       fade.dispose();
 
       // Should still work after dispose (cleanup happens later)
-      expect(name).toMatch(/^k\d+$/);
+      expect(name).toMatch(/^tk\d+$/);
     });
 
     it('should allow custom names via options', () => {
@@ -739,7 +739,7 @@ describe('Global Style Injector API', () => {
       );
 
       expect(fade1.toString()).toBe('fade');
-      expect(fade2.toString()).toMatch(/^fade-k\d+$/); // Collision: unique name generated
+      expect(fade2.toString()).toMatch(/^fade-tk\d+$/); // Collision: unique name generated
     });
 
     it('should allow same name after dispose (for dynamic updates)', () => {

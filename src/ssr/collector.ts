@@ -3,8 +3,9 @@
  *
  * Accumulates CSS rules and cache metadata during server rendering.
  * This is the server-side counterpart to StyleInjector: it allocates
- * hash-based class names (`t${hash}`), formats CSS rules into text,
- * and tracks rendered class names for lightweight client transfer.
+ * hash-based class names using the configured `namePrefix` (defaults
+ * to `'t'`), formats CSS rules into text, and tracks rendered class
+ * names for lightweight client transfer.
  *
  * One instance is created per HTTP request. Concurrent requests
  * each get their own collector (via AsyncLocalStorage or React context).
@@ -16,19 +17,22 @@ import {
   getGlobalCounterStyle,
   getGlobalFontFace,
   getGlobalConfigTokens,
+  getNamePrefix,
 } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { hashString } from '../utils/hash';
+import {
+  makeClassName,
+  makeCounterStyleName,
+  makeKeyframeName,
+  validateNamePrefix,
+} from '../utils/name-prefix';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
 import { formatRules } from './format-rules';
-
-function generateClassName(cacheKey: string): string {
-  return `t${hashString(cacheKey)}`;
-}
 
 export class ServerStyleCollector {
   private chunks = new Map<string, string>();
@@ -49,6 +53,25 @@ export class ServerStyleCollector {
   private keyframesCounter = 0;
   private counterStyleCounter = 0;
   private internalsCollected = false;
+  private namePrefix: string;
+
+  /**
+   * @param namePrefix - Optional override for the configured prefix.
+   *   Defaults to the value from `configure({ namePrefix })` (or `'t'`).
+   *   Pass an explicit prefix when constructing a collector outside the
+   *   normal configure() lifecycle (e.g. in tests). Validated eagerly
+   *   so misconfiguration fails before any CSS is collected.
+   */
+  constructor(namePrefix?: string) {
+    if (namePrefix !== undefined) {
+      validateNamePrefix(namePrefix);
+    }
+    this.namePrefix = namePrefix ?? getNamePrefix();
+  }
+
+  private generateClassName(cacheKey: string): string {
+    return makeClassName(this.namePrefix, hashString(cacheKey));
+  }
 
   /**
    * Collect internal @property rules and :root token defaults.
@@ -132,7 +155,7 @@ export class ServerStyleCollector {
       return { className: existing, isNewAllocation: false };
     }
 
-    const className = generateClassName(cacheKey);
+    const className = this.generateClassName(cacheKey);
     this.cacheKeyToClassName.set(cacheKey, className);
 
     return { className, isNewAllocation: true };
@@ -176,7 +199,10 @@ export class ServerStyleCollector {
    * Allocate a keyframe name for SSR. Uses provided name or generates one.
    */
   allocateKeyframeName(providedName?: string): string {
-    return providedName ?? `k${this.keyframesCounter++}`;
+    return (
+      providedName ??
+      makeKeyframeName(this.namePrefix, String(this.keyframesCounter++))
+    );
   }
 
   /**
@@ -201,7 +227,10 @@ export class ServerStyleCollector {
    * Allocate a counter-style name for SSR. Uses provided name or generates one.
    */
   allocateCounterStyleName(providedName?: string): string {
-    return providedName ?? `cs${this.counterStyleCounter++}`;
+    return (
+      providedName ??
+      makeCounterStyleName(this.namePrefix, String(this.counterStyleCounter++))
+    );
   }
 
   /**

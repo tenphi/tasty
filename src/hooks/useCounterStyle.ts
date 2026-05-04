@@ -1,8 +1,9 @@
-import { getGlobalInjector } from '../config';
+import { getGlobalInjector, getNamePrefix } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { hashString } from '../utils/hash';
+import { makeCounterStyleName } from '../utils/name-prefix';
 
 interface UseCounterStyleOptions {
   name?: string;
@@ -68,7 +69,9 @@ export function useCounterStyle(
     const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName = options?.name ?? `cs${hashString(serializedContent)}`;
+    const actualName =
+      options?.name ??
+      makeCounterStyleName(getNamePrefix(), hashString(serializedContent));
     const css = formatCounterStyleRule(actualName, descriptors);
     pushRSCCSS(target.cache, key, css);
     target.cache.generatedNames.set(key, actualName);
@@ -84,7 +87,9 @@ export function useCounterStyle(
     return existingName;
   }
 
-  const name = options?.name ?? `cs${clientCounterStyleCounter++}`;
+  const name =
+    options?.name ??
+    makeCounterStyleName(getNamePrefix(), String(clientCounterStyleCounter++));
   clientContentToName.set(cacheKey, name);
 
   const injector = getGlobalInjector();

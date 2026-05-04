@@ -178,6 +178,21 @@ module.exports = {
 | `config.globalStyles` | `Record<string, Styles>` | — | Global Tasty styles keyed by CSS selector. Supports the full style syntax. |
 | `config.autoPropertyTypes` | `boolean` | `true` | Automatically infer and register CSS `@property` declarations from values |
 | `config.parserCacheSize` | `number` | `1000` | Parser LRU cache size. Larger values improve performance for builds with many unique style values |
+| `config.namePrefix` | `string` | `'ts'` | Prefix prepended to every generated identifier. Defaults to `'ts'` so static classes never collide with runtime (`'t'`) classes. See [Configuration: Name prefix](configuration.md#name-prefix). |
+
+### Coexisting with runtime tasty
+
+When a page mixes `tastyStatic` with runtime `tasty`, both must use **different** `namePrefix` values. The defaults handle this automatically (`'t'` for runtime, `'ts'` for zero-runtime). If you customize one, customize the other:
+
+```ts
+// tasty-zero.config.ts (Babel plugin)
+export default { namePrefix: 'mbs' };
+```
+
+```ts
+// app entry (runtime configure)
+configure({ namePrefix: 'mb' });
+```
 
 ---
 

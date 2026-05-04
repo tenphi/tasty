@@ -358,16 +358,18 @@ const stream = await runWithCollector(collector, () =>
 
 Server-safe style collector. One instance per request.
 
+Constructor: `new ServerStyleCollector(namePrefix?)`. The optional `namePrefix` overrides the value from `configure({ namePrefix })`; in normal usage you pass nothing and let the global config drive it. See [Configuration: Name prefix](configuration.md#name-prefix).
+
 | Method | Description |
 |---|---|
-| `allocateClassName(cacheKey)` | Allocate a sequential class name (`t0`, `t1`, ...) for a cache key. Returns `{ className, isNewAllocation }`. |
+| `allocateClassName(cacheKey)` | Allocate a deterministic, content-hashed class name for a cache key (e.g. `t1a2b3` with the default prefix). The same `cacheKey` always produces the same class name on server and client when both share the same `namePrefix`. Returns `{ className, isNewAllocation }`. |
 | `collectChunk(cacheKey, className, rules)` | Record CSS rules for a chunk. Deduplicated by `cacheKey`. |
 | `collectKeyframes(name, css)` | Record a `@keyframes` rule. Deduplicated by name. |
-| `allocateKeyframeName(providedName?)` | Allocate a keyframe name. Returns `providedName` if given, otherwise generates one (`k0`, `k1`, ...). |
+| `allocateKeyframeName(providedName?)` | Allocate a keyframe name. Returns `providedName` if given, otherwise generates one using `${namePrefix}k${counter}` (e.g. `tk0`, `tk1`, ...). |
 | `collectProperty(name, css)` | Record a `@property` rule. Deduplicated by name. |
 | `collectFontFace(key, css)` | Record a `@font-face` rule. Deduplicated by content hash. |
 | `collectCounterStyle(name, css)` | Record a `@counter-style` rule. Deduplicated by name. |
-| `allocateCounterStyleName(providedName?)` | Allocate a counter-style name. Returns `providedName` if given, otherwise generates one (`cs0`, `cs1`, ...). |
+| `allocateCounterStyleName(providedName?)` | Allocate a counter-style name. Returns `providedName` if given, otherwise generates one using `${namePrefix}c${counter}` (e.g. `tc0`, `tc1`, ...). |
 | `collectGlobalStyles(key, css)` | Record global styles (from `useGlobalStyles`). Deduplicated by key. |
 | `collectRawCSS(key, css)` | Record raw CSS text (from `useRawCSS`). Deduplicated by key. |
 | `collectInternals()` | Collect internal `@property` rules, `:root` token defaults, `@font-face`, and `@counter-style` rules from the global config. Called automatically on first chunk collection; idempotent. |

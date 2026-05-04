@@ -2,6 +2,8 @@ import {
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
   extractStylesWithChunks,
+  getExtractorNamePrefix,
+  setExtractorNamePrefix,
 } from './extractor';
 
 describe('extractStylesWithChunks', () => {
@@ -55,7 +57,8 @@ describe('extractKeyframesFromStyles', () => {
     const result = extractKeyframesFromStyles(styles);
 
     expect(result.keyframes).toHaveLength(1);
-    expect(result.keyframes[0].name).toMatch(/^kf[a-f0-9]{6}$/);
+    // Default zero-runtime prefix is 'ts', keyframe discriminator is 'k'
+    expect(result.keyframes[0].name).toMatch(/^tsk[a-f0-9]{6}$/);
     expect(result.nameMap.get('fadeIn')).toBe(result.keyframes[0].name);
   });
 
@@ -251,5 +254,38 @@ describe('extractPropertiesFromStyles', () => {
     const scaleRule = properties.find((p) => p.name === '--pulse-scale');
     expect(scaleRule).toBeDefined();
     expect(scaleRule!.css).toContain('syntax: "<number>"');
+  });
+});
+
+describe('extractor namePrefix', () => {
+  afterEach(() => {
+    // Reset to default zero-runtime prefix between tests so other suites
+    // see the documented default.
+    setExtractorNamePrefix('ts');
+  });
+
+  it('defaults to "ts" so static classes do not collide with runtime', () => {
+    expect(getExtractorNamePrefix()).toBe('ts');
+    const chunks = extractStylesWithChunks({ display: 'block' });
+    expect(chunks[0].className).toMatch(/^ts[a-f0-9]{6}$/);
+  });
+
+  it('honors a custom prefix for both class and keyframe names', () => {
+    setExtractorNamePrefix('mb');
+
+    const chunks = extractStylesWithChunks({ display: 'block' });
+    expect(chunks[0].className).toMatch(/^mb[a-f0-9]{6}$/);
+
+    const result = extractKeyframesFromStyles({
+      animation: 'fadeIn 1s',
+      '@keyframes': {
+        fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+      },
+    });
+    expect(result.keyframes[0].name).toMatch(/^mbk[a-f0-9]{6}$/);
+  });
+
+  it('rejects an invalid prefix', () => {
+    expect(() => setExtractorNamePrefix('1bad')).toThrow(/namePrefix/);
   });
 });

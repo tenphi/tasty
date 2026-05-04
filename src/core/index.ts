@@ -2,6 +2,7 @@
 export {
   configure,
   getConfig,
+  getNamePrefix,
   isConfigLocked,
   hasStylesGenerated,
   resetConfig,
@@ -15,6 +16,10 @@ export {
 } from '../config';
 export type { TastyConfig } from '../config';
 export type { ColorSpace } from '../utils/color-space';
+export {
+  DEFAULT_NAME_PREFIX,
+  DEFAULT_ZERO_NAME_PREFIX,
+} from '../utils/name-prefix';
 
 // Plugins
 export { okhslPlugin, okhslFunc } from '../plugins';

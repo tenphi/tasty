@@ -1,10 +1,12 @@
 import {
   getConfig,
   getGlobalInjector,
+  getNamePrefix,
   isTestEnvironment,
   markStylesGenerated,
 } from '../config';
 import type { StyleResult } from '../pipeline';
+import { tastyClassRegex } from '../utils/name-prefix';
 
 import { StyleInjector } from './injector';
 import type {
@@ -192,14 +194,16 @@ export function getCssTextForNode(
   node: ParentNode | Element | DocumentFragment,
   options?: { root?: Document | ShadowRoot },
 ): string {
-  // Collect tasty-generated class names (t<number>) from the subtree
+  // Collect tasty-generated class names from the subtree using the
+  // configured namePrefix (default `'t'`).
+  const classRegex = tastyClassRegex(getNamePrefix());
   const classSet = new Set<string>();
 
   const readClasses = (el: Element) => {
     const cls = el.getAttribute('class');
     if (!cls) return;
     for (const token of cls.split(/\s+/)) {
-      if (/^t[a-z0-9]+$/.test(token)) classSet.add(token);
+      if (classRegex.test(token)) classSet.add(token);
     }
   };
 

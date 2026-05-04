@@ -10,6 +10,14 @@ import {
 } from '../properties';
 import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
+import {
+  DEFAULT_NAME_PREFIX,
+  makeClassName,
+  makeKeyframeName,
+  rscClassRegexGlobal,
+  tastyClassRegex,
+  validateNamePrefix,
+} from '../utils/name-prefix';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
@@ -34,20 +42,10 @@ import type {
 } from './types';
 
 /**
- * Generate a deterministic class name from a cache key using content hash.
- * The same cache key always produces the same class name across environments.
- */
-function generateClassName(cacheKey: string): string {
-  return `t${hashString(cacheKey)}`;
-}
-
-const RSC_CLASS_RE = /\.(t[a-z0-9]+)\.\1/g;
-
-/**
  * Extract class names from `<style data-tasty-rsc>` tags.
  * The doubled-specificity pattern `.tXXX.tXXX` makes extraction reliable.
  */
-function extractRSCClassNames(): string[] {
+function extractRSCClassNames(rscClassRegex: RegExp): string[] {
   if (typeof document === 'undefined') return [];
   const styles = document.querySelectorAll('style[data-tasty-rsc]');
   if (styles.length === 0) return [];
@@ -57,8 +55,8 @@ function extractRSCClassNames(): string[] {
     const text = style.textContent;
     if (!text) continue;
     let match: RegExpExecArray | null;
-    RSC_CLASS_RE.lastIndex = 0;
-    while ((match = RSC_CLASS_RE.exec(text)) !== null) {
+    rscClassRegex.lastIndex = 0;
+    while ((match = rscClassRegex.exec(text)) !== null) {
       classSet.add(match[1]);
     }
   }
@@ -75,7 +73,10 @@ function extractRSCClassNames(): string[] {
  * Called inside `inject()` / `allocateClassName()` to pick up
  * class names rendered on the server (including during SPA navigation).
  */
-function syncServerClasses(registry: RootRegistry): void {
+function syncServerClasses(
+  registry: RootRegistry,
+  rscClassRegex: RegExp,
+): void {
   if (typeof window === 'undefined') return;
 
   // Source 1: window.__TASTY__ (SSR streaming scripts)
@@ -90,7 +91,7 @@ function syncServerClasses(registry: RootRegistry): void {
   // Source 2: <style data-tasty-rsc> tags (RSC inline styles)
   if (!registry.rscStylesScanned) {
     registry.rscStylesScanned = true;
-    for (const cls of extractRSCClassNames()) {
+    for (const cls of extractRSCClassNames(rscClassRegex)) {
       registerHydratedClass(registry, cls);
     }
   }
@@ -114,6 +115,9 @@ export class StyleInjector {
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
   private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
+  private namePrefix: string;
+  private classRegex: RegExp;
+  private rscClassRegex: RegExp;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
@@ -121,8 +125,23 @@ export class StyleInjector {
   }
 
   constructor(config: StyleInjectorConfig = {}) {
+    if (config.namePrefix !== undefined) {
+      validateNamePrefix(config.namePrefix);
+    }
     this.config = config;
     this.sheetManager = new SheetManager(config);
+    this.namePrefix = config.namePrefix ?? DEFAULT_NAME_PREFIX;
+    this.classRegex = tastyClassRegex(this.namePrefix);
+    this.rscClassRegex = rscClassRegexGlobal(this.namePrefix);
+  }
+
+  /**
+   * Generate a deterministic class name from a cache key using content hash.
+   * The same cache key always produces the same class name across environments
+   * with the same `namePrefix`.
+   */
+  private generateClassName(cacheKey: string): string {
+    return makeClassName(this.namePrefix, hashString(cacheKey));
   }
 
   /**
@@ -134,7 +153,7 @@ export class StyleInjector {
     cacheKey: string,
     className: string,
   ): boolean {
-    syncServerClasses(registry);
+    syncServerClasses(registry, this.rscClassRegex);
     const rule = registry.rules.get(className);
     if (
       rule &&
@@ -168,7 +187,7 @@ export class StyleInjector {
     }
 
     // Generate deterministic className from cache key
-    const className = generateClassName(cacheKey);
+    const className = this.generateClassName(cacheKey);
 
     // Check if this className was hydrated from server-rendered styles
     if (this.tryHydratedHit(registry, cacheKey, className)) {
@@ -258,7 +277,7 @@ export class StyleInjector {
       }
     } else if (cacheKey) {
       // Generate deterministic className from cache key
-      className = generateClassName(cacheKey);
+      className = this.generateClassName(cacheKey);
 
       // Check if this className was hydrated from server-rendered styles
       if (this.tryHydratedHit(registry, cacheKey, className)) {
@@ -279,7 +298,7 @@ export class StyleInjector {
     } else {
       // No cache key — generate from rules content
       const parts = rules.map((r) => `${r.selector}\0${r.declarations}`);
-      className = `t${hashString(parts.join('\n'))}`;
+      className = makeClassName(this.namePrefix, hashString(parts.join('\n')));
     }
 
     // Process rules: handle needsClassName flag and apply specificity
@@ -845,7 +864,10 @@ export class StyleInjector {
       if (existingContentForName && existingContentForName !== contentHash) {
         // Name collision: same name, different content
         // Generate a unique name to avoid overwriting
-        actualName = `${providedName}-k${registry.keyframesCounter++}`;
+        actualName = `${providedName}-${makeKeyframeName(
+          this.namePrefix,
+          String(registry.keyframesCounter++),
+        )}`;
       } else {
         // Name is available or used with same content
         actualName = providedName;
@@ -854,7 +876,10 @@ export class StyleInjector {
       }
     } else {
       // No name provided, generate one
-      actualName = `k${registry.keyframesCounter++}`;
+      actualName = makeKeyframeName(
+        this.namePrefix,
+        String(registry.keyframesCounter++),
+      );
     }
 
     // Insert keyframes
@@ -945,8 +970,6 @@ export class StyleInjector {
   // GC: touch-count-driven garbage collection with DOM safety guard
   // =========================================================================
 
-  private static readonly TASTY_CLASS_RE = /^t[a-z0-9]+$/;
-
   /**
    * Record a render-time usage hit for one or more classNames.
    * Handles space-separated multi-chunk classNames.
@@ -966,7 +989,7 @@ export class StyleInjector {
       className.indexOf(' ') === -1 ? [className] : className.split(' ');
 
     for (const cls of parts) {
-      if (!StyleInjector.TASTY_CLASS_RE.test(cls)) continue;
+      if (!this.classRegex.test(cls)) continue;
       if (!registry.rules.has(cls)) continue;
 
       const entry = registry.usageMap.get(cls);
@@ -1050,7 +1073,7 @@ export class StyleInjector {
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
       for (const token of el.classList) {
-        if (StyleInjector.TASTY_CLASS_RE.test(token)) {
+        if (this.classRegex.test(token)) {
           liveClasses.add(token);
         }
       }

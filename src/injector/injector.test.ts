@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 import type { StyleResult } from '../pipeline';
+import { resetColorSpace, setColorSpace } from '../utils/color-space';
 
 import { StyleInjector } from './injector';
 import type { StyleInjectorConfig } from './types';
@@ -735,6 +736,78 @@ describe('StyleInjector', () => {
       injector.inject(rules);
 
       expect(injector.isPropertyDefined('--scale')).toBe(true);
+    });
+  });
+
+  describe('property() — color companion', () => {
+    afterEach(() => {
+      resetColorSpace();
+    });
+
+    it('registers the decomposed-components companion for #name color tokens', () => {
+      setColorSpace('rgb');
+
+      injector.property('#accent', {
+        initialValue: 'rgb(128 0 255)',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@property --accent-color');
+      expect(cssText).toContain('syntax: "<color>"');
+      expect(cssText).toContain('@property --accent-color-rgb');
+      expect(cssText).toContain('syntax: "<number>+"');
+      expect(injector.isPropertyDefined('#accent')).toBe(true);
+      expect(injector.isPropertyDefined('--accent-color-rgb')).toBe(true);
+    });
+
+    it('uses the configured color space suffix for the companion', () => {
+      setColorSpace('oklch');
+
+      injector.property('#brand', {
+        initialValue: 'rgb(255 0 0)',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@property --brand-color-oklch');
+      expect(cssText).toContain('syntax: "<number>+"');
+    });
+
+    it('emits `*` companion syntax for the hsl color space', () => {
+      setColorSpace('hsl');
+
+      injector.property('#mix', {
+        initialValue: 'rgb(255 128 64)',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@property --mix-color-hsl');
+      // HSL components include percentages, so syntax is `*` not `<number>+`
+      expect(cssText).toContain('syntax: "*"');
+    });
+
+    it('falls back to default components when initial value is `transparent`', () => {
+      setColorSpace('rgb');
+
+      injector.property('#bg', {
+        initialValue: 'transparent',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain('@property --bg-color-rgb');
+      expect(cssText).toContain('initial-value: 0 0 0');
+    });
+
+    it('does not register a companion for non-color properties', () => {
+      setColorSpace('rgb');
+
+      injector.property('$rotation', {
+        syntax: '<angle>',
+        inherits: false,
+        initialValue: '0deg',
+      });
+
+      expect(injector.isPropertyDefined('$rotation')).toBe(true);
+      expect(injector.isPropertyDefined('--rotation-rgb')).toBe(false);
     });
   });
 

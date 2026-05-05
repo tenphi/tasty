@@ -8,6 +8,11 @@ import {
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
+import {
+  colorInitialValueToComponents,
+  getColorSpaceSuffix,
+  getComponentPropertySyntax,
+} from '../utils/color-space';
 import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
 import {
@@ -659,12 +664,42 @@ export class StyleInjector {
     const cssName = effectiveResult.cssName;
     const definition = effectiveResult.definition;
 
-    // Normalize the definition for comparison
-    const normalizedDef = normalizePropertyDefinition(definition);
+    this.insertPropertyRule(registry, root, cssName, definition, name);
 
-    // Check if already defined
-    const existingDef = registry.injectedProperties.get(cssName);
-    if (existingDef !== undefined) {
+    // For color tokens, also register the decomposed-components companion
+    // (`--{name}-color-{colorSpace}`) so it can be transitioned/animated and
+    // referenced as a single design-system token. Mirrors the SSR formatter
+    // in `src/ssr/format-property.ts`.
+    if (effectiveResult.isColor) {
+      const suffix = getColorSpaceSuffix();
+      const companionCssName = `${cssName}-${suffix}`;
+      const companionDefinition: PropertyDefinition = {
+        syntax: getComponentPropertySyntax(),
+        inherits: definition.inherits,
+        initialValue: colorInitialValueToComponents(definition.initialValue),
+      };
+      this.insertPropertyRule(
+        registry,
+        root,
+        companionCssName,
+        companionDefinition,
+        `${name}:components`,
+      );
+    }
+  }
+
+  /**
+   * Build and insert a single `@property` rule into the given registry.
+   * No-op if the property was already injected.
+   */
+  private insertPropertyRule(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+    cssName: string,
+    definition: PropertyDefinition,
+    cacheKey: string,
+  ): void {
+    if (registry.injectedProperties.has(cssName)) {
       return;
     }
 
@@ -704,7 +739,7 @@ export class StyleInjector {
     const info = this.sheetManager.insertGlobalRule(
       registry,
       [rule],
-      `property:${name}`,
+      `property:${cacheKey}`,
       root,
     );
 
@@ -712,8 +747,10 @@ export class StyleInjector {
       return;
     }
 
-    // Track that this property was injected with its normalized definition
-    registry.injectedProperties.set(cssName, normalizedDef);
+    registry.injectedProperties.set(
+      cssName,
+      normalizePropertyDefinition(definition),
+    );
   }
 
   /**

@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.3.1
+
+### Patch Changes
+
+- [#169](https://github.com/tenphi/tasty/pull/169) [`d353271`](https://github.com/tenphi/tasty/commit/d353271562f1dadc677808a947ecb65144a15fe9) Thanks [@tenphi](https://github.com/tenphi)! - Runtime injector now registers the decomposed-components companion `@property --{name}-color-{colorSpace}` for every color token, matching the SSR formatter. Previously, `injector.property('#name', …)` (and therefore `markStylesGenerated()` and `DEFAULT_PROPERTIES` like `#white`/`#black`/`#current`) only emitted the `--name-color` rule on the client, while SSR emitted both. Non-SSR consumers (Storybook, CSR apps) can now animate/transition the components variable just like in SSR.
+
 ## 2.3.0
 
 ### Minor Changes

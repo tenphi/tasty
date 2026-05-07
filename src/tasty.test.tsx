@@ -5,7 +5,6 @@ import { configure, resetConfig } from './config';
 import { useGlobalStyles } from './hooks';
 import { CONTAINER_STYLES } from './styles/list';
 import { tasty } from './tasty';
-import { brandTastyComponent } from './utils/is-tasty-component';
 
 const BaseButton = tasty({ as: 'button' });
 
@@ -129,10 +128,6 @@ describe('tasty() API', () => {
     function BlockWithInput(props) {
       return <Block styles={props.inputStyles} />;
     }
-
-    // `*Styles` default merging is a `tastyWrap` feature; opt the custom
-    // pass-through component into the Tasty path so the merge applies.
-    brandTastyComponent(BlockWithInput);
 
     const StyledOnceBlock = tasty(BlockWithInput, {
       inputStyles: {
@@ -1774,119 +1769,5 @@ describe('tokenProps', () => {
 
     expect(el.style.getPropertyValue('--spacing')).toBe('16px');
     expect(el.style.getPropertyValue('--border-color')).toBeTruthy();
-  });
-
-  describe('non-tasty component wrapping', () => {
-    it('should style a non-tasty forwardRef via className', () => {
-      const Anchor = forwardRef<HTMLAnchorElement, Record<string, any>>(
-        function Anchor(props, ref) {
-          return <a ref={ref} {...props} />;
-        },
-      );
-
-      const Link = tasty(Anchor, {
-        styles: { color: '#purple' },
-      });
-
-      const { container } = render(<Link qa="link" href="#" />);
-      const el = container.firstElementChild as HTMLElement;
-
-      expect(el.tagName).toBe('A');
-      expect(el.dataset.qa).toBe('link');
-      expect(el.className).toMatch(/^t/);
-      expect(el.hasAttribute('styles')).toBe(false);
-      expect(el.hasAttribute('qa')).toBe(false);
-    });
-
-    it('should convert mods to data attributes for non-tasty components', () => {
-      const Anchor = forwardRef<HTMLAnchorElement, Record<string, any>>(
-        function Anchor(props, ref) {
-          return <a ref={ref} {...props} />;
-        },
-      );
-
-      const Link = tasty(Anchor, {
-        styles: { color: { '': '#dark', active: '#purple' } },
-      });
-
-      const { container } = render(<Link mods={{ active: true }} href="#" />);
-      const el = container.firstElementChild as HTMLElement;
-
-      expect(el.hasAttribute('data-active')).toBe(true);
-      expect(el.hasAttribute('mods')).toBe(false);
-    });
-
-    it('should merge user className with computed className', () => {
-      const Anchor = forwardRef<HTMLAnchorElement, Record<string, any>>(
-        function Anchor(props, ref) {
-          return <a ref={ref} {...props} />;
-        },
-      );
-
-      const Link = tasty(Anchor, {
-        styles: { color: '#purple' },
-      });
-
-      const { container } = render(<Link className="extra" href="#" />);
-      const el = container.firstElementChild as HTMLElement;
-
-      expect(el.className).toContain('extra');
-      expect(el.className).toMatch(/\st\w+/);
-    });
-
-    it('should style a string tag passed as the first argument', () => {
-      const StyledSpan = tasty('span' as never, {
-        styles: { color: '#purple' },
-      });
-
-      const { container } = render(<StyledSpan qa="span" />);
-      const el = container.firstElementChild as HTMLElement;
-
-      expect(el.tagName).toBe('SPAN');
-      expect(el.dataset.qa).toBe('span');
-      expect(el.className).toMatch(/^t/);
-      expect(el.hasAttribute('styles')).toBe(false);
-    });
-
-    it('should keep using tastyWrap for branded tasty components', () => {
-      const Inner = tasty({ as: 'div', styles: { color: '#purple' } });
-      const Wrapped = tasty(Inner, { styles: { fill: '#white' } });
-
-      expect(Wrapped.displayName).toMatch(/^TastyWrappedComponent\(/);
-    });
-
-    it('should brand the tastyElement-routed wrap result', () => {
-      const Anchor = forwardRef<HTMLAnchorElement, Record<string, any>>(
-        function Anchor(props, ref) {
-          return <a ref={ref} {...props} />;
-        },
-      );
-
-      const Link = tasty(Anchor, { styles: { color: '#purple' } });
-
-      const Extended = tasty(Link, { styles: { fill: '#surface' } });
-
-      expect((Link as any).displayName).toMatch(/^TastyComponent\(/);
-      expect((Extended as any).displayName).toMatch(/^TastyWrappedComponent\(/);
-    });
-
-    it('should support styleProps on a wrapped non-tasty component', () => {
-      const Anchor = forwardRef<HTMLAnchorElement, Record<string, any>>(
-        function Anchor(props, ref) {
-          return <a ref={ref} {...props} />;
-        },
-      );
-
-      const Link = tasty(Anchor, {
-        styles: { color: '#purple' },
-        styleProps: ['padding'] as const,
-      });
-
-      const { container } = render(<Link padding="2x" href="#" />);
-      const el = container.firstElementChild as HTMLElement;
-
-      expect(el.className).toMatch(/^t/);
-      expect(el.hasAttribute('padding')).toBe(false);
-    });
   });
 });

@@ -42,12 +42,13 @@ const PrimaryButton = tasty(Button, {
 
 Style maps merge intelligently — see [Style DSL — Extending vs. Replacing State Maps](dsl.md#extending-vs-replacing-state-maps) for extend mode, replace mode, `@inherit`, `null`, and `false` tombstones.
 
-`tasty(Component, ...)` also works for components that are **not** produced by `tasty()` — Next.js `Link`, `react-router`'s `Link`, Radix primitives, MUI, or any `forwardRef`/`memo` that forwards `className`. Tasty-produced components are internally branded; non-branded components get styled through their `className` prop, which keeps `styles`, `mods`, `qa`, etc. from leaking to the DOM:
+`tasty(Component, ...)` always wraps `Component` and forwards every prop to it, so `Component` must be Tasty-aware (i.e. it accepts `styles`, `mods`, `qa`, etc. and renders them through its own Tasty pipeline). To apply styles to a third-party component or a string DOM tag via `className`, use the options-only form with `as`:
 
 ```jsx
 import NextLink from 'next/link';
 
-const Link = tasty(NextLink, {
+const Link = tasty({
+  as: NextLink,
   styles: {
     color: { '': '#accent-text', ':hover': '#text' },
     textDecoration: 'underline',
@@ -55,10 +56,15 @@ const Link = tasty(NextLink, {
   styleProps: ['padding'],
 });
 
+const Span = tasty({
+  as: 'span',
+  styles: { fontWeight: 'bold' },
+});
+
 <Link href="/blog" padding="1x">Blog</Link>;
 ```
 
-The only requirement on the wrapped component is that it forwards `className` (and ideally `style`/`ref`). See [Methodology — Wrapping non-Tasty components](methodology.md#wrapping-non-tasty-components) for the full picture.
+The wrapped component only needs to forward `className` (and ideally `style`/`ref`). Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `styleProps`, `modProps`, `tokenProps`) are consumed by Tasty and never leak to the DOM.
 
 ---
 

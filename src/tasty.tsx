@@ -22,10 +22,6 @@ import type {
   Tokens,
 } from './types';
 import { getDisplayName } from './utils/get-display-name';
-import {
-  brandTastyComponent,
-  isTastyComponent,
-} from './utils/is-tasty-component';
 import { isValidElementType } from './utils/is-valid-element-type';
 import { mergeStyles } from './utils/merge-styles';
 import { isSelector } from './pipeline';
@@ -519,20 +515,7 @@ export function tasty<
   _C = Record<string, unknown>,
 >(Component: any, options?: any) {
   if (isValidElementType(Component)) {
-    // Branded Tasty components keep going through the prop-forwarding path
-    // (preserves merge-by-prop, default merging, and the inner component's
-    // own style pipeline).
-    if (isTastyComponent(Component)) {
-      return tastyWrap(Component as ComponentType<any>, options);
-    }
-
-    // String tags, third-party components, plain forwardRef/memo wrappers, etc.
-    // route through the element-creation path so styles are applied via the
-    // `className` prop the wrapped component already forwards.
-    return tastyElement({
-      ...((options as Record<string, unknown>) ?? {}),
-      as: Component,
-    } as unknown as TastyProps<K, V>);
+    return tastyWrap(Component as ComponentType<any>, options);
   }
 
   return tastyElement(Component as TastyProps<K, V>);
@@ -590,8 +573,6 @@ function tastyWrap<
     Component,
     (defaultProps as any).qa ?? (extendTag as any) ?? 'Anonymous',
   )})`;
-
-  brandTastyComponent(_WrappedComponent);
 
   return _WrappedComponent as unknown as ComponentType<
     TastyComponentPropsWithDefaults<P, DefaultProps>
@@ -884,8 +865,6 @@ function tastyElement<
   _TastyComponent.displayName = `TastyComponent(${
     (defaultProps as any).qa || originalAs
   })`;
-
-  brandTastyComponent(_TastyComponent);
 
   // Attach sub-element components if elements are defined
   if (elements) {

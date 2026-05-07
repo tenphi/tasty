@@ -501,9 +501,14 @@ export function tasty<
 export function tasty<
   Props extends PropsWithStyles,
   DefaultProps extends Partial<Props> = Partial<Props>,
+  K extends StyleList = readonly never[],
+  V extends VariantMap = VariantMap,
+  E extends ElementsDefinition = Record<string, never>,
+  M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 >(
   Component: ComponentType<Props>,
-  options?: TastyProps<never, never, Record<string, never>, Props>,
+  options?: TastyProps<K, V, E, Props, M, TP>,
 ): ComponentType<TastyComponentPropsWithDefaults<Props, DefaultProps>>;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

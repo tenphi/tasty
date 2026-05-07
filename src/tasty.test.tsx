@@ -1784,7 +1784,7 @@ describe('tokenProps', () => {
         },
       );
 
-      const Link = tasty(Anchor as any, {
+      const Link = tasty(Anchor, {
         styles: { color: '#purple' },
       });
 
@@ -1805,7 +1805,7 @@ describe('tokenProps', () => {
         },
       );
 
-      const Link = tasty(Anchor as any, {
+      const Link = tasty(Anchor, {
         styles: { color: { '': '#dark', active: '#purple' } },
       });
 
@@ -1823,7 +1823,7 @@ describe('tokenProps', () => {
         },
       );
 
-      const Link = tasty(Anchor as any, {
+      const Link = tasty(Anchor, {
         styles: { color: '#purple' },
       });
 
@@ -1835,7 +1835,7 @@ describe('tokenProps', () => {
     });
 
     it('should style a string tag passed as the first argument', () => {
-      const StyledSpan = tasty('span' as any, {
+      const StyledSpan = tasty('span' as never, {
         styles: { color: '#purple' },
       });
 
@@ -1862,7 +1862,7 @@ describe('tokenProps', () => {
         },
       );
 
-      const Link = tasty(Anchor as any, { styles: { color: '#purple' } });
+      const Link = tasty(Anchor, { styles: { color: '#purple' } });
 
       const Extended = tasty(Link, { styles: { fill: '#surface' } });
 
@@ -1877,7 +1877,7 @@ describe('tokenProps', () => {
         },
       );
 
-      const Link = tasty(Anchor as any, {
+      const Link = tasty(Anchor, {
         styles: { color: '#purple' },
         styleProps: ['padding'] as const,
       });

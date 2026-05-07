@@ -1,5 +1,27 @@
 # @tenphi/tasty
 
+## 2.5.0
+
+### Minor Changes
+
+- [#178](https://github.com/tenphi/tasty/pull/178) [`81a591b`](https://github.com/tenphi/tasty/commit/81a591b7aaf4ceca9c8d2ed03b10c371d1c2e936) Thanks [@tenphi](https://github.com/tenphi)! - Revert the dispatch behaviour introduced in 2.4.0. `tasty(Component, options)`
+  again unconditionally uses the prop-forwarding wrap path; the brand-based
+  discriminator (`brandTastyComponent` / `isTastyComponent`) and the
+  `tasty('div', options)` shorthand are removed.
+
+  To apply styles to a third-party component (Next.js `Link`, `react-router`
+  `Link`, Radix primitives, MUI, …) or to a string DOM tag via `className`, use
+  the options-only form with `as`:
+
+  ```ts
+  const Link = tasty({ as: NextLink, styles: { … } });
+  const Span = tasty({ as: 'span',   styles: { … } });
+  ```
+
+  This restores 2.3.x semantics for `tasty(Component, …)` and removes the silent
+  prop-leakage that 2.4.0 introduced when wrapping plain `forwardRef`/`memo`
+  components that were not branded.
+
 ## 2.4.0
 
 ### Minor Changes

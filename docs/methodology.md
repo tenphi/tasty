@@ -399,6 +399,28 @@ tasty(Button, {
 
 For full details on merge semantics, `@inherit`, `null`, and `false` tombstones, see [Style DSL — Extending vs. Replacing State Maps](dsl.md#extending-vs-replacing-state-maps).
 
+### Wrapping non-Tasty components
+
+`tasty(Component, { ... })` also accepts components that are **not** produced by `tasty()` — Next.js `Link`, `react-router`'s `Link`, Radix primitives, MUI components, or any plain `forwardRef`/`memo` you wrote yourself. The only requirement is that the wrapped component forwards the `className` prop (and ideally `style` and `ref`) to its underlying DOM node.
+
+```tsx
+import NextLink from 'next/link';
+
+const Link = tasty(NextLink, {
+  styles: {
+    color: { '': '#accent-text', ':hover': '#text' },
+    textDecoration: 'underline',
+  },
+  styleProps: ['padding'],
+});
+
+<Link href="/blog" padding="1x">Blog</Link>;
+```
+
+For non-Tasty components Tasty cannot forward `styles`/`mods`/`tokens` as props (the wrapped component would not know what to do with them), so it computes a class name and writes it onto the rendered element via `className`. Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `isDisabled`, `isHidden`, `isChecked`, and any `styleProps`/`modProps`/`tokenProps` you declared) are consumed by the wrapper and converted to `data-*` attributes or CSS custom properties — they never leak to the DOM.
+
+As with every other `tasty()` component, `<Link as="span">` at the call site overrides the wrapped element if you ever need it.
+
 ### When to use styleProps vs wrapping
 
 If the component exposes the properties you need as `styleProps`, use them directly — that is what they are for:

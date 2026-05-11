@@ -106,10 +106,13 @@ function resolveFontFamily(
 /**
  * Handles typography preset and individual font properties.
  *
- * Preset syntax uses `/` to separate name from modifier:
+ * Preset syntax uses `/` to separate the name from one or more
+ * space-separated modifiers:
  * - `preset="h1"` — name only
  * - `preset="h2 / strong"` — name + modifier
+ * - `preset="h2 / strong italic"` — name + multiple modifiers
  * - `preset="bold"` — modifier-only shorthand (name defaults to `inherit`)
+ * - `preset="bold italic"` — modifier-only shorthand with multiple modifiers
  *
  * When `preset` is defined, it sets up CSS custom properties for typography.
  * Individual font props can be used with or without `preset`:
@@ -145,21 +148,31 @@ export function presetStyle({
     const group = processed.groups[0];
     const { parts } = group ?? { parts: [] };
 
-    // parts[0] = preset name (or a modifier for shorthand like preset="bold")
-    // parts[1] = optional modifier after slash (e.g. "t3 / bold")
+    // parts[0] = preset name (or modifiers for shorthand like preset="bold italic")
+    // parts[1] = optional space-separated modifiers after slash (e.g. "t3 / strong italic")
     const namePart = parts[0];
     const modPart = parts[1];
 
+    const nameTokens = namePart?.all ?? [];
+    // Mod-only shorthand: all tokens in parts[0] are recognized modifiers.
+    const isModOnly =
+      nameTokens.length > 0 && nameTokens.every((t) => PRESET_MODIFIERS.has(t));
+
     const nameToken = namePart?.mods[0] ?? namePart?.values[0] ?? '';
-    const isModOnly = PRESET_MODIFIERS.has(nameToken);
-
     const name = isModOnly ? 'inherit' : nameToken || 'inherit';
-    const modifier = isModOnly ? nameToken : (modPart?.mods[0] ?? '');
 
-    const isStrong = modifier === 'strong' || modifier === 'bold';
-    const isItalic = modifier === 'italic';
-    const isIcon = modifier === 'icon';
-    const isTight = modifier === 'tight';
+    const modTokens = isModOnly ? nameTokens : (modPart?.all ?? []);
+    const activeMods = new Set<string>();
+    for (const tok of modTokens) {
+      if (PRESET_MODIFIERS.has(tok)) {
+        activeMods.add(tok);
+      }
+    }
+
+    const isStrong = activeMods.has('strong') || activeMods.has('bold');
+    const isItalic = activeMods.has('italic');
+    const isIcon = activeMods.has('icon');
+    const isTight = activeMods.has('tight');
 
     // Set preset values for properties not explicitly overridden
     if (fontSize == null) {

@@ -364,6 +364,59 @@ describe('Tasty style tests', () => {
     );
   });
 
+  it('should support multiple modifiers: t3 / strong italic', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / strong italic',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'font-weight': 'var(--bold-font-weight)',
+        'font-style': 'italic',
+        'font-size': 'var(--t3-font-size, var(--default-font-size))',
+      }),
+    );
+  });
+
+  it('should support multiple modifiers: t3 / strong tight', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / strong tight',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'font-weight': 'var(--bold-font-weight)',
+        'line-height': '1em',
+        'font-size': 'var(--t3-font-size, var(--default-font-size))',
+      }),
+    );
+  });
+
+  it('should support multiple modifiers: t3 / italic tight', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / italic tight',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'font-style': 'italic',
+        'line-height': '1em',
+        'font-size': 'var(--t3-font-size, var(--default-font-size))',
+      }),
+    );
+  });
+
+  it('should support mod-only shorthand with multiple modifiers: bold italic', () => {
+    const result = presetStyle({ preset: 'bold italic' });
+    expect(result).toEqual(
+      expect.objectContaining({
+        'font-weight': 'var(--bold-font-weight)',
+        'font-style': 'italic',
+        'font-size': 'inherit',
+      }),
+    );
+  });
+
   it('should handle flow styles', () => {
     expect(flowStyle({ flow: 'row nowrap' })).toEqual(null);
   });

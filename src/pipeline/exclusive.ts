@@ -10,6 +10,7 @@ import type { StyleValue } from '../utils/styles';
 
 import type { ConditionNode } from './conditions';
 import { and, isCompoundCondition, not, or, trueCondition } from './conditions';
+import { branchesProduceDifferentContexts } from './materialize';
 import { simplifyCondition } from './simplify';
 
 // ============================================================================
@@ -431,12 +432,30 @@ export function expandOrConditions(
  * independently in its own scope and at-rule sort isn't load-bearing.
  * The post-build pass needs the sort because it has to preserve at-rule
  * wrapping across branches that came from negating a compound at-rule.
+ *
+ * Skip optimisation: when every branch renders into the same at-rule /
+ * root / parent / own context (see "Key Design Decision #2" in
+ * `docs/pipeline.md`), forcing mutual exclusivity here produces dead
+ * `B & !A`-style branches that materialization later folds back into
+ * `:is(A, B)`. Bail out and let `materialize.ts` collapse the OR via
+ * `mergeVariantsIntoSelectorGroups`. Cross-entry exclusivity is still
+ * enforced by `buildExclusiveConditions`; the post-build `expandExclusiveOrs`
+ * pass still handles De Morgan ORs whose branches actually differ in
+ * context.
  */
 function expandSingleEntry(entry: ParsedStyleEntry): ParsedStyleEntry[] {
   const orBranches = collectOrBranches(entry.condition);
 
   // If no OR (single branch), return as-is
   if (orBranches.length <= 1) {
+    return [entry];
+  }
+
+  // Skip OR expansion when all branches share the same at-rule context.
+  // Pure-selector ORs (e.g. `:hover | :focus`,
+  // `:-webkit-autofill | :autofill`) are better merged into `:is(...)` at
+  // materialization than expanded into mutually-exclusive cascades.
+  if (!branchesProduceDifferentContexts(orBranches)) {
     return [entry];
   }
 
@@ -604,6 +623,18 @@ function expandExclusiveConditionOrs(
 
   // If no OR (single branch), return as-is
   if (orBranches.length <= 1) {
+    return [entry];
+  }
+
+  // Skip OR expansion when all branches share the same at-rule context.
+  // De Morgan ORs across different at-rule scopes (e.g.
+  // `!@supports | !:has`) still need exclusive splitting so each branch
+  // ends up in the correct at-rule wrapper, but pure-selector ORs
+  // (`:hover | :focus`, `:-webkit-autofill | :autofill`) collapse
+  // cleanly via `:is(...)` at materialization. Matches the same
+  // heuristic used by `makeOrBranchesExclusive` in `materialize.ts` and
+  // by Stage 2a above.
+  if (!branchesProduceDifferentContexts(orBranches)) {
     return [entry];
   }
 

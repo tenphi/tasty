@@ -14,6 +14,7 @@ import {
   resolvePredefinedState,
 } from '../states';
 import { camelToKebab } from '../utils/case-converter';
+import { isDevEnv } from '../utils/is-dev-env';
 import { transformSelectorContent } from '../utils/selector-transform';
 
 import type { ConditionNode, NumericBound } from './conditions';
@@ -64,6 +65,20 @@ export interface ParseStateKeyOptions {
 
 // Cache for parsed state keys (key -> ConditionNode)
 const parseCache = new Lru<string, ConditionNode>(5000);
+
+// ============================================================================
+// Internal-pseudo Detection
+// ============================================================================
+
+/**
+ * Chrome-internal pseudo-classes (e.g. `:-internal-autofill-selected`,
+ * `:-internal-autofill-previewed`) cannot be targeted from user CSS and
+ * may invalidate the surrounding rule in Safari even when wrapped in
+ * forgiving `:is(...)`. The regex matches both bare uses and references
+ * inside enhanced pseudo arguments like `:is(:-webkit-autofill,
+ * :-internal-autofill-selected)`.
+ */
+const INTERNAL_PSEUDO_PATTERN = /:-internal-[a-z0-9-]+/g;
 
 // ============================================================================
 // Tokenizer Patterns
@@ -839,6 +854,30 @@ export function parseStateKey(
   const cached = parseCache.get(cacheKey);
   if (cached) {
     return cached;
+  }
+
+  // Warn about `:-internal-*` pseudo-classes. The cache miss above
+  // means we only emit the warning the first time we encounter a
+  // given key (subsequent identical keys reuse the cached result and
+  // skip this scan). The regex catches both bare uses and references
+  // inside `:is(...)` / `:has(...)` / `:not(...)` / `:where(...)`.
+  //
+  // Gated behind `isDevEnv()` because this is a developer-only aid.
+  // `isDevEnv()` uses bracket notation on `process.env` to survive
+  // tasty's own bundling and also returns `false` under `NODE_ENV=test`
+  // / `NODE_ENV=production`, so the warning only fires in real dev.
+  if (isDevEnv()) {
+    INTERNAL_PSEUDO_PATTERN.lastIndex = 0;
+    const internalMatches = trimmed.match(INTERNAL_PSEUDO_PATTERN);
+    if (internalMatches && internalMatches.length > 0) {
+      const unique = Array.from(new Set(internalMatches));
+      emitWarning(
+        'INTERNAL_PSEUDO_USED',
+        `State key "${trimmed}" references internal pseudo-class${unique.length > 1 ? 'es' : ''} ${unique.map((p) => `\`${p}\``).join(', ')}. ` +
+          `These are unmatchable from user CSS and can invalidate the surrounding rule in Safari (even inside \`:is(...)\`). ` +
+          `Use \`:-webkit-autofill | :autofill\` instead for autofill states.`,
+      );
+    }
   }
 
   // Tokenize and parse

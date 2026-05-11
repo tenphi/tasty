@@ -5,7 +5,10 @@
  * can programmatically intercept, suppress, or reroute warnings.
  */
 
-export type TastyWarningCode = 'INVALID_SELECTOR_AFFIX' | 'XOR_CHAIN_TOO_LONG';
+export type TastyWarningCode =
+  | 'INVALID_SELECTOR_AFFIX'
+  | 'XOR_CHAIN_TOO_LONG'
+  | 'INTERNAL_PSEUDO_USED';
 
 export interface TastyWarning {
   code: TastyWarningCode;

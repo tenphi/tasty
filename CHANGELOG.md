@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 2.6.0
+
+### Minor Changes
+
+- [#182](https://github.com/tenphi/tasty/pull/182) [`a8ef75c`](https://github.com/tenphi/tasty/commit/a8ef75ca3748a69eeafe3a5ef965582b12d9df67) Thanks [@tenphi](https://github.com/tenphi)! - Support multiple space-separated modifiers in the `preset` style. Modifiers can now be combined after the slash (e.g. `preset="h2 / strong italic"`, `preset="t2 / strong tight"`) and in the modifier-only shorthand (e.g. `preset="bold italic"`). Existing single-modifier syntax is unchanged.
+
+### Patch Changes
+
+- [#180](https://github.com/tenphi/tasty/pull/180) [`c714552`](https://github.com/tenphi/tasty/commit/c7145529686c957ab0bdf7ca1fb2d680bab9dbae) Thanks [@tenphi](https://github.com/tenphi)! - Skip OR expansion for pure-selector ORs so same-context branches like `:hover | :focus` or `:-webkit-autofill | :autofill` collapse cleanly into `:is(...)` instead of producing dead `:not()` chains. Also warn (dev only) when a state key references unmatchable `:-internal-*` pseudo-classes.
+
 ## 2.5.0
 
 ### Minor Changes

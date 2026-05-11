@@ -1447,8 +1447,16 @@ function makeOrBranchesExclusive(children: ConditionNode[]): ConditionNode[] {
  * Check if OR branches produce different at-rule contexts when
  * materialized. If so, the Cartesian product in andToCSS will
  * create overlapping CSS variants that need exclusive expansion.
+ *
+ * Exported so Stage 2a (`expandOrConditions` in `exclusive.ts`) can
+ * reuse the same heuristic and skip OR expansion when every branch
+ * lives in the same at-rule/root/parent/own context — pure-selector
+ * ORs are better collapsed into `:is(...)` at materialization time
+ * than expanded into mutually-exclusive `A | (B & !A) | …` cascades.
  */
-function branchesProduceDifferentContexts(branches: ConditionNode[]): boolean {
+export function branchesProduceDifferentContexts(
+  branches: ConditionNode[],
+): boolean {
   const contextKeys = new Set<string>();
 
   for (const branch of branches) {

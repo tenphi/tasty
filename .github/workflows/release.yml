@@ -50,7 +50,7 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           SNAPSHOT_VERSION="0.0.0-snapshot.${SHORT_SHA}"
-          pnpm pkg set version="${SNAPSHOT_VERSION}"
+          npm pkg set version="${SNAPSHOT_VERSION}"
           echo "version=${SNAPSHOT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Clear .npmrc auth token (use OIDC instead)

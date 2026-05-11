@@ -2912,6 +2912,99 @@ describe('Vendor-prefixed pseudo-classes', () => {
   });
 });
 
+describe('Stage 2a OR skip for same-context branches', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('should merge :-webkit-autofill | :autofill into :is(...) without :not() chain', () => {
+    const styles = {
+      color: { ':-webkit-autofill | :autofill': 'red' },
+    };
+
+    const result = renderStyles(styles, '.input');
+
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        r.declarations.includes('red'),
+    );
+    expect(autofillRule).toBeDefined();
+    // Should NOT contain :not(:-webkit-autofill) — pure selector ORs are
+    // merged at materialization time rather than expanded into exclusive
+    // cascades.
+    expect(autofillRule!.selector).not.toContain(':not(:-webkit-autofill)');
+    expect(autofillRule!.selector).not.toContain(':not(:autofill)');
+    expect(autofillRule!.selector).toContain(':autofill');
+  });
+
+  it('should merge :hover | :focus into :is(...) without :not(:hover) chain', () => {
+    const styles = {
+      color: { ':hover | :focus': 'red' },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    const hoverFocusRule = result.find(
+      (r) => r.selector.includes(':hover') && r.declarations.includes('red'),
+    );
+    expect(hoverFocusRule).toBeDefined();
+    expect(hoverFocusRule!.selector).not.toContain(':not(:hover)');
+    expect(hoverFocusRule!.selector).not.toContain(':not(:focus)');
+    expect(hoverFocusRule!.selector).toContain(':focus');
+  });
+
+  it('should still expand OR when branches differ in at-rule context', () => {
+    const styles = {
+      color: {
+        ':hover | @media(prefers-reduced-motion: reduce)': 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test');
+
+    // Mixed-context ORs must still be split so the at-rule branch keeps
+    // its own @media wrapper and the pure-selector branch isn't accidentally
+    // tucked inside it.
+    const mediaRule = result.find((r) =>
+      r.atRules?.some((a) => a.includes('prefers-reduced-motion')),
+    );
+    expect(mediaRule).toBeDefined();
+
+    const hoverRule = result.find(
+      (r) =>
+        r.selector.includes(':hover') &&
+        (!r.atRules || r.atRules.length === 0) &&
+        r.declarations.includes('red'),
+    );
+    expect(hoverRule).toBeDefined();
+  });
+
+  it('should produce a clean :is(:-webkit-autofill, :autofill) rule for the autofill recipe', () => {
+    const styles = {
+      '@autofill': ':-webkit-autofill | :autofill',
+      appearance: {
+        '@autofill | (@autofill & :hover) | (@autofill & :focus)': 'none',
+      },
+    };
+
+    const result = renderStyles(styles, '.input');
+
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        r.declarations.includes('appearance: none'),
+    );
+    expect(autofillRule).toBeDefined();
+    // Superset deduplication should collapse the OR with `@autofill & :hover`
+    // / `@autofill & :focus` to just `@autofill`, so the final selector
+    // should NOT mention `:hover` or `:focus`.
+    expect(autofillRule!.selector).not.toContain(':hover');
+    expect(autofillRule!.selector).not.toContain(':focus');
+    expect(autofillRule!.selector).not.toContain(':not(:-webkit-autofill)');
+  });
+});
+
 describe('Sub-element scoped predefined states', () => {
   beforeEach(() => {
     clearPipelineCache();

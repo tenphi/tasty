@@ -410,9 +410,23 @@ export class SheetManager {
                 // noop: all selectors invalid here; safe to skip
               }
             } else {
-              // Single selector failed — skip it silently (likely unsupported in this engine)
+              // Single selector failed — skip it silently (likely unsupported in this engine).
+              // For @property rules specifically, probe once per registry to distinguish
+              // "engine doesn't support @property at all" (e.g., jsdom) from
+              // "engine supports @property but this specific rule is invalid"
+              // (a real user bug worth warning about).
               if (process.env.NODE_ENV !== 'production') {
-                console.warn('[tasty] Browser rejected CSS rule:', fullRule, e);
+                const isAtProperty = fullRule.startsWith('@property ');
+                const shouldSuppress =
+                  isAtProperty &&
+                  !this.engineSupportsAtProperty(registry, styleSheet);
+                if (!shouldSuppress) {
+                  console.warn(
+                    '[tasty] Browser rejected CSS rule:',
+                    fullRule,
+                    e,
+                  );
+                }
               }
             }
           }
@@ -733,6 +747,50 @@ export class SheetManager {
   findAvailableRuleIndex(sheet: SheetInfo): number {
     // Always append to the end - CSS doesn't have holes
     return sheet.ruleCount;
+  }
+
+  /**
+   * Probe whether the underlying CSS engine supports `@property` at-rules.
+   * Result is cached per registry on `registry.atPropertySupported`.
+   *
+   * The probe inserts and immediately deletes a minimal known-valid rule
+   * (`@property --__tasty_probe__ { syntax: "*"; inherits: true; }`).
+   * Engines that lack `@property` support (jsdom, happy-dom) reject any
+   * `@property` rule including this one, so a probe failure is a reliable
+   * signal that further `@property` rejections are environmental noise and
+   * not user-authored bugs.
+   *
+   * The probe is intentionally a separate operation from the user's failing
+   * insertion: we don't want to leak `--__tasty_probe__` into the sheet, so
+   * on success we delete the probe rule immediately, leaving `ruleCount`
+   * and `cssRules.length` unchanged.
+   */
+  private engineSupportsAtProperty(
+    registry: RootRegistry,
+    styleSheet: CSSStyleSheet,
+  ): boolean {
+    if (registry.atPropertySupported !== undefined) {
+      return registry.atPropertySupported;
+    }
+
+    const probeRule =
+      '@property --__tasty_probe__ { syntax: "*"; inherits: true; }';
+
+    try {
+      const probeIdx = styleSheet.cssRules.length;
+      styleSheet.insertRule(probeRule, probeIdx);
+      try {
+        styleSheet.deleteRule(probeIdx);
+      } catch {
+        // noop: unable to delete the probe; leaving it in is harmless
+        // (declares an unused CSS custom property scoped to documentElement)
+      }
+      registry.atPropertySupported = true;
+    } catch {
+      registry.atPropertySupported = false;
+    }
+
+    return registry.atPropertySupported;
   }
 
   /**

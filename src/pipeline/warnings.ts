@@ -8,7 +8,8 @@
 export type TastyWarningCode =
   | 'INVALID_SELECTOR_AFFIX'
   | 'XOR_CHAIN_TOO_LONG'
-  | 'INTERNAL_PSEUDO_USED';
+  | 'INTERNAL_PSEUDO_USED'
+  | 'INVALID_TOP_LEVEL_PSEUDO_KEY';
 
 export interface TastyWarning {
   code: TastyWarningCode;

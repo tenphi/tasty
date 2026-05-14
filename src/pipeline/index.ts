@@ -248,9 +248,28 @@ function processStyles(
   // Skip @keyframes (processed separately) and other @-prefixed keys
   // (predefined states), which are not handler entries.
   const selectorKeys = keys.filter((key) => isSelector(key));
-  const styleKeys = keys.filter(
-    (key) => !isSelector(key) && !key.startsWith('@'),
-  );
+  const styleKeys: string[] = [];
+  for (const key of keys) {
+    if (isSelector(key) || key.startsWith('@')) continue;
+
+    // Reject top-level pseudo-class / pseudo-element keys like ':hover',
+    // '::before', ':has(...)'. These are not valid Tasty style keys —
+    // pseudo-states belong inside a value map (e.g. `color: { ':hover': '...' }`),
+    // and nested-declaration form requires an `&` prefix (e.g. `'&:hover': {…}`).
+    // Without `&`, a key like ':hover' falls through to a generic style
+    // handler and produces malformed CSS, so we drop it and warn in dev.
+    if (key.startsWith(':')) {
+      emitWarning(
+        'INVALID_TOP_LEVEL_PSEUDO_KEY',
+        `Style key "${key}" starts with ':' which is not a valid Tasty style key. ` +
+          `Use "&${key}" for nested-selector form, or move the state into a value map ` +
+          `(e.g. \`{ color: { '${key}': value } }\`). The key has been ignored.`,
+      );
+      continue;
+    }
+
+    styleKeys.push(key);
+  }
 
   // Process nested selectors first
   processNestedSelectors(

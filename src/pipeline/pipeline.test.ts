@@ -4876,3 +4876,84 @@ describe('Compound state CSS bloat fixes', () => {
     expect(variant.selectorGroups[0].branches.length).toBe(3);
   });
 });
+
+describe('Top-level pseudo-class / pseudo-element keys', () => {
+  it('should warn and ignore top-level keys starting with ":"', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler(
+      (w: { code: string; message: string }) => {
+        warnings.push(w);
+      },
+    );
+
+    clearPipelineCache();
+
+    const result = renderStyles(
+      {
+        color: 'red',
+        ':hover': { color: 'blue' } as never,
+        '::before': { content: '"x"' } as never,
+      },
+      '.subject',
+    );
+
+    restore();
+
+    // Only the valid `color: red` rule should survive.
+    expect(result).toEqual([
+      { selector: '.subject', declarations: 'color: red;' },
+    ]);
+
+    // No declarations should leak pseudo-keys as property names.
+    for (const r of result) {
+      expect(r.declarations).not.toMatch(/(^|\s|;):hover\s*:/);
+      expect(r.declarations).not.toMatch(/(^|\s|;)::before\s*:/);
+    }
+
+    const pseudoWarnings = warnings.filter(
+      (w) => w.code === 'INVALID_TOP_LEVEL_PSEUDO_KEY',
+    );
+    expect(pseudoWarnings.length).toBe(2);
+    expect(pseudoWarnings[0].message).toContain('":hover"');
+    expect(pseudoWarnings[0].message).toContain('"&:hover"');
+    expect(pseudoWarnings[1].message).toContain('"::before"');
+    expect(pseudoWarnings[1].message).toContain('"&::before"');
+  });
+
+  it('should still accept "&:hover" nested-selector form', () => {
+    clearPipelineCache();
+
+    const result = renderStyles(
+      {
+        color: 'red',
+        '&:hover': { color: 'blue' },
+      },
+      '.subject',
+    );
+
+    const hoverRule = result.find((r) => r.selector.includes(':hover'));
+    expect(hoverRule).toBeDefined();
+    expect(hoverRule!.selector).toBe('.subject:hover');
+    expect(hoverRule!.declarations).toContain('color: blue');
+  });
+
+  it('should still accept state keys inside a value map', () => {
+    clearPipelineCache();
+
+    const result = renderStyles(
+      {
+        color: {
+          '': 'red',
+          ':hover': 'blue',
+        },
+      },
+      '.subject',
+    );
+
+    const hoverRule = result.find(
+      (r) => r.selector.includes(':hover') && r.declarations.includes('blue'),
+    );
+    expect(hoverRule).toBeDefined();
+  });
+});

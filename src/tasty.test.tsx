@@ -1376,14 +1376,14 @@ describe('useGlobalStyles() hook', () => {
     function GlobalWithPseudoStyles() {
       useGlobalStyles('.pseudo-test', {
         color: '#dark',
-        ':hover': {
+        '&:hover': {
           color: '#purple',
         },
-        ':focus': {
+        '&:focus': {
           color: '#blue',
           outline: '2px solid #blue',
         },
-        '::before': {
+        '&::before': {
           content: '"→ "',
           color: '#gray',
         },
@@ -1407,10 +1407,18 @@ describe('useGlobalStyles() hook', () => {
       .join('');
 
     expect(styleContent).toContain('.pseudo-test');
-    expect(styleContent).toContain(':hover');
-    expect(styleContent).toContain(':focus');
-    expect(styleContent).toContain('::before');
+    expect(styleContent).toContain('.pseudo-test:hover');
+    expect(styleContent).toContain('.pseudo-test:focus');
+    expect(styleContent).toContain('.pseudo-test::before');
     expect(styleContent).toContain('color: var(--dark-color)');
+    expect(styleContent).toContain('color: var(--purple-color)');
+    expect(styleContent).toContain('color: var(--blue-color)');
+    expect(styleContent).toContain('color: var(--gray-color)');
+    expect(styleContent).toContain('content: "\u2192 "');
+    // Ensure no malformed declarations (pseudo-keys used as property names)
+    expect(styleContent).not.toMatch(/\{[^}]*:hover\s*:/);
+    expect(styleContent).not.toMatch(/\{[^}]*:focus\s*:/);
+    expect(styleContent).not.toMatch(/\{[^}]*::before\s*:/);
   });
 
   it('should support attribute selectors', () => {

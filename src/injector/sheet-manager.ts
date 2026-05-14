@@ -365,7 +365,7 @@ export class SheetManager {
             if (firstInsertedIndex == null) firstInsertedIndex = safeIndex;
             lastInsertedIndex = safeIndex;
             currentRuleIndex = safeIndex + 1;
-          } catch {
+          } catch (e) {
             // If the browser rejects the combined selector (e.g., vendor pseudo-elements),
             // try to split and insert each selector independently. Skip unsupported ones.
             const selectors = splitSelectorsSafely(rule.selector);
@@ -394,9 +394,15 @@ export class SheetManager {
                   lastInsertedIndex = idx;
                   currentRuleIndex = idx + 1;
                   anyInserted = true;
-                } catch {
-                  // Skip unsupported selector in this engine (e.g., ::-moz-selection in Blink).
-                  // Silent by design: browser rejections are common and noisy in dev/tests.
+                } catch (singleErr) {
+                  // Skip unsupported selector in this engine (e.g., ::-moz-selection in Blink)
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.warn(
+                      '[tasty] Browser rejected CSS rule:',
+                      singleRule,
+                      singleErr,
+                    );
+                  }
                 }
               }
               // If none inserted, continue without throwing to avoid aborting the whole batch
@@ -404,8 +410,10 @@ export class SheetManager {
                 // noop: all selectors invalid here; safe to skip
               }
             } else {
-              // Single selector failed — skip silently (likely unsupported in this engine).
-              // Browser rejections are common and were too noisy in dev/tests to warn on.
+              // Single selector failed — skip it silently (likely unsupported in this engine)
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('[tasty] Browser rejected CSS rule:', fullRule, e);
+              }
             }
           }
         } else if (styleElement) {

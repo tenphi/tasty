@@ -735,21 +735,21 @@ export class StyleInjector {
       declarations,
     } as StyleRule;
 
-    // Insert as a global rule; only mark injected when insertion succeeds
-    const info = this.sheetManager.insertGlobalRule(
+    // Mark as attempted BEFORE inserting so repeated calls bail early even
+    // when the insertion ultimately fails (e.g., engines like jsdom that
+    // don't support @property reject every @property rule unconditionally).
+    // Without this, every render's auto-property scan would re-attempt the
+    // same rejected rules and flood the console with warnings.
+    registry.injectedProperties.set(
+      cssName,
+      normalizePropertyDefinition(definition),
+    );
+
+    this.sheetManager.insertGlobalRule(
       registry,
       [rule],
       `property:${cacheKey}`,
       root,
-    );
-
-    if (!info) {
-      return;
-    }
-
-    registry.injectedProperties.set(
-      cssName,
-      normalizePropertyDefinition(definition),
     );
   }
 

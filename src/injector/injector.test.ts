@@ -1084,3 +1084,138 @@ describe('StyleInjector namePrefix', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// @property rejection handling (jsdom / happy-dom and other engines that
+// don't support @property at all)
+// ---------------------------------------------------------------------------
+// Suppress no-op lint rule: vi.spyOn requires a function argument.
+function noop(): void {
+  /* no-op */
+}
+
+describe('StyleInjector @property rejection handling', () => {
+  afterEach(() => {
+    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+    vi.restoreAllMocks();
+  });
+
+  it('marks the property as injected even when the engine rejects the rule', () => {
+    // happy-dom rejects every @property rule natively, so this exercises
+    // the "engine doesn't support @property" path without any stubbing.
+    const injector = new StyleInjector({ forceTextInjection: false });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
+
+    try {
+      injector.property('#accent', { initialValue: 'red' });
+
+      // Even though the underlying insertRule threw, the registry must
+      // remember the attempt so subsequent calls do not re-attempt it.
+      expect(injector.isPropertyDefined('#accent')).toBe(true);
+      expect(injector.isPropertyDefined('--accent-color')).toBe(true);
+
+      // Calling property() again for the same token must short-circuit.
+      injector.property('#accent', { initialValue: 'red' });
+    } finally {
+      injector.destroy();
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('suppresses the "Browser rejected CSS rule" warning for @property when the engine has no @property support', () => {
+    const injector = new StyleInjector({ forceTextInjection: false });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
+
+    try {
+      // Multiple distinct color tokens — all rejected by happy-dom — must
+      // not flood the console; the per-registry probe should detect the
+      // missing @property support after the first failure and silence the
+      // rest.
+      injector.property('#accent', { initialValue: 'red' });
+      injector.property('#brand', { initialValue: 'blue' });
+      injector.property('#muted', { initialValue: 'gray' });
+
+      // Also exercise the auto-property path via inject() — it scans
+      // declarations and re-emits @property rules for any unknown custom
+      // properties.
+      injector.inject([
+        {
+          selector: '.t0',
+          declarations: '--accent-color: red; --brand-color: blue',
+        },
+      ]);
+      injector.inject([
+        {
+          selector: '.t1',
+          declarations: '--accent-color: red; --brand-color: blue',
+        },
+      ]);
+
+      const atPropertyWarnings = warnSpy.mock.calls.filter((args) => {
+        const [first, second] = args;
+        return (
+          typeof first === 'string' &&
+          first.startsWith('[tasty] Browser rejected CSS rule:') &&
+          typeof second === 'string' &&
+          second.startsWith('@property ')
+        );
+      });
+
+      expect(atPropertyWarnings).toHaveLength(0);
+    } finally {
+      injector.destroy();
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('still warns for invalid @property definitions when the engine supports @property', () => {
+    const injector = new StyleInjector({ forceTextInjection: false });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
+
+    // Simulate an engine that supports @property in general but rejects
+    // this specific (hypothetically) invalid rule. The probe rule must
+    // succeed; only `--bad-prop` should throw.
+    const originalInsertRule = CSSStyleSheet.prototype.insertRule;
+    const insertRuleSpy = vi
+      .spyOn(CSSStyleSheet.prototype, 'insertRule')
+      .mockImplementation(function (
+        this: CSSStyleSheet,
+        rule: string,
+        index?: number,
+      ) {
+        if (rule.startsWith('@property ')) {
+          if (rule.includes('--bad-prop')) {
+            throw new DOMException('Failed to parse the rule.', 'SyntaxError');
+          }
+          // Probe rule: pretend success. We can't actually insert an
+          // @property rule in happy-dom, so just return the index. The
+          // probe's deleteRule fallback handles missing rules silently.
+          return index ?? 0;
+        }
+        return originalInsertRule.call(this, rule, index);
+      });
+
+    try {
+      injector.property('$bad-prop', {
+        syntax: '<color>',
+        initialValue: 'transparent',
+      });
+
+      const matched = warnSpy.mock.calls.some((args) => {
+        const [first, second] = args;
+        return (
+          typeof first === 'string' &&
+          first.startsWith('[tasty] Browser rejected CSS rule:') &&
+          typeof second === 'string' &&
+          second.includes('--bad-prop')
+        );
+      });
+
+      expect(matched).toBe(true);
+    } finally {
+      insertRuleSpy.mockRestore();
+      injector.destroy();
+      warnSpy.mockRestore();
+    }
+  });
+});

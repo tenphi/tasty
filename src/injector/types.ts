@@ -171,6 +171,15 @@ export interface RootRegistry {
   rscStylesScanned: boolean;
   /** Whether this root uses adoptedStyleSheets or <style> elements */
   injectionMode: InjectionMode;
+  /**
+   * Lazy feature-test for `@property` support, cached per registry.
+   * - `undefined`: not yet probed.
+   * - `true`: engine supports `@property`; rejections indicate user-authored
+   *   invalid rules and should warn.
+   * - `false`: engine doesn't support `@property` (e.g., jsdom); rejections
+   *   are expected and warnings are suppressed.
+   */
+  atPropertySupported?: boolean;
 }
 
 // StyleRule is now just an alias for StyleResult from the pipeline

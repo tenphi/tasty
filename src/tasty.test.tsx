@@ -1,5 +1,6 @@
 import { cleanup, getByTestId, render } from '@testing-library/react';
 import { act, forwardRef } from 'react';
+import type { ReactNode } from 'react';
 
 import { configure, resetConfig } from './config';
 import { useGlobalStyles } from './hooks';
@@ -1777,5 +1778,42 @@ describe('tokenProps', () => {
 
     expect(el.style.getPropertyValue('--spacing')).toBe('16px');
     expect(el.style.getPropertyValue('--border-color')).toBeTruthy();
+  });
+});
+
+describe('tasty() `as: Component` typing', () => {
+  interface CustomLinkProps {
+    to: string;
+    replace?: boolean;
+    className?: string;
+    children?: ReactNode;
+  }
+
+  const CustomLink = forwardRef<HTMLAnchorElement, CustomLinkProps>(
+    function CustomLink({ to, replace: _replace, className, children }, ref) {
+      return (
+        <a ref={ref} href={to} className={className} data-test-custom-link="">
+          {children}
+        </a>
+      );
+    },
+  );
+
+  it('preserves the wrapped component prop API at factory time', () => {
+    const StyledLink = tasty({
+      as: CustomLink,
+      styles: { color: '#purple' },
+      styleProps: ['padding'] as const,
+    });
+
+    const { container } = render(
+      <StyledLink to="/blog" replace padding="1x">
+        Blog
+      </StyledLink>,
+    );
+
+    const anchor = container.firstElementChild as HTMLAnchorElement;
+    expect(anchor.getAttribute('href')).toBe('/blog');
+    expect(anchor.getAttribute('data-test-custom-link')).toBe('');
   });
 });

@@ -1,6 +1,7 @@
 import type {
   AllHTMLAttributes,
   ComponentType,
+  ElementType,
   ForwardRefExoticComponent,
   JSX,
   PropsWithoutRef,
@@ -372,9 +373,23 @@ export type TastyProps<
   >;
 
 /**
+ * Resolves the props of a polymorphic `as` value (intrinsic tag or component).
+ * - For intrinsic tags (`'div'`, `'button'`, ...): returns `JSX.IntrinsicElements[Tag]`.
+ * - For React component types: returns the component's own props.
+ * - Falls back to an empty record for anything else.
+ */
+export type ResolveAsProps<AsType extends ElementType> =
+  AsType extends keyof JSX.IntrinsicElements
+    ? JSX.IntrinsicElements[AsType]
+    : AsType extends ComponentType<infer P>
+      ? P
+      : Record<string, never>;
+
+/**
  * TastyElementOptions is used for the element-creation overload of tasty().
- * It includes a Tag generic that allows TypeScript to infer the correct
- * HTML element type from the `as` prop.
+ * It includes an `AsType` generic that allows TypeScript to infer the correct
+ * element type from the `as` prop — both for intrinsic tags and for React
+ * components (so the wrapped component's prop API is preserved).
  *
  * Note: Uses a separate index signature with `unknown` instead of inheriting
  * from Props (which has `any`) to ensure strict type checking for styles.
@@ -383,13 +398,12 @@ export type TastyElementOptions<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
-  Tag extends keyof JSX.IntrinsicElements = 'div',
+  AsType extends ElementType = 'div',
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
 > = TastyBaseProps<K, V, E, M, TP> & {
   /** The tag name of the element or a React component. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  as?: Tag | ComponentType<any>;
+  as?: AsType;
 } & Record<string, unknown>;
 
 export type AllBasePropsWithMods<
@@ -439,33 +453,36 @@ type TokenPropsKeys<TP extends TokenPropsInput> =
 /**
  * Props type for tasty elements that combines:
  * - AllBasePropsWithMods for style props with strict tokens type
- * - HTML attributes for flexibility (properly typed based on tag)
+ * - HTML attributes for flexibility (properly typed based on `as`)
  * - Variant support
  *
  * AllBasePropsWithMods carries generic AllHTMLAttributes which can conflict
- * with tag-specific types from JSX.IntrinsicElements (e.g. `src` is `string`
- * in AllHTMLAttributes but `string | Blob` in ImgHTMLAttributes). To avoid
- * intersection-narrowing, we Omit tag-specific keys from AllBasePropsWithMods
- * (keeping TastySpecificKeys, style props, mod props, and token props) and let
- * JSX.IntrinsicElements supply the authoritative HTML attribute types.
+ * with element-specific types (e.g. `src` is `string` in AllHTMLAttributes but
+ * `string | Blob` in ImgHTMLAttributes, or the custom props on a third-party
+ * component like Next.js `Link`). To avoid intersection-narrowing, we Omit
+ * element-specific keys from AllBasePropsWithMods (keeping TastySpecificKeys,
+ * style props, mod props, and token props) and let the resolved `as` props
+ * supply the authoritative attribute types. The `AllHTMLAttributes<HTMLElement>`
+ * baseline is preserved so generic HTML attributes still work even when `as`
+ * is a component type with a narrower prop API.
  */
 export type TastyElementProps<
   K extends StyleList,
   V extends VariantMap,
-  Tag extends keyof JSX.IntrinsicElements = 'div',
+  AsType extends ElementType = 'div',
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
 > = Omit<
   AllBasePropsWithMods<K, M, TP>,
   Exclude<
-    keyof JSX.IntrinsicElements[Tag],
+    keyof ResolveAsProps<AsType>,
     TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
   >
 > &
   WithVariant<V> &
   Omit<
-    Omit<AllHTMLAttributes<HTMLElement>, keyof JSX.IntrinsicElements[Tag]> &
-      JSX.IntrinsicElements[Tag],
+    Omit<AllHTMLAttributes<HTMLElement>, keyof ResolveAsProps<AsType>> &
+      ResolveAsProps<AsType>,
     TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
   >;
 
@@ -480,20 +497,41 @@ type TastyComponentPropsWithDefaults<
       [key in keyof Omit<Props, keyof DefaultProps>]: Props[key];
     };
 
+/**
+ * The component type returned by the `tasty(options)` element-factory overload.
+ *
+ * It's a regular React forward-ref component whose props are typed from the
+ * factory-time `as` value. Polymorphism is at factory time: each call to
+ * `tasty({ as: X })` produces a component whose prop API includes `X`'s own
+ * props (so `tasty({ as: NextLink })` exposes `href`, `replace`, `prefetch`,
+ * etc.) alongside the Tasty-specific props (`mods`, `tokens`, `styleProps`,
+ * `modProps`, `tokenProps`).
+ *
+ * Note: a render-time `<X as={SomeComponent} />` does not re-infer props from
+ * `SomeComponent`; create another `tasty({ as: SomeComponent })` for that.
+ */
+export type TastyPolymorphicComponent<
+  DefaultAs extends ElementType,
+  K extends StyleList,
+  V extends VariantMap,
+  M extends ModPropsInput,
+  TP extends TokenPropsInput,
+> = ForwardRefExoticComponent<
+  PropsWithoutRef<TastyElementProps<K, V, DefaultAs, M, TP>> &
+    RefAttributes<unknown>
+>;
+
 export function tasty<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
-  Tag extends keyof JSX.IntrinsicElements = 'div',
+  AsType extends ElementType = 'div',
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
 >(
-  options: TastyElementOptions<K, V, E, Tag, M, TP>,
+  options: TastyElementOptions<K, V, E, AsType, M, TP>,
   secondArg?: never,
-): ForwardRefExoticComponent<
-  PropsWithoutRef<TastyElementProps<K, V, Tag, M, TP>> & RefAttributes<unknown>
-> &
-  SubElementComponents<E>;
+): TastyPolymorphicComponent<AsType, K, V, M, TP> & SubElementComponents<E>;
 export function tasty<
   Props extends PropsWithStyles,
   DefaultProps extends Partial<Props> = Partial<Props>,

@@ -406,9 +406,11 @@ function buildExclusivesForHandler(
         parseStateKey(stateKey, { context: parserContext }),
       );
 
-      // Stage 1b: Merge entries that share the same value before exclusive
-      // expansion. Prevents combinatorial blowup when e.g. @dark and
-      // @dark & @high-contrast map to the same color.
+      // Stage 1b: Merge same-value entries before exclusive expansion to
+      // prevent combinatorial blowup (e.g. @dark and @dark & @high-contrast
+      // mapping to the same color). Merges happen only when provably safe
+      // with respect to intermediate-priority entries, so the authored
+      // cascade is preserved.
       const merged = mergeEntriesByValue(parsed);
 
       // Stage 2a: Expand user OR conditions into exclusive branches

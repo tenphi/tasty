@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 2.6.3
+
+### Patch Changes
+
+- [#192](https://github.com/tenphi/tasty/pull/192) [`832cb65`](https://github.com/tenphi/tasty/commit/832cb6521ae475ca71436cca28393610689ed493) Thanks [@tenphi](https://github.com/tenphi)! - Fix cascade order corruption in `mergeEntriesByValue` (style rendering Stage 1b). When a style map contained two non-default states with the same value separated by a state with a different value (e.g. `{ hovered: 'red', pressed: 'blue', disabled: 'red' }`), the early merge would lift the lower-priority entry up to the maximum priority of the group, producing an `:is([data-disabled], [data-hovered])` rule that shadowed `pressed` whenever `[data-hovered]` was set — so `pressed + hovered` together resolved to red instead of blue. Same-value entries are now only merged when the merge is provably safe (no intermediate-priority state could have won in a scenario the merge would block), restoring the authored cascade while preserving the existing dark/high-contrast token deduplication optimization.
+
+- [#194](https://github.com/tenphi/tasty/pull/194) [`dd54644`](https://github.com/tenphi/tasty/commit/dd5464440e192822a224ce6f5a28a3a077ddbd61) Thanks [@tenphi](https://github.com/tenphi)! - Infer the wrapped component's prop API when `as` is a React component in the element-factory form: `tasty({ as: NextLink, ... })` now exposes `NextLink`'s own props (e.g. `href`, `replace`, `prefetch`) on the resulting Tasty component alongside the existing Tasty-specific props. Previously the resulting component was typed as if it rendered a `div` and the wrapped component's prop API was lost. Intrinsic-tag usage (`as: 'div' | 'button' | …`) and the `tasty(Component, options)` wrap form are unchanged.
+
 ## 2.6.2
 
 ### Patch Changes

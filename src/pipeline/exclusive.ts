@@ -242,6 +242,8 @@ export function mergeEntriesByValue(
       const newCondition = simplifyCondition(
         or(prev.condition, entry.condition),
       );
+      // `prev` was processed before `entry`, so its priority is always
+      // greater or equal. Keep `Math.max` for clarity of intent.
       merged[mergeIdx] = {
         styleKey: prev.styleKey,
         stateKey: `${prev.stateKey} | ${entry.stateKey}`,
@@ -254,11 +256,10 @@ export function mergeEntriesByValue(
     }
   }
 
-  // Re-sort by priority (highest first). Entries are processed in
-  // priority order, but absorption-safe merges may pull a lower-
-  // priority entry "up" past defaults that we kept in place.
-  merged.sort((a, b) => b.priority - a.priority);
-
+  // `merged` is already highest-priority-first by construction: input
+  // entries arrive in that order, merges update an entry in place
+  // without changing its priority, and no insert/delete reorders the
+  // array.
   return merged;
 }
 

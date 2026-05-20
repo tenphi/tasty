@@ -179,36 +179,62 @@ The condition tree representation enables:
 
 ### What It Does
 
-Collapses parsed entries that share the same value. Only **non-default** entries are merged — an entry with the default state (`''` → `TrueCondition`) is never merged with a non-default entry.
+Collapses parsed entries that share the same value when doing so provably preserves the authored cascade. Only **non-default** entries are merged — an entry with the default state (`''` → `TrueCondition`) is never merged with a non-default entry.
 
 ### How It Works
 
-1. Group entries by serialized value.
-2. Within each group, split out default (TRUE) entries.
-3. Keep default entries as-is; they must retain TRUE so they participate correctly in exclusive building.
-4. Combine non-default entries into a single entry with condition `OR(e1.condition, e2.condition, …)`, simplified via `simplifyCondition`. The merged entry keeps the **highest** priority in the group.
-5. Re-sort by priority (highest first).
+Entries arrive sorted highest-priority-first. For each entry the pass walks already-emitted entries from most-recent backward, looking for the nearest same-value entry where merging is safe. If found, the two entries collapse into one (priority becomes the maximum of the pair, condition becomes the simplified `OR`). Default entries are emitted as singletons and never participate in a merge.
+
+### The Safety Condition
+
+Merging two same-value entries with conditions `C_h` (higher priority) and `C_l` (lower priority) lifts the lower one up to `p_h` and changes the higher-priority "blocker" for every intermediate-priority entry from `!C_h` to `!(C_h | C_l) = !C_h & !C_l`. The added `!C_l` constraint can incorrectly block an intermediate entry that should have won.
+
+The merge is safe iff for every entry `e_m` strictly between them in priority with a different value,
+
+    simplify(C_m & C_l & !C_h) = FALSE
+
+i.e. there is no scenario where the intermediate state could have matched, the lower same-value entry would also have matched, and the higher one would not. This is the only way the merge could leak through and shadow the intermediate state.
 
 ### Why
 
-Without this, a value map like `{ '@dark': 'red', '@dark & @hc': 'red' }` would create two separate entries that later produce two CSS rules with identical output. Merging before exclusive building keeps the exclusive condition algebra small and avoids duplicate CSS.
+Without this pass a value map like `{ '@dark': 'red', '@dark & @hc': 'red' }` would create two separate entries that later produce two CSS rules with identical output. Merging before exclusive building keeps the exclusive condition algebra small and avoids duplicate CSS. The safety check ensures we never break the cascade in service of this optimization.
 
-**Why defaults are kept separate:** merging `TRUE | X` collapses to `TRUE`, destroying X's participation in the exclusive cascade. Intermediate-priority states would then lose their `:not(X)` negation, producing overlapping CSS rules. See `exclusive.ts:140-160` for the rationale.
+**Why defaults are kept separate:** merging `TRUE | X` collapses to `TRUE`, destroying X's participation in the exclusive cascade. Intermediate-priority states would then lose their `:not(X)` negation, producing overlapping CSS rules.
 
-### Example
+### Example — Safe merge (still collapses)
 
 ```typescript
-// Input entries (highest priority first)
+// { '@dark & @hc': 'red', '@dark': 'red' }
+// Input entries (highest priority first), no intermediate different-value entry
 [
-  { stateKey: '@dark & @hc', value: 'red', condition: dark & hc },
-  { stateKey: '@dark',       value: 'red', condition: dark     },
+  { stateKey: '@dark & @hc', value: 'red', condition: dark & hc, priority: 1 },
+  { stateKey: '@dark',       value: 'red', condition: dark,      priority: 0 },
 ]
 
-// Output: one merged entry
+// Safe: no intermediates. Output: one merged entry
 [
   { stateKey: '@dark & @hc | @dark', value: 'red',
-    condition: simplify((dark & hc) | dark) = dark }
+    condition: simplify((dark & hc) | dark) = dark, priority: 1 }
 ]
+```
+
+The compound dark/HC dedup pattern `{ '': light, '@dark': dark, '@hc': hc, '@dark & @hc': dark }` also collapses cleanly because `@hc & @dark & !(@dark & @hc)` simplifies to FALSE — the intermediate `@hc` is structurally blocked by the contradiction.
+
+### Example — Unsafe merge (must NOT collapse)
+
+```typescript
+// { hovered: 'red', pressed: 'blue', disabled: 'red' }
+// Authored cascade: disabled > pressed > hovered.
+// Merging hovered (priority 0) with disabled (priority 2) would lift
+// hovered to priority 2 and rewrite `pressed`'s exclusive from
+// `pressed & !disabled` to `pressed & !disabled & !hovered`, making
+// `pressed + hovered` resolve to red instead of blue.
+
+// `simplify(pressed & hovered & !disabled)` is not FALSE — three
+// independent modifiers can all be active — so the entries are kept
+// separate. Stage 6 `mergeByValue` will later combine the two red
+// CSS rules into one selector group, but only after the cascade is
+// correctly resolved.
 ```
 
 ---

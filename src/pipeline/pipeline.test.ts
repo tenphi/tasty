@@ -982,6 +982,107 @@ describe('mergeEntriesByValue with default + same-value state', () => {
     expect(defaultRule).toBeDefined();
     expect(defaultRule!.selector).toContain(':not([data-disabled])');
   });
+
+  it('preserves cascade when two non-default states share a value with a different-valued state between them', () => {
+    // Sandwich pattern: hovered (red) and disabled (red) have the same value,
+    // but pressed (blue) sits between them in priority order.
+    //
+    // Authored cascade: disabled > pressed > hovered.
+    // When [data-pressed] and [data-hovered] are both active (no
+    // [data-disabled]), pressed must win and the element must be blue —
+    // because pressed is authored after hovered.
+    //
+    // The early Stage 1b merge used to lift hovered up to disabled's
+    // priority by merging the two reds into a single OR'd entry, which
+    // produced a red rule matching :is([data-disabled], [data-hovered])
+    // and a blue rule wrapped in :not([data-hovered]) — so pressed +
+    // hovered together resolved to red. This test guards against that.
+    const styles = {
+      fill: {
+        hovered: 'red',
+        pressed: 'blue',
+        disabled: 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test') as StyleResult[];
+
+    const redRule = result.find(
+      (r) =>
+        r.declarations.includes('red') &&
+        (r.selector.includes('[data-hovered]') ||
+          r.selector.includes('[data-disabled]')),
+    );
+    expect(redRule).toBeDefined();
+    expect(
+      redRule!.selector,
+      'red rule must exclude pressed so the cascade `pressed > hovered` is preserved',
+    ).toContain(':not([data-pressed])');
+
+    const blueRule = result.find((r) => r.declarations.includes('blue'));
+    expect(blueRule).toBeDefined();
+    expect(
+      blueRule!.selector,
+      'blue rule must not require :not([data-hovered]); pressed beats hovered',
+    ).not.toContain(':not([data-hovered])');
+  });
+
+  it('merges consecutive same-value runs but keeps non-consecutive same-value entries separate', () => {
+    // pressed (red) and disabled (red) are consecutive in priority order
+    // (highest two), so they may be merged into a single rule. hovered
+    // (red) sits below blue/active, so it must stay separate and carry
+    // its own :not([data-active]):not([data-pressed]):not([data-disabled])
+    // negations.
+    const styles = {
+      fill: {
+        hovered: 'red',
+        active: 'green',
+        pressed: 'red',
+        disabled: 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test') as StyleResult[];
+    const dump = result.map((r) => r.selector).join('\n');
+
+    // The green rule must exclude both pressed and disabled (their red
+    // run sits above active in priority).
+    const greenRule = result.find((r) => r.declarations.includes('green'));
+    expect(greenRule, `green rule missing in:\n${dump}`).toBeDefined();
+    expect(greenRule!.selector).toContain(':not([data-pressed])');
+    expect(greenRule!.selector).toContain(':not([data-disabled])');
+
+    // The hovered red rule sits below active and must exclude active
+    // (this is the proof that hovered is NOT lifted up to the
+    // pressed/disabled run by the merge).
+    const hoveredRed = result.find(
+      (r) =>
+        r.declarations.includes('red') && r.selector.includes('[data-hovered]'),
+    );
+    expect(hoveredRed, `hovered red rule missing in:\n${dump}`).toBeDefined();
+    expect(hoveredRed!.selector).toContain(':not([data-active])');
+    expect(hoveredRed!.selector).toContain(':not([data-pressed])');
+    expect(hoveredRed!.selector).toContain(':not([data-disabled])');
+  });
+
+  it('still merges consecutive same-value non-default entries', () => {
+    // Documented behavior preserved: when two non-default same-value
+    // entries are consecutive in priority order with no different-valued
+    // state between them, they're combined into one rule with a single
+    // selector group.
+    const styles = {
+      fill: {
+        pressed: 'red',
+        disabled: 'red',
+      },
+    };
+
+    const result = renderStyles(styles, '.test') as StyleResult[];
+    const redRules = result.filter((r) => r.declarations.includes('red'));
+    expect(redRules.length).toBe(1);
+    expect(redRules[0].selector).toContain('[data-pressed]');
+    expect(redRules[0].selector).toContain('[data-disabled]');
+  });
 });
 
 describe('conditionToCSS()', () => {

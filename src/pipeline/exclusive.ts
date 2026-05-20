@@ -147,89 +147,116 @@ export function parseStyleEntries(
  * This must happen **before** exclusive expansion and OR branch splitting
  * to avoid combinatorial explosion and duplicate CSS output.
  *
- * Default (TRUE) entries are **never** merged with non-default entries.
+ * **Merging must preserve the authored cascade.** Merging two same-value
+ * entries with priorities `p_h > p_l` lifts the lower-priority entry up
+ * to `p_h` and changes the "blocker" for intermediate-priority entries
+ * from `!C_h` to `!(C_h | C_l) = !C_h & !C_l`. The added `!C_l`
+ * constraint can incorrectly block an intermediate entry that should
+ * have won.
+ *
+ * Two same-value entries with conditions `C_h` (higher priority) and
+ * `C_l` (lower priority) are safe to merge iff for every entry
+ * `e_m` strictly between them in priority with a different value,
+ *
+ *     simplify(C_m & C_l & !C_h) = FALSE
+ *
+ * i.e. there is no scenario where the intermediate state could have
+ * matched (`C_m`), the lower-priority same-value entry would also have
+ * matched (`C_l`), and the higher-priority entry would not (`!C_h`).
+ * In such scenarios the intermediate is supposed to win; the merge
+ * would block it by introducing `!C_l`.
+ *
+ * Example (UNSAFE — must not merge):
+ * `{ hovered: 'red', pressed: 'blue', disabled: 'red' }`.
+ * C_h = disabled, C_l = hovered, C_m = pressed. `pressed & hovered &
+ * !disabled` is satisfiable (three independent modifiers), so the
+ * intermediate `pressed` would lose to a merged red rule when both
+ * `pressed` and `hovered` are active — breaking the cascade
+ * `disabled > pressed > hovered`.
+ *
+ * Example (SAFE — still merges):
+ * `{ '': light, '@dark': dark, '@hc': hc, '@dark & @hc': dark }`.
+ * C_h = `@dark & @hc`, C_l = `@dark`, C_m = `@hc`.
+ * `@hc & @dark & !(@dark & @hc) = @hc & @dark & (!@dark | !@hc)`
+ * simplifies to FALSE, so merging the two darks into one `@dark` rule
+ * at the higher priority does not affect the `@hc` rule.
+ *
+ * Default (TRUE) entries are never merged with non-default entries.
  * Merging `TRUE | X` collapses to `TRUE`, destroying the non-default
- * condition's participation in exclusive building. That causes
- * intermediate-priority states to lose their `:not(X)` negation,
- * breaking mutual exclusivity when X and an intermediate state are
- * both active. Stage 6 `mergeByValue` handles combining rules with
- * identical CSS output after exclusive conditions are correctly built.
+ * condition's participation in exclusive building. Stage 6
+ * `mergeByValue` handles combining rules with identical CSS output
+ * after exclusive conditions are correctly built.
  *
- * Example: `{ '@dark': 'red', '@dark & @hc': 'red' }` merges into a
- * single entry with condition `@dark | (@dark & @hc)` = `@dark`.
- *
- * Entries are ordered highest-priority-first. The merged entry keeps the
- * highest priority of the group.
+ * The merged entry keeps the highest priority of the merged entries.
  */
 export function mergeEntriesByValue(
   entries: ParsedStyleEntry[],
 ): ParsedStyleEntry[] {
   if (entries.length <= 1) return entries;
 
-  const groups = new Map<
-    string,
-    { entries: ParsedStyleEntry[]; maxPriority: number }
-  >();
+  const merged: ParsedStyleEntry[] = [];
 
   for (const entry of entries) {
-    const valueKey = serializeValue(entry.value);
-    const group = groups.get(valueKey);
-    if (group) {
-      group.entries.push(entry);
-      group.maxPriority = Math.max(group.maxPriority, entry.priority);
-    } else {
-      groups.set(valueKey, { entries: [entry], maxPriority: entry.priority });
-    }
-  }
-
-  // If no merges possible, return as-is
-  if (groups.size === entries.length) return entries;
-
-  const merged: ParsedStyleEntry[] = [];
-  for (const [, group] of groups) {
-    if (group.entries.length === 1) {
-      merged.push(group.entries[0]);
+    // Defaults are never merged with non-defaults.
+    if (entry.condition.kind === 'true') {
+      merged.push(entry);
       continue;
     }
 
-    // Separate default (TRUE) entries from non-default entries.
-    // Default entries must stay separate so that non-default conditions
-    // participate in exclusive building and block intermediate states.
-    const defaultEntries = group.entries.filter(
-      (e) => e.condition.kind === 'true',
-    );
-    const nonDefaultEntries = group.entries.filter(
-      (e) => e.condition.kind !== 'true',
-    );
+    const valueKey = serializeValue(entry.value);
+    let mergeIdx = -1;
 
-    // Keep default entries as-is
-    for (const entry of defaultEntries) {
-      merged.push(entry);
+    // Find the most recent merged entry with the same value such that
+    // merging is provably safe with respect to every different-value
+    // entry strictly between them in priority order.
+    for (let j = merged.length - 1; j >= 0; j--) {
+      const prev = merged[j];
+      if (prev.condition.kind === 'true') continue;
+      if (serializeValue(prev.value) !== valueKey) continue;
+
+      let safe = true;
+      for (let k = j + 1; k < merged.length; k++) {
+        const inter = merged[k];
+        if (inter.condition.kind === 'true') continue;
+        if (serializeValue(inter.value) === valueKey) continue;
+
+        // Safety: simplify(C_m & C_l & !C_h) must be FALSE.
+        // C_h = prev.condition, C_l = entry.condition, C_m = inter.condition.
+        const conflict = simplifyCondition(
+          and(inter.condition, entry.condition, not(prev.condition)),
+        );
+        if (conflict.kind !== 'false') {
+          safe = false;
+          break;
+        }
+      }
+
+      if (safe) {
+        mergeIdx = j;
+        break;
+      }
     }
 
-    // Merge only non-default entries
-    if (nonDefaultEntries.length === 1) {
-      merged.push(nonDefaultEntries[0]);
-    } else if (nonDefaultEntries.length >= 2) {
-      const combinedCondition = simplifyCondition(
-        or(...nonDefaultEntries.map((e) => e.condition)),
+    if (mergeIdx >= 0) {
+      const prev = merged[mergeIdx];
+      const newCondition = simplifyCondition(
+        or(prev.condition, entry.condition),
       );
-
-      const combinedStateKey = nonDefaultEntries
-        .map((e) => e.stateKey)
-        .join(' | ');
-
-      merged.push({
-        styleKey: nonDefaultEntries[0].styleKey,
-        stateKey: combinedStateKey,
-        value: nonDefaultEntries[0].value,
-        condition: combinedCondition,
-        priority: group.maxPriority,
-      });
+      merged[mergeIdx] = {
+        styleKey: prev.styleKey,
+        stateKey: `${prev.stateKey} | ${entry.stateKey}`,
+        value: prev.value,
+        condition: newCondition,
+        priority: Math.max(prev.priority, entry.priority),
+      };
+    } else {
+      merged.push(entry);
     }
   }
 
-  // Re-sort by priority (highest first)
+  // Re-sort by priority (highest first). Entries are processed in
+  // priority order, but absorption-safe merges may pull a lower-
+  // priority entry "up" past defaults that we kept in place.
   merged.sort((a, b) => b.priority - a.priority);
 
   return merged;

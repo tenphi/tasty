@@ -76,12 +76,12 @@ exports[`tasty() API > should optimize attribute selectors 1`] = `
 exports[`tasty() API > should optimize attribute selectors 2`] = `
 ".tmkx54k.tmkx54k[data-size="large"] { padding: 24px 0px 0px; }
 .tmkx54k.tmkx54k[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
-.tmkx54k.tmkx54k:not([data-size="large"]):is(:not([data-selected]), :not([data-size="medium"])) { padding: 8px 0px 0px; }"
+.tmkx54k.tmkx54k:not([data-size="large"]):not([data-selected][data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
 ".t1c00a7t.t1c00a7t[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t1c00a7t.t1c00a7t:is([data-selected]:not([data-size="large"]), [data-size="medium"]) { padding: 16px 0px 0px; }
+.t1c00a7t.t1c00a7t:not([data-selected][data-size="large"]):is([data-selected], [data-size="medium"]) { padding: 16px 0px 0px; }
 .t1c00a7t.t1c00a7t:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
 `;
 

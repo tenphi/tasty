@@ -75,9 +75,29 @@ export function buildExclusiveConditions(
 
     for (const prior of priorConditions) {
       // Skip negating "always true" (default state) - it would become "always false"
-      if (prior.kind !== 'true') {
-        exclusive = and(exclusive, not(prior));
+      if (prior.kind === 'true') {
+        continue;
       }
+
+      // Cheap mutual-exclusivity pre-check: if this entry's own condition
+      // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
+      // `[theme=green] & ...`), then `prior` can never match when this entry
+      // does, so `!prior` is always true here and adds nothing. Skipping it
+      // avoids De Morgan'ing `prior` into a wide OR of negations that would
+      // otherwise feed an exponential Cartesian product at materialization.
+      //
+      // This only fires when the contradiction is structurally provable via
+      // `simplifyCondition` (memoized, operates on the small pairwise AND).
+      // The default entry (no positive terms) is unaffected and keeps its
+      // full negation chain, which `orToCSS` recombines into compact :not().
+      if (
+        entry.condition.kind !== 'true' &&
+        simplifyCondition(and(entry.condition, prior)).kind === 'false'
+      ) {
+        continue;
+      }
+
+      exclusive = and(exclusive, not(prior));
     }
 
     // Simplify the exclusive condition

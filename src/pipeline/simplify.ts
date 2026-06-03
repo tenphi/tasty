@@ -117,17 +117,30 @@ function simplifyInner(node: ConditionNode): ConditionNode {
     return node;
   }
 
-  // Compound conditions - recursively simplify
+  // Compound conditions - recursively simplify.
+  // Memoize compound results: the cross-level pruning pass
+  // (`pruneContradictedOrBranches`) re-simplifies many overlapping
+  // `AND(branch, ...siblings)` combinations, so caching by structural id
+  // turns repeated work into O(1) lookups and tames otherwise exponential
+  // blowup on wide exclusive conditions (large state maps).
   if (node.kind === 'compound') {
+    const key = getConditionUniqueId(node);
+    const cached = simplifyCache.get(key);
+    if (cached) {
+      return cached;
+    }
+
     // First, recursively simplify all children
     const simplifiedChildren = node.children.map((c) => simplifyInner(c));
 
     // Then apply compound-specific simplifications
-    if (node.operator === 'AND') {
-      return simplifyAnd(simplifiedChildren);
-    } else {
-      return simplifyOr(simplifiedChildren);
-    }
+    const result =
+      node.operator === 'AND'
+        ? simplifyAnd(simplifiedChildren)
+        : simplifyOr(simplifiedChildren);
+
+    simplifyCache.set(key, result);
+    return result;
   }
 
   return node;
@@ -192,35 +205,55 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     return falseCondition();
   }
 
-  // ─── Pass 3: redundancy elimination + canonicalization ─────────────────
+  // ─── Passes 3-5: redundancy elimination + boolean reductions ───────────
+  // Run to a fixpoint: Pass 5 (`pruneContradictedOrBranches`) can collapse
+  // single-branch ORs into flat AND siblings, which then expose fresh
+  // implied negations for Pass 3 (`removeImpliedNegations`) and absorption
+  // targets for Pass 4. Without re-running, an exclusive condition like
+  // `[theme=gray] & OR(!proc, !theme=rose)` keeps a redundant
+  // `:not([theme=rose])` term even though `[theme=gray]` already implies it.
+  const MAX_SIMPLIFY_PASSES = 4;
+  for (let pass = 0; pass < MAX_SIMPLIFY_PASSES; pass++) {
+    const lengthBefore = terms.length;
+    const keyBefore = simplifyTermsKey(terms);
 
-  // Remove redundant negations implied by positive terms
-  // e.g., style(--variant: danger) implies NOT style(--variant: success)
-  // and style(--variant: danger) implies style(--variant) (existence)
-  terms = removeImpliedNegations(terms);
+    // Pass 3: redundancy elimination + canonicalization
+    // Remove redundant negations implied by positive terms
+    // e.g., style(--variant: danger) implies NOT style(--variant: success)
+    // and style(--variant: danger) implies style(--variant) (existence)
+    terms = removeImpliedNegations(terms);
+    terms = deduplicateTerms(terms);
+    terms = mergeRanges(terms);
+    terms = sortTerms(terms);
 
-  // Deduplicate (by uniqueId)
-  terms = deduplicateTerms(terms);
+    // Pass 4: boolean-algebra reductions
+    terms = applyAbsorptionAnd(terms); // A & (A | B) → A
+    terms = applyConsensusAnd(terms); // (A | B) & (A | !B) → A
 
-  // Try to merge numeric ranges
-  terms = mergeRanges(terms);
+    // Pass 5: cross-level contradiction pruning
+    // A & OR(!A & X, Y) → A & Y
+    // For each OR child, prune branches that are impossible given the other
+    // AND siblings. This catches dead branches left by exclusive negation.
+    terms = pruneContradictedOrBranches(terms);
 
-  // Sort for canonical form
-  terms = sortTerms(terms);
+    // Re-check contradictions exposed by pruning before continuing.
+    if (terms.length === 0) break;
+    if (terms.length === 1) break;
+    if (hasContradiction(terms)) {
+      return falseCondition();
+    }
+    if (hasAttributeConflict(terms)) {
+      return falseCondition();
+    }
 
-  // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
-
-  // Apply absorption: A & (A | B) → A
-  terms = applyAbsorptionAnd(terms);
-
-  // Apply consensus/resolution: (A | B) & (A | !B) → A
-  terms = applyConsensusAnd(terms);
-
-  // ─── Pass 5: cross-level contradiction pruning ──────────────────────────
-  // A & OR(!A & X, Y) → A & Y
-  // For each OR child, prune branches that are impossible given the other
-  // AND siblings. This catches dead branches left by exclusive negation.
-  terms = pruneContradictedOrBranches(terms);
+    // Stop once a full pass made no structural change.
+    if (
+      terms.length === lengthBefore &&
+      simplifyTermsKey(terms) === keyBefore
+    ) {
+      break;
+    }
+  }
 
   if (terms.length === 0) {
     return trueCondition();
@@ -832,6 +865,17 @@ function removeImpliedNegations(terms: ConditionNode[]): ConditionNode[] {
 // ============================================================================
 // Deduplication
 // ============================================================================
+
+/**
+ * Build a stable, order-insensitive key for a list of AND terms.
+ * Used to detect fixpoint convergence in `simplifyAnd`.
+ */
+function simplifyTermsKey(terms: ConditionNode[]): string {
+  return terms
+    .map((t) => getConditionUniqueId(t))
+    .sort()
+    .join('&');
+}
 
 function deduplicateTerms(terms: ConditionNode[]): ConditionNode[] {
   const seen = new Set<string>();

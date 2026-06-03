@@ -919,6 +919,187 @@ describe('buildExclusiveConditions()', () => {
   });
 });
 
+describe('attribute mutual-exclusivity optimization', () => {
+  describe('bracket attribute selectors parse as modifiers', () => {
+    it('parses [data-variant="processing"] as a modifier (not opaque pseudo)', () => {
+      const node = parseStateKey('[data-variant="processing"]');
+      const mod = assertModifierCondition(node);
+      expect(mod.attribute).toBe('data-variant');
+      expect(mod.value).toBe('processing');
+      expect(mod.operator).toBe('=');
+      expect(mod.negated).toBe(false);
+    });
+
+    it('parses a boolean attribute [data-disabled] as a modifier', () => {
+      const node = parseStateKey('[data-disabled]');
+      const mod = assertModifierCondition(node);
+      expect(mod.attribute).toBe('data-disabled');
+      expect(mod.value).toBeUndefined();
+    });
+
+    it('parses prefix/suffix/substring operators as modifiers', () => {
+      const prefix = assertModifierCondition(parseStateKey('[data-x^="a"]'));
+      expect(prefix.operator).toBe('^=');
+      expect(prefix.value).toBe('a');
+
+      const suffix = assertModifierCondition(parseStateKey('[data-x$="b"]'));
+      expect(suffix.operator).toBe('$=');
+
+      const substr = assertModifierCondition(parseStateKey('[data-x*="c"]'));
+      expect(substr.operator).toBe('*=');
+
+      const unquoted = assertModifierCondition(parseStateKey('[data-x=plain]'));
+      expect(unquoted.value).toBe('plain');
+    });
+
+    it('keeps complex attribute selectors as opaque pseudos', () => {
+      // ~= (whitespace-list) is not a modifier operator → stays pseudo.
+      assertPseudoCondition(parseStateKey('[data-x~="a"]'));
+      // case-insensitive flag → stays pseudo.
+      assertPseudoCondition(parseStateKey('[data-x="a" i]'));
+      // |= operator → stays pseudo.
+      assertPseudoCondition(parseStateKey('[lang|="en"]'));
+    });
+  });
+
+  describe('mutually-exclusive attribute values simplify', () => {
+    it('treats same attribute, different values as a contradiction', () => {
+      const cond = and(
+        parseStateKey('[data-theme="rose"]'),
+        parseStateKey('[data-theme="gray"]'),
+      );
+      expect(simplifyCondition(cond).kind).toBe('false');
+    });
+
+    it('drops a negation implied by a positive value on the same attribute', () => {
+      // [data-theme="gray"] implies NOT [data-theme="rose"], so the
+      // explicit negation is redundant and should be removed.
+      const cond = and(
+        parseStateKey('[data-theme="gray"]'),
+        not(parseStateKey('[data-theme="rose"]')),
+      );
+      const simplified = simplifyCondition(cond);
+      const css = conditionToCSS(simplified);
+      const selectors = css.variants.map((v) =>
+        v.modifierConditions
+          .map((m) => `${m.negated ? '!' : ''}${m.attribute}=${m.value}`)
+          .join(','),
+      );
+      // Only the positive gray modifier should remain.
+      expect(selectors).toEqual(['data-theme=gray']);
+    });
+  });
+
+  describe('De Morgan recombination in conditionToCSS', () => {
+    it('collapses OR of negated selector leaves into a single :not()', () => {
+      const cond = or(
+        not(parseStateKey('[data-variant="processing"]')),
+        not(parseStateKey('[data-theme="rose"]')),
+      );
+      const css = conditionToCSS(cond);
+      // Single variant carrying one negated combined pseudo, instead of
+      // two separate :not() branches.
+      expect(css.variants.length).toBe(1);
+      const pseudos = css.variants[0].pseudoConditions;
+      expect(pseudos.length).toBe(1);
+      expect(pseudos[0].negated).toBe(true);
+      expect(pseudos[0].pseudo).toContain('[data-theme="rose"]');
+      expect(pseudos[0].pseudo).toContain('[data-variant="processing"]');
+    });
+
+    it('does not recombine genuine unions (positive branches)', () => {
+      const cond = or(parseStateKey('hovered'), parseStateKey('focused'));
+      const css = conditionToCSS(cond);
+      expect(css.variants.length).toBe(2);
+    });
+  });
+
+  describe('large state map (reported 6s repro)', () => {
+    const THEMES = [
+      'purple',
+      'green',
+      'pink',
+      'ocean',
+      'orange',
+      'blue',
+      'gray',
+      'rose',
+    ];
+
+    function buildFillMap() {
+      const fill: Record<string, string> = {
+        '': '#purple-04',
+        '[data-variant="waiting"]': '#purple-04.1',
+      };
+      for (const theme of THEMES) {
+        fill[`[data-variant="processing"] & [data-theme="${theme}"]`] =
+          `#${theme}-highlight`;
+        fill[`[data-variant="processing"] & [data-theme="${theme}"] & hover`] =
+          `#${theme}-highlight-hover`;
+      }
+      return { fill };
+    }
+
+    it('materializes quickly without combinatorial blowup', () => {
+      clearPipelineCache();
+      const start = performance.now();
+      const result = renderStyles(buildFillMap(), '.x');
+      const elapsed = performance.now() - start;
+
+      // Before the fix this took ~6s; assert it stays well under a second.
+      expect(elapsed).toBeLessThan(1500);
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('emits one clean compound selector per theme entry (no cross-theme :not)', () => {
+      clearPipelineCache();
+      const result = renderStyles(buildFillMap(), '.x');
+
+      // The hover entry for "rose" should be a single compound with no
+      // negation against any other theme.
+      const roseHover = result.find((r) =>
+        r.declarations.includes('--rose-highlight-hover-color'),
+      );
+      expect(roseHover).toBeDefined();
+      expect(roseHover!.selector).toContain('[data-theme="rose"]');
+      expect(roseHover!.selector).toContain('[data-variant="processing"]');
+      expect(roseHover!.selector).toContain('[data-hover]');
+      // No other theme appears in this selector.
+      for (const other of THEMES.filter((t) => t !== 'rose')) {
+        expect(roseHover!.selector).not.toContain(`[data-theme="${other}"]`);
+      }
+
+      // The non-hover "rose" entry only excludes its own hover sibling.
+      const roseBase = result.find(
+        (r) =>
+          r.declarations.includes('--rose-highlight-color') &&
+          !r.declarations.includes('--rose-highlight-hover-color'),
+      );
+      expect(roseBase).toBeDefined();
+      expect(roseBase!.selector).toContain(':not([data-hover])');
+      for (const other of THEMES.filter((t) => t !== 'rose')) {
+        expect(roseBase!.selector).not.toContain(`[data-theme="${other}"]`);
+      }
+    });
+
+    it('keeps the default entry as a compact :not() chain', () => {
+      clearPipelineCache();
+      const result = renderStyles(buildFillMap(), '.x');
+
+      // The default uses the bare token; the waiting entry uses an oklch()
+      // opacity variant, so match `var(--purple-04-color)` exactly.
+      const matches = result.filter((r) =>
+        r.declarations.includes('var(--purple-04-color)'),
+      );
+      // One variant (no exploded selector list): a single rule.
+      expect(matches.length).toBe(1);
+      const fallback = matches[0];
+      // Excludes waiting + each processing theme via :not().
+      expect(fallback.selector).toContain(':not([data-variant="waiting"])');
+    });
+  });
+});
+
 describe('mergeEntriesByValue with default + same-value state', () => {
   it('should preserve pressed state when its value matches default', () => {
     const styles = {

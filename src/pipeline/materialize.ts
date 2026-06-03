@@ -1482,7 +1482,84 @@ export function branchesProduceDifferentContexts(
  * so here we just collect all variants. Any remaining ORs in the condition
  * tree (e.g., from De Morgan expansion) are handled as simple alternatives.
  */
+/**
+ * Serialize a single negated own-element selector leaf (modifier or pseudo)
+ * to its *positive* selector string, for use inside a combined `:not(...)`.
+ *
+ * Returns `null` when the node is not a negated, own-element selector leaf
+ * (e.g. positive, or a media/container/parent/root/own/supports/starting
+ * wrapper, or a compound), which means it cannot participate in De Morgan
+ * recombination.
+ */
+function negatedSelectorLeafToPositiveSelector(
+  node: ConditionNode,
+): string | null {
+  if (node.kind !== 'state' || !node.negated) return null;
+
+  if (node.type === 'modifier') {
+    return modifierToCSS({
+      attribute: node.attribute,
+      value: node.value,
+      operator: node.operator,
+      negated: false,
+    });
+  }
+
+  if (node.type === 'pseudo') {
+    // `pseudo` may itself be a `:is(X)`/`:where(X)` wrapper (from a parsed
+    // `:not(X)`); unwrap so the recombined `:not(...)` stays compound-safe.
+    const p = node.pseudo;
+    if ((p.startsWith(':is(') || p.startsWith(':where(')) && !p.includes(',')) {
+      const inner = p.slice(p.indexOf('(') + 1, -1);
+      if (!/\s/.test(inner)) return inner;
+      return `:is(${inner})`;
+    }
+    return p;
+  }
+
+  return null;
+}
+
+/**
+ * De Morgan recombination for an OR whose every branch is a negated
+ * own-element selector leaf:
+ *
+ *   OR(¬a, ¬b, ¬c)  ≡  ¬(a ∧ b ∧ c)  →  single `:not(a b c)`
+ *
+ * This keeps the catch-all/default exclusive condition (which has no
+ * positive terms to prune against) from exploding into a Cartesian product
+ * of OR branches at `andToCSS`. Returns `null` when recombination does not
+ * apply, so genuine unions (e.g. `:hover | :focus`) fall through to the
+ * normal per-branch materialization.
+ */
+function tryRecombineNegatedSelectorOr(
+  children: ConditionNode[],
+): CSSComponents | null {
+  if (children.length < 2) return null;
+
+  const positiveSelectors: string[] = [];
+  for (const child of children) {
+    const sel = negatedSelectorLeafToPositiveSelector(child);
+    if (sel === null) return null;
+    positiveSelectors.push(sel);
+  }
+
+  // Stable ordering for deterministic hashing/dedupe.
+  positiveSelectors.sort();
+  const compound = positiveSelectors.join('');
+
+  const v = emptyVariant();
+  v.pseudoConditions.push({ pseudo: `:is(${compound})`, negated: true });
+  return { variants: [v], isImpossible: false };
+}
+
 function orToCSS(children: ConditionNode[]): CSSComponents {
+  // De Morgan recombination: OR(¬a, ¬b, ...) → single :not(a b ...).
+  const recombined = tryRecombineNegatedSelectorOr(children);
+  if (recombined !== null) {
+    return recombined;
+  }
+
   const allVariants: SelectorVariant[] = [];
 
   for (const child of children) {

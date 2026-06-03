@@ -387,7 +387,36 @@ class Parser {
     }
 
     // Attribute selector (e.g., [disabled], [data-state="active"])
+    // Single, simple attribute selectors become structured modifiers so the
+    // pipeline can reason about their mutual exclusivity (same attribute,
+    // different value can never match at once). Complex forms (~=, |=, case
+    // flags, namespaces, multiple attrs, combinators) stay opaque pseudos.
     if (value.startsWith('[')) {
+      const attrMatch =
+        /^\[\s*([a-zA-Z_][\w-]*)\s*(?:(=|\^=|\$=|\*=)\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+)))?\s*\]$/.exec(
+          value,
+        );
+      if (attrMatch) {
+        const [, attribute, operator, dq, sq, bare] = attrMatch;
+        if (operator === undefined) {
+          // Boolean attribute: [data-disabled]
+          return createModifierCondition(
+            attribute,
+            undefined,
+            '=',
+            false,
+            value,
+          );
+        }
+        const attrValue = dq ?? sq ?? bare;
+        return createModifierCondition(
+          attribute,
+          attrValue,
+          operator as '=' | '^=' | '$=' | '*=',
+          false,
+          value,
+        );
+      }
       return createPseudoCondition(value, false, value);
     }
 

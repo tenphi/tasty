@@ -244,7 +244,7 @@ function buildTokenPropsMapping(
   return Object.entries(def);
 }
 
-export type PropsWithStyles = {
+type PropsWithStyles = {
   styles?: Styles;
 } & Omit<Props, 'styles'>;
 

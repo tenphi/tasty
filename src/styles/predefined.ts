@@ -53,7 +53,7 @@ const rowsConverter = (val: string | number | boolean | undefined) => {
 
 type StyleHandlerMap = Record<string, StyleHandler[]>;
 
-export const STYLE_HANDLER_MAP: StyleHandlerMap = {};
+const STYLE_HANDLER_MAP: StyleHandlerMap = {};
 
 // Store initial handler state for reset functionality
 let initialHandlerMapSnapshot: StyleHandlerMap | null = null;
@@ -91,7 +91,7 @@ export function resetHandlers(): void {
   }
 }
 
-export function defineCustomStyle(
+function defineCustomStyle(
   names: string[] | StyleHandler,
   handler?: RawStyleHandler,
 ) {
@@ -123,7 +123,7 @@ type ConverterHandler = (
   s: string | boolean | number | undefined,
 ) => string | undefined;
 
-export function defineStyleAlias(
+function defineStyleAlias(
   styleName: string,
   cssStyleName?: string,
   converter?: ConverterHandler,
@@ -277,32 +277,6 @@ function validateHandler(
     console.warn(
       `[Tasty] Handler "${name}" has invalid lookupStyles. ` +
         'Expected non-empty array of style names.',
-    );
-  }
-}
-
-/**
- * Validate a handler result in development mode.
- * Call this after invoking a handler to check the return value.
- */
-export function validateHandlerResult(name: string, result: unknown): void {
-  if (!devMode) return;
-  if (result === undefined || result === null) return; // void is valid
-
-  // Check for empty string (migration from old pattern)
-  if (result === '') {
-    console.warn(
-      `[Tasty] Handler "${name}" returned empty string. ` +
-        'Return null instead for no output.',
-    );
-    return;
-  }
-
-  // Check result is object (CSSMap or CSSMap[])
-  if (typeof result !== 'object') {
-    console.warn(
-      `[Tasty] Handler "${name}" returned invalid type: ${typeof result}. ` +
-        'Expected CSSMap, CSSMap[], or null.',
     );
   }
 }

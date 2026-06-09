@@ -471,7 +471,7 @@ function clearGlobalThisConfig(): void {
  * For properties with CSS @property-compatible types (length, time, number, color),
  * an `initialValue` is provided so the property works even without a project-level token.
  */
-export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
+const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   // Used by dual-fill feature to enable CSS transitions on the second fill color
   '#tasty-second-fill': {
     inherits: false,
@@ -755,25 +755,6 @@ function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
 // ============================================================================
 // Global Properties Management
 // ============================================================================
-
-/**
- * Check if any global properties are configured.
- * Fast path: returns false if no properties were ever set.
- */
-export function hasGlobalProperties(): boolean {
-  return globalProperties !== null && Object.keys(globalProperties).length > 0;
-}
-
-/**
- * Get global properties configuration.
- * Returns null if no properties configured (fast path for zero-overhead).
- */
-export function getGlobalProperties(): Record<
-  string,
-  PropertyDefinition
-> | null {
-  return globalProperties;
-}
 
 /**
  * Set global properties (called from configure).
@@ -1380,6 +1361,3 @@ export function resetConfig(): void {
     typeof window !== 'undefined' ? window : globalThis;
   delete storage[GLOBAL_INJECTOR_KEY];
 }
-
-// Re-export TastyConfig as StyleInjectorConfig for backward compatibility
-export type { TastyConfig as StyleInjectorConfig };

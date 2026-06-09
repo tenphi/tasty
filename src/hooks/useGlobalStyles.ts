@@ -31,11 +31,6 @@ interface ClientGlobalEntry {
 
 const clientGlobalEntries = new Map<string, ClientGlobalEntry>();
 
-/* @internal — used only for tests */
-export function _resetGlobalStylesCache(): void {
-  clientGlobalEntries.clear();
-}
-
 /**
  * Inject global styles for a given selector.
  * Useful for styling elements by selector without generating classNames.

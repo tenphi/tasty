@@ -1,4 +1,4 @@
-export type TokenCallback = (
+type TokenCallback = (
   token: string,
   isComma: boolean,
   isSlash: boolean,

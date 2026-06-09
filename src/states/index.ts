@@ -775,22 +775,3 @@ function findMatchingParen(str: string, startIndex: number): number {
 export function isAdvancedState(stateKey: string): boolean {
   return stateKey.startsWith('@') || stateKey.startsWith('!@');
 }
-
-/**
- * Detect the type of advanced state from a raw state key
- */
-export function detectAdvancedStateType(
-  stateKey: string,
-): ParsedAdvancedState['type'] {
-  // Handle negation prefix
-  const key = stateKey.startsWith('!') ? stateKey.slice(1) : stateKey;
-
-  if (key === '@starting') return 'starting';
-  if (key.startsWith('@media')) return 'media';
-  if (key.startsWith('@root(')) return 'root';
-  if (key.startsWith('@parent(')) return 'parent';
-  if (key.startsWith('@own(')) return 'own';
-  if (key.startsWith('@(')) return 'container';
-  if (isPredefinedStateRef(key)) return 'predefined';
-  return 'modifier';
-}

@@ -26,6 +26,34 @@ exports[`@supports queries snapshot tests > should eliminate impossible @support
 ]
 `;
 
+exports[`@supports queries snapshot tests > should keep the not-supported path free of guarded feature queries 1`] = `
+[
+  {
+    "atRules": [
+      "@container scroll-state(scrolled: block-end)",
+      "@supports (container-type: scroll-state)",
+    ],
+    "declarations": "display: grid;",
+    "selector": ".component",
+  },
+  {
+    "atRules": [
+      "@supports (not (container-type: scroll-state))",
+    ],
+    "declarations": "display: block;",
+    "selector": ".component",
+  },
+  {
+    "atRules": [
+      "@container (not scroll-state(scrolled: block-end))",
+      "@supports (container-type: scroll-state)",
+    ],
+    "declarations": "display: block;",
+    "selector": ".component",
+  },
+]
+`;
+
 exports[`@supports queries snapshot tests > should render @supports combined with @container 1`] = `
 [
   {
@@ -38,15 +66,15 @@ exports[`@supports queries snapshot tests > should render @supports combined wit
   },
   {
     "atRules": [
-      "@container (not (width <= 400px))",
+      "@supports (not (display: grid))",
     ],
     "declarations": "display: block;",
     "selector": ".component",
   },
   {
     "atRules": [
-      "@container (width <= 400px)",
-      "@supports (not (display: grid))",
+      "@container (not (width <= 400px))",
+      "@supports (display: grid)",
     ],
     "declarations": "display: block;",
     "selector": ".component",
@@ -66,15 +94,15 @@ exports[`@supports queries snapshot tests > should render @supports combined wit
   },
   {
     "atRules": [
-      "@media (not (width <= 768px))",
+      "@supports (not (display: grid))",
     ],
     "declarations": "display: block;",
     "selector": ".component",
   },
   {
     "atRules": [
-      "@media (width <= 768px)",
-      "@supports (not (display: grid))",
+      "@media (not (width <= 768px))",
+      "@supports (display: grid)",
     ],
     "declarations": "display: block;",
     "selector": ".component",

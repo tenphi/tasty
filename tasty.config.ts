@@ -12,4 +12,5 @@ export default {
     '$sharp-radius',
     '$bold-font-weight',
   ],
+  styles: ['viewTransitionName'],
 };

@@ -1521,7 +1521,7 @@ describe('conditionToCSS()', () => {
 
     const rendered = parentGroupsToCSS(css.variants[0].parentGroups);
     expect(rendered).toBe(
-      ':is([data-active][data-focused] *, [data-hovered][data-pressed] *)',
+      ':where([data-active][data-focused] *, [data-hovered][data-pressed] *)',
     );
   });
 
@@ -1682,7 +1682,7 @@ describe('renderStyles integration', () => {
 
     // Should generate a supports rule
     const supportsRule = result.find((r) =>
-      r.atRules?.some((a) => a.startsWith('@supports')),
+      r.atRules?.some((a) => a.startsWith('@supports') && !a.includes('not')),
     );
     expect(supportsRule).toBeDefined();
     expect(supportsRule!.atRules![0]).toBe('@supports (display: grid)');
@@ -1701,7 +1701,7 @@ describe('renderStyles integration', () => {
 
     // Should generate a supports selector rule
     const supportsRule = result.find((r) =>
-      r.atRules?.some((a) => a.startsWith('@supports')),
+      r.atRules?.some((a) => a.startsWith('@supports') && !a.includes('not')),
     );
     expect(supportsRule).toBeDefined();
     expect(supportsRule!.atRules![0]).toBe('@supports selector(:has(*))');
@@ -1749,6 +1749,7 @@ describe('renderStyles integration', () => {
     const gridRule = result.find(
       (r) =>
         r.atRules?.[0]?.includes('(display: grid)') &&
+        !r.atRules?.[0]?.includes('not (display: grid)') &&
         r.atRules?.[0]?.includes('not selector(:has(*))'),
     );
     const defaultRule = result.find(
@@ -1965,7 +1966,7 @@ describe('Complex OR conditions with mixed types', () => {
     const result = renderStyles(styles, '.test');
     const blueRule = result.find((r) => r.declarations.includes('blue'));
     expect(blueRule).toBeDefined();
-    expect(blueRule!.selector).toContain(':is(');
+    expect(blueRule!.selector).toContain(':where(');
     expect(blueRule!.selector).toContain('[data-theme="dark"]');
     expect(blueRule!.selector).toContain(':not([data-disabled])');
   });
@@ -2005,7 +2006,9 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRules.length).toBeGreaterThanOrEqual(1);
 
     const allSelectors = blueRules.map((r) => r.selector).join(', ');
-    expect(allSelectors).toContain(':is([data-focused] *, [data-hovered] *)');
+    expect(allSelectors).toContain(
+      ':where([data-focused] *, [data-hovered] *)',
+    );
   });
 });
 
@@ -3188,6 +3191,171 @@ describe('@supports queries snapshot tests', () => {
   });
 });
 
+describe('@fallback negation opt-out', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('should emit a bare default + positive override for the scroll-state case', () => {
+    // The unknown-query hole: `@supports(container-type: scroll-state)` may
+    // be true while the `scroll-state(...)` container query is unknown. With
+    // `@fallback` the default is NOT negated by the override, so it persists
+    // as a cascade floor and the override layers on top when it does match.
+    const styles = {
+      inset: {
+        '@fallback': '0 top',
+        '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
+          '-10px top',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.component');
+
+    // The base must be a bare rule with no negated scroll-state / @supports.
+    const baseRule = result.find((r) => r.declarations.includes('inset: 0 '));
+    expect(baseRule).toBeDefined();
+    expect(baseRule!.atRules ?? []).toEqual([]);
+
+    // The override is gated by the positive @supports + @container queries.
+    const overrideRule = result.find((r) =>
+      r.declarations.includes('inset: -10px'),
+    );
+    expect(overrideRule).toBeDefined();
+    expect(
+      overrideRule!.atRules?.some((a) =>
+        a.includes('(container-type: scroll-state)'),
+      ),
+    ).toBe(true);
+    expect(
+      overrideRule!.atRules?.some(
+        (a) =>
+          a.includes('scroll-state(scrolled: block-end)') && !a.includes('not'),
+      ),
+    ).toBe(true);
+
+    // No negated-support / negated-container fallback branches exist at all.
+    const negatedSupport = result.find((r) =>
+      r.atRules?.some((a) => a.includes('not (container-type: scroll-state)')),
+    );
+    expect(negatedSupport).toBeUndefined();
+    const negatedContainer = result.find((r) =>
+      r.atRules?.some((a) => a.includes('not scroll-state')),
+    );
+    expect(negatedContainer).toBeUndefined();
+
+    // The base must be emitted BEFORE the override so the override (equal
+    // specificity via :where()) wins the cascade when it matches.
+    const baseIdx = result.indexOf(baseRule!);
+    const overrideIdx = result.indexOf(overrideRule!);
+    expect(baseIdx).toBeLessThan(overrideIdx);
+
+    expect(result).toMatchSnapshot();
+  });
+
+  it('should still negate lower-priority entries from a conditional @fallback', () => {
+    // `@fallback & m` opts out of receiving negation from H (so it persists
+    // when H matches), but still negates the lower-priority default and
+    // keeps its own `m` condition.
+    const styles = {
+      color: {
+        '': 'black',
+        '@fallback & hovered': 'blue',
+        pressed: 'red',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.btn');
+
+    // `pressed` keeps a plain (non-fallback) condition.
+    const pressedRule = result.find((r) => r.declarations.includes('red'));
+    expect(pressedRule).toBeDefined();
+    expect(pressedRule!.selector).toContain('[data-pressed]');
+
+    // The hovered fallback keeps its own `hovered` condition and is NOT
+    // negated by the higher-priority `pressed`.
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(hoveredRule).toBeDefined();
+    expect(hoveredRule!.selector).toContain('[data-hovered]');
+    expect(hoveredRule!.selector).not.toContain('[data-pressed]');
+
+    // The default is still excluded in hovered's scope (lower priority is
+    // negated by the fallback): it carries `:not([data-hovered])`.
+    const defaultRule = result.find(
+      (r) => r.declarations.includes('black') && r.selector.includes(':where('),
+    );
+    expect(defaultRule).toBeDefined();
+    expect(defaultRule!.selector).toContain(':not([data-hovered])');
+
+    expect(result).toMatchSnapshot();
+  });
+
+  it('should treat the default @fallback as a guaranteed floor', () => {
+    const styles = {
+      color: {
+        '@fallback': 'black',
+        hovered: 'blue',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.btn');
+
+    // The floor is a bare rule (no :not(hovered)) — it is not turned off by
+    // the higher-priority hovered state.
+    const floorRule = result.find((r) => r.declarations.includes('black'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
+
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(hoveredRule).toBeDefined();
+    expect(hoveredRule!.selector).toContain('[data-hovered]');
+
+    // Floor before override.
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(hoveredRule!),
+    );
+  });
+
+  it('should warn and ignore @fallback used inside an OR group', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    renderStyles(
+      { color: { '': 'black', '@fallback | hovered': 'blue' } },
+      '.btn',
+    );
+
+    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_MARKER')).toBe(
+      true,
+    );
+
+    restore();
+  });
+
+  it('cannot be redefined via configure({ states }) — stays the fallback marker', () => {
+    resetConfig();
+    // Attempt to hijack @fallback as a :hover alias; it is reserved, so the
+    // attempt is ignored and @fallback keeps its opt-out semantics.
+    configure({ states: { '@fallback': ':hover' } });
+
+    const result = renderStyles(
+      { color: { '@fallback': 'black', hovered: 'blue' } },
+      '.btn',
+    );
+
+    // If @fallback had been redefined to :hover, the floor would carry a
+    // :hover selector. It must remain a bare floor instead.
+    const floorRule = result.find((r) => r.declarations.includes('black'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':hover');
+    expect(floorRule!.selector).not.toContain(':not');
+
+    resetConfig();
+  });
+});
+
 describe('Vendor-prefixed pseudo-classes', () => {
   beforeEach(() => {
     clearPipelineCache();
@@ -3199,8 +3367,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const autofillRule = result.find((r) =>
-      r.selector.includes(':-webkit-autofill'),
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        !r.selector.includes(':not'),
     );
     expect(autofillRule).toBeDefined();
     expect(autofillRule!.declarations).toContain('blue');
@@ -3233,8 +3403,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const autofillRule = result.find((r) =>
-      r.selector.includes(':-webkit-autofill'),
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        !r.selector.includes(':not'),
     );
     expect(autofillRule).toBeDefined();
     expect(autofillRule!.declarations).toContain('blue');
@@ -3246,8 +3418,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const mozRule = result.find((r) =>
-      r.selector.includes(':-moz-placeholder'),
+    const mozRule = result.find(
+      (r) =>
+        r.selector.includes(':-moz-placeholder') &&
+        !r.selector.includes(':not'),
     );
     expect(mozRule).toBeDefined();
     expect(mozRule!.declarations).toContain('gray');
@@ -3362,7 +3536,9 @@ describe('Sub-element scoped predefined states', () => {
 
     const result = renderStyles(styles, '.input');
     expect(result.length).toBe(2);
-    const activeRule = result.find((r) => r.selector.includes(':focus'));
+    const activeRule = result.find(
+      (r) => r.selector.includes(':focus') && !r.selector.includes(':not'),
+    );
     expect(activeRule).toBeDefined();
     expect(activeRule!.selector).toContain('[data-element="Label"]');
     expect(activeRule!.declarations).toContain('blue');
@@ -3381,7 +3557,7 @@ describe('Sub-element scoped predefined states', () => {
     const labelCompact = result.find(
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
-        r.atRules?.some((a) => a.includes('container')),
+        r.atRules?.some((a) => a.includes('container') && !a.includes('not')),
     );
     expect(labelCompact).toBeDefined();
     expect(labelCompact!.declarations).toContain('gray');
@@ -3433,7 +3609,9 @@ describe('Sub-element scoped predefined states', () => {
     // Root-level @custom should resolve to :hover
     const rootHover = result.find(
       (r) =>
-        !r.selector.includes('[data-element') && r.selector.includes(':hover'),
+        !r.selector.includes('[data-element') &&
+        r.selector.includes(':hover') &&
+        !r.selector.includes(':not'),
     );
     expect(rootHover).toBeDefined();
     expect(rootHover!.declarations).toContain('red');
@@ -3442,7 +3620,8 @@ describe('Sub-element scoped predefined states', () => {
     const labelFocus = result.find(
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
-        r.selector.includes(':focus'),
+        r.selector.includes(':focus') &&
+        !r.selector.includes(':not'),
     );
     expect(labelFocus).toBeDefined();
     expect(labelFocus!.declarations).toContain('blue');
@@ -3474,7 +3653,8 @@ describe('Sub-element scoped predefined states', () => {
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
         r.selector.includes('::placeholder') &&
-        r.selector.includes(':focus'),
+        r.selector.includes(':focus') &&
+        !r.selector.includes(':not'),
     );
     expect(placeholderActive).toBeDefined();
     expect(placeholderActive!.declarations).toContain('lightblue');
@@ -3497,8 +3677,10 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
         { display: { '': 'block', ':has(> Icon)': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes(':has(> [data-element="Icon"])'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes(':has(> [data-element="Icon"])') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3767,7 +3949,9 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
         { display: { '': 'block', ':has(>)': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) => r.selector.includes(':has(> *)'));
+      const rule = result.find(
+        (r) => r.selector.includes(':has(> *)') && !r.selector.includes(':not'),
+      );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
     });
@@ -3822,8 +4006,9 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
       );
       const rule = result.find(
         (r) =>
-          r.selector.includes(':is([data-hovered]') &&
-          r.selector.includes(':has(> [data-element="Icon"])'),
+          r.selector.includes(':where([data-hovered] *)') &&
+          r.selector.includes(':has(> [data-element="Icon"])') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
     });
@@ -3911,8 +4096,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'type^=full': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-type^="full"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-type^="full"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3923,8 +4110,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'type$=screen': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-type$="screen"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-type$="screen"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3935,8 +4124,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'name*=test': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-name*="test"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-name*="test"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -4500,7 +4691,10 @@ describe('Container style query rendering', () => {
     const result = renderStyles(styles, '.component');
 
     const darkRule = result.find((r) =>
-      r.atRules?.some((ar) => ar.includes('style(--theme: dark)')),
+      r.atRules?.some(
+        (ar) =>
+          ar.includes('style(--theme: dark)') && !ar.includes('not style'),
+      ),
     );
     expect(darkRule).toBeDefined();
     expect(darkRule!.atRules![0]).toContain('@container card');
@@ -4518,7 +4712,10 @@ describe('Container style query rendering', () => {
     const result = renderStyles(styles, '.component');
 
     const primary = result.find((r) =>
-      r.atRules?.some((ar) => ar.includes('style(--variant: primary)')),
+      r.atRules?.some(
+        (ar) =>
+          ar.includes('style(--variant: primary)') && !ar.includes('not style'),
+      ),
     );
     expect(primary).toBeDefined();
     expect(primary!.atRules![0]).toMatch(/^@container style\(/);

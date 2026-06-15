@@ -60,6 +60,7 @@ import {
   parentGroupsToCSS,
   rootGroupsToCSS,
   selectorGroupToCSS,
+  wrapWhere,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
@@ -94,6 +95,14 @@ interface ComputedRule {
   condition: ConditionNode;
   declarations: Record<string, string>;
   selectorSuffix: string;
+  /**
+   * Cascade order hint (source priority of the highest-priority style entry
+   * that contributed to this rule). Higher = should appear later in the
+   * stylesheet so it wins the cascade. Used to emit `@fallback` rules before
+   * the higher-priority rules that layer over them, since `:where()` makes
+   * all rules share specificity and source order decides the winner.
+   */
+  order: number;
 }
 
 // ============================================================================
@@ -154,7 +163,26 @@ function runPipeline(
     }
   }
 
-  return normal.concat(starting);
+  // Order rules by their cascade order hint (ascending source priority) so
+  // higher-priority rules come later and win. This is load-bearing once
+  // selector specificity is equalized via `:where()`: `@fallback` rules
+  // (low order) must precede the higher-priority rules that layer over
+  // them. The sort is stable, so equal-order rules keep their emission
+  // order. Mutually-exclusive rules are unaffected by ordering.
+  const stableOrdered = stableSortByOrder(normal);
+
+  return stableOrdered.concat(stableSortByOrder(starting));
+}
+
+/**
+ * Stable sort CSS rules by their `order` hint ascending. Rules without an
+ * `order` are treated as 0. `Array.prototype.sort` is stable (ES2019+,
+ * Node >= 20), so equal-order rules keep their emission order — `@fallback`
+ * (low order) stays before the overrides that layer over it.
+ */
+function stableSortByOrder(rules: CSSRule[]): CSSRule[] {
+  if (rules.length <= 1) return rules;
+  return [...rules].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 /**
@@ -416,6 +444,7 @@ function invokeHandler(
           condition: snapshot.condition,
           declarations,
           selectorSuffix: suffix,
+          order: snapshot.order,
         });
       }
     }
@@ -989,7 +1018,11 @@ function buildHandlerQueue(
 function computeStateCombinations(
   exclusiveByStyle: Map<string, ExclusiveStyleEntry[]>,
   lookupStyles: string[],
-): { condition: ConditionNode; values: Record<string, StyleValue> }[] {
+): {
+  condition: ConditionNode;
+  values: Record<string, StyleValue>;
+  order: number;
+}[] {
   // Get entries for each style
   const entriesPerStyle = lookupStyles.map(
     (style) => exclusiveByStyle.get(style) || [],
@@ -1002,6 +1035,7 @@ function computeStateCombinations(
   const snapshots: {
     condition: ConditionNode;
     values: Record<string, StyleValue>;
+    order: number;
   }[] = [];
 
   for (const combo of combinations) {
@@ -1015,13 +1049,17 @@ function computeStateCombinations(
 
     // Build values map
     const values: Record<string, StyleValue> = {};
+    // Cascade order = highest source priority among the contributing entries.
+    let order = 0;
     for (const entry of combo) {
       values[entry.styleKey] = entry.value;
+      if (entry.priority > order) order = entry.priority;
     }
 
     snapshots.push({
       condition: simplified,
       values,
+      order,
     });
   }
 
@@ -1089,10 +1127,15 @@ function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
       const mergedCondition = simplifyCondition(
         or(...groupRules.map((r) => r.condition)),
       );
+      // Take the lowest order so a merged group carrying a fallback's value
+      // keeps the fallback's early cascade position.
+      let order = groupRules[0].order;
+      for (const r of groupRules) if (r.order < order) order = r.order;
       merged.push({
         condition: mergedCondition,
         declarations: groupRules[0].declarations,
         selectorSuffix: groupRules[0].selectorSuffix,
+        order,
       });
     }
   }
@@ -1109,29 +1152,37 @@ function buildSelectorFromVariant(
 ): string {
   let selector = '';
 
-  // Add flat modifier + pseudo selectors (sorted for canonical output)
-  selector += branchToCSS([
+  // Root-element state segment: flat modifiers/pseudos + :is()/:not()
+  // groups, all attaching to the root element. Combine into a single
+  // `:where(...)` so the whole segment carries zero specificity (the
+  // doubled class is the only anchor). See `wrapWhere`.
+  let rootSegment = branchToCSS([
     ...variant.modifierConditions,
     ...variant.pseudoConditions,
   ]);
-
-  // Add selector groups (:is()/:not() on element)
   for (const group of variant.selectorGroups) {
-    selector += selectorGroupToCSS(group);
+    rootSegment += selectorGroupToCSS(group);
   }
+  selector += wrapWhere(rootSegment);
 
-  // Add parent selectors (before sub-element suffix)
+  // Add parent selectors (before sub-element suffix). parentGroupsToCSS
+  // already wraps each group in :where() so ancestor state adds no
+  // specificity.
   if (variant.parentGroups.length > 0) {
     selector += parentGroupsToCSS(variant.parentGroups);
   }
 
   selector += selectorSuffix;
 
-  // Add own groups (:is()/:not() on sub-element)
+  // Sub-element (own) state segment: wrapped in its own separate
+  // `:where(...)` so the sub-element's own structural specificity
+  // ([data-element="X"]) is preserved while its states are zeroed.
   const ownOptimized = optimizeGroups(variant.ownGroups);
+  let ownSegment = '';
   for (const group of ownOptimized) {
-    selector += selectorGroupToCSS(group);
+    ownSegment += selectorGroupToCSS(group);
   }
+  selector += wrapWhere(ownSegment);
 
   return selector;
 }
@@ -1211,6 +1262,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
     const cssRule: CSSRule = {
       selector,
       declarations,
+      order: rule.order,
     };
 
     if (group.atRules.length > 0) {

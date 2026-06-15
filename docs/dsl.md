@@ -288,10 +288,20 @@ const SimpleButton = tasty(Button, {
 | `@parent` | Parent/ancestor element states | `@parent(hovered)` |
 | `@own` | Sub-element's own state | `@own(hovered)` |
 | `@starting` | Entry animation | `@starting` |
+| `@fallback` | Negation opt-out (persistent floor) | `@fallback` |
 | `:is()` | CSS `:is()` structural pseudo-class | `:is(fieldset > label)` |
 | `:has()` | CSS `:has()` relational pseudo-class | `:has(> Icon)` |
 | `:not()` | CSS `:not()` negation (prefer `!:is()`) | `:not(:first-child)` |
 | `:where()` | CSS `:where()` (zero specificity) | `:where(Section)` |
+
+> **Specificity.** All state selectors Tasty generates (modifiers, pseudo-classes,
+> `:is()`/`:not()` groups, and `@root` / `@parent` context) are wrapped in
+> `:where(...)` so they carry **zero specificity**. The only specificity anchors
+> are the doubled component class (`.t0.t0`) and sub-element `[data-element]`
+> attributes. This means overlapping rules (e.g. an `@fallback` floor and the
+> states layered over it) resolve purely by **source order** — Tasty emits
+> lower-priority states first and higher-priority states last so the cascade
+> produces the intended winner.
 
 ### `@media(...)` — Media Queries
 
@@ -373,6 +383,61 @@ display: {
   '@supports(display: grid)': 'grid',
 }
 ```
+
+### `@fallback` — Negation Opt-out
+
+By default Tasty makes states **mutually exclusive**: a higher-priority state
+turns the lower-priority ones off via negation, so exactly one branch applies.
+This relies on `A | !A` always being true. CSS feature/container queries break
+that assumption: `@supports(...)` and `@(...)` queries can be **unknown** (not
+just true/false), and `not(unknown)` is also unknown — so a negated default
+branch silently never applies. The classic case is `scroll-state`: a browser can
+support `container-type: scroll-state` while a specific `scroll-state(...)` query
+is unknown, leaving *no* branch active.
+
+`@fallback` solves this. Mark an entry with `@fallback` (as a top-level `&` atom
+on the key) and it **opts out of receiving negation** from higher-priority
+states: it persists as a guaranteed floor, and higher-priority states simply
+layer over it via the cascade.
+
+```jsx
+inset: {
+  '@fallback': '0 top',
+  '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
+    '-80x top',
+}
+```
+
+```css
+.t0.t0 { inset: 0 ...; }
+@container scroll-state(scrolled: block-end) {
+  @supports (container-type: scroll-state) {
+    .t0.t0 { inset: -80px ...; }
+  }
+}
+```
+
+The base is emitted as a bare rule (no negated `@supports` / container branches),
+so it always applies. When the override matches it wins because it is emitted
+later and all state selectors share the same specificity (see the note on
+`:where()` below).
+
+| Form | Meaning |
+|------|---------|
+| `'@fallback'` | Default floor (condition = always). Never negated by higher-priority states. |
+| `'@fallback & hovered'` | Conditional fallback. Applies under `hovered`; not negated by higher-priority states, but still negates lower-priority ones. |
+
+Notes:
+
+- `@fallback` only changes whether the entry **receives** negation. It still
+  **negates lower-priority entries**, so the cascade below it stays mutually
+  exclusive.
+- `@fallback` must be a top-level `&` atom. Using it inside an `|` (OR) or `^`
+  (XOR) group is ignored with a dev warning.
+- `@fallback` is reserved and cannot be redefined via `configure({ states })`
+  or a local `@name` state.
+- `@fallback(<state>)` (selective opt-out from one specific higher-priority
+  state) is reserved for future use and not implemented yet.
 
 ### `@root(...)` — Root Element States
 

@@ -12,6 +12,7 @@ import type { ConditionNode } from './conditions';
 import { and, isCompoundCondition, not, or, trueCondition } from './conditions';
 import { branchesProduceDifferentContexts } from './materialize';
 import { simplifyCondition } from './simplify';
+import { emitWarning } from './warnings';
 
 // ============================================================================
 // Types
@@ -26,6 +27,14 @@ interface ParsedStyleEntry {
   value: StyleValue; // The style value (before handler processing)
   condition: ConditionNode; // Parsed condition tree
   priority: number; // Order in original object (higher = higher priority)
+  /**
+   * When true (set by the `@fallback` state token), this entry opts out of
+   * RECEIVING negation from higher-priority entries — it persists as a
+   * fallback that higher-priority states layer over via the cascade. It
+   * still negates lower-priority entries, so the cascade below it stays
+   * mutually exclusive. See `buildExclusiveConditions`.
+   */
+  fallback?: boolean;
 }
 
 /**
@@ -73,31 +82,38 @@ export function buildExclusiveConditions(
     // Build: condition & !prior[0] & !prior[1] & ...
     let exclusive: ConditionNode = entry.condition;
 
-    for (const prior of priorConditions) {
-      // Skip negating "always true" (default state) - it would become "always false"
-      if (prior.kind === 'true') {
-        continue;
-      }
+    // `@fallback` entries opt out of RECEIVING negation: a higher-priority
+    // state cannot turn them off. They keep their own condition (TRUE for
+    // the default) and persist as a cascade fallback. They are still added
+    // to `priorConditions` below, so lower-priority entries are negated by
+    // them and the cascade below stays mutually exclusive.
+    if (!entry.fallback) {
+      for (const prior of priorConditions) {
+        // Skip negating "always true" (default state) - it would become "always false"
+        if (prior.kind === 'true') {
+          continue;
+        }
 
-      // Cheap mutual-exclusivity pre-check: if this entry's own condition
-      // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
-      // `[theme=green] & ...`), then `prior` can never match when this entry
-      // does, so `!prior` is always true here and adds nothing. Skipping it
-      // avoids De Morgan'ing `prior` into a wide OR of negations that would
-      // otherwise feed an exponential Cartesian product at materialization.
-      //
-      // This only fires when the contradiction is structurally provable via
-      // `simplifyCondition` (memoized, operates on the small pairwise AND).
-      // The default entry (no positive terms) is unaffected and keeps its
-      // full negation chain, which `orToCSS` recombines into compact :not().
-      if (
-        entry.condition.kind !== 'true' &&
-        simplifyCondition(and(entry.condition, prior)).kind === 'false'
-      ) {
-        continue;
-      }
+        // Cheap mutual-exclusivity pre-check: if this entry's own condition
+        // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
+        // `[theme=green] & ...`), then `prior` can never match when this entry
+        // does, so `!prior` is always true here and adds nothing. Skipping it
+        // avoids De Morgan'ing `prior` into a wide OR of negations that would
+        // otherwise feed an exponential Cartesian product at materialization.
+        //
+        // This only fires when the contradiction is structurally provable via
+        // `simplifyCondition` (memoized, operates on the small pairwise AND).
+        // The default entry (no positive terms) is unaffected and keeps its
+        // full negation chain, which `orToCSS` recombines into compact :not().
+        if (
+          entry.condition.kind !== 'true' &&
+          simplifyCondition(and(entry.condition, prior)).kind === 'false'
+        ) {
+          continue;
+        }
 
-      exclusive = and(exclusive, not(prior));
+        exclusive = and(exclusive, not(prior));
+      }
     }
 
     // Simplify the exclusive condition
@@ -140,8 +156,18 @@ export function parseStyleEntries(
 
   keys.forEach((stateKey, index) => {
     const value = valueMap[stateKey];
+
+    // Extract the `@fallback` negation opt-out marker. It is a top-level
+    // `&` atom on the key; the remaining atoms form the actual condition.
+    // Done before parseCondition so `@fallback` is never mis-parsed as a
+    // modifier by parseStateKey/parseAdvancedState.
+    const { fallback, condition: conditionKey } = extractFallbackMarker(
+      stateKey,
+      styleKey,
+    );
+
     const condition =
-      stateKey === '' ? trueCondition() : parseCondition(stateKey);
+      conditionKey === '' ? trueCondition() : parseCondition(conditionKey);
 
     entries.push({
       styleKey,
@@ -149,6 +175,7 @@ export function parseStyleEntries(
       value,
       condition,
       priority: index,
+      ...(fallback ? { fallback: true } : {}),
     });
   });
 
@@ -157,6 +184,49 @@ export function parseStyleEntries(
   entries.reverse();
 
   return entries;
+}
+
+/**
+ * Extract the `@fallback` negation opt-out marker from a state key.
+ *
+ * `@fallback` must appear as a top-level `&` atom (not inside `|`/`^`).
+ * Returns `fallback: true` and the remaining condition key (atoms minus
+ * `@fallback`, rejoined with ` & `; empty string for the default state).
+ *
+ * If `@fallback` appears inside an OR/XOR (so `splitTopLevelAnd` returns
+ * `null`) but is present in the key, a dev warning is emitted and the
+ * marker is ignored (the key is parsed as-is).
+ */
+function extractFallbackMarker(
+  stateKey: string,
+  styleKey: string,
+): { fallback: boolean; condition: string } {
+  if (stateKey === '' || !stateKey.includes('@fallback')) {
+    return { fallback: false, condition: stateKey };
+  }
+
+  const atoms = splitTopLevelAnd(stateKey);
+
+  // Key contains `|`, `^`, or `,` at top level — `@fallback` is not a
+  // valid top-level AND atom here. Warn and treat the key verbatim.
+  if (atoms === null) {
+    emitWarning(
+      'INVALID_FALLBACK_MARKER',
+      `Style key "${stateKey}" (in "${styleKey}") uses @fallback inside an OR/XOR group. ` +
+        `@fallback must be a top-level "&" atom (e.g. "@fallback" or "@fallback & hovered"). ` +
+        `The marker has been ignored.`,
+    );
+    return { fallback: false, condition: stateKey };
+  }
+
+  const rest = atoms.filter((a) => a !== '@fallback');
+  if (rest.length === atoms.length) {
+    // Contains the substring "@fallback" but not as a standalone atom
+    // (e.g. a user state name like "@fallbackish"); leave it untouched.
+    return { fallback: false, condition: stateKey };
+  }
+
+  return { fallback: true, condition: rest.join(' & ') };
 }
 
 /**
@@ -218,7 +288,10 @@ export function mergeEntriesByValue(
 
   for (const entry of entries) {
     // Defaults are never merged with non-defaults.
-    if (entry.condition.kind === 'true') {
+    // `@fallback` entries are never merged either: merging would lift their
+    // condition and rewrite the negation cascade, destroying the opt-out
+    // semantics. They participate in Stage 6 `mergeByValue` later instead.
+    if (entry.condition.kind === 'true' || entry.fallback) {
       merged.push(entry);
       continue;
     }
@@ -232,6 +305,8 @@ export function mergeEntriesByValue(
     for (let j = merged.length - 1; j >= 0; j--) {
       const prev = merged[j];
       if (prev.condition.kind === 'true') continue;
+      // Never merge into a `@fallback` entry — it must keep its opt-out flag.
+      if (prev.fallback) continue;
       if (serializeValue(prev.value) !== valueKey) continue;
 
       let safe = true;
@@ -325,10 +400,14 @@ export function extractCompoundStates(
 
   const entries = keys.map((key) => {
     const atoms = splitTopLevelAnd(key);
+    // Keys carrying a top-level `@fallback` marker must stay opaque so the
+    // marker is never dropped as a "redundant atom" or collapsed into
+    // another key. (`@fallback` is extracted later in parseStyleEntries.)
+    const isOpaque = atoms === null || atoms.includes('@fallback');
     return {
       // null means the key has non-AND operators; treat the whole key
       // as a single opaque atom so it never matches partial pairs.
-      atoms: atoms ?? [key],
+      atoms: isOpaque ? [key] : (atoms as string[]),
       value: valueMap[key],
     };
   });

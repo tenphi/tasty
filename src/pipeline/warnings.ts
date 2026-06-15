@@ -9,7 +9,8 @@ type TastyWarningCode =
   | 'INVALID_SELECTOR_AFFIX'
   | 'XOR_CHAIN_TOO_LONG'
   | 'INTERNAL_PSEUDO_USED'
-  | 'INVALID_TOP_LEVEL_PSEUDO_KEY';
+  | 'INVALID_TOP_LEVEL_PSEUDO_KEY'
+  | 'INVALID_FALLBACK_MARKER';
 
 interface TastyWarning {
   code: TastyWarningCode;

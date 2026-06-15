@@ -595,6 +595,19 @@ function wrapInIsOrNot(args: string[], negated: boolean): string {
 }
 
 /**
+ * Wrap a non-empty selector fragment in `:where(...)` to zero its
+ * specificity. Tasty anchors specificity solely on the doubled class
+ * (`.tXX.tXX`) and `data-element` attributes; every stateful selector
+ * (modifiers, pseudos, :is()/:not() groups, root/parent context) is wrapped
+ * so it contributes nothing to specificity and the cascade is decided by
+ * source order alone. Empty input passes through unchanged.
+ */
+export function wrapWhere(inner: string): string {
+  if (!inner) return '';
+  return `:where(${inner})`;
+}
+
+/**
  * Convert a selector group to a CSS selector fragment.
  *
  * Single-branch groups are unwrapped (no :is() wrapper).
@@ -752,7 +765,10 @@ export function rootGroupsToCSS(groups: SelectorGroup[]): string | undefined {
   for (const group of optimized) {
     prefix += selectorGroupToCSS(group);
   }
-  return prefix;
+  // The root context prefix carries zero specificity: wrap the whole
+  // `:root...` selector in :where() so neither the :root pseudo nor its
+  // state groups contribute to specificity.
+  return wrapWhere(prefix);
 }
 
 /**
@@ -767,7 +783,13 @@ export function parentGroupsToCSS(groups: ParentGroup[]): string {
     const args = group.branches.map(
       (branch) => branchToCSS(branch) + combinator,
     );
-    result += wrapInIsOrNot(args, group.negated);
+    // Ancestor context selectors carry zero specificity: wrap in :where().
+    // Negation goes inside as :where(:not(...)) so the negated ancestor
+    // adds nothing either.
+    const inner = group.negated
+      ? `:not(${args.sort().join(', ')})`
+      : args.sort().join(', ');
+    result += wrapWhere(inner);
   }
   return result;
 }

@@ -195,4 +195,11 @@ export interface CSSRule {
   rootPrefix?: string;
   /** When true, declarations are wrapped in @starting-style { ... } inside the selector rule */
   startingStyle?: boolean;
+  /**
+   * Cascade order hint propagated from the source style entry priority.
+   * Higher = later in the stylesheet (wins the cascade). Used by the
+   * pipeline post-pass to emit `@fallback` rules before the higher-priority
+   * rules that layer over them. Internal; stripped before injection.
+   */
+  order?: number;
 }

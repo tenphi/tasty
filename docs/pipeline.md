@@ -76,7 +76,7 @@ Output: CSSRule[]
 
 **Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside OR expansion, exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization. Every call is cached by condition unique-id, so the repetition is cheap.
 
-**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts:188`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle` and then reorders rules so every `@starting-style` rule is emitted **after** all normal rules. This ordering is cascade-critical: `@starting-style` rules share specificity with their normal counterparts, and source order decides which value wins.
+**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle`, then **stable-sorts rules by their cascade `order` hint (ascending source priority)** so lower-priority rules come first and higher-priority rules win, and finally emits every `@starting-style` rule **after** all normal rules. The `order` hint is the highest source priority among the entries that produced each rule (threaded `ComputedRule → CSSRule`). This ordering is cascade-critical because Stage 7 equalizes specificity with `:where()`: once every state selector carries zero specificity, source order alone decides which of two overlapping rules wins — most importantly the `@fallback` floor (low order, emitted first) versus the states layered over it, and `@starting-style` versus its normal counterpart. Mutually-exclusive rules are unaffected by ordering (they never both match), so reordering them is safe.
 
 ---
 
@@ -293,6 +293,23 @@ C: C & !A & !B          (applies only when neither A nor B)
 
 Each exclusive condition is passed through `simplifyCondition`. Entries that simplify to `FALSE` (impossible) are filtered out. The default state (`''` → `TrueCondition`) is not added to the “prior” list for negation (see `buildExclusiveConditions`).
 
+### `@fallback` entries (negation opt-out)
+
+An entry flagged `fallback: true` (from the `@fallback` state-key token) is the
+one exception to the negation cascade above. A `fallback` entry **skips
+receiving `!prior`** — its exclusive condition stays its own condition (`TRUE`
+for the default `@fallback`) so it persists as a floor and a higher-priority
+state cannot turn it off. It is **still pushed into the prior list** (subject to
+the usual non-`TRUE` guard), so lower-priority entries are still negated by it
+and the cascade below it stays mutually exclusive. `fallback` entries are never
+merged with non-`fallback` entries in Stage 1 (they get their own value bucket).
+
+This exists to fix the *unknown-query hole*: CSS three-valued logic makes
+`not(unknown) = unknown`, so a negated `@supports(...)` / container-query default
+branch silently never applies. A `@fallback` floor sidesteps negation entirely
+and lets the positive override layer on top via the cascade (see Stage 7's
+`:where()` equalization and the ascending-priority post-pass).
+
 ### Why
 
 This eliminates CSS specificity wars. Instead of relying on cascade order, each CSS rule matches in exactly one scenario. Benefits:
@@ -477,7 +494,15 @@ Converts condition trees into actual CSS selectors and at-rules.
 
 3. **Contradiction detection**: During variant merging, impossible combinations are dropped (e.g. conflicting media, root, or modifier negations).
 
-4. **`materializeComputedRule`**: Groups variants by sorted at-rules plus root-prefix key; within each group, `mergeVariantsIntoSelectorGroups` merges variants that differ only in flat modifier/pseudo parts; builds selector strings and emits one or more `CSSRule` objects.
+4. **`materializeComputedRule`**: Groups variants by sorted at-rules plus root-prefix key; within each group, `mergeVariantsIntoSelectorGroups` merges variants that differ only in flat modifier/pseudo parts; builds selector strings and emits one or more `CSSRule` objects. The rule's `order` hint (cascade priority) is propagated here for the post-pass sort.
+
+5. **`:where()` specificity equalization**: Every stateful part of the selector is wrapped in `:where(...)` so it contributes **zero specificity**:
+   - the flat root modifiers + pseudos and the root element's `:is()`/`:not()` groups are combined into one `:where(...)` (`buildSelectorFromVariant`);
+   - the sub-element (`@own`) groups are wrapped in a **separate** `:where(...)` so the sub-element's structural `[data-element="X"]` specificity is preserved while its states are zeroed;
+   - `@parent` ancestors (`parentGroupsToCSS`) become `:where(... *)` / `:where(:not(... *))`;
+   - the `@root` context prefix (`rootGroupsToCSS`) becomes `:where(:root...)` (zeroing the `:root` pseudo too).
+
+   The only specificity anchors that remain are the doubled component class (`.tXX.tXX`, added by the injector) and sub-element `[data-element]` attributes. Because Stage 2b already makes ordinary rules mutually exclusive, zeroing specificity never changes *which* rule matches — it only makes additive layering (`@fallback`, `@starting-style`) resolve deterministically by source order (see the post-pass). Canonical sorting/dedup/subsumption still run first; `:where()` is only the final wrapper, and both output paths (injector and direct-selector / SSR) consume the same wrapped fragments.
 
 ### Why
 
@@ -498,6 +523,8 @@ interface CSSRule {
   declarations: string; // CSS declarations (e.g. 'color: red;')
   atRules?: string[]; // Wrapping at-rules
   rootPrefix?: string; // Root state prefix
+  startingStyle?: boolean; // Wrap declarations in @starting-style
+  order?: number; // Internal cascade order hint (ascending source priority); stripped before injection
 }
 ```
 

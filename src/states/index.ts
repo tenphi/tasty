@@ -56,6 +56,10 @@ const BUILTIN_STATES = new Set([
   '@fontFace',
   '@counterStyle',
   '@supports',
+  // @fallback is a negation opt-out marker handled during exclusive
+  // condition building (see src/pipeline/exclusive.ts). Reserved here so
+  // users can't redefine it via configure() or local @name states.
+  '@fallback',
   // @inherit is a value (not a key), but reserved here to prevent
   // users from accidentally defining a state named '@inherit'.
   '@inherit',

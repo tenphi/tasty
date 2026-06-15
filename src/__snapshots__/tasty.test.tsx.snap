@@ -1,8 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`modProps > should work with style state maps via modProps 1`] = `
-".tzl9xo5.tzl9xo5[data-is-active] { background-color: var(--purple-color); }
-.tzl9xo5.tzl9xo5:not([data-is-active]) { background-color: var(--white-color); }"
+".tzl9xo5.tzl9xo5:where(:not([data-is-active])) { background-color: var(--white-color); }
+.tzl9xo5.tzl9xo5:where([data-is-active]) { background-color: var(--purple-color); }"
 `;
 
 exports[`tasty() API > should allow multiple wrapping 1`] = `
@@ -13,32 +13,32 @@ exports[`tasty() API > should allow multiple wrapping 1`] = `
 `;
 
 exports[`tasty() API > should allow nested modifiers 1`] = `
-".t1flirgv.t1flirgv:not(:first-child) { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }
-.t1flirgv.t1flirgv:first-child { color: var(--clear-color); --current-color: var(--clear-color); --current-color-oklch: var(--clear-color-oklch); }"
+".t1flirgv.t1flirgv:where(:first-child) { color: var(--clear-color); --current-color: var(--clear-color); --current-color-oklch: var(--clear-color-oklch); }
+.t1flirgv.t1flirgv:where(:not(:first-child)) { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }"
 `;
 
 exports[`tasty() API > should apply extend-mode base styles on top of variant 1`] = `
-".t13tun0x.t13tun0x:is([data-disabled], [data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
-.t13tun0x.t13tun0x[data-pressed]:not([data-disabled]):not([data-type="primary"]) { border: var(--border-width) solid var(--primary-text-color); }
-.t13tun0x.t13tun0x:not([data-disabled]):not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--white-color-oklch) / .2); }
-.t13tun0x.t13tun0x[data-hovered] { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
-.t13tun0x.t13tun0x:not([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+".t13tun0x.t13tun0x:where(:not([data-disabled]):not([data-pressed]):not([data-type="primary"])) { border: var(--border-width) solid oklch(var(--white-color-oklch) / .2); }
+.t13tun0x.t13tun0x:where(:not([data-hovered])) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t13tun0x.t13tun0x:where([data-pressed]:not([data-disabled]):not([data-type="primary"])) { border: var(--border-width) solid var(--primary-text-color); }
+.t13tun0x.t13tun0x:where([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
+.t13tun0x.t13tun0x:where(:is([data-disabled], [data-type="primary"])) { border: var(--border-width) solid var(--clear-color); }
 .t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
 exports[`tasty() API > should apply extend-mode base styles on top of variant 2`] = `
-".tmipikk.tmipikk[data-type="primary"] { border: var(--border-width) solid var(--clear-color); }
-.tmipikk.tmipikk[data-pressed]:not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .3); }
-.tmipikk.tmipikk:not([data-pressed]):not([data-type="primary"]) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .15); }
+".tmipikk.tmipikk:where(:not([data-pressed]):not([data-type="primary"])) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .15); }
 .tmipikk.tmipikk { background-color: oklch(var(--primary-color-oklch) / .10); }
+.tmipikk.tmipikk:where([data-pressed]:not([data-type="primary"])) { border: var(--border-width) solid oklch(var(--primary-color-oklch) / .3); }
+.tmipikk.tmipikk:where([data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
 .t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
 exports[`tasty() API > should be able to override styles 1`] = `".tdiafv5.tdiafv5 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch)/.1); --current-color-oklch: var(--black-color-oklch); }"`;
 
 exports[`tasty() API > should create element styles 1`] = `
-".tt6i54n.tt6i54n[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.tt6i54n.tt6i54n:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".tt6i54n.tt6i54n:where(:not([data-modified])) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.tt6i54n.tt6i54n:where([data-modified]) [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should define style props 1`] = `".tms9l71.tms9l71 { border: 1px solid var(--border-color, currentColor); }"`;
@@ -50,56 +50,56 @@ exports[`tasty() API > should handle color fallback syntax 1`] = `".t1x40q7f.t1x
 exports[`tasty() API > should handle fill fallback syntax 1`] = `".th5j7l3.th5j7l3 { background-color: var(--surface-color, var(--white-color)); }"`;
 
 exports[`tasty() API > should merge element styles 1`] = `
-".t2tusuk.t2tusuk[data-modified] [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t2tusuk.t2tusuk:not([data-modified]) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t2tusuk.t2tusuk [data-element="Element"] { background-color: var(--black-color); }"
+".t2tusuk.t2tusuk:where(:not([data-modified])) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t2tusuk.t2tusuk [data-element="Element"] { background-color: var(--black-color); }
+.t2tusuk.t2tusuk:where([data-modified]) [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should merge styles 1`] = `
-".t1rf8zks.t1rf8zks[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t1rf8zks.t1rf8zks:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t1rf8zks.t1rf8zks { background-color: var(--black-color); }"
+".t1rf8zks.t1rf8zks:where(:not([data-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t1rf8zks.t1rf8zks { background-color: var(--black-color); }
+.t1rf8zks.t1rf8zks:where([data-modified]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should merge styles in custom prop 1`] = `
-".t1rf8zks.t1rf8zks[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t1rf8zks.t1rf8zks:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
-.t1rf8zks.t1rf8zks { background-color: var(--black-color); }"
+".t1rf8zks.t1rf8zks:where(:not([data-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t1rf8zks.t1rf8zks { background-color: var(--black-color); }
+.t1rf8zks.t1rf8zks:where([data-modified]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 1`] = `
-".tbbb46d.tbbb46d[data-size="large"] { padding: 24px 0px 0px; }
-.tbbb46d.tbbb46d[data-size="medium"] { padding: 16px 0px 0px; }
-.tbbb46d.tbbb46d:not([data-size="large"]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".tbbb46d.tbbb46d:where(:not([data-size="large"]):not([data-size="medium"])) { padding: 8px 0px 0px; }
+.tbbb46d.tbbb46d:where([data-size="medium"]) { padding: 16px 0px 0px; }
+.tbbb46d.tbbb46d:where([data-size="large"]) { padding: 24px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 2`] = `
-".tmkx54k.tmkx54k[data-size="large"] { padding: 24px 0px 0px; }
-.tmkx54k.tmkx54k[data-selected][data-size="medium"] { padding: 16px 0px 0px; }
-.tmkx54k.tmkx54k:not([data-size="large"]):not([data-selected][data-size="medium"]) { padding: 8px 0px 0px; }"
+".tmkx54k.tmkx54k:where(:not([data-size="large"]):not([data-selected][data-size="medium"])) { padding: 8px 0px 0px; }
+.tmkx54k.tmkx54k:where([data-selected][data-size="medium"]) { padding: 16px 0px 0px; }
+.tmkx54k.tmkx54k:where([data-size="large"]) { padding: 24px 0px 0px; }"
 `;
 
 exports[`tasty() API > should optimize attribute selectors 3`] = `
-".t1c00a7t.t1c00a7t[data-selected][data-size="large"] { padding: 24px 0px 0px; }
-.t1c00a7t.t1c00a7t:not([data-selected][data-size="large"]):is([data-selected], [data-size="medium"]) { padding: 16px 0px 0px; }
-.t1c00a7t.t1c00a7t:not([data-selected]):not([data-size="medium"]) { padding: 8px 0px 0px; }"
+".t1c00a7t.t1c00a7t:where(:not([data-selected]):not([data-size="medium"])) { padding: 8px 0px 0px; }
+.t1c00a7t.t1c00a7t:where(:not([data-selected][data-size="large"]):is([data-selected], [data-size="medium"])) { padding: 16px 0px 0px; }
+.t1c00a7t.t1c00a7t:where([data-selected][data-size="large"]) { padding: 24px 0px 0px; }"
 `;
 
 exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch)/.1); --current-color-oklch: var(--clear-color-oklch); }"`;
 
 exports[`tasty() API > should support camelCase modifiers 1`] = `
-".t10vr46x.t10vr46x[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t10vr46x.t10vr46x:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".t10vr46x.t10vr46x:where(:not([data-somehow-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t10vr46x.t10vr46x:where([data-somehow-modified]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should support kebab-case modifiers 1`] = `
-".tosqocm.tosqocm[data-somehow-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.tosqocm.tosqocm:not([data-somehow-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".tosqocm.tosqocm:where(:not([data-somehow-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.tosqocm.tosqocm:where([data-somehow-modified]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should support modifiers 1`] = `
-".t9xq1h3.t9xq1h3[data-modified] { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }
-.t9xq1h3.t9xq1h3:not([data-modified]) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }"
+".t9xq1h3.t9xq1h3:where(:not([data-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t9xq1h3.t9xq1h3:where([data-modified]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
 `;
 
 exports[`tasty() API > should support variants 1`] = `".t1dgbtn6.t1dgbtn6 { color: var(--black-color); --current-color: var(--black-color); --current-color-oklch: var(--black-color-oklch); }"`;

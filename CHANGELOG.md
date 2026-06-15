@@ -1,5 +1,20 @@
 # @tenphi/tasty
 
+## 2.6.5
+
+### Patch Changes
+
+- [#212](https://github.com/tenphi/tasty/pull/212) [`08efe45`](https://github.com/tenphi/tasty/commit/08efe45217ceee24cccebbe6f704da1a82968c83) Thanks [@tenphi](https://github.com/tenphi)! - Internal export optimizations to reduce exposure of internal logic.
+
+- [#218](https://github.com/tenphi/tasty/pull/218) [`6e6de33`](https://github.com/tenphi/tasty/commit/6e6de330579571d32c9ed52c375835b95f09d0d9) Thanks [@tenphi](https://github.com/tenphi)! - Fix negation of `@supports`-guarded feature queries. When an `@supports`
+  feature query guards a dependent query (e.g. `@supports(container-type:
+scroll-state) & @(scroll-state(...))`), the default state is now emitted under
+  a bare `@supports (not (...))` fallback instead of a meaningless bare
+  `@container (not scroll-state(...))` rule. Previously the default could fail to
+  apply in browsers without the feature. `@supports` negation branches now sort
+  ahead of other at-rule branches during exclusive expansion; cases without an
+  `@supports` guard are unaffected.
+
 ## 2.6.4
 
 ### Patch Changes

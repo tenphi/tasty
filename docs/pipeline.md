@@ -333,16 +333,23 @@ This is the companion to **Stage 2a** (user-OR expansion). The split exists beca
 
 1. Collect top-level OR branches of `exclusiveCondition`.
 2. If there is no OR (single branch), the entry is unchanged. Pure selector ORs with no at-rule context are also left alone (materialization handles them via `:is()` / variant merging).
-3. Otherwise `sortOrBranchesForExpansion` reorders branches so at-rule-heavy branches come first. This is load-bearing for correctness (see below).
+3. Otherwise `sortOrBranchesForExpansion` reorders branches by a three-tier rank — `@supports` branches first, then other at-rule branches (media / container / starting), then pure-selector branches. This is load-bearing for correctness (see below).
 4. Each branch is made exclusive against prior branches: `branch & !prior[0] & !prior[1] & ...`, then simplified.
 5. Impossible branches are dropped; expanded entries get a synthetic `stateKey` suffix like `[or:0]`.
 
 ### Why the sort matters
 
-Consider `!A | !B` where A is an at-rule (e.g. `@supports(grid)`) and B is a modifier (e.g. `:has(foo)`):
+**At-rules before selectors.** Consider `!A | !B` where A is an at-rule (e.g. `@supports(grid)`) and B is a modifier (e.g. `:has(foo)`):
 
 - **With at-rule-first sort** (`!A`, then `!B & A`): the first branch emits "outside `@supports`", the second emits "inside `@supports` with `:not(:has(foo))`". Full coverage.
 - **Without the sort** (`!B`, then `!A & B`): the first branch emits `:not(:has(foo))` as a bare selector with no at-rule context — leaking the rule outside `@supports`. The second is incomplete.
+
+**`@supports` before other at-rules (Kleene logic).** A `@supports` feature query is special: anything ANDed with it can become *unknown* — not simply false — when the feature is unsupported. The canonical case is a feature guard over a dependent query, e.g. `@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))` (`S & C`). The default's exclusive is `!(S & C) = !S | !C`, which `simplify` sorts alphabetically into `[!C, !S]`.
+
+- **Expanding `!C` first** emits a bare `@container (not scroll-state(...))` rule. In a browser without `scroll-state` support that query is unknown (not false), so it matches nothing and the default `inset` is never applied — a coverage hole.
+- **Expanding `!S` first** yields `!S | (S & !C)`: a bare `@supports (not (container-type: scroll-state))` fallback carrying the default, plus the dependent negation nested inside the supported scope. Full coverage, and the unsupported path never references the guarded query.
+
+Because `!S | (S & !R) ≡ !S | !R` in two-valued logic, this reordering is a no-op for cases without an `@supports` guard. The same supports-first ordering is also applied in `makeOrBranchesExclusive` (`materialize.ts`) for ORs that survive nested inside an AND (e.g. `compact & (!S | !C)`).
 
 The pre-build Stage 2a pass doesn't need this because user-authored ORs aren't produced by negation and their branches are expected to apply in each branch's own scope.
 

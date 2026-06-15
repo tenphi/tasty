@@ -3112,6 +3112,66 @@ describe('@supports queries snapshot tests', () => {
     expect(result).toMatchSnapshot();
   });
 
+  it('should keep the not-supported path free of guarded feature queries', () => {
+    // `@supports(container-type: scroll-state)` guards a scroll-state
+    // container query. Negating the guarded override must NOT emit a bare
+    // `@container (not scroll-state(...))` rule — that query is meaningless
+    // where the feature is unsupported, which would leave the default
+    // unapplied. The unsupported path must carry the default via a bare
+    // `@supports (not (...))` instead, with the dependent negation nested
+    // inside the supported scope.
+    const styles = {
+      display: {
+        '': 'block',
+        '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
+          'grid',
+      },
+    };
+
+    const result = renderStyles(styles, '.component');
+
+    // Not-supported path: bare `@supports (not ...)` carrying the default,
+    // and referencing NO scroll-state *container query* (the `scroll-state(`
+    // function form — distinct from the `container-type: scroll-state`
+    // feature it guards).
+    const notSupportedRule = result.find((r) =>
+      r.atRules?.some((a) => a.includes('not (container-type: scroll-state)')),
+    );
+    expect(notSupportedRule).toBeDefined();
+    expect(notSupportedRule!.declarations).toContain('display: block');
+    expect(
+      notSupportedRule!.atRules!.some((a) => a.includes('scroll-state(')),
+    ).toBe(false);
+
+    // No `@container (not scroll-state(...))` rule outside an `@supports` guard.
+    const bareContainerNegation = result.find(
+      (r) =>
+        !!r.atRules?.some((a) => a.includes('(not scroll-state')) &&
+        !r.atRules?.some((a) => a.startsWith('@supports')),
+    );
+    expect(bareContainerNegation).toBeUndefined();
+
+    // Override applies only inside the supported scope, gated by the
+    // (positive) scroll-state container query.
+    const overrideRule = result.find((r) =>
+      r.declarations.includes('display: grid'),
+    );
+    expect(overrideRule).toBeDefined();
+    expect(
+      overrideRule!.atRules?.some((a) =>
+        a.includes('(container-type: scroll-state)'),
+      ),
+    ).toBe(true);
+    expect(
+      overrideRule!.atRules?.some(
+        (a) =>
+          a.includes('scroll-state(scrolled: block-end)') && !a.includes('not'),
+      ),
+    ).toBe(true);
+
+    expect(result).toMatchSnapshot();
+  });
+
   it('should eliminate impossible @supports combinations', () => {
     const styles = {
       display: {

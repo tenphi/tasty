@@ -1371,6 +1371,19 @@ function andToCSS(children: ConditionNode[]): CSSComponents {
 }
 
 /**
+ * Check if a condition involves an `@supports` query (recursively).
+ */
+function branchHasSupports(node: ConditionNode): boolean {
+  if (node.kind === 'state') {
+    return node.type === 'supports';
+  }
+  if (isCompoundCondition(node)) {
+    return node.children.some(branchHasSupports);
+  }
+  return false;
+}
+
+/**
  * Make OR branches within AND children mutually exclusive.
  *
  * For an AND child that is OR(A, B), transforms it to OR(A, B & !A)
@@ -1392,10 +1405,20 @@ function makeOrBranchesExclusive(children: ConditionNode[]): ConditionNode[] {
     // produce the same context key, the :is() merging handles it.
     if (!branchesProduceDifferentContexts(child.children)) return child;
 
+    // Process `@supports` branches first so a negated feature guard becomes
+    // the bare "feature unsupported" fallback and every dependent negation
+    // (e.g. a `@container scroll-state(...)` query) nests inside the
+    // supported scope. Without this, `simplify`'s alphabetical ordering can
+    // emit a dependent query negation bare, where it is meaningless when the
+    // feature is unsupported. Stable for ties.
+    const sortedBranches = [...child.children].sort(
+      (a, b) => (branchHasSupports(a) ? 0 : 1) - (branchHasSupports(b) ? 0 : 1),
+    );
+
     const exclusiveBranches: ConditionNode[] = [];
     const priorBranches: ConditionNode[] = [];
 
-    for (const branch of child.children) {
+    for (const branch of sortedBranches) {
       if (priorBranches.length === 0) {
         exclusiveBranches.push(branch);
       } else {

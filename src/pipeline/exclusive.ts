@@ -634,7 +634,43 @@ function hasAtRuleContext(node: ConditionNode): boolean {
 }
 
 /**
- * Sort OR branches to prioritize at-rule conditions first.
+ * Check if a condition involves an `@supports` query.
+ *
+ * `@supports` is feature detection: anything ANDed with it (e.g. a
+ * `@container scroll-state(...)` query that only exists when
+ * `container-type: scroll-state` is supported) becomes *unknown* — not
+ * simply false — when the feature is absent. So a negated supports branch
+ * must be emitted first (as the bare "feature unsupported" fallback) and
+ * every other negated branch must nest inside the supported scope.
+ */
+function hasSupportsContext(node: ConditionNode): boolean {
+  if (node.kind === 'state') {
+    return node.type === 'supports';
+  }
+
+  if (node.kind === 'compound') {
+    return node.children.some(hasSupportsContext);
+  }
+
+  return false;
+}
+
+/**
+ * Rank an OR branch for exclusive expansion ordering. Lower rank is
+ * processed first (becomes the more "outer" / less-constrained branch):
+ *   0 — branch involves `@supports` (feature-detection guard)
+ *   1 — branch involves another at-rule (media / container / starting)
+ *   2 — branch is pure selector context (modifiers / pseudos)
+ */
+function orBranchRank(node: ConditionNode): 0 | 1 | 2 {
+  if (hasSupportsContext(node)) return 0;
+  if (hasAtRuleContext(node)) return 1;
+  return 2;
+}
+
+/**
+ * Sort OR branches to prioritize at-rule conditions first, with
+ * `@supports` branches ahead of all other at-rules.
  *
  * This is critical for correct CSS generation. For `!A | !B` where A is at-rule
  * and B is modifier, we want:
@@ -644,21 +680,20 @@ function hasAtRuleContext(node: ConditionNode): boolean {
  * If we process in wrong order (!B first), we'd get:
  *   - Branch 0: !B (modifier negation WITHOUT at-rule context - WRONG!)
  *   - Branch 1: B & !A (at-rule negation with modifier - incomplete coverage)
+ *
+ * The extra `@supports`-first tier matters when a feature query guards a
+ * dependent query. For `!(S & C) = !S | !C` (S = `@supports(...)`, C =
+ * `@container scroll-state(...)`), `simplify` sorts the branches
+ * alphabetically into `[!C, !S]`. Expanding in that order would emit `!C`
+ * as a bare `@container (not scroll-state(...))` — meaningless where the
+ * feature is unsupported, so the default would never apply there. Putting
+ * `!S` first yields `!S | (S & !C)`: a bare supports fallback plus the
+ * dependent negation nested in the supported scope.
  */
 function sortOrBranchesForExpansion(
   branches: ConditionNode[],
 ): ConditionNode[] {
-  return [...branches].sort((a, b) => {
-    const aHasAtRule = hasAtRuleContext(a);
-    const bHasAtRule = hasAtRuleContext(b);
-
-    // At-rule conditions come first
-    if (aHasAtRule && !bHasAtRule) return -1;
-    if (!aHasAtRule && bHasAtRule) return 1;
-
-    // Same type - keep original order (stable sort)
-    return 0;
-  });
+  return [...branches].sort((a, b) => orBranchRank(a) - orBranchRank(b));
 }
 
 /**

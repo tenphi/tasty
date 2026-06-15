@@ -47,6 +47,8 @@ import { isSelector } from '../pipeline';
 
 /**
  * Appearance chunk - visual styling with independent handlers
+ *
+ * @public
  */
 export const APPEARANCE_CHUNK_STYLES = [
   'fill', // fillStyle (independent)
@@ -67,6 +69,7 @@ export const APPEARANCE_CHUNK_STYLES = [
  * ⚠️ presetStyle: preset, fontSize, lineHeight, letterSpacing, textTransform,
  *    fontWeight, fontStyle, font
  */
+/** @public */
 export const FONT_CHUNK_STYLES = [
   // All from presetStyle handler - MUST stay together
   'preset',
@@ -95,6 +98,7 @@ export const FONT_CHUNK_STYLES = [
  * ⚠️ widthStyle: width, minWidth, maxWidth
  * ⚠️ heightStyle: height, minHeight, maxHeight
  */
+/** @public */
 export const DIMENSION_CHUNK_STYLES = [
   // All from paddingStyle handler - MUST stay together
   'padding',
@@ -135,6 +139,7 @@ export const DIMENSION_CHUNK_STYLES = [
  * ⚠️ gapStyle: display, flow, gap
  * ⚠️ scrollbarStyle: scrollbar, overflow
  */
+/** @public */
 export const DISPLAY_CHUNK_STYLES = [
   // displayStyle handler
   'display',
@@ -156,6 +161,7 @@ export const DISPLAY_CHUNK_STYLES = [
  * Note: flow and gap are in DISPLAY chunk due to handler dependencies
  * (flowStyle and gapStyle both require 'display' prop).
  */
+/** @public */
 export const LAYOUT_CHUNK_STYLES = [
   // Alignment styles (all independent handlers)
   'placeItems',
@@ -185,6 +191,7 @@ export const LAYOUT_CHUNK_STYLES = [
  * Handler dependencies (all styles in each handler MUST stay in this chunk):
  * ⚠️ insetStyle: inset, insetBlock, insetInline, top, right, bottom, left
  */
+/** @public */
 export const POSITION_CHUNK_STYLES = [
   'position',
   // All from insetStyle handler - MUST stay together

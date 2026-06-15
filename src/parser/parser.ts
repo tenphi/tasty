@@ -164,6 +164,3 @@ export class StyleParser {
     return this.opts.units;
   }
 }
-
-// Re-export
-export type { StyleDetails, ProcessedStyle } from './types';

@@ -33,7 +33,6 @@ import {
 } from './materialize-contradictions';
 import type {
   CSSComponents,
-  CSSRule,
   ParentGroup,
   ParsedContainerCondition,
   ParsedMediaCondition,
@@ -44,22 +43,6 @@ import type {
   SelectorGroup,
   SelectorVariant,
 } from './materialize-types';
-
-// Re-export types so existing `import { ... } from './materialize'` keeps
-// working without callers needing to chase the new file layout.
-export type {
-  CSSComponents,
-  CSSRule,
-  ParentGroup,
-  ParsedContainerCondition,
-  ParsedMediaCondition,
-  ParsedModifierCondition,
-  ParsedPseudoCondition,
-  ParsedSelectorCondition,
-  ParsedSupportsCondition,
-  SelectorGroup,
-  SelectorVariant,
-};
 
 // ============================================================================
 // Caching
@@ -237,7 +220,7 @@ function modifierToParsed(state: ModifierCondition): ParsedModifierCondition {
 /**
  * Convert parsed modifier to CSS selector string (for final output)
  */
-export function modifierToCSS(mod: ParsedModifierCondition): string {
+function modifierToCSS(mod: ParsedModifierCondition): string {
   let selector: string;
 
   if (mod.value !== undefined) {
@@ -792,7 +775,7 @@ export function parentGroupsToCSS(groups: ParentGroup[]): string {
 /**
  * Convert a modifier or pseudo condition to a CSS selector fragment
  */
-export function selectorConditionToCSS(cond: ParsedSelectorCondition): string {
+function selectorConditionToCSS(cond: ParsedSelectorCondition): string {
   if ('attribute' in cond) {
     return modifierToCSS(cond);
   }

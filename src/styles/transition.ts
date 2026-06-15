@@ -69,7 +69,6 @@ const MAP: Record<string, string[]> = {
   inset: ['inset', 'top', 'right', 'bottom', 'left'],
 };
 
-export const DEFAULT_TIMING = 'var(--transition)';
 const DEFAULT_EASING = 'linear';
 
 const EASING_KEYWORDS = new Set([

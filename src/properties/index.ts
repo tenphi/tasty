@@ -40,7 +40,7 @@ export function isValidPropertyName(name: string): boolean {
 /**
  * Result of parsing a property token.
  */
-export interface ParsedPropertyToken {
+interface ParsedPropertyToken {
   /** The CSS custom property name (e.g., '--my-prop') */
   cssName: string;
   /** Whether this is a color property */
@@ -204,7 +204,7 @@ export function normalizePropertyDefinition(def: PropertyDefinition): string {
 /**
  * Result of getEffectiveDefinition.
  */
-export interface EffectiveDefinitionResult {
+interface EffectiveDefinitionResult {
   /** The CSS custom property name */
   cssName: string;
   /** The effective property definition */
@@ -265,19 +265,13 @@ export function getEffectiveDefinition(
 }
 
 // ============================================================================
-// Color Utilities
-// ============================================================================
-
-export { colorInitialValueToComponents } from '../utils/color-space';
-
-// ============================================================================
 // Value Type Inference
 // ============================================================================
 
 /**
  * Result of inferring a CSS @property syntax from a value.
  */
-export interface InferredSyntax {
+interface InferredSyntax {
   syntax: string;
   initialValue: string;
 }

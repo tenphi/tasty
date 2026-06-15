@@ -5,7 +5,6 @@
  * Designed for zero overhead when no keyframes are used.
  */
 
-import { getGlobalKeyframes, hasGlobalKeyframes } from '../config';
 import type { KeyframesSteps } from '../injector/types';
 import type { Styles } from '../styles/types';
 
@@ -85,18 +84,6 @@ export function mergeKeyframes(
   if (!global) return local;
   // Local overrides global
   return { ...global, ...local };
-}
-
-/**
- * Get merged keyframes for styles (local + global).
- * Returns null if no keyframes defined anywhere (fast path).
- */
-export function getKeyframesForStyles(
-  styles: Styles,
-): Record<string, KeyframesSteps> | null {
-  const local = extractLocalKeyframes(styles);
-  const global = hasGlobalKeyframes() ? getGlobalKeyframes() : null;
-  return mergeKeyframes(local, global);
 }
 
 // ============================================================================

@@ -28,7 +28,7 @@ export interface DirectionalConfig {
   directionProperty?: (dir: Direction) => string;
 }
 
-export function parseSingleValue(
+function parseSingleValue(
   val: string | number | boolean,
   defaultValue: string,
   trueValue: string,
@@ -96,7 +96,7 @@ function optimizeShorthand(
   return { [property]: `${top} ${right} ${bottom} ${left}` };
 }
 
-export interface DirectionalProps {
+interface DirectionalProps {
   main?: string | number | boolean;
   block?: string | number | boolean;
   inline?: string | number | boolean;

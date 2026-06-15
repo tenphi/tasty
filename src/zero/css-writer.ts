@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export interface CSSWriterOptions {
+interface CSSWriterOptions {
   /** Enable source comments in output (e.g., "from: Button.tsx") */
   devMode?: boolean;
 }

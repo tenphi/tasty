@@ -14,12 +14,6 @@ let clientCounterStyleCounter = 0;
 
 const clientContentToName = new Map<string, string>();
 
-/* @internal — used only for tests */
-export function _resetCounterStyleCache(): void {
-  clientContentToName.clear();
-  clientCounterStyleCounter = 0;
-}
-
 /**
  * Inject a CSS @counter-style rule and return the generated name.
  * Permanent — no cleanup on unmount. Deduplicates by name.

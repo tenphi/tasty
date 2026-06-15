@@ -26,7 +26,17 @@ export { okhslPlugin, okhslFunc } from '../plugins';
 export type { TastyPlugin, TastyPluginFactory } from '../plugins';
 
 // Chunk utilities
-export { CHUNK_NAMES, STYLE_TO_CHUNK, categorizeStyleKeys } from '../chunks';
+export {
+  APPEARANCE_CHUNK_STYLES,
+  FONT_CHUNK_STYLES,
+  DIMENSION_CHUNK_STYLES,
+  DISPLAY_CHUNK_STYLES,
+  LAYOUT_CHUNK_STYLES,
+  POSITION_CHUNK_STYLES,
+  CHUNK_NAMES,
+  STYLE_TO_CHUNK,
+  categorizeStyleKeys,
+} from '../chunks';
 export type { ChunkName, ChunkInfo } from '../chunks';
 
 // State mapping utilities

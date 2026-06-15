@@ -55,7 +55,7 @@ export interface ExtractedKeyframes {
   css: string;
 }
 
-export interface KeyframesExtractionResult {
+interface KeyframesExtractionResult {
   /** Keyframes to inject (deduplicated by content) */
   keyframes: ExtractedKeyframes[];
   /** Map from original animation name to canonical name (for replacement) */

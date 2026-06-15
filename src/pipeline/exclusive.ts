@@ -20,7 +20,7 @@ import { simplifyCondition } from './simplify';
 /**
  * Parsed style entry with condition
  */
-export interface ParsedStyleEntry {
+interface ParsedStyleEntry {
   styleKey: string; // e.g., 'padding', 'fill'
   stateKey: string; // Original key: '', 'compact', '@media(w < 768px)'
   value: StyleValue; // The style value (before handler processing)

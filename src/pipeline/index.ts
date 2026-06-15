@@ -50,7 +50,7 @@ import {
   mergeEntriesByValue,
   parseStyleEntries,
 } from './exclusive';
-import type { CSSRule, SelectorVariant } from './materialize';
+import type { CSSRule, SelectorVariant } from './materialize-types';
 import {
   branchToCSS,
   buildAtRulesFromVariant,
@@ -90,11 +90,6 @@ export interface RenderResult {
   className?: string;
 }
 
-export interface PipelineResult {
-  rules: CSSRule[];
-  className?: string;
-}
-
 interface ComputedRule {
   condition: ConditionNode;
   declarations: Record<string, string>;
@@ -106,73 +101,6 @@ interface ComputedRule {
 // ============================================================================
 
 const pipelineCache = new Lru<string, CSSRule[]>(5000);
-
-// ============================================================================
-// Main Pipeline Function
-// ============================================================================
-
-/**
- * Render styles using the new pipeline.
- *
- * This is the main entrypoint that implements the complete flow.
- */
-export function renderStylesPipeline(
-  styles?: Styles,
-  className?: string,
-  pipelineCacheKey?: string,
-): PipelineResult {
-  if (!styles) {
-    return { rules: [], className };
-  }
-
-  // Use pre-computed cache key when available, falling back to stringifyStyles
-  const cacheKey = pipelineCacheKey || stringifyStyles(styles);
-  let rules = pipelineCache.get(cacheKey);
-
-  if (!rules) {
-    // Create parser context
-    const parserContext = createStateParserContext(styles);
-
-    // Run pipeline
-    rules = runPipeline(styles, parserContext);
-
-    // Cache result
-    pipelineCache.set(cacheKey, rules);
-  }
-
-  // If no className, rules need it to be prepended later
-  if (!className) {
-    return {
-      rules: rules.map((r) => ({
-        ...r,
-        needsClassName: true,
-      })),
-    };
-  }
-
-  // Prepend className to selectors
-  const finalRules = rules.map((rule) => {
-    // Parse the selector to find where to insert className
-    let selector = rule.selector;
-
-    // If selector starts with :root, insert className after the :root part
-    if (rule.rootPrefix) {
-      selector = `${rule.rootPrefix} .${className}.${className}${selector}`;
-    } else {
-      selector = `.${className}.${className}${selector}`;
-    }
-
-    return {
-      ...rule,
-      selector,
-    };
-  });
-
-  return {
-    rules: finalRules,
-    className,
-  };
-}
 
 /**
  * Check if a cache key exists in the pipeline cache.
@@ -1343,7 +1271,7 @@ function mergeStyleResults(results: StyleResult[]): StyleResult[] {
 /**
  * Options for renderStyles when using direct selector mode.
  */
-export interface RenderStylesOptions {
+interface RenderStylesOptions {
   /**
    * Whether to double the class selector for increased specificity.
    * When true, `.myClass` becomes `.myClass.myClass` for higher specificity.
@@ -1482,20 +1410,5 @@ export function renderStyles(
   };
 }
 
-// ============================================================================
-// Exports
-// ============================================================================
-
 export type { ConditionNode } from './conditions';
-export { and, or, not, trueCondition, falseCondition } from './conditions';
 export { parseStateKey } from './parseStateKey';
-export { simplifyCondition } from './simplify';
-export { buildExclusiveConditions } from './exclusive';
-export { conditionToCSS } from './materialize';
-export type { CSSRule } from './materialize';
-export { setWarningHandler, emitWarning } from './warnings';
-export type {
-  TastyWarning,
-  TastyWarningCode,
-  TastyWarningHandler,
-} from './warnings';

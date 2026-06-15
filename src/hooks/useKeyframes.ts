@@ -21,12 +21,6 @@ interface FactoryDepsEntry {
 
 const factoryDepsCache = new Map<string, FactoryDepsEntry>();
 
-/* @internal — used only for tests */
-export function _resetKeyframesCache(): void {
-  clientContentToName.clear();
-  factoryDepsCache.clear();
-}
-
 /**
  * Inject CSS @keyframes and return the generated animation name.
  * Deduplicates by content — identical steps always return the same name.

@@ -80,7 +80,7 @@ export function pushRSCCSS(
   return true;
 }
 
-export type StyleTarget =
+type StyleTarget =
   | { mode: 'ssr'; collector: ServerStyleCollector }
   | { mode: 'rsc'; cache: RSCStyleCache }
   | { mode: 'client' };

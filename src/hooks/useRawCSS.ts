@@ -29,13 +29,6 @@ const clientEntries = new Map<string, ClientEntry>();
 const clientContentDedup = new Set<string>();
 const factoryDepsCache = new Map<string, readonly unknown[]>();
 
-/* @internal — used only for tests */
-export function _resetRawCSSCache(): void {
-  clientEntries.clear();
-  clientContentDedup.clear();
-  factoryDepsCache.clear();
-}
-
 // Overload 1: Static CSS string
 export function useRawCSS(css: string, options?: UseRawCSSOptions): void;
 

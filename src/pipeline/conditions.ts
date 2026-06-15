@@ -326,7 +326,7 @@ export function isCompoundCondition(
 /**
  * Generate a normalized unique ID for a modifier condition
  */
-export function modifierUniqueId(
+function modifierUniqueId(
   attribute: string,
   value?: string,
   operator = '=',
@@ -341,7 +341,7 @@ export function modifierUniqueId(
 /**
  * Generate a normalized unique ID for a pseudo condition
  */
-export function pseudoUniqueId(pseudo: string, negated = false): string {
+function pseudoUniqueId(pseudo: string, negated = false): string {
   const base = `pseudo:${pseudo}`;
   return negated ? `!${base}` : base;
 }
@@ -349,7 +349,7 @@ export function pseudoUniqueId(pseudo: string, negated = false): string {
 /**
  * Generate a normalized unique ID for a media condition
  */
-export function mediaUniqueId(
+function mediaUniqueId(
   subtype: 'dimension' | 'feature' | 'type',
   props: {
     dimension?: string;
@@ -388,7 +388,7 @@ export function mediaUniqueId(
 /**
  * Generate a normalized unique ID for a container condition
  */
-export function containerUniqueId(
+function containerUniqueId(
   subtype: 'dimension' | 'style' | 'raw',
   props: {
     containerName?: string;
@@ -429,7 +429,7 @@ export function containerUniqueId(
 /**
  * Generate a normalized unique ID for a root condition
  */
-export function rootUniqueId(innerUniqueId: string, negated = false): string {
+function rootUniqueId(innerUniqueId: string, negated = false): string {
   const base = `root:${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }
@@ -437,7 +437,7 @@ export function rootUniqueId(innerUniqueId: string, negated = false): string {
 /**
  * Generate a normalized unique ID for a parent condition
  */
-export function parentUniqueId(
+function parentUniqueId(
   innerUniqueId: string,
   direct: boolean,
   negated = false,
@@ -449,7 +449,7 @@ export function parentUniqueId(
 /**
  * Generate a normalized unique ID for an own condition
  */
-export function ownUniqueId(innerUniqueId: string, negated = false): string {
+function ownUniqueId(innerUniqueId: string, negated = false): string {
   const base = `own:${innerUniqueId}`;
   return negated ? `!${base}` : base;
 }
@@ -457,14 +457,14 @@ export function ownUniqueId(innerUniqueId: string, negated = false): string {
 /**
  * Generate a normalized unique ID for a starting condition
  */
-export function startingUniqueId(negated = false): string {
+function startingUniqueId(negated = false): string {
   return negated ? '!starting' : 'starting';
 }
 
 /**
  * Generate a normalized unique ID for a supports condition
  */
-export function supportsUniqueId(
+function supportsUniqueId(
   subtype: 'feature' | 'selector',
   condition: string,
   negated = false,

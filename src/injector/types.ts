@@ -114,7 +114,7 @@ export interface SheetInfo {
   holes: number[]; // Available rule indices from deletions
 }
 
-export interface CleanupStats {
+interface CleanupStats {
   timestamp: number;
   classesDeleted: number;
   cssSize: number;
@@ -193,7 +193,7 @@ export interface KeyframesInfo {
   cssText?: string;
 }
 
-export type KeyframeStep = string | Record<string, string | number>;
+type KeyframeStep = string | Record<string, string | number>;
 export type KeyframesSteps = Record<string, KeyframeStep>;
 
 export interface KeyframesResult {

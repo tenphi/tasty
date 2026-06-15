@@ -5,18 +5,18 @@
  * can programmatically intercept, suppress, or reroute warnings.
  */
 
-export type TastyWarningCode =
+type TastyWarningCode =
   | 'INVALID_SELECTOR_AFFIX'
   | 'XOR_CHAIN_TOO_LONG'
   | 'INTERNAL_PSEUDO_USED'
   | 'INVALID_TOP_LEVEL_PSEUDO_KEY';
 
-export interface TastyWarning {
+interface TastyWarning {
   code: TastyWarningCode;
   message: string;
 }
 
-export type TastyWarningHandler = (warning: TastyWarning) => void;
+type TastyWarningHandler = (warning: TastyWarning) => void;
 
 const defaultWarningHandler: TastyWarningHandler = (warning) => {
   console.warn(`[Tasty] ${warning.message}`);

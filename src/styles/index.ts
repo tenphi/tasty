@@ -1,17 +1,11 @@
 import { predefine, styleHandlers } from './predefined';
 
-const { STYLE_HANDLER_MAP, defineCustomStyle, defineStyleAlias } = predefine();
+const { STYLE_HANDLER_MAP } = predefine();
 
-export {
-  STYLE_HANDLER_MAP,
-  defineCustomStyle,
-  defineStyleAlias,
-  styleHandlers,
-};
+export { STYLE_HANDLER_MAP, styleHandlers };
 export * from './createStyle';
 export {
   normalizeHandlerDefinition,
   registerHandler,
   resetHandlers,
-  validateHandlerResult,
 } from './predefined';

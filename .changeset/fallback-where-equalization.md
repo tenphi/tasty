@@ -2,15 +2,17 @@
 '@tenphi/tasty': minor
 ---
 
-Add the `@fallback` state token and equalize selector specificity with `:where()`.
+Add the `_` fallback floor key and equalize selector specificity with `:where()`.
 
-`@fallback` (used as a top-level `&` atom on a state key, e.g. `'@fallback'` or
-`'@fallback & hovered'`) opts an entry out of *receiving* negation from
-higher-priority states, so it persists as a guaranteed floor while still
-negating lower-priority states. This fixes the CSS three-valued-logic hole where
-a negated `@supports(...)` / container-query default branch silently never
-applies (e.g. `scroll-state` is supported but a specific `scroll-state(...)`
-query is unknown), leaving no rule active.
+A standalone `_` key in a style value map defines a map-wide fallback floor: its
+value **always applies** and is never turned off by higher-priority states,
+which simply layer over it via the cascade. This fixes the CSS
+three-valued-logic hole where a negated `@supports(...)` / container-query
+default branch silently never applies (e.g. `scroll-state` is supported but a
+specific `scroll-state(...)` query is unknown), leaving no rule active. `_` is
+standalone-only — it cannot be combined with state logic (`_ & hovered` is
+ignored with a dev warning) — and it can coexist with the bare `''` default
+(`''` is the negated default, `_` is the always-on floor).
 
 To make the additive cascade predictable, every stateful selector Tasty
 generates (modifiers, pseudo-classes, `:is()`/`:not()` groups, and

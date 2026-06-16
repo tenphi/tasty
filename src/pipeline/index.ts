@@ -98,9 +98,9 @@ interface ComputedRule {
   /**
    * Cascade order hint (source priority of the highest-priority style entry
    * that contributed to this rule). Higher = should appear later in the
-   * stylesheet so it wins the cascade. Used to emit `@fallback` rules before
-   * the higher-priority rules that layer over them, since `:where()` makes
-   * all rules share specificity and source order decides the winner.
+   * stylesheet so it wins the cascade. Used to emit `_` fallback floor rules
+   * before the higher-priority rules that layer over them, since `:where()`
+   * makes all rules share specificity and source order decides the winner.
    */
   order: number;
 }
@@ -165,8 +165,8 @@ function runPipeline(
 
   // Order rules by their cascade order hint (ascending source priority) so
   // higher-priority rules come later and win. This is load-bearing once
-  // selector specificity is equalized via `:where()`: `@fallback` rules
-  // (low order) must precede the higher-priority rules that layer over
+  // selector specificity is equalized via `:where()`: `_` fallback floor
+  // rules (low order) must precede the higher-priority rules that layer over
   // them. The sort is stable, so equal-order rules keep their emission
   // order. Mutually-exclusive rules are unaffected by ordering.
   const stableOrdered = stableSortByOrder(normal);
@@ -177,8 +177,8 @@ function runPipeline(
 /**
  * Stable sort CSS rules by their `order` hint ascending. Rules without an
  * `order` are treated as 0. `Array.prototype.sort` is stable (ES2019+,
- * Node >= 20), so equal-order rules keep their emission order — `@fallback`
- * (low order) stays before the overrides that layer over it.
+ * Node >= 20), so equal-order rules keep their emission order — the `_`
+ * fallback floor (low order) stays before the overrides that layer over it.
  */
 function stableSortByOrder(rules: CSSRule[]): CSSRule[] {
   if (rules.length <= 1) return rules;

@@ -76,7 +76,7 @@ Output: CSSRule[]
 
 **Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside OR expansion, exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization. Every call is cached by condition unique-id, so the repetition is cheap.
 
-**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle`, then **stable-sorts rules by their cascade `order` hint (ascending source priority)** so lower-priority rules come first and higher-priority rules win, and finally emits every `@starting-style` rule **after** all normal rules. The `order` hint is the highest source priority among the entries that produced each rule (threaded `ComputedRule → CSSRule`). This ordering is cascade-critical because Stage 7 equalizes specificity with `:where()`: once every state selector carries zero specificity, source order alone decides which of two overlapping rules wins — most importantly the `@fallback` floor (low order, emitted first) versus the states layered over it, and `@starting-style` versus its normal counterpart. Mutually-exclusive rules are unaffected by ordering (they never both match), so reordering them is safe.
+**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle`, then **stable-sorts rules by their cascade `order` hint (ascending source priority)** so lower-priority rules come first and higher-priority rules win, and finally emits every `@starting-style` rule **after** all normal rules. The `order` hint is the highest source priority among the entries that produced each rule (threaded `ComputedRule → CSSRule`). This ordering is cascade-critical because Stage 7 equalizes specificity with `:where()`: once every state selector carries zero specificity, source order alone decides which of two overlapping rules wins — most importantly the `_` fallback floor (low order, emitted first) versus the states layered over it, and `@starting-style` versus its normal counterpart. Mutually-exclusive rules are unaffected by ordering (they never both match), so reordering them is safe.
 
 ---
 
@@ -119,6 +119,8 @@ Removing don't-care dimensions before parsing prevents combinatorial blowup in l
 ### What It Does
 
 Converts each state key in a style value map (like `'hovered & !disabled'`, `'@media(w < 768px)'`) into `ConditionNode` trees. `parseStyleEntries` walks the object keys in source order and assigns priorities; `parseStateKey` parses a single key string.
+
+`parseStyleEntries` also handles the bare `''` default and the standalone `_` fallback floor before the priority order is finalized. The bare `''` default only behaves correctly as the lowest-priority state, so a misplaced one is moved to the front (`MISPLACED_DEFAULT_STATE` warning). The `_` key is pulled out as a separate floor entry (`floor: true`, `TrueCondition`) and always assigned the lowest priority. If a map defines only `_` and a bare `''` (no other states), the `''` default is redundant — it is dropped in favor of the `_` value (`REDUNDANT_DEFAULT_STATE` warning). A `_` combined with state logic (`_ & hovered`, `_ | x`) is ignored (`INVALID_FALLBACK_KEY` warning).
 
 ### How It Works
 
@@ -293,22 +295,31 @@ C: C & !A & !B          (applies only when neither A nor B)
 
 Each exclusive condition is passed through `simplifyCondition`. Entries that simplify to `FALSE` (impossible) are filtered out. The default state (`''` → `TrueCondition`) is not added to the “prior” list for negation (see `buildExclusiveConditions`).
 
-### `@fallback` entries (negation opt-out)
+### `_` fallback floor
 
-An entry flagged `fallback: true` (from the `@fallback` state-key token) is the
-one exception to the negation cascade above. A `fallback` entry **skips
-receiving `!prior`** — its exclusive condition stays its own condition (`TRUE`
-for the default `@fallback`) so it persists as a floor and a higher-priority
-state cannot turn it off. It is **still pushed into the prior list** (subject to
-the usual non-`TRUE` guard), so lower-priority entries are still negated by it
-and the cascade below it stays mutually exclusive. `fallback` entries are never
-merged with non-`fallback` entries in Stage 1 (they get their own value bucket).
+An entry flagged `floor: true` (from the standalone `_` key) is the one
+exception to the negation cascade above. `buildExclusiveConditions` **pulls the
+floor entries out** before the negation pass, builds the remaining entries with a
+plain unconditional negation loop, then re-appends each floor with its own
+(`TRUE`) condition as the exclusive condition. So the floor **always applies**,
+never receives `!prior`, and never negates lower-priority entries. Because its
+condition is `TRUE`, Stage 1 `mergeEntriesByValue` already leaves it untouched
+(same guard as the bare `''` default), so no floor-specific merge handling is
+needed.
 
 This exists to fix the *unknown-query hole*: CSS three-valued logic makes
 `not(unknown) = unknown`, so a negated `@supports(...)` / container-query default
-branch silently never applies. A `@fallback` floor sidesteps negation entirely
-and lets the positive override layer on top via the cascade (see Stage 7's
-`:where()` equalization and the ascending-priority post-pass).
+branch silently never applies. A `_` floor sidesteps negation entirely and lets
+the positive override layer on top via the cascade (see Stage 7's `:where()`
+equalization and the ascending-priority post-pass).
+
+Because the floor is **additive** (always emitted, never negated) rather than
+mutually exclusive, it differs observably from the `''` default in two ways
+beyond the unknown-query fix: an "empty" higher-priority state (one that emits no
+declarations) cannot unset the property — the floor still applies — and when
+states emit different declaration sets, the floor's declarations bleed through
+wherever a winning state does not override the same property. The `''` default,
+being negated, swaps out cleanly. See the DSL guide's "`_` vs the `''` default".
 
 ### Why
 
@@ -502,7 +513,7 @@ Converts condition trees into actual CSS selectors and at-rules.
    - `@parent` ancestors (`parentGroupsToCSS`) become `:where(... *)` / `:where(:not(... *))`;
    - the `@root` context prefix (`rootGroupsToCSS`) becomes `:where(:root...)` (zeroing the `:root` pseudo too).
 
-   The only specificity anchors that remain are the doubled component class (`.tXX.tXX`, added by the injector) and sub-element `[data-element]` attributes. Because Stage 2b already makes ordinary rules mutually exclusive, zeroing specificity never changes *which* rule matches — it only makes additive layering (`@fallback`, `@starting-style`) resolve deterministically by source order (see the post-pass). Canonical sorting/dedup/subsumption still run first; `:where()` is only the final wrapper, and both output paths (injector and direct-selector / SSR) consume the same wrapped fragments.
+   The only specificity anchors that remain are the doubled component class (`.tXX.tXX`, added by the injector) and sub-element `[data-element]` attributes. Because Stage 2b already makes ordinary rules mutually exclusive, zeroing specificity never changes *which* rule matches — it only makes additive layering (`_` fallback floor, `@starting-style`) resolve deterministically by source order (see the post-pass). Canonical sorting/dedup/subsumption still run first; `:where()` is only the final wrapper, and both output paths (injector and direct-selector / SSR) consume the same wrapped fragments.
 
 ### Why
 

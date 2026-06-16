@@ -28,13 +28,13 @@ interface ParsedStyleEntry {
   condition: ConditionNode; // Parsed condition tree
   priority: number; // Order in original object (higher = higher priority)
   /**
-   * When true (set by the `@fallback` state token), this entry opts out of
-   * RECEIVING negation from higher-priority entries — it persists as a
-   * fallback that higher-priority states layer over via the cascade. It
-   * still negates lower-priority entries, so the cascade below it stays
-   * mutually exclusive. See `buildExclusiveConditions`.
+   * When true (set by the standalone `_` key), this entry is a map-wide
+   * fallback floor. It always applies (its condition is `TRUE`), opts out
+   * of RECEIVING negation from higher-priority entries, and never negates
+   * lower-priority entries. It is pulled out of the negation cascade and
+   * handled separately. See `buildExclusiveConditions`.
    */
-  fallback?: boolean;
+  floor?: boolean;
 }
 
 /**
@@ -78,42 +78,47 @@ export function buildExclusiveConditions(
   const result: ExclusiveStyleEntry[] = [];
   const priorConditions: ConditionNode[] = [];
 
+  // Pull the `_` fallback floor out of the negation cascade entirely. It
+  // always applies (TRUE condition), never receives negation, and never
+  // negates lower-priority entries — so the remaining entries can be built
+  // with a plain, unconditional negation pass. The floor is re-appended
+  // afterward with its TRUE exclusive condition.
+  const floors: ParsedStyleEntry[] = [];
+
   for (const entry of entries) {
+    if (entry.floor) {
+      floors.push(entry);
+      continue;
+    }
+
     // Build: condition & !prior[0] & !prior[1] & ...
     let exclusive: ConditionNode = entry.condition;
 
-    // `@fallback` entries opt out of RECEIVING negation: a higher-priority
-    // state cannot turn them off. They keep their own condition (TRUE for
-    // the default) and persist as a cascade fallback. They are still added
-    // to `priorConditions` below, so lower-priority entries are negated by
-    // them and the cascade below stays mutually exclusive.
-    if (!entry.fallback) {
-      for (const prior of priorConditions) {
-        // Skip negating "always true" (default state) - it would become "always false"
-        if (prior.kind === 'true') {
-          continue;
-        }
-
-        // Cheap mutual-exclusivity pre-check: if this entry's own condition
-        // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
-        // `[theme=green] & ...`), then `prior` can never match when this entry
-        // does, so `!prior` is always true here and adds nothing. Skipping it
-        // avoids De Morgan'ing `prior` into a wide OR of negations that would
-        // otherwise feed an exponential Cartesian product at materialization.
-        //
-        // This only fires when the contradiction is structurally provable via
-        // `simplifyCondition` (memoized, operates on the small pairwise AND).
-        // The default entry (no positive terms) is unaffected and keeps its
-        // full negation chain, which `orToCSS` recombines into compact :not().
-        if (
-          entry.condition.kind !== 'true' &&
-          simplifyCondition(and(entry.condition, prior)).kind === 'false'
-        ) {
-          continue;
-        }
-
-        exclusive = and(exclusive, not(prior));
+    for (const prior of priorConditions) {
+      // Skip negating "always true" (default state) - it would become "always false"
+      if (prior.kind === 'true') {
+        continue;
       }
+
+      // Cheap mutual-exclusivity pre-check: if this entry's own condition
+      // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
+      // `[theme=green] & ...`), then `prior` can never match when this entry
+      // does, so `!prior` is always true here and adds nothing. Skipping it
+      // avoids De Morgan'ing `prior` into a wide OR of negations that would
+      // otherwise feed an exponential Cartesian product at materialization.
+      //
+      // This only fires when the contradiction is structurally provable via
+      // `simplifyCondition` (memoized, operates on the small pairwise AND).
+      // The default entry (no positive terms) is unaffected and keeps its
+      // full negation chain, which `orToCSS` recombines into compact :not().
+      if (
+        entry.condition.kind !== 'true' &&
+        simplifyCondition(and(entry.condition, prior)).kind === 'false'
+      ) {
+        continue;
+      }
+
+      exclusive = and(exclusive, not(prior));
     }
 
     // Simplify the exclusive condition
@@ -135,6 +140,15 @@ export function buildExclusiveConditions(
     }
   }
 
+  // Re-append the fallback floor(s). Their exclusive condition is just their
+  // own (TRUE) condition: always active, never negated.
+  for (const floor of floors) {
+    result.push({
+      ...floor,
+      exclusiveCondition: floor.condition,
+    });
+  }
+
   return result;
 }
 
@@ -152,81 +166,137 @@ export function parseStyleEntries(
   parseCondition: (stateKey: string) => ConditionNode,
 ): ParsedStyleEntry[] {
   const entries: ParsedStyleEntry[] = [];
+  let floorEntry: ParsedStyleEntry | null = null;
   const keys = Object.keys(valueMap);
 
-  keys.forEach((stateKey, index) => {
+  keys.forEach((stateKey) => {
     const value = valueMap[stateKey];
 
-    // Extract the `@fallback` negation opt-out marker. It is a top-level
-    // `&` atom on the key; the remaining atoms form the actual condition.
-    // Done before parseCondition so `@fallback` is never mis-parsed as a
-    // modifier by parseStateKey/parseAdvancedState.
-    const { fallback, condition: conditionKey } = extractFallbackMarker(
-      stateKey,
-      styleKey,
-    );
+    // The standalone `_` key is the map-wide fallback floor. It must be used
+    // on its own — it cannot be combined with state logic (`_ & hovered`,
+    // `_ | x`). A misused `_` is warned about and ignored.
+    if (stateKey === '_') {
+      floorEntry = {
+        styleKey,
+        stateKey,
+        value,
+        condition: trueCondition(),
+        priority: 0,
+        floor: true,
+      };
+      return;
+    }
+
+    if (isMisusedFallbackKey(stateKey)) {
+      emitWarning(
+        'INVALID_FALLBACK_KEY',
+        `Style key "${stateKey}" (in "${styleKey}") combines the fallback "_" with ` +
+          `other state logic. "_" can only be used on its own as a map-wide ` +
+          `fallback floor. The key has been ignored.`,
+      );
+      return;
+    }
 
     const condition =
-      conditionKey === '' ? trueCondition() : parseCondition(conditionKey);
+      stateKey === '' ? trueCondition() : parseCondition(stateKey);
 
     entries.push({
       styleKey,
       stateKey,
       value,
       condition,
-      priority: index,
-      ...(fallback ? { fallback: true } : {}),
+      priority: 0,
     });
+  });
+
+  // A floor combined only with a bare `""` default (and no other states) is
+  // redundant: the `""` default would always be superseded by the floor, so
+  // only the floor's value matters. Drop the `""` default and warn.
+  if (floorEntry !== null) {
+    const hasOtherStates = entries.some((e) => e.condition.kind !== 'true');
+    const hasDefault = entries.some((e) => e.condition.kind === 'true');
+    if (!hasOtherStates && hasDefault) {
+      emitWarning(
+        'REDUNDANT_DEFAULT_STATE',
+        `Style "${styleKey}" defines both a "_" fallback and a "" default with no ` +
+          `other states. The "" default is redundant (always superseded by "_"); ` +
+          `the "_" value is used and the "" default is ignored.`,
+      );
+      // Only the floor remains; drop the redundant bare default.
+      entries.length = 0;
+    }
+  }
+
+  const normalized = normalizeDefaultStates(entries, styleKey);
+
+  // Assign contiguous priorities: the fallback floor is always lowest
+  // priority (0) so it sits first in the cascade (emitted before the states
+  // that layer over it); the remaining entries follow in authored order.
+  const ordered =
+    floorEntry !== null ? [floorEntry, ...normalized] : normalized;
+  ordered.forEach((entry, index) => {
+    entry.priority = index;
   });
 
   // Reverse so highest priority (last in object) comes first for exclusive building
   // buildExclusiveConditions expects highest priority first
-  entries.reverse();
+  ordered.reverse();
 
-  return entries;
+  return ordered;
 }
 
 /**
- * Extract the `@fallback` negation opt-out marker from a state key.
- *
- * `@fallback` must appear as a top-level `&` atom (not inside `|`/`^`).
- * Returns `fallback: true` and the remaining condition key (atoms minus
- * `@fallback`, rejoined with ` & `; empty string for the default state).
- *
- * If `@fallback` appears inside an OR/XOR (so `splitTopLevelAnd` returns
- * `null`) but is present in the key, a dev warning is emitted and the
- * marker is ignored (the key is parsed as-is).
+ * Detect a misused standalone `_` fallback key: a key that is not exactly
+ * `_` but contains `_` as a standalone atom among state-logic operators
+ * (`&`, `|`, `^`, `,`) or grouping parens. A `_` embedded in a longer token
+ * (e.g. a modifier named `_private`) is not a misuse.
  */
-function extractFallbackMarker(
-  stateKey: string,
+function isMisusedFallbackKey(stateKey: string): boolean {
+  if (stateKey === '_' || !stateKey.includes('_')) return false;
+  return /(?:^|[\s&|^,(])_(?:[\s&|^,)]|$)/.test(stateKey);
+}
+
+/**
+ * Resolve the bare `''` default state (`condition.kind === 'true'`) in a
+ * style value map.
+ *
+ * The bare default only behaves correctly as the **first** (lowest-priority)
+ * key. When it appears later, `buildExclusiveConditions` processes it first
+ * (after the reverse), never adds it to the prior list, and never negates it
+ * — so it silently overrides every state authored before it.
+ *
+ * This function, given entries in authored order, moves a misplaced bare
+ * default to the front (lowest priority), preserving the relative order of
+ * all other entries, and emits a `MISPLACED_DEFAULT_STATE` warning.
+ *
+ * The `_` fallback floor is pulled out before this runs (see
+ * `parseStyleEntries`), so only the bare `''` default is considered here.
+ */
+function normalizeDefaultStates(
+  entries: ParsedStyleEntry[],
   styleKey: string,
-): { fallback: boolean; condition: string } {
-  if (stateKey === '' || !stateKey.includes('@fallback')) {
-    return { fallback: false, condition: stateKey };
+): ParsedStyleEntry[] {
+  const defaultPos = entries.findIndex((e) => e.condition.kind === 'true');
+
+  // No bare default, or already first: nothing to do (the common case).
+  if (defaultPos <= 0) {
+    return entries;
   }
 
-  const atoms = splitTopLevelAnd(stateKey);
+  const defaultEntry = entries[defaultPos];
+  emitWarning(
+    'MISPLACED_DEFAULT_STATE',
+    `Style "${styleKey}" defines the default state "${defaultEntry.stateKey}" ` +
+      `after other states. A bare default ("") must be the first key, ` +
+      `otherwise it overrides the states above it. It has been moved to the ` +
+      `first position. Define default states first.`,
+  );
 
-  // Key contains `|`, `^`, or `,` at top level — `@fallback` is not a
-  // valid top-level AND atom here. Warn and treat the key verbatim.
-  if (atoms === null) {
-    emitWarning(
-      'INVALID_FALLBACK_MARKER',
-      `Style key "${stateKey}" (in "${styleKey}") uses @fallback inside an OR/XOR group. ` +
-        `@fallback must be a top-level "&" atom (e.g. "@fallback" or "@fallback & hovered"). ` +
-        `The marker has been ignored.`,
-    );
-    return { fallback: false, condition: stateKey };
-  }
-
-  const rest = atoms.filter((a) => a !== '@fallback');
-  if (rest.length === atoms.length) {
-    // Contains the substring "@fallback" but not as a standalone atom
-    // (e.g. a user state name like "@fallbackish"); leave it untouched.
-    return { fallback: false, condition: stateKey };
-  }
-
-  return { fallback: true, condition: rest.join(' & ') };
+  return [
+    defaultEntry,
+    ...entries.slice(0, defaultPos),
+    ...entries.slice(defaultPos + 1),
+  ];
 }
 
 /**
@@ -287,11 +357,10 @@ export function mergeEntriesByValue(
   const merged: ParsedStyleEntry[] = [];
 
   for (const entry of entries) {
-    // Defaults are never merged with non-defaults.
-    // `@fallback` entries are never merged either: merging would lift their
-    // condition and rewrite the negation cascade, destroying the opt-out
-    // semantics. They participate in Stage 6 `mergeByValue` later instead.
-    if (entry.condition.kind === 'true' || entry.fallback) {
+    // Defaults are never merged with non-defaults. The `_` fallback floor
+    // has a `TRUE` condition, so this same guard excludes it from merging;
+    // it participates in Stage 6 `mergeByValue` later instead.
+    if (entry.condition.kind === 'true') {
       merged.push(entry);
       continue;
     }
@@ -305,8 +374,6 @@ export function mergeEntriesByValue(
     for (let j = merged.length - 1; j >= 0; j--) {
       const prev = merged[j];
       if (prev.condition.kind === 'true') continue;
-      // Never merge into a `@fallback` entry — it must keep its opt-out flag.
-      if (prev.fallback) continue;
       if (serializeValue(prev.value) !== valueKey) continue;
 
       let safe = true;
@@ -400,10 +467,10 @@ export function extractCompoundStates(
 
   const entries = keys.map((key) => {
     const atoms = splitTopLevelAnd(key);
-    // Keys carrying a top-level `@fallback` marker must stay opaque so the
-    // marker is never dropped as a "redundant atom" or collapsed into
-    // another key. (`@fallback` is extracted later in parseStyleEntries.)
-    const isOpaque = atoms === null || atoms.includes('@fallback');
+    // Keys containing the `_` fallback floor must stay opaque so `_` is never
+    // dropped as a "redundant atom" or collapsed into the `""` default.
+    // (`_` is handled later in parseStyleEntries.)
+    const isOpaque = atoms === null || atoms.includes('_');
     return {
       // null means the key has non-AND operators; treat the whole key
       // as a single opaque atom so it never matches partial pairs.

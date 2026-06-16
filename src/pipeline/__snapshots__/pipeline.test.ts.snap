@@ -1,39 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`@fallback negation opt-out > should emit a bare default + positive override for the scroll-state case 1`] = `
-[
-  {
-    "declarations": "inset: 0 auto auto auto;",
-    "selector": ".component",
-  },
-  {
-    "atRules": [
-      "@container scroll-state(scrolled: block-end)",
-      "@supports (container-type: scroll-state)",
-    ],
-    "declarations": "inset: -10px auto auto auto;",
-    "selector": ".component",
-  },
-]
-`;
-
-exports[`@fallback negation opt-out > should still negate lower-priority entries from a conditional @fallback 1`] = `
-[
-  {
-    "declarations": "color: black;",
-    "selector": ".btn:where(:not([data-hovered]):not([data-pressed]))",
-  },
-  {
-    "declarations": "color: blue;",
-    "selector": ".btn:where([data-hovered])",
-  },
-  {
-    "declarations": "color: red;",
-    "selector": ".btn:where([data-pressed])",
-  },
-]
-`;
-
 exports[`@supports queries snapshot tests > should eliminate impossible @supports combinations 1`] = `
 [
   {
@@ -333,6 +299,40 @@ exports[`@supports queries snapshot tests > should render multiple @supports wit
       "@supports (display: grid)",
     ],
     "declarations": "display: grid;",
+    "selector": ".component",
+  },
+]
+`;
+
+exports[`_ fallback floor > persists the floor alongside a "" default and other states 1`] = `
+[
+  {
+    "declarations": "color: gray;",
+    "selector": ".btn",
+  },
+  {
+    "declarations": "color: black;",
+    "selector": ".btn:where(:not([data-pressed]))",
+  },
+  {
+    "declarations": "color: red;",
+    "selector": ".btn:where([data-pressed])",
+  },
+]
+`;
+
+exports[`_ fallback floor > should emit a bare default + positive override for the scroll-state case 1`] = `
+[
+  {
+    "declarations": "inset: 0 auto auto auto;",
+    "selector": ".component",
+  },
+  {
+    "atRules": [
+      "@container scroll-state(scrolled: block-end)",
+      "@supports (container-type: scroll-state)",
+    ],
+    "declarations": "inset: -10px auto auto auto;",
     "selector": ".component",
   },
 ]

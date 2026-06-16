@@ -919,6 +919,268 @@ describe('buildExclusiveConditions()', () => {
   });
 });
 
+describe('misplaced default state reordering', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('moves a non-first "" default to the lowest priority', () => {
+    // Authored with "" AFTER hovered. parseStyleEntries returns entries
+    // highest-priority-first, so the default must end up LAST here.
+    const entries = parseStyleEntries(
+      'color',
+      {
+        hovered: 'blue',
+        '': 'red',
+      },
+      parseStateKey,
+    );
+
+    expect(entries.map((e) => e.stateKey)).toEqual(['hovered', '']);
+    // The default's priority is the lowest after normalization.
+    const defaultEntry = entries.find((e) => e.stateKey === '')!;
+    const hoveredEntry = entries.find((e) => e.stateKey === 'hovered')!;
+    expect(defaultEntry.priority).toBeLessThan(hoveredEntry.priority);
+  });
+
+  it('produces the same exclusive CSS regardless of "" position', () => {
+    const defaultFirst = renderStyles(
+      { color: { '': 'red', hovered: 'blue' } },
+      '.btn',
+    );
+    clearPipelineCache();
+    const defaultLast = renderStyles(
+      { color: { hovered: 'blue', '': 'red' } },
+      '.btn',
+    );
+
+    // The default must negate hovered in both forms.
+    const negatedFirst = defaultFirst.find(
+      (r) => r.declarations.includes('red') && r.selector.includes(':not'),
+    );
+    const negatedLast = defaultLast.find(
+      (r) => r.declarations.includes('red') && r.selector.includes(':not'),
+    );
+    expect(negatedFirst).toBeDefined();
+    expect(negatedLast).toBeDefined();
+    expect(negatedLast!.selector).toBe(negatedFirst!.selector);
+
+    // hovered stays bare (highest priority) in both forms.
+    const hoveredLast = defaultLast.find((r) =>
+      r.declarations.includes('blue'),
+    );
+    expect(hoveredLast!.selector).toContain('[data-hovered]');
+    expect(hoveredLast!.selector).not.toContain(':not');
+  });
+
+  it('reordering yields a ruleset identical to author-first (3 states + at-rule)', () => {
+    // Compare the full rendered ruleset in emission order (selectors,
+    // declarations, and at-rule context). Equal arrays mean a misplaced
+    // default produces byte-identical CSS — including cascade order, which
+    // array position encodes — to authoring the default first.
+    const normalize = (rules: ReturnType<typeof renderStyles>) =>
+      rules.map((r) => ({
+        selector: r.selector,
+        declarations: r.declarations,
+        atRules: r.atRules ?? [],
+      }));
+
+    const authorFirst = renderStyles(
+      {
+        color: {
+          '': 'red',
+          hovered: 'blue',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+        },
+      },
+      '.btn',
+    );
+
+    clearPipelineCache();
+    const defaultLast = renderStyles(
+      {
+        color: {
+          hovered: 'blue',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+          '': 'red',
+        },
+      },
+      '.btn',
+    );
+
+    clearPipelineCache();
+    const defaultMiddle = renderStyles(
+      {
+        color: {
+          hovered: 'blue',
+          '': 'red',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+        },
+      },
+      '.btn',
+    );
+
+    // A misplaced default (last or middle) must produce the exact same CSS
+    // as authoring it first — the non-default cascade order is preserved and
+    // the floor is reinserted at the lowest priority.
+    expect(normalize(defaultLast)).toEqual(normalize(authorFirst));
+    expect(normalize(defaultMiddle)).toEqual(normalize(authorFirst));
+  });
+
+  it('places a non-first "_" floor at the lowest priority', () => {
+    const entries = parseStyleEntries(
+      'color',
+      {
+        hovered: 'blue',
+        _: 'red',
+      },
+      parseStateKey,
+    );
+
+    const floorEntry = entries.find((e) => e.stateKey === '_')!;
+    const hoveredEntry = entries.find((e) => e.stateKey === 'hovered')!;
+    expect(floorEntry.floor).toBe(true);
+    expect(floorEntry.priority).toBeLessThan(hoveredEntry.priority);
+
+    clearPipelineCache();
+    const result = renderStyles(
+      { color: { hovered: 'blue', _: 'red' } },
+      '.btn',
+    );
+    // The floor stays bare (opt-out of negation) and is emitted before the
+    // override.
+    const floorRule = result.find((r) => r.declarations.includes('red'));
+    expect(floorRule!.selector).not.toContain(':not');
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(hoveredRule!),
+    );
+  });
+
+  it('emits MISPLACED_DEFAULT_STATE when "" is not first', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    parseStyleEntries('color', { hovered: 'blue', '': 'red' }, parseStateKey);
+
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      true,
+    );
+
+    restore();
+  });
+
+  it('does not warn or reorder when "" is already first', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    const entries = parseStyleEntries(
+      'color',
+      { '': 'red', hovered: 'blue' },
+      parseStateKey,
+    );
+
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      false,
+    );
+    // Highest-priority-first: hovered then default.
+    expect(entries.map((e) => e.stateKey)).toEqual(['hovered', '']);
+
+    restore();
+  });
+
+  it('keeps a "_" floor alongside a bare "" default with other states', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    const entries = parseStyleEntries(
+      'color',
+      {
+        '': 'black',
+        _: 'gray',
+        pressed: 'red',
+      },
+      parseStateKey,
+    );
+
+    // Both the floor and the bare default survive (other states exist), and
+    // neither triggers a misplacement or redundancy warning.
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      false,
+    );
+    expect(warnings.some((w) => w.code === 'REDUNDANT_DEFAULT_STATE')).toBe(
+      false,
+    );
+    // Highest-priority-first after reverse: pressed, "" default, then the
+    // floor (lowest priority).
+    expect(entries.map((e) => e.stateKey)).toEqual(['pressed', '', '_']);
+    const floorEntry = entries.find((e) => e.stateKey === '_')!;
+    expect(floorEntry.floor).toBe(true);
+
+    restore();
+  });
+});
+
+describe('redundant default state ("_" + bare "")', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('drops the bare "" default and keeps the "_" floor', () => {
+    const entries = parseStyleEntries(
+      'color',
+      {
+        '': 'red',
+        _: 'green',
+      },
+      parseStateKey,
+    );
+
+    const stateKeys = entries.map((e) => e.stateKey);
+    expect(stateKeys).toContain('_');
+    expect(stateKeys).not.toContain('');
+  });
+
+  it('emits REDUNDANT_DEFAULT_STATE', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    parseStyleEntries('color', { '': 'red', _: 'green' }, parseStateKey);
+
+    expect(warnings.some((w) => w.code === 'REDUNDANT_DEFAULT_STATE')).toBe(
+      true,
+    );
+
+    restore();
+  });
+
+  it('renders only the "_" floor value', () => {
+    const result = renderStyles({ color: { '': 'red', _: 'green' } }, '.btn');
+
+    // The dropped "" value must not appear at all.
+    expect(result.some((r) => r.declarations.includes('red'))).toBe(false);
+    // The "_" floor renders as a bare rule.
+    const floorRule = result.find((r) => r.declarations.includes('green'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
+  });
+});
+
 describe('attribute mutual-exclusivity optimization', () => {
   describe('bracket attribute selectors parse as modifiers', () => {
     it('parses [data-variant="processing"] as a modifier (not opaque pseudo)', () => {
@@ -3191,7 +3453,7 @@ describe('@supports queries snapshot tests', () => {
   });
 });
 
-describe('@fallback negation opt-out', () => {
+describe('_ fallback floor', () => {
   beforeEach(() => {
     clearPipelineCache();
   });
@@ -3199,11 +3461,11 @@ describe('@fallback negation opt-out', () => {
   it('should emit a bare default + positive override for the scroll-state case', () => {
     // The unknown-query hole: `@supports(container-type: scroll-state)` may
     // be true while the `scroll-state(...)` container query is unknown. With
-    // `@fallback` the default is NOT negated by the override, so it persists
+    // the `_` floor the default is NOT negated by the override, so it persists
     // as a cascade floor and the override layers on top when it does match.
     const styles = {
       inset: {
-        '@fallback': '0 top',
+        _: '0 top',
         '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
           '-10px top',
       },
@@ -3252,47 +3514,49 @@ describe('@fallback negation opt-out', () => {
     expect(result).toMatchSnapshot();
   });
 
-  it('should still negate lower-priority entries from a conditional @fallback', () => {
-    // `@fallback & m` opts out of receiving negation from H (so it persists
-    // when H matches), but still negates the lower-priority default and
-    // keeps its own `m` condition.
+  it('persists the floor alongside a "" default and other states', () => {
+    // `_` is the always-on floor; `""` is the negated default; `pressed` is a
+    // higher-priority state. The floor must stay bare while the default still
+    // receives negation from the higher-priority states.
     const styles = {
       color: {
         '': 'black',
-        '@fallback & hovered': 'blue',
+        _: 'gray',
         pressed: 'red',
       },
     } as const;
 
     const result = renderStyles(styles, '.btn');
 
-    // `pressed` keeps a plain (non-fallback) condition.
+    // `pressed` keeps a plain condition.
     const pressedRule = result.find((r) => r.declarations.includes('red'));
     expect(pressedRule).toBeDefined();
     expect(pressedRule!.selector).toContain('[data-pressed]');
 
-    // The hovered fallback keeps its own `hovered` condition and is NOT
-    // negated by the higher-priority `pressed`.
-    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
-    expect(hoveredRule).toBeDefined();
-    expect(hoveredRule!.selector).toContain('[data-hovered]');
-    expect(hoveredRule!.selector).not.toContain('[data-pressed]');
+    // The `_` floor is a bare rule, never negated.
+    const floorRule = result.find((r) => r.declarations.includes('gray'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
 
-    // The default is still excluded in hovered's scope (lower priority is
-    // negated by the fallback): it carries `:not([data-hovered])`.
+    // The bare default still receives negation from `pressed`.
     const defaultRule = result.find(
       (r) => r.declarations.includes('black') && r.selector.includes(':where('),
     );
     expect(defaultRule).toBeDefined();
-    expect(defaultRule!.selector).toContain(':not([data-hovered])');
+    expect(defaultRule!.selector).toContain(':not([data-pressed])');
+
+    // The floor is emitted before the default and the override.
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(pressedRule!),
+    );
 
     expect(result).toMatchSnapshot();
   });
 
-  it('should treat the default @fallback as a guaranteed floor', () => {
+  it('should treat a standalone "_" as a guaranteed floor', () => {
     const styles = {
       color: {
-        '@fallback': 'black',
+        _: 'black',
         hovered: 'blue',
       },
     } as const;
@@ -3315,38 +3579,46 @@ describe('@fallback negation opt-out', () => {
     );
   });
 
-  it('should warn and ignore @fallback used inside an OR group', async () => {
+  it('should warn and ignore "_" combined with state logic', async () => {
     const { setWarningHandler } = await import('./warnings');
     const warnings: { code: string; message: string }[] = [];
     const restore = setWarningHandler((w) => {
       warnings.push(w);
     });
 
-    renderStyles(
-      { color: { '': 'black', '@fallback | hovered': 'blue' } },
+    const orResult = renderStyles(
+      { color: { '': 'black', '_ | hovered': 'blue' } },
       '.btn',
     );
+    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_KEY')).toBe(true);
+    // The misused entry is ignored, so its value never renders.
+    expect(orResult.some((r) => r.declarations.includes('blue'))).toBe(false);
 
-    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_MARKER')).toBe(
-      true,
+    clearPipelineCache();
+    warnings.length = 0;
+    const andResult = renderStyles(
+      { color: { '': 'black', '_ & hovered': 'green' } },
+      '.btn',
     );
+    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_KEY')).toBe(true);
+    expect(andResult.some((r) => r.declarations.includes('green'))).toBe(false);
 
     restore();
   });
 
-  it('cannot be redefined via configure({ states }) — stays the fallback marker', () => {
+  it('cannot be redefined via configure({ states })', () => {
     resetConfig();
-    // Attempt to hijack @fallback as a :hover alias; it is reserved, so the
-    // attempt is ignored and @fallback keeps its opt-out semantics.
-    configure({ states: { '@fallback': ':hover' } });
+    // Attempt to hijack "_" as a :hover alias; "_" is intercepted before
+    // state resolution, so the attempt has no effect and "_" stays the floor.
+    configure({ states: { _: ':hover' } });
 
     const result = renderStyles(
-      { color: { '@fallback': 'black', hovered: 'blue' } },
+      { color: { _: 'black', hovered: 'blue' } },
       '.btn',
     );
 
-    // If @fallback had been redefined to :hover, the floor would carry a
-    // :hover selector. It must remain a bare floor instead.
+    // If "_" had been redefined to :hover, the floor would carry a :hover
+    // selector. It must remain a bare floor instead.
     const floorRule = result.find((r) => r.declarations.includes('black'));
     expect(floorRule).toBeDefined();
     expect(floorRule!.selector).not.toContain(':hover');

@@ -10,7 +10,9 @@ type TastyWarningCode =
   | 'XOR_CHAIN_TOO_LONG'
   | 'INTERNAL_PSEUDO_USED'
   | 'INVALID_TOP_LEVEL_PSEUDO_KEY'
-  | 'INVALID_FALLBACK_MARKER';
+  | 'INVALID_FALLBACK_KEY'
+  | 'MISPLACED_DEFAULT_STATE'
+  | 'REDUNDANT_DEFAULT_STATE';
 
 interface TastyWarning {
   code: TastyWarningCode;

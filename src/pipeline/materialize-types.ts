@@ -198,8 +198,9 @@ export interface CSSRule {
   /**
    * Cascade order hint propagated from the source style entry priority.
    * Higher = later in the stylesheet (wins the cascade). Used by the
-   * pipeline post-pass to emit `@fallback` rules before the higher-priority
-   * rules that layer over them. Internal; stripped before injection.
+   * pipeline post-pass to emit `_` fallback floor rules before the
+   * higher-priority rules that layer over them. Internal; stripped before
+   * injection.
    */
   order?: number;
 }

@@ -1,5 +1,49 @@
 # @tenphi/tasty
 
+## 2.7.0
+
+### Minor Changes
+
+- [#220](https://github.com/tenphi/tasty/pull/220) [`e9d04ac`](https://github.com/tenphi/tasty/commit/e9d04ac1616098acd07e63a6bc26dbff382c3ec1) Thanks [@tenphi](https://github.com/tenphi)! - Add the `_` fallback floor key and equalize selector specificity with `:where()`.
+
+  A standalone `_` key in a style value map defines a map-wide fallback floor: its
+  value **always applies** and is never turned off by higher-priority states,
+  which simply layer over it via the cascade. This fixes the CSS
+  three-valued-logic hole where a negated `@supports(...)` / container-query
+  default branch silently never applies (e.g. `scroll-state` is supported but a
+  specific `scroll-state(...)` query is unknown), leaving no rule active. `_` is
+  standalone-only — it cannot be combined with state logic (`_ & hovered` is
+  ignored with a dev warning) — and it can coexist with the bare `''` default
+  (`''` is the negated default, `_` is the always-on floor).
+
+  To make the additive cascade predictable, every stateful selector Tasty
+  generates (modifiers, pseudo-classes, `:is()`/`:not()` groups, and
+  `@root`/`@parent` context) is now wrapped in `:where(...)` so it carries zero
+  specificity. The only specificity anchors are the doubled component class
+  (`.tXX.tXX`) and sub-element `[data-element]` attributes; overlapping rules
+  resolve purely by source order, which Tasty now emits ascending by priority
+  (`@starting-style` last).
+
+  Note: state selectors drop from e.g. `0,3,0` to the class baseline `0,2,0`
+  specificity. This is intentional — the doubled class remains the floor — but may
+  affect overrides from external CSS that relied on state-selector specificity.
+
+### Patch Changes
+
+- [#220](https://github.com/tenphi/tasty/pull/220) [`3c11119`](https://github.com/tenphi/tasty/commit/3c11119ee1a93dec54a23ee3883d3f915ac68703) Thanks [@tenphi](https://github.com/tenphi)! - Auto-correct and warn on misplaced or redundant default states in style maps.
+
+  The bare default state (`''`) is the lowest-priority state and must be the first
+  key in a state map. When it is authored after other states, Tasty now moves it
+  to the front and emits a `MISPLACED_DEFAULT_STATE` dev warning — previously it
+  silently overrode every state above it because a `TRUE` condition is never
+  negated.
+
+  Defining both a `_` fallback floor and a bare `''` default with no other states
+  is redundant: the `''` default would always be superseded by the floor. Tasty
+  now keeps the `_` value, drops the `''` default, and emits a
+  `REDUNDANT_DEFAULT_STATE` dev warning. When other states exist, `_` and `''`
+  coexist (one is the always-on floor, the other the negated default).
+
 ## 2.6.5
 
 ### Patch Changes

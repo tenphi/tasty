@@ -107,6 +107,6 @@ exports[`Advanced State Mapping - CSS Output > sub-element advanced states > sho
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should handle negated @own state 1`] = `""`;
 
 exports[`Advanced State Mapping - renderStyles direct tests > XOR (^) operator > should render a tasty() component with XOR state 1`] = `
-".to43j36.to43j36:is([data-focused]:not([data-hovered]), [data-hovered]:not([data-focused])) { color: red; }
-.to43j36.to43j36:is(:not([data-focused]):not([data-hovered]), [data-focused][data-hovered]) { color: black; }"
+".to43j36.to43j36:where(:is(:not([data-focused]):not([data-hovered]), [data-focused][data-hovered])) { color: black; }
+.to43j36.to43j36:where(:is([data-focused]:not([data-hovered]), [data-hovered]:not([data-focused]))) { color: red; }"
 `;

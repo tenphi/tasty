@@ -41,6 +41,20 @@ fill: {
 }
 ```
 
+#### Default State Ordering
+
+Key order sets priority — later keys win and turn off earlier ones via negation. The bare default (`''`) is the lowest-priority state, so it **must be the first key**. If it appears after other states, Tasty moves it to the front and emits a dev warning (`MISPLACED_DEFAULT_STATE`); otherwise it would override every state above it.
+
+```jsx
+// Correct — default first
+color: { '': '#text', hovered: '#accent' }
+
+// Auto-corrected with a warning — '' moved to the front
+color: { hovered: '#accent', '': '#text' }
+```
+
+The bare `''` default still **receives negation** (it is turned off when a higher-priority state matches). For a value that must always apply as a guaranteed floor — even where a query is *unknown* — use the [`_` fallback floor](#_--fallback-floor) instead. The two can coexist: `''` is the negated default, `_` is the always-on floor. If a map contains only `_` and `''` (no other states), the `''` default is redundant — Tasty keeps the `_` value and drops `''` with a `REDUNDANT_DEFAULT_STATE` warning.
+
 ### Sub-element
 
 Element styled using a capitalized key. Identified by `data-element` attribute:
@@ -288,10 +302,20 @@ const SimpleButton = tasty(Button, {
 | `@parent` | Parent/ancestor element states | `@parent(hovered)` |
 | `@own` | Sub-element's own state | `@own(hovered)` |
 | `@starting` | Entry animation | `@starting` |
+| `_` | Fallback floor (always-on, never negated) | `_` |
 | `:is()` | CSS `:is()` structural pseudo-class | `:is(fieldset > label)` |
 | `:has()` | CSS `:has()` relational pseudo-class | `:has(> Icon)` |
 | `:not()` | CSS `:not()` negation (prefer `!:is()`) | `:not(:first-child)` |
 | `:where()` | CSS `:where()` (zero specificity) | `:where(Section)` |
+
+> **Specificity.** All state selectors Tasty generates (modifiers, pseudo-classes,
+> `:is()`/`:not()` groups, and `@root` / `@parent` context) are wrapped in
+> `:where(...)` so they carry **zero specificity**. The only specificity anchors
+> are the doubled component class (`.t0.t0`) and sub-element `[data-element]`
+> attributes. This means overlapping rules (e.g. a `_` fallback floor and the
+> states layered over it) resolve purely by **source order** — Tasty emits
+> lower-priority states first and higher-priority states last so the cascade
+> produces the intended winner.
 
 ### `@media(...)` — Media Queries
 
@@ -373,6 +397,91 @@ display: {
   '@supports(display: grid)': 'grid',
 }
 ```
+
+### `_` — Fallback Floor
+
+By default Tasty makes states **mutually exclusive**: a higher-priority state
+turns the lower-priority ones off via negation, so exactly one branch applies.
+This relies on `A | !A` always being true. CSS feature/container queries break
+that assumption: `@supports(...)` and `@(...)` queries can be **unknown** (not
+just true/false), and `not(unknown)` is also unknown — so a negated default
+branch silently never applies. The classic case is `scroll-state`: a browser can
+support `container-type: scroll-state` while a specific `scroll-state(...)` query
+is unknown, leaving *no* branch active.
+
+The `_` fallback floor solves this. Use `_` as a **standalone key** and its value
+**always applies** as a guaranteed floor: it never receives negation, and
+higher-priority states simply layer over it via the cascade.
+
+```jsx
+inset: {
+  _: '0 top',
+  '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
+    '-80x top',
+}
+```
+
+```css
+.t0.t0 { inset: 0 ...; }
+@container scroll-state(scrolled: block-end) {
+  @supports (container-type: scroll-state) {
+    .t0.t0 { inset: -80px ...; }
+  }
+}
+```
+
+The floor is emitted as a bare rule (no negated `@supports` / container branches),
+so it always applies. When the override matches it wins because it is emitted
+later and all state selectors share the same specificity (see the note on
+`:where()` below).
+
+Notes:
+
+- `_` is a **standalone key only** — it defines a single map-wide floor and
+  cannot be combined with state logic. Keys like `_ & hovered` or `_ | focused`
+  are ignored with an `INVALID_FALLBACK_KEY` dev warning.
+- `_` can coexist with the bare `''` default when other states exist: `''` is the
+  negated default, `_` is the always-on floor. With only `_` and `''` (no other
+  states) the `''` default is redundant — Tasty keeps the `_` value and drops
+  `''` with a `REDUNDANT_DEFAULT_STATE` warning.
+- `_` is position-independent: it is always placed at the lowest priority
+  regardless of where it appears in the map.
+
+#### `_` vs the `''` default
+
+In simple maps where every other state is a plain modifier (always cleanly
+on/off), `_` and `''` produce the **same visible result** — the base value shows
+whenever no other state wins. They diverge in three situations, and the root
+cause is always the same: **`''` is mutually exclusive (turned off by negation),
+while `_` is always on (layered underneath).**
+
+- **Unknown / invalid branches.** If a higher-priority branch sits behind a query
+  that can be *unknown* (`@supports`, container, `scroll-state`) or uses a
+  selector the browser drops, the negated `''` default disappears along with it
+  (`not(unknown) = unknown`), leaving the property with no rule. The `_` floor
+  survives because it is an unconditional bare rule. This is the case `_` exists
+  for.
+
+- **Empty / "unset" states.** A state can intentionally produce *no* output (an
+  empty value) to leave a property unset while that state is active. With `''`
+  this works — the default is negated away and nothing replaces it, so the
+  property unsets. With `_` the floor can never be turned off, so its value keeps
+  applying and the "unset on this state" intent is lost.
+
+  ```jsx
+  // '' : color unsets while loading.  '_' : color stays #text while loading.
+  color: { '': '#text', loading: '' }
+  ```
+
+- **States with different output shapes.** Because `_` layers additively, when
+  different states emit *different sets* of declarations, the floor's
+  declarations bleed through wherever the winning state does not override the
+  same property — which can produce inconsistent combinations. A `''` default is
+  swapped out cleanly by its mutually-exclusive condition.
+
+Rule of thumb: **use `''` for the normal default** (clean mutual exclusivity,
+supports unsetting), and reach for `_` only when a value must survive an
+*unknown* higher-priority branch.
 
 ### `@root(...)` — Root Element States
 

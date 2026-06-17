@@ -1043,7 +1043,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
 
       // Find the container query rule
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.startsWith('@container')),
+        r.atRules?.some(
+          (at: string) => at.startsWith('@container') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       expect(containerRule.atRules[0]).toBe('@container (width < 400px)');
@@ -1061,7 +1063,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
 
       // Find the container query rule
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.includes('card')),
+        r.atRules?.some(
+          (at: string) => at.includes('card') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       // The format is "@container name (condition)"
@@ -1270,7 +1274,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       });
 
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.startsWith('@container')),
+        r.atRules?.some(
+          (at: string) => at.startsWith('@container') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       expect(containerRule.atRules[0]).toBe(
@@ -1287,7 +1293,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       });
 
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.includes('nav')),
+        r.atRules?.some(
+          (at: string) => at.includes('nav') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       expect(containerRule.atRules[0]).toBe(
@@ -1321,7 +1329,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       });
 
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.includes('scroll-state')),
+        r.atRules?.some(
+          (at: string) => at.includes('scroll-state') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       // Both conditions should be combined in one @container rule for same name
@@ -1339,7 +1349,9 @@ describe('Advanced State Mapping - renderStyles direct tests', () => {
       });
 
       const containerRule = rules.find((r: any) =>
-        r.atRules?.some((at: string) => at.startsWith('@container')),
+        r.atRules?.some(
+          (at: string) => at.startsWith('@container') && !at.includes('not'),
+        ),
       );
       expect(containerRule).toBeDefined();
       expect(containerRule.atRules[0]).toBe('@container style(--theme: dark)');

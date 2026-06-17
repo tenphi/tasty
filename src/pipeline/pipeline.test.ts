@@ -919,6 +919,268 @@ describe('buildExclusiveConditions()', () => {
   });
 });
 
+describe('misplaced default state reordering', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('moves a non-first "" default to the lowest priority', () => {
+    // Authored with "" AFTER hovered. parseStyleEntries returns entries
+    // highest-priority-first, so the default must end up LAST here.
+    const entries = parseStyleEntries(
+      'color',
+      {
+        hovered: 'blue',
+        '': 'red',
+      },
+      parseStateKey,
+    );
+
+    expect(entries.map((e) => e.stateKey)).toEqual(['hovered', '']);
+    // The default's priority is the lowest after normalization.
+    const defaultEntry = entries.find((e) => e.stateKey === '')!;
+    const hoveredEntry = entries.find((e) => e.stateKey === 'hovered')!;
+    expect(defaultEntry.priority).toBeLessThan(hoveredEntry.priority);
+  });
+
+  it('produces the same exclusive CSS regardless of "" position', () => {
+    const defaultFirst = renderStyles(
+      { color: { '': 'red', hovered: 'blue' } },
+      '.btn',
+    );
+    clearPipelineCache();
+    const defaultLast = renderStyles(
+      { color: { hovered: 'blue', '': 'red' } },
+      '.btn',
+    );
+
+    // The default must negate hovered in both forms.
+    const negatedFirst = defaultFirst.find(
+      (r) => r.declarations.includes('red') && r.selector.includes(':not'),
+    );
+    const negatedLast = defaultLast.find(
+      (r) => r.declarations.includes('red') && r.selector.includes(':not'),
+    );
+    expect(negatedFirst).toBeDefined();
+    expect(negatedLast).toBeDefined();
+    expect(negatedLast!.selector).toBe(negatedFirst!.selector);
+
+    // hovered stays bare (highest priority) in both forms.
+    const hoveredLast = defaultLast.find((r) =>
+      r.declarations.includes('blue'),
+    );
+    expect(hoveredLast!.selector).toContain('[data-hovered]');
+    expect(hoveredLast!.selector).not.toContain(':not');
+  });
+
+  it('reordering yields a ruleset identical to author-first (3 states + at-rule)', () => {
+    // Compare the full rendered ruleset in emission order (selectors,
+    // declarations, and at-rule context). Equal arrays mean a misplaced
+    // default produces byte-identical CSS — including cascade order, which
+    // array position encodes — to authoring the default first.
+    const normalize = (rules: ReturnType<typeof renderStyles>) =>
+      rules.map((r) => ({
+        selector: r.selector,
+        declarations: r.declarations,
+        atRules: r.atRules ?? [],
+      }));
+
+    const authorFirst = renderStyles(
+      {
+        color: {
+          '': 'red',
+          hovered: 'blue',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+        },
+      },
+      '.btn',
+    );
+
+    clearPipelineCache();
+    const defaultLast = renderStyles(
+      {
+        color: {
+          hovered: 'blue',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+          '': 'red',
+        },
+      },
+      '.btn',
+    );
+
+    clearPipelineCache();
+    const defaultMiddle = renderStyles(
+      {
+        color: {
+          hovered: 'blue',
+          '': 'red',
+          pressed: 'green',
+          '@media (min-width: 768px)': 'darkblue',
+        },
+      },
+      '.btn',
+    );
+
+    // A misplaced default (last or middle) must produce the exact same CSS
+    // as authoring it first — the non-default cascade order is preserved and
+    // the floor is reinserted at the lowest priority.
+    expect(normalize(defaultLast)).toEqual(normalize(authorFirst));
+    expect(normalize(defaultMiddle)).toEqual(normalize(authorFirst));
+  });
+
+  it('places a non-first "_" floor at the lowest priority', () => {
+    const entries = parseStyleEntries(
+      'color',
+      {
+        hovered: 'blue',
+        _: 'red',
+      },
+      parseStateKey,
+    );
+
+    const floorEntry = entries.find((e) => e.stateKey === '_')!;
+    const hoveredEntry = entries.find((e) => e.stateKey === 'hovered')!;
+    expect(floorEntry.floor).toBe(true);
+    expect(floorEntry.priority).toBeLessThan(hoveredEntry.priority);
+
+    clearPipelineCache();
+    const result = renderStyles(
+      { color: { hovered: 'blue', _: 'red' } },
+      '.btn',
+    );
+    // The floor stays bare (opt-out of negation) and is emitted before the
+    // override.
+    const floorRule = result.find((r) => r.declarations.includes('red'));
+    expect(floorRule!.selector).not.toContain(':not');
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(hoveredRule!),
+    );
+  });
+
+  it('emits MISPLACED_DEFAULT_STATE when "" is not first', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    parseStyleEntries('color', { hovered: 'blue', '': 'red' }, parseStateKey);
+
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      true,
+    );
+
+    restore();
+  });
+
+  it('does not warn or reorder when "" is already first', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    const entries = parseStyleEntries(
+      'color',
+      { '': 'red', hovered: 'blue' },
+      parseStateKey,
+    );
+
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      false,
+    );
+    // Highest-priority-first: hovered then default.
+    expect(entries.map((e) => e.stateKey)).toEqual(['hovered', '']);
+
+    restore();
+  });
+
+  it('keeps a "_" floor alongside a bare "" default with other states', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    const entries = parseStyleEntries(
+      'color',
+      {
+        '': 'black',
+        _: 'gray',
+        pressed: 'red',
+      },
+      parseStateKey,
+    );
+
+    // Both the floor and the bare default survive (other states exist), and
+    // neither triggers a misplacement or redundancy warning.
+    expect(warnings.some((w) => w.code === 'MISPLACED_DEFAULT_STATE')).toBe(
+      false,
+    );
+    expect(warnings.some((w) => w.code === 'REDUNDANT_DEFAULT_STATE')).toBe(
+      false,
+    );
+    // Highest-priority-first after reverse: pressed, "" default, then the
+    // floor (lowest priority).
+    expect(entries.map((e) => e.stateKey)).toEqual(['pressed', '', '_']);
+    const floorEntry = entries.find((e) => e.stateKey === '_')!;
+    expect(floorEntry.floor).toBe(true);
+
+    restore();
+  });
+});
+
+describe('redundant default state ("_" + bare "")', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('drops the bare "" default and keeps the "_" floor', () => {
+    const entries = parseStyleEntries(
+      'color',
+      {
+        '': 'red',
+        _: 'green',
+      },
+      parseStateKey,
+    );
+
+    const stateKeys = entries.map((e) => e.stateKey);
+    expect(stateKeys).toContain('_');
+    expect(stateKeys).not.toContain('');
+  });
+
+  it('emits REDUNDANT_DEFAULT_STATE', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    parseStyleEntries('color', { '': 'red', _: 'green' }, parseStateKey);
+
+    expect(warnings.some((w) => w.code === 'REDUNDANT_DEFAULT_STATE')).toBe(
+      true,
+    );
+
+    restore();
+  });
+
+  it('renders only the "_" floor value', () => {
+    const result = renderStyles({ color: { '': 'red', _: 'green' } }, '.btn');
+
+    // The dropped "" value must not appear at all.
+    expect(result.some((r) => r.declarations.includes('red'))).toBe(false);
+    // The "_" floor renders as a bare rule.
+    const floorRule = result.find((r) => r.declarations.includes('green'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
+  });
+});
+
 describe('attribute mutual-exclusivity optimization', () => {
   describe('bracket attribute selectors parse as modifiers', () => {
     it('parses [data-variant="processing"] as a modifier (not opaque pseudo)', () => {
@@ -1521,7 +1783,7 @@ describe('conditionToCSS()', () => {
 
     const rendered = parentGroupsToCSS(css.variants[0].parentGroups);
     expect(rendered).toBe(
-      ':is([data-active][data-focused] *, [data-hovered][data-pressed] *)',
+      ':where([data-active][data-focused] *, [data-hovered][data-pressed] *)',
     );
   });
 
@@ -1682,7 +1944,7 @@ describe('renderStyles integration', () => {
 
     // Should generate a supports rule
     const supportsRule = result.find((r) =>
-      r.atRules?.some((a) => a.startsWith('@supports')),
+      r.atRules?.some((a) => a.startsWith('@supports') && !a.includes('not')),
     );
     expect(supportsRule).toBeDefined();
     expect(supportsRule!.atRules![0]).toBe('@supports (display: grid)');
@@ -1701,7 +1963,7 @@ describe('renderStyles integration', () => {
 
     // Should generate a supports selector rule
     const supportsRule = result.find((r) =>
-      r.atRules?.some((a) => a.startsWith('@supports')),
+      r.atRules?.some((a) => a.startsWith('@supports') && !a.includes('not')),
     );
     expect(supportsRule).toBeDefined();
     expect(supportsRule!.atRules![0]).toBe('@supports selector(:has(*))');
@@ -1749,6 +2011,7 @@ describe('renderStyles integration', () => {
     const gridRule = result.find(
       (r) =>
         r.atRules?.[0]?.includes('(display: grid)') &&
+        !r.atRules?.[0]?.includes('not (display: grid)') &&
         r.atRules?.[0]?.includes('not selector(:has(*))'),
     );
     const defaultRule = result.find(
@@ -1965,7 +2228,7 @@ describe('Complex OR conditions with mixed types', () => {
     const result = renderStyles(styles, '.test');
     const blueRule = result.find((r) => r.declarations.includes('blue'));
     expect(blueRule).toBeDefined();
-    expect(blueRule!.selector).toContain(':is(');
+    expect(blueRule!.selector).toContain(':where(');
     expect(blueRule!.selector).toContain('[data-theme="dark"]');
     expect(blueRule!.selector).toContain(':not([data-disabled])');
   });
@@ -2005,7 +2268,9 @@ describe('Complex OR conditions with mixed types', () => {
     expect(blueRules.length).toBeGreaterThanOrEqual(1);
 
     const allSelectors = blueRules.map((r) => r.selector).join(', ');
-    expect(allSelectors).toContain(':is([data-focused] *, [data-hovered] *)');
+    expect(allSelectors).toContain(
+      ':where([data-focused] *, [data-hovered] *)',
+    );
   });
 });
 
@@ -3188,6 +3453,181 @@ describe('@supports queries snapshot tests', () => {
   });
 });
 
+describe('_ fallback floor', () => {
+  beforeEach(() => {
+    clearPipelineCache();
+  });
+
+  it('should emit a bare default + positive override for the scroll-state case', () => {
+    // The unknown-query hole: `@supports(container-type: scroll-state)` may
+    // be true while the `scroll-state(...)` container query is unknown. With
+    // the `_` floor the default is NOT negated by the override, so it persists
+    // as a cascade floor and the override layers on top when it does match.
+    const styles = {
+      inset: {
+        _: '0 top',
+        '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))':
+          '-10px top',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.component');
+
+    // The base must be a bare rule with no negated scroll-state / @supports.
+    const baseRule = result.find((r) => r.declarations.includes('inset: 0 '));
+    expect(baseRule).toBeDefined();
+    expect(baseRule!.atRules ?? []).toEqual([]);
+
+    // The override is gated by the positive @supports + @container queries.
+    const overrideRule = result.find((r) =>
+      r.declarations.includes('inset: -10px'),
+    );
+    expect(overrideRule).toBeDefined();
+    expect(
+      overrideRule!.atRules?.some((a) =>
+        a.includes('(container-type: scroll-state)'),
+      ),
+    ).toBe(true);
+    expect(
+      overrideRule!.atRules?.some(
+        (a) =>
+          a.includes('scroll-state(scrolled: block-end)') && !a.includes('not'),
+      ),
+    ).toBe(true);
+
+    // No negated-support / negated-container fallback branches exist at all.
+    const negatedSupport = result.find((r) =>
+      r.atRules?.some((a) => a.includes('not (container-type: scroll-state)')),
+    );
+    expect(negatedSupport).toBeUndefined();
+    const negatedContainer = result.find((r) =>
+      r.atRules?.some((a) => a.includes('not scroll-state')),
+    );
+    expect(negatedContainer).toBeUndefined();
+
+    // The base must be emitted BEFORE the override so the override (equal
+    // specificity via :where()) wins the cascade when it matches.
+    const baseIdx = result.indexOf(baseRule!);
+    const overrideIdx = result.indexOf(overrideRule!);
+    expect(baseIdx).toBeLessThan(overrideIdx);
+
+    expect(result).toMatchSnapshot();
+  });
+
+  it('persists the floor alongside a "" default and other states', () => {
+    // `_` is the always-on floor; `""` is the negated default; `pressed` is a
+    // higher-priority state. The floor must stay bare while the default still
+    // receives negation from the higher-priority states.
+    const styles = {
+      color: {
+        '': 'black',
+        _: 'gray',
+        pressed: 'red',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.btn');
+
+    // `pressed` keeps a plain condition.
+    const pressedRule = result.find((r) => r.declarations.includes('red'));
+    expect(pressedRule).toBeDefined();
+    expect(pressedRule!.selector).toContain('[data-pressed]');
+
+    // The `_` floor is a bare rule, never negated.
+    const floorRule = result.find((r) => r.declarations.includes('gray'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
+
+    // The bare default still receives negation from `pressed`.
+    const defaultRule = result.find(
+      (r) => r.declarations.includes('black') && r.selector.includes(':where('),
+    );
+    expect(defaultRule).toBeDefined();
+    expect(defaultRule!.selector).toContain(':not([data-pressed])');
+
+    // The floor is emitted before the default and the override.
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(pressedRule!),
+    );
+
+    expect(result).toMatchSnapshot();
+  });
+
+  it('should treat a standalone "_" as a guaranteed floor', () => {
+    const styles = {
+      color: {
+        _: 'black',
+        hovered: 'blue',
+      },
+    } as const;
+
+    const result = renderStyles(styles, '.btn');
+
+    // The floor is a bare rule (no :not(hovered)) — it is not turned off by
+    // the higher-priority hovered state.
+    const floorRule = result.find((r) => r.declarations.includes('black'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':not');
+
+    const hoveredRule = result.find((r) => r.declarations.includes('blue'));
+    expect(hoveredRule).toBeDefined();
+    expect(hoveredRule!.selector).toContain('[data-hovered]');
+
+    // Floor before override.
+    expect(result.indexOf(floorRule!)).toBeLessThan(
+      result.indexOf(hoveredRule!),
+    );
+  });
+
+  it('should warn and ignore "_" combined with state logic', async () => {
+    const { setWarningHandler } = await import('./warnings');
+    const warnings: { code: string; message: string }[] = [];
+    const restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+
+    const orResult = renderStyles(
+      { color: { '': 'black', '_ | hovered': 'blue' } },
+      '.btn',
+    );
+    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_KEY')).toBe(true);
+    // The misused entry is ignored, so its value never renders.
+    expect(orResult.some((r) => r.declarations.includes('blue'))).toBe(false);
+
+    clearPipelineCache();
+    warnings.length = 0;
+    const andResult = renderStyles(
+      { color: { '': 'black', '_ & hovered': 'green' } },
+      '.btn',
+    );
+    expect(warnings.some((w) => w.code === 'INVALID_FALLBACK_KEY')).toBe(true);
+    expect(andResult.some((r) => r.declarations.includes('green'))).toBe(false);
+
+    restore();
+  });
+
+  it('cannot be redefined via configure({ states })', () => {
+    resetConfig();
+    // Attempt to hijack "_" as a :hover alias; "_" is intercepted before
+    // state resolution, so the attempt has no effect and "_" stays the floor.
+    configure({ states: { _: ':hover' } });
+
+    const result = renderStyles(
+      { color: { _: 'black', hovered: 'blue' } },
+      '.btn',
+    );
+
+    // If "_" had been redefined to :hover, the floor would carry a :hover
+    // selector. It must remain a bare floor instead.
+    const floorRule = result.find((r) => r.declarations.includes('black'));
+    expect(floorRule).toBeDefined();
+    expect(floorRule!.selector).not.toContain(':hover');
+    expect(floorRule!.selector).not.toContain(':not');
+
+    resetConfig();
+  });
+});
+
 describe('Vendor-prefixed pseudo-classes', () => {
   beforeEach(() => {
     clearPipelineCache();
@@ -3199,8 +3639,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const autofillRule = result.find((r) =>
-      r.selector.includes(':-webkit-autofill'),
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        !r.selector.includes(':not'),
     );
     expect(autofillRule).toBeDefined();
     expect(autofillRule!.declarations).toContain('blue');
@@ -3233,8 +3675,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const autofillRule = result.find((r) =>
-      r.selector.includes(':-webkit-autofill'),
+    const autofillRule = result.find(
+      (r) =>
+        r.selector.includes(':-webkit-autofill') &&
+        !r.selector.includes(':not'),
     );
     expect(autofillRule).toBeDefined();
     expect(autofillRule!.declarations).toContain('blue');
@@ -3246,8 +3690,10 @@ describe('Vendor-prefixed pseudo-classes', () => {
     };
 
     const result = renderStyles(styles, '.input');
-    const mozRule = result.find((r) =>
-      r.selector.includes(':-moz-placeholder'),
+    const mozRule = result.find(
+      (r) =>
+        r.selector.includes(':-moz-placeholder') &&
+        !r.selector.includes(':not'),
     );
     expect(mozRule).toBeDefined();
     expect(mozRule!.declarations).toContain('gray');
@@ -3362,7 +3808,9 @@ describe('Sub-element scoped predefined states', () => {
 
     const result = renderStyles(styles, '.input');
     expect(result.length).toBe(2);
-    const activeRule = result.find((r) => r.selector.includes(':focus'));
+    const activeRule = result.find(
+      (r) => r.selector.includes(':focus') && !r.selector.includes(':not'),
+    );
     expect(activeRule).toBeDefined();
     expect(activeRule!.selector).toContain('[data-element="Label"]');
     expect(activeRule!.declarations).toContain('blue');
@@ -3381,7 +3829,7 @@ describe('Sub-element scoped predefined states', () => {
     const labelCompact = result.find(
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
-        r.atRules?.some((a) => a.includes('container')),
+        r.atRules?.some((a) => a.includes('container') && !a.includes('not')),
     );
     expect(labelCompact).toBeDefined();
     expect(labelCompact!.declarations).toContain('gray');
@@ -3433,7 +3881,9 @@ describe('Sub-element scoped predefined states', () => {
     // Root-level @custom should resolve to :hover
     const rootHover = result.find(
       (r) =>
-        !r.selector.includes('[data-element') && r.selector.includes(':hover'),
+        !r.selector.includes('[data-element') &&
+        r.selector.includes(':hover') &&
+        !r.selector.includes(':not'),
     );
     expect(rootHover).toBeDefined();
     expect(rootHover!.declarations).toContain('red');
@@ -3442,7 +3892,8 @@ describe('Sub-element scoped predefined states', () => {
     const labelFocus = result.find(
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
-        r.selector.includes(':focus'),
+        r.selector.includes(':focus') &&
+        !r.selector.includes(':not'),
     );
     expect(labelFocus).toBeDefined();
     expect(labelFocus!.declarations).toContain('blue');
@@ -3474,7 +3925,8 @@ describe('Sub-element scoped predefined states', () => {
       (r) =>
         r.selector.includes('[data-element="Label"]') &&
         r.selector.includes('::placeholder') &&
-        r.selector.includes(':focus'),
+        r.selector.includes(':focus') &&
+        !r.selector.includes(':not'),
     );
     expect(placeholderActive).toBeDefined();
     expect(placeholderActive!.declarations).toContain('lightblue');
@@ -3497,8 +3949,10 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
         { display: { '': 'block', ':has(> Icon)': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes(':has(> [data-element="Icon"])'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes(':has(> [data-element="Icon"])') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3767,7 +4221,9 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
         { display: { '': 'block', ':has(>)': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) => r.selector.includes(':has(> *)'));
+      const rule = result.find(
+        (r) => r.selector.includes(':has(> *)') && !r.selector.includes(':not'),
+      );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
     });
@@ -3822,8 +4278,9 @@ describe('Enhanced pseudo-classes (:is, :has, :not, :where)', () => {
       );
       const rule = result.find(
         (r) =>
-          r.selector.includes(':is([data-hovered]') &&
-          r.selector.includes(':has(> [data-element="Icon"])'),
+          r.selector.includes(':where([data-hovered] *)') &&
+          r.selector.includes(':has(> [data-element="Icon"])') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
     });
@@ -3911,8 +4368,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'type^=full': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-type^="full"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-type^="full"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3923,8 +4382,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'type$=screen': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-type$="screen"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-type$="screen"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -3935,8 +4396,10 @@ describe('Value mod partial-match operators', () => {
         { display: { '': 'block', 'name*=test': 'flex' } },
         '.c',
       );
-      const rule = result.find((r) =>
-        r.selector.includes('[data-name*="test"]'),
+      const rule = result.find(
+        (r) =>
+          r.selector.includes('[data-name*="test"]') &&
+          !r.selector.includes(':not'),
       );
       expect(rule).toBeDefined();
       expect(rule!.declarations).toContain('flex');
@@ -4500,7 +4963,10 @@ describe('Container style query rendering', () => {
     const result = renderStyles(styles, '.component');
 
     const darkRule = result.find((r) =>
-      r.atRules?.some((ar) => ar.includes('style(--theme: dark)')),
+      r.atRules?.some(
+        (ar) =>
+          ar.includes('style(--theme: dark)') && !ar.includes('not style'),
+      ),
     );
     expect(darkRule).toBeDefined();
     expect(darkRule!.atRules![0]).toContain('@container card');
@@ -4518,7 +4984,10 @@ describe('Container style query rendering', () => {
     const result = renderStyles(styles, '.component');
 
     const primary = result.find((r) =>
-      r.atRules?.some((ar) => ar.includes('style(--variant: primary)')),
+      r.atRules?.some(
+        (ar) =>
+          ar.includes('style(--variant: primary)') && !ar.includes('not style'),
+      ),
     );
     expect(primary).toBeDefined();
     expect(primary!.atRules![0]).toMatch(/^@container style\(/);

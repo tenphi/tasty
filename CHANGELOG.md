@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.8.0
+
+### Minor Changes
+
+- [#223](https://github.com/tenphi/tasty/pull/223) [`602b7da`](https://github.com/tenphi/tasty/commit/602b7da9e5eb0934d1cfdbc8e944ffff5c93e40b) Thanks [@tenphi](https://github.com/tenphi)! - Add `okhstPlugin` for the contrast-uniform OKHST tone color space.
+
 ## 2.7.0
 
 ### Minor Changes

@@ -674,7 +674,7 @@ CSS cannot transition or animate custom properties unless the browser knows thei
 const AnimatedGradient = tasty({
   styles: {
     '$gradient-angle': '0deg',
-    '#theme': 'okhsl(280 80% 50%)',
+    '#theme': 'okhst(280 80% 50%)',
     background: 'linear-gradient($gradient-angle, #theme, transparent)',
     transition: '$$gradient-angle 0.3s, ##theme 0.3s',
   },

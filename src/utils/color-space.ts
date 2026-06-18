@@ -5,6 +5,7 @@ import {
   hexToRgbaValues,
   hslToRgbValues,
   okhslToSrgb,
+  okhstToSrgb,
   oklchToRgbValues,
   rgbToHsl,
   rgbToOklch,
@@ -229,6 +230,16 @@ function resolveToRgbaValues(color: string): RgbaResult | null {
     const s = clamp01(parsePercent(parsed.parts[1]));
     const l = clamp01(parsePercent(parsed.parts[2]));
     const [r, g, b] = okhslToSrgb(h, s, l);
+    return [clamp01(r) * 255, clamp01(g) * 255, clamp01(b) * 255, parsed.alpha];
+  }
+
+  if (trimmed.startsWith('okhst(')) {
+    const parsed = parseColorFuncArgs(trimmed, 'okhst');
+    if (!parsed) return null;
+    const h = parseHue(parsed.parts[0]);
+    const s = clamp01(parsePercent(parsed.parts[1]));
+    const t = clamp01(parsePercent(parsed.parts[2]));
+    const [r, g, b] = okhstToSrgb(h, s, t);
     return [clamp01(r) * 255, clamp01(g) * 255, clamp01(b) * 255, parsed.alpha];
   }
 

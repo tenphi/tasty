@@ -7,6 +7,8 @@ import {
   hslToRgbValues,
   okhslStringToRgb,
   okhslToSrgb,
+  okhstStringToRgb,
+  okhstToSrgb,
   oklchStringToRgb,
   oklchToRgbValues,
   rgbToHsl,
@@ -15,6 +17,8 @@ import {
   srgbToLinear,
   srgbToOkhsl,
   strToRgb,
+  toTone,
+  fromTone,
 } from './color-math';
 
 // ============================================================================
@@ -33,6 +37,45 @@ describe('srgbToLinear / srgbLinearToGamma', () => {
   it('returns 0 for 0', () => {
     expect(srgbToLinear(0)).toBe(0);
     expect(srgbLinearToGamma(0)).toBe(0);
+  });
+});
+
+// ============================================================================
+// OKHST Tone Transfers
+// ============================================================================
+
+describe('OKHST tone transfers', () => {
+  it('round-trips tone to lightness and back', () => {
+    for (const t of [0, 10, 50, 90, 100]) {
+      const l = fromTone(t);
+      const back = toTone(l);
+      expect(back).toBeCloseTo(t, 4);
+    }
+  });
+
+  it('maps endpoints correctly', () => {
+    expect(fromTone(0)).toBeCloseTo(0, 4);
+    expect(fromTone(100)).toBeCloseTo(1, 4);
+    expect(toTone(0)).toBeCloseTo(0, 4);
+    expect(toTone(1)).toBeCloseTo(100, 4);
+  });
+
+  it('agrees with OKHSL on the gray axis when L = fromTone(T)', () => {
+    for (const t of [0, 25, 50, 75, 100]) {
+      const l = fromTone(t);
+      const rgbFromHst = okhstToSrgb(180, 0, t / 100);
+      const rgbFromHsl = okhslToSrgb(180, 0, l);
+      expect(rgbFromHst[0]).toBeCloseTo(rgbFromHsl[0], 4);
+      expect(rgbFromHst[1]).toBeCloseTo(rgbFromHsl[1], 4);
+      expect(rgbFromHst[2]).toBeCloseTo(rgbFromHsl[2], 4);
+    }
+  });
+
+  it('parses okhst strings', () => {
+    expect(okhstStringToRgb('okhst(180 50% 50%)')).toBe('rgb(70 130 119)');
+    expect(okhstStringToRgb('okhst(180 50% 50% / 0.5)')).toBe(
+      'rgba(70, 130, 119, 0.5)',
+    );
   });
 });
 

@@ -19,3 +19,4 @@ export type { TastyPlugin, TastyPluginFactory } from './types';
 
 // Plugins
 export { okhslPlugin, okhslFunc } from './okhsl-plugin';
+export { okhstPlugin, okhstFunc } from './okhst-plugin';

@@ -22,7 +22,7 @@ export {
 } from '../utils/name-prefix';
 
 // Plugins
-export { okhslPlugin, okhslFunc } from '../plugins';
+export { okhslPlugin, okhslFunc, okhstPlugin, okhstFunc } from '../plugins';
 export type { TastyPlugin, TastyPluginFactory } from '../plugins';
 
 // Chunk utilities

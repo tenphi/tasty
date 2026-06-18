@@ -1,5 +1,6 @@
 import { StyleParser } from '../parser/parser';
 import { okhslFunc } from '../plugins/okhsl-plugin';
+import { okhstFunc } from '../plugins/okhst-plugin';
 
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
@@ -102,7 +103,11 @@ function isSimpleColorFast(val: string): boolean {
     case 108: // 'l'
       return val.charCodeAt(1) === 99 && val.charCodeAt(2) === 104; // 'lch'
     case 111: // 'o'
-      return val.startsWith('oklch(') || val.startsWith('okhsl(');
+      return (
+        val.startsWith('oklch(') ||
+        val.startsWith('okhsl(') ||
+        val.startsWith('okhst(')
+      );
     case 118: // 'v'
       return RE_VAR_COLOR.test(val);
     case 99: // 'c'
@@ -145,10 +150,11 @@ function getOrCreateParser(): StyleParser {
 
 // Registry for user-provided custom functions that the parser can call.
 // It is updated through the `customFunc` helper exported below.
-// okhsl is registered as a built-in function so it works regardless of
+// okhsl and okhst are registered as built-in functions so they work regardless of
 // tree-shaking or module initialization order.
 const __tastyFuncs: Record<string, (groups: StyleDetails[]) => string> = {
   okhsl: okhslFunc,
+  okhst: okhstFunc,
 };
 
 export function customFunc(

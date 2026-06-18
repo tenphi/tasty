@@ -98,6 +98,40 @@ const toe = (x: number): number =>
 const toeInv = (x: number): number => (x ** 2 + K1 * x) / (K3 * (x + K2));
 
 // ============================================================================
+// OKHST Tone Transfers
+// ============================================================================
+
+export const OKHST_REF_EPS = 0.05;
+
+export function lToY(l: number): number {
+  const L = toeInv(l);
+  return L * L * L;
+}
+
+export function yToL(y: number): number {
+  return toe(Math.cbrt(Math.max(0, y)));
+}
+
+export function toneFromY(y: number, eps: number = OKHST_REF_EPS): number {
+  const num = Math.log(y + eps) - Math.log(eps);
+  const den = Math.log(1 + eps) - Math.log(eps);
+  return (num / den) * 100;
+}
+
+export function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
+  const den = Math.log(1 + eps) - Math.log(eps);
+  return Math.exp((t / 100) * den + Math.log(eps)) - eps;
+}
+
+export function toTone(l: number, eps: number = OKHST_REF_EPS): number {
+  return toneFromY(lToY(l), eps);
+}
+
+export function fromTone(t: number, eps: number = OKHST_REF_EPS): number {
+  return yToL(yFromTone(t, eps));
+}
+
+// ============================================================================
 // OKLab <-> Linear sRGB
 // ============================================================================
 
@@ -542,6 +576,17 @@ export function okhslToSrgb(h: number, s: number, l: number): Vec3 {
 }
 
 /**
+ * OKHST to sRGB (0-1 range).
+ * @param h - Hue in degrees (0-360)
+ * @param s - Saturation (0-1)
+ * @param t - Tone (0-1)
+ * @returns sRGB values in 0-1 range, clamped to gamut
+ */
+export function okhstToSrgb(h: number, s: number, t: number): Vec3 {
+  return okhslToSrgb(h, clamp(s, 0, 1), clamp(fromTone(t * 100), 0, 1));
+}
+
+/**
  * OKLCH to sRGB (0-255 range).
  * @param L - Lightness (0-1)
  * @param C - Chroma (typically 0-0.4)
@@ -905,7 +950,7 @@ export function getRgbValuesFromRgbaString(str: string): number[] {
 
 /**
  * Convert any recognized color string to an `rgb()` CSS string.
- * Handles hex, `okhsl()`, `hsl()`/`hsla()`, named CSS colors,
+ * Handles hex, `okhsl()`, `okhst()`, `hsl()`/`hsla()`, named CSS colors,
  * and `rgb()`/`rgba()` pass-through.
  */
 export function strToRgb(
@@ -918,6 +963,7 @@ export function strToRgb(
   if (color.startsWith('#')) return hexToRgb(color);
   if (color.startsWith('oklch(')) return oklchStringToRgb(color);
   if (color.startsWith('okhsl(')) return okhslStringToRgb(color);
+  if (color.startsWith('okhst(')) return okhstStringToRgb(color);
   if (color.startsWith('hsl')) return hslStringToRgb(color);
 
   const namedHex = getNamedColorHex().get(color.toLowerCase());
@@ -1000,6 +1046,50 @@ export function okhslStringToRgb(okhslStr: string): string | null {
   const l = Math.max(0, Math.min(1, parsePercent(parts[2])));
 
   const [r, g, b] = okhslToSrgb(h, s, l);
+
+  const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
+  const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);
+  const b255 = Math.round(Math.max(0, Math.min(1, b)) * 255);
+
+  if (alphaPart) {
+    const alpha = parseFloat(alphaPart.trim());
+    return `rgba(${r255}, ${g255}, ${b255}, ${alpha})`;
+  }
+
+  return `rgb(${r255} ${g255} ${b255})`;
+}
+
+/**
+ * Convert an `okhst()` color string to an `rgb()`/`rgba()` CSS string.
+ * Supports deg/turn/rad hue units and percentage saturation/tone.
+ */
+export function okhstStringToRgb(okhstStr: string): string | null {
+  const match = okhstStr.match(/okhst\(([^)]+)\)/i);
+  if (!match) return null;
+
+  const inner = match[1].trim();
+  const [colorPart, alphaPart] = inner.split('/');
+  const parts = colorPart
+    .trim()
+    .split(/[,\s]+/)
+    .filter(Boolean);
+
+  if (parts.length < 3) return null;
+
+  let h = parseFloat(parts[0]);
+  const hueStr = parts[0].toLowerCase();
+  if (hueStr.endsWith('turn')) h = parseFloat(hueStr) * 360;
+  else if (hueStr.endsWith('rad')) h = (parseFloat(hueStr) * 180) / Math.PI;
+  else if (hueStr.endsWith('deg')) h = parseFloat(hueStr);
+
+  const parsePercent = (val: string): number => {
+    const num = parseFloat(val);
+    return val.includes('%') ? num / 100 : num;
+  };
+  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
+  const t = Math.max(0, Math.min(1, parsePercent(parts[2])));
+
+  const [r, g, b] = okhstToSrgb(h, s, t);
 
   const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
   const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);

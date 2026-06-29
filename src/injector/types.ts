@@ -32,7 +32,7 @@ export interface StyleInjectorConfig {
   states?: Record<string, string>;
   /**
    * Automatically infer and register CSS @property declarations
-   * from custom property values. When false, only explicit @properties are used.
+   * from custom property values. When false, only explicit @property are used.
    * @default true
    */
   autoPropertyTypes?: boolean;

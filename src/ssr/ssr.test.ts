@@ -778,7 +778,7 @@ describe('collectAutoInferredProperties', () => {
       [{ selector: '', declarations: '--angle: 45deg' }],
       collector,
       {
-        '@properties': {
+        '@property': {
           $angle: { syntax: '<angle>', inherits: false, initialValue: '0deg' },
         },
       } as any,

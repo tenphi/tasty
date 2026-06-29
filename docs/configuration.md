@@ -327,7 +327,7 @@ configure({
 });
 ```
 
-Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@properties`. Recipes cannot reference other recipes.
+Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@property`. Recipes cannot reference other recipes.
 
 For how to apply, compose, and override recipes in components, see [Recipes](dsl.md#recipes) in the Style DSL reference.
 
@@ -416,12 +416,12 @@ Supported types:
 | `300ms`, `1s` (time units) | `<time>` |
 | `#name` tokens (by naming convention) | `<color>` |
 
-Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@properties` when you need different settings:
+Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@property` when you need different settings:
 
 ```jsx
 // In component styles
 styles: {
-  '@properties': {
+  '@property': {
     '$scale': { syntax: '<number>', inherits: false, initialValue: 1 },
   },
 }
@@ -434,7 +434,7 @@ configure({
 });
 ```
 
-To disable auto-inference entirely (only explicit `@properties` will be used):
+To disable auto-inference entirely (only explicit `@property` will be used):
 
 ```jsx
 configure({ autoPropertyTypes: false });

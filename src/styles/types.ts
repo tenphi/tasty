@@ -517,10 +517,10 @@ export interface StylesInterface extends Omit<
    * - `#name` for color properties → `--name-color` (auto-sets syntax: '<color>', defaults initialValue: 'transparent')
    *
    * Examples:
-   * - `'@properties': { '$rotation': { syntax: '<angle>', inherits: false, initialValue: '45deg' } }`
-   * - `'@properties': { '#theme': { initialValue: 'purple' } }` // syntax: '<color>' is auto-set
+   * - `'@property': { '$rotation': { syntax: '<angle>', inherits: false, initialValue: '45deg' } }`
+   * - `'@property': { '#theme': { initialValue: 'purple' } }` // syntax: '<color>' is auto-set
    */
-  '@properties'?: Record<string, PropertyDefinition>;
+  '@property'?: Record<string, PropertyDefinition>;
   /**
    * Local @font-face definitions for this component.
    * Keys are font-family names, values are descriptors or arrays of descriptors
@@ -605,7 +605,7 @@ export type NotSelector = Exclude<string, Selector | keyof StylesInterface>;
 /** Special style keys that should not be wrapped in StyleValue/StyleValueStateMap */
 type SpecialStyleKeys =
   | '@keyframes'
-  | '@properties'
+  | '@property'
   | '@fontFace'
   | '@counterStyle'
   | '@function'
@@ -633,14 +633,14 @@ export type RecipeIndexSignature = Record<
 
 /**
  * Style type for recipe definitions.
- * Like StylesWithoutSelectors but also allows `@keyframes`, `@properties`,
+ * Like StylesWithoutSelectors but also allows `@keyframes`, `@property`,
  * local predefined states, and vendor-prefixed CSS properties.
  * Excludes `recipe` to prevent recursive references.
  */
 export type RecipeStyles = StylesWithoutSelectors &
   RecipeIndexSignature & {
     '@keyframes'?: StylesInterface['@keyframes'];
-    '@properties'?: StylesInterface['@properties'];
+    '@property'?: StylesInterface['@property'];
     '@fontFace'?: StylesInterface['@fontFace'];
     '@counterStyle'?: StylesInterface['@counterStyle'];
     '@function'?: StylesInterface['@function'];
@@ -649,7 +649,7 @@ export type RecipeStyles = StylesWithoutSelectors &
 /** Special properties that are not regular style values */
 export interface SpecialStyleProperties {
   '@keyframes'?: StylesInterface['@keyframes'];
-  '@properties'?: StylesInterface['@properties'];
+  '@property'?: StylesInterface['@property'];
   '@fontFace'?: StylesInterface['@fontFace'];
   '@counterStyle'?: StylesInterface['@counterStyle'];
   '@function'?: StylesInterface['@function'];
@@ -664,7 +664,7 @@ export interface StylesIndexSignature {
     | Styles
     | false // Removes all styles for this sub-element when extending
     | StylesInterface['@keyframes']
-    | StylesInterface['@properties']
+    | StylesInterface['@property']
     | StylesInterface['@fontFace']
     | StylesInterface['@counterStyle']
     | StylesInterface['@function'];

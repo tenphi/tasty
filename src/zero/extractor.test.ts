@@ -287,7 +287,7 @@ describe('extractPropertiesFromStyles', () => {
     const styles = {
       '$pulse-scale': 1 as unknown as string,
       transform: 'scale($pulse-scale)',
-      '@properties': {
+      '@property': {
         '$pulse-scale': {
           syntax: '<number>',
           inherits: false,

@@ -328,12 +328,12 @@ export function categorizeStyleKeys(
 
   for (const key of keys) {
     // Skip the $ helper key (used for selector combinators)
-    // Skip @keyframes and @properties (processed separately in useStyles)
+    // Skip @keyframes and @property (processed separately in useStyles)
     // Skip recipe (resolved before pipeline by resolveRecipes)
     if (
       key === '$' ||
       key === '@keyframes' ||
-      key === '@properties' ||
+      key === '@property' ||
       key === '@fontFace' ||
       key === '@counterStyle' ||
       key === '@function' ||

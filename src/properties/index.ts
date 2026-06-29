@@ -17,7 +17,7 @@ import type { Styles } from '../styles/types';
 // Constants
 // ============================================================================
 
-const PROPERTIES_KEY = '@properties';
+const PROPERTIES_KEY = '@property';
 
 /**
  * Valid CSS custom property name pattern (after the -- prefix).
@@ -56,7 +56,7 @@ interface ParsedPropertyToken {
 // ============================================================================
 
 /**
- * Check if styles object has local @properties definition.
+ * Check if styles object has local @property definition.
  * Fast path: single property lookup.
  */
 export function hasLocalProperties(styles: Styles): boolean {
@@ -64,7 +64,7 @@ export function hasLocalProperties(styles: Styles): boolean {
 }
 
 /**
- * Extract local @properties from styles object.
+ * Extract local @property from styles object.
  * Returns null if no local properties (fast path).
  */
 export function extractLocalProperties(

@@ -425,9 +425,9 @@ If you prefer explicit control, disable inference with `configure({ autoProperty
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
-### Explicit `@properties`
+### Explicit `@property`
 
-Use explicit `@properties` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
+Use explicit `@property` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 

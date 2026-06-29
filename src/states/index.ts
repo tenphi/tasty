@@ -52,7 +52,7 @@ export interface AtRuleContext {
 const BUILTIN_STATES = new Set([
   '@starting',
   '@keyframes',
-  '@properties',
+  '@property',
   '@fontFace',
   '@counterStyle',
   '@function',
@@ -71,7 +71,7 @@ const RESERVED_PREFIXES = [
   '@(',
   '@starting',
   '@keyframes',
-  '@properties',
+  '@property',
   '@supports',
   '@inherit',
 ];

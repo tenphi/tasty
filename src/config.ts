@@ -124,7 +124,7 @@ export interface TastyConfig {
    * Automatically infer and register CSS @property declarations
    * from custom property values found in styles, keyframes, and global config.
    * Covers all types: \<color\>, \<number\>, \<length\>, \<angle\>, \<percentage\>, \<time\>.
-   * When false, only explicitly declared @properties are registered.
+   * When false, only explicitly declared @property are registered.
    * @default true
    */
   autoPropertyTypes?: boolean;
@@ -359,7 +359,7 @@ export interface TastyConfig {
   /**
    * Predefined style recipes -- named style bundles that can be applied via `recipe` style property.
    * Recipe values are flat tasty styles (no sub-element keys). They may contain base styles,
-   * tokens (`$name`/`#name` definitions), local states, `@keyframes`, and `@properties`.
+   * tokens (`$name`/`#name` definitions), local states, `@keyframes`, and `@property`.
    *
    * Components reference recipes via: `recipe: 'name1 name2'` in their styles.
    * Use `/` to separate base recipes from post recipes: `recipe: 'base1 base2 / post1'`.

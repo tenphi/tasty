@@ -126,7 +126,7 @@ export class ServerStyleCollector {
     if (globalCS) {
       for (const [name, descriptors] of Object.entries(globalCS)) {
         const css = formatCounterStyleRule(name, descriptors);
-        this.collectCounterStyle(name, css);
+        this.collectCounterStyle(name, css, { weak: true });
       }
     }
 
@@ -134,7 +134,7 @@ export class ServerStyleCollector {
     if (globalFn) {
       for (const [name, definition] of Object.entries(globalFn)) {
         const css = formatFunctionRule(name, definition);
-        this.collectFunction(parseFunctionName(name), css);
+        this.collectFunction(parseFunctionName(name), css, { weak: true });
       }
     }
 
@@ -227,21 +227,47 @@ export class ServerStyleCollector {
   }
 
   /**
-   * Record a @counter-style rule. Deduplicated by name.
+   * Record a @counter-style rule. Deduplicated by name and overrides an
+   * existing rule by default. Pass `weak: true` for global `configure()`
+   * definitions, which never clobber an existing rule.
    */
-  collectCounterStyle(name: string, css: string): void {
-    if (!this.counterStyleRules.has(name)) {
+  collectCounterStyle(
+    name: string,
+    css: string,
+    options?: { weak?: boolean },
+  ): void {
+    const existing = this.counterStyleRules.get(name);
+    if (existing === undefined) {
       this.counterStyleRules.set(name, css);
+      return;
     }
+    if (options?.weak || existing === css) return;
+    this.counterStyleRules.set(name, css);
+    // If a rule with this name was already flushed (streaming), allow the
+    // overriding rule to be flushed again so it wins by source order.
+    this.flushedCounterStyleKeys.delete(name);
   }
 
   /**
-   * Record a @function rule. Deduplicated by CSS function name.
+   * Record a @function rule. Deduplicated by CSS function name and overrides an
+   * existing rule by default. Pass `weak: true` for global `configure()`
+   * definitions, which never clobber an existing rule.
    */
-  collectFunction(name: string, css: string): void {
-    if (!this.functionRules.has(name)) {
+  collectFunction(
+    name: string,
+    css: string,
+    options?: { weak?: boolean },
+  ): void {
+    const existing = this.functionRules.get(name);
+    if (existing === undefined) {
       this.functionRules.set(name, css);
+      return;
     }
+    if (options?.weak || existing === css) return;
+    this.functionRules.set(name, css);
+    // If a rule with this name was already flushed (streaming), allow the
+    // overriding rule to be flushed again so it wins by source order.
+    this.flushedFunctionKeys.delete(name);
   }
 
   /**

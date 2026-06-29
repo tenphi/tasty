@@ -155,10 +155,18 @@ export interface RootRegistry {
   injectedProperties: Map<string, string>; // propertyName -> normalized declaration
   /** Content hashes of injected @font-face rules for deduplication */
   injectedFontFaces: Set<string>;
-  /** Names of injected @counter-style rules for deduplication */
-  injectedCounterStyles: Set<string>;
-  /** Names of injected @function rules for deduplication */
-  injectedFunctions: Set<string>;
+  /**
+   * Injected @counter-style rules. Maps the name to whether it was injected
+   * "strong" (`true`, the default — overrides) or "weak" (`false`, global
+   * `configure()` definitions that never clobber an existing rule).
+   */
+  injectedCounterStyles: Map<string, boolean>;
+  /**
+   * Injected @function rules. Maps the CSS function name to whether it was
+   * injected "strong" (`true`, the default — overrides) or "weak" (`false`,
+   * global `configure()` definitions that never clobber an existing rule).
+   */
+  injectedFunctions: Map<string, boolean>;
   /** Global rules tracking for index adjustment */
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */

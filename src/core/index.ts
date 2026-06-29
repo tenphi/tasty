@@ -11,6 +11,7 @@ export {
   getGlobalKeyframes,
   getGlobalFontFace,
   getGlobalCounterStyle,
+  getGlobalFunction,
   hasGlobalRecipes,
   getGlobalRecipes,
 } from '../config';

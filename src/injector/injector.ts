@@ -823,19 +823,29 @@ export class StyleInjector {
   /**
    * Inject a CSS @counter-style rule.
    *
-   * Permanent and global — no dispose or ref-counting.
-   * Deduplicates by name (first definition wins).
+   * Permanent and global — no dispose or ref-counting. Deduplicates by name.
+   * By default a definition overrides a previously injected one of the same
+   * name. Pass `weak: true` for global `configure()` definitions, which must
+   * never clobber an existing rule (so component-local definitions win
+   * regardless of injection order).
    */
   counterStyle(
     name: string,
     descriptors: CounterStyleDescriptors,
-    options?: { root?: Document | ShadowRoot },
+    options?: { root?: Document | ShadowRoot; weak?: boolean },
   ): void {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
+    const isWeak = options?.weak === true;
 
-    if (registry.injectedCounterStyles.has(name)) {
-      return;
+    const existingIsStrong = registry.injectedCounterStyles.get(name);
+    if (existingIsStrong !== undefined) {
+      // A weak (global) definition never overrides; a strong one keeps the
+      // first definition. Only a strong definition replacing a weak one wins.
+      if (isWeak || existingIsStrong === true) {
+        return;
+      }
+      this.sheetManager.deleteGlobalRule(registry, `counterstyle:${name}`);
     }
 
     const rule: StyleRule = {
@@ -851,28 +861,38 @@ export class StyleInjector {
     );
 
     if (info) {
-      registry.injectedCounterStyles.add(name);
+      registry.injectedCounterStyles.set(name, !isWeak);
     }
   }
 
   /**
    * Inject a CSS @function rule (custom function).
    *
-   * Permanent and global — no dispose or ref-counting.
-   * Deduplicates by function name (first definition wins).
+   * Permanent and global — no dispose or ref-counting. Deduplicates by function
+   * name. By default a definition overrides a previously injected one of the
+   * same name. Pass `weak: true` for global `configure()` definitions, which
+   * must never clobber an existing rule (so component-local definitions win
+   * regardless of injection order).
    */
   func(
     name: string,
     definition: FunctionDefinition,
-    options?: { root?: Document | ShadowRoot },
+    options?: { root?: Document | ShadowRoot; weak?: boolean },
   ): void {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
+    const isWeak = options?.weak === true;
 
     const cssName = parseFunctionName(name);
 
-    if (registry.injectedFunctions.has(cssName)) {
-      return;
+    const existingIsStrong = registry.injectedFunctions.get(cssName);
+    if (existingIsStrong !== undefined) {
+      // A weak (global) definition never overrides; a strong one keeps the
+      // first definition. Only a strong definition replacing a weak one wins.
+      if (isWeak || existingIsStrong === true) {
+        return;
+      }
+      this.sheetManager.deleteGlobalRule(registry, `function:${cssName}`);
     }
 
     const rule: StyleRule = {
@@ -892,7 +912,7 @@ export class StyleInjector {
     );
 
     if (info) {
-      registry.injectedFunctions.add(cssName);
+      registry.injectedFunctions.set(cssName, !isWeak);
     }
   }
 

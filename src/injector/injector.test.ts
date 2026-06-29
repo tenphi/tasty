@@ -900,6 +900,30 @@ describe('StyleInjector', () => {
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(2);
     });
+
+    it('should not let a weak (global) definition clobber an existing one', () => {
+      injector.counterStyle('thumbs', { system: 'cyclic', symbols: '"★"' });
+      injector.counterStyle(
+        'thumbs',
+        { system: 'cyclic', symbols: '"👍"' },
+        { weak: true },
+      );
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@counter-style/g);
+      expect(matches?.length).toBe(1);
+      expect(cssText).toContain('"★"');
+      expect(cssText).not.toContain('"👍"');
+    });
+
+    it('should be idempotent for repeated definitions of the same name', () => {
+      injector.counterStyle('thumbs', { system: 'cyclic', symbols: '"★"' });
+      injector.counterStyle('thumbs', { system: 'cyclic', symbols: '"★"' });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@counter-style/g);
+      expect(matches?.length).toBe(1);
+    });
   });
 
   describe('func', () => {
@@ -950,6 +974,30 @@ describe('StyleInjector', () => {
       expect(cssText).toContain(
         'result: var(--offset) var(--offset) var(--color, black);',
       );
+    });
+
+    it('should not let a weak (global) definition clobber an existing one', () => {
+      injector.func('$$f', { args: ['$value'], result: '(2 * $value)' });
+      injector.func(
+        '$$f',
+        { args: ['$value'], result: '$value' },
+        { weak: true },
+      );
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@function/g);
+      expect(matches?.length).toBe(1);
+      expect(cssText).toContain('result: calc(2 * var(--value));');
+      expect(cssText).not.toContain('result: var(--value);');
+    });
+
+    it('should be idempotent for repeated definitions of the same name', () => {
+      injector.func('$$f', { args: ['$value'], result: '$value' });
+      injector.func('$$f', { args: ['$value'], result: '$value' });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@function/g);
+      expect(matches?.length).toBe(1);
     });
   });
 });

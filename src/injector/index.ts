@@ -169,13 +169,14 @@ export function fontFace(
 /**
  * Inject a CSS @counter-style rule.
  *
- * Permanent and global — no dispose or ref-counting.
- * Deduplicates by name (first definition wins).
+ * Permanent and global — no dispose or ref-counting. Deduplicates by name and
+ * overrides an existing rule by default. Pass `weak: true` for global
+ * `configure()` definitions, which never clobber an existing rule.
  */
 export function counterStyle(
   name: string,
   descriptors: CounterStyleDescriptors,
-  options?: { root?: Document | ShadowRoot },
+  options?: { root?: Document | ShadowRoot; weak?: boolean },
 ): void {
   return getGlobalInjector().counterStyle(name, descriptors, options);
 }
@@ -183,8 +184,9 @@ export function counterStyle(
 /**
  * Inject a CSS @function rule (custom function).
  *
- * Permanent and global — no dispose or ref-counting.
- * Deduplicates by function name (first definition wins).
+ * Permanent and global — no dispose or ref-counting. Deduplicates by function
+ * name and overrides an existing rule by default. Pass `weak: true` for global
+ * `configure()` definitions, which never clobber an existing rule.
  *
  * @param name - The function name (`$$name`, `$name`, or `--name`)
  * @param definition - Function definition (args, returns, result, local vars)
@@ -197,7 +199,7 @@ export function counterStyle(
 export function func(
   name: string,
   definition: FunctionDefinition,
-  options?: { root?: Document | ShadowRoot },
+  options?: { root?: Document | ShadowRoot; weak?: boolean },
 ): void {
   return getGlobalInjector().func(name, definition, options);
 }

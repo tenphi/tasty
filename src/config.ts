@@ -687,17 +687,19 @@ export function markStylesGenerated(): void {
     }
   }
 
-  // Inject global @counter-style rules (eagerly)
+  // Inject global @counter-style rules (eagerly, weakly — never override a
+  // component-local definition of the same name)
   if (globalCounterStyle && Object.keys(globalCounterStyle).length > 0) {
     for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
-      injector.counterStyle(name, descriptors);
+      injector.counterStyle(name, descriptors, { weak: true });
     }
   }
 
-  // Inject global @function rules (eagerly)
+  // Inject global @function rules (eagerly, weakly — never override a
+  // component-local definition of the same name)
   if (globalFunction && Object.keys(globalFunction).length > 0) {
     for (const [name, definition] of Object.entries(globalFunction)) {
-      injector.func(name, definition);
+      injector.func(name, definition, { weak: true });
     }
   }
 

@@ -524,7 +524,9 @@ export function extractFontFaceFromStyles(
     }
   }
 
-  // Local font faces (override globals with same hash)
+  // Local font faces. @font-face is keyed by content hash, not family name, so
+  // distinct definitions all emit and byte-identical ones collapse — there is
+  // no "winner" to pick between a global and a local definition.
   if (hasLocalFontFace(styles)) {
     const local = extractLocalFontFace(styles);
     if (local) {
@@ -548,30 +550,26 @@ export interface ExtractedCounterStyle {
 
 /**
  * Extract @counter-style rules from styles, merging with global config.
- * Deduplicates by name (first definition wins).
+ * Deduplicates by name; component-local definitions override global ones with
+ * the same name (local wins).
  */
 export function extractCounterStyleFromStyles(
   styles: Styles,
   globalCounterStyle?: Record<string, CounterStyleDescriptors> | null,
 ): ExtractedCounterStyle[] {
-  const results: ExtractedCounterStyle[] = [];
-  const seenNames = new Set<string>();
+  const byName = new Map<string, ExtractedCounterStyle>();
 
   function addCounterStyle(name: string, descriptors: CounterStyleDescriptors) {
-    if (!seenNames.has(name)) {
-      seenNames.add(name);
-      results.push({ name, css: formatCounterStyleRule(name, descriptors) });
-    }
+    byName.set(name, { name, css: formatCounterStyleRule(name, descriptors) });
   }
 
-  // Global counter styles first
+  // Global counter styles first, then local — local replaces global on conflict.
   if (globalCounterStyle) {
     for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
       addCounterStyle(name, descriptors);
     }
   }
 
-  // Local counter styles (override globals with same name)
   if (hasLocalCounterStyle(styles)) {
     const local = extractLocalCounterStyle(styles);
     if (local) {
@@ -581,7 +579,7 @@ export function extractCounterStyleFromStyles(
     }
   }
 
-  return results;
+  return [...byName.values()];
 }
 
 // ============================================================================
@@ -595,34 +593,30 @@ export interface ExtractedFunction {
 
 /**
  * Extract @function rules from styles, merging with global config.
- * Deduplicates by CSS function name (first definition wins).
+ * Deduplicates by CSS function name; component-local definitions override
+ * global ones with the same name (local wins).
  */
 export function extractFunctionsFromStyles(
   styles: Styles,
   globalFunction?: Record<string, FunctionDefinition> | null,
 ): ExtractedFunction[] {
-  const results: ExtractedFunction[] = [];
-  const seenNames = new Set<string>();
+  const byName = new Map<string, ExtractedFunction>();
 
   function addFunction(name: string, definition: FunctionDefinition) {
     const cssName = parseFunctionName(name);
-    if (!seenNames.has(cssName)) {
-      seenNames.add(cssName);
-      results.push({
-        name: cssName,
-        css: formatFunctionRule(name, definition),
-      });
-    }
+    byName.set(cssName, {
+      name: cssName,
+      css: formatFunctionRule(name, definition),
+    });
   }
 
-  // Global functions first
+  // Global functions first, then local — local replaces global on conflict.
   if (globalFunction) {
     for (const [name, definition] of Object.entries(globalFunction)) {
       addFunction(name, definition);
     }
   }
 
-  // Local functions (override globals with same name)
   if (hasLocalFunctions(styles)) {
     const local = extractLocalFunctions(styles);
     if (local) {
@@ -632,5 +626,5 @@ export function extractFunctionsFromStyles(
     }
   }
 
-  return results;
+  return [...byName.values()];
 }

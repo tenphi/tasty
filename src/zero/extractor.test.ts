@@ -1,4 +1,5 @@
 import {
+  extractCounterStyleFromStyles,
   extractFunctionsFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
@@ -58,7 +59,7 @@ describe('extractFunctionsFromStyles', () => {
     ]);
   });
 
-  it('merges global functions and dedups by name (first wins)', () => {
+  it('merges global functions and lets local override on name conflict', () => {
     const results = extractFunctionsFromStyles(
       {
         '@function': {
@@ -71,10 +72,33 @@ describe('extractFunctionsFromStyles', () => {
       },
     );
     expect(results.map((r) => r.name)).toEqual(['--global', '--shared']);
-    // Global definition wins for the shared name
+    // Local definition wins for the shared name
     expect(results.find((r) => r.name === '--shared')!.css).toContain(
-      'result: var(--x);',
+      'result: calc(2 * var(--x));',
     );
+  });
+});
+
+describe('extractCounterStyleFromStyles', () => {
+  it('returns empty array when no counter styles', () => {
+    expect(extractCounterStyleFromStyles({ display: 'block' })).toEqual([]);
+  });
+
+  it('merges global counter styles and lets local override on name conflict', () => {
+    const results = extractCounterStyleFromStyles(
+      {
+        '@counterStyle': {
+          shared: { system: 'cyclic', symbols: '"L"' },
+        },
+      },
+      {
+        global: { system: 'cyclic', symbols: '"G"' },
+        shared: { system: 'cyclic', symbols: '"X"' },
+      },
+    );
+    expect(results.map((r) => r.name)).toEqual(['global', 'shared']);
+    // Local definition wins for the shared name
+    expect(results.find((r) => r.name === 'shared')!.css).toContain('"L"');
   });
 });
 

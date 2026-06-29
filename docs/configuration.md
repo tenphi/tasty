@@ -26,12 +26,15 @@ configure({
     custom: (n) => `${n * 10}px`, // Function-based unit
   },
 
-  // Custom functions for the parser
-  funcs: {
+  // Custom functions — a single map for both flavors, discriminated by value type:
+  functions: {
+    // Bare key + function value → parse-time function, called as `double(...)`
     double: (groups) => {
       const value = parseFloat(groups[0]?.output || '0');
       return `${value * 2}px`;
     },
+    // `$$name` key + object value → declarative CSS @function, called as `$$negative(...)`
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
   },
 });
 ```
@@ -48,7 +51,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
 | `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
 | `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
-| `funcs` | `Record<string, Function>` | - | Custom parser functions (merged with existing) |
+| `functions` | `Record<string, FunctionDefinition \| Function>` | - | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
 | `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
 | `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
 | `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
@@ -56,7 +59,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
 | `fontFace` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
 | `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
-| `function` | `Record<string, FunctionDefinition>` | - | Global @function (custom function) definitions |
+| `polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
@@ -243,25 +246,64 @@ See [Counter Style (`@counterStyle`)](dsl.md#counter-style-counterstyle) for inl
 
 ## Functions
 
-Define reusable CSS [custom functions](https://developer.mozilla.org/en-US/docs/Web/CSS/@function) globally. Rules are injected eagerly when styles are first generated. Keys use `$$name` (the literal callable `--name`), matching the call site `$$name(...)`.
+The single `functions` map holds both kinds of custom functions, discriminated by the value type:
+
+- **Parse functions** — a **bare key** with a **function value** `(groups) => string`. Runs at parse time and is called as `name(...)`. Use these for computed/derived CSS that JavaScript produces (e.g. color-space conversions).
+- **CSS `@function` definitions** — a **`$$name` key** with an **object value** (a [`FunctionDefinition`](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)). Injected eagerly as a native `@function` rule and called as `$$name(...)` (→ `--name(...)`).
 
 ```ts
 configure({
-  function: {
-    '$$negative': { args: ['$value'], result: '(-1 * $value)' },
-    '$$shadow': {
+  functions: {
+    // Parse function — bare key, function value
+    double: (groups) => `calc(2 * ${groups[0]?.output ?? '0'})`,
+
+    // CSS @function — `$$` key, object value
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
+    $$shadow: {
       args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
       returns: '<color>',
-      '$offset': '2px',
+      $offset: '2px',
       result: '$offset $offset ($shadow-color, black)',
     },
   },
 });
 ```
 
-Components can then invoke them with the `$$name(...)` sugar, e.g. `marginTop: '$$negative(10px)'`.
+Components then invoke parse functions as `double(...)` and CSS functions with the `$$name(...)` sugar, e.g. `marginTop: '$$negative(10px)'`.
 
-See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside component styles, the full descriptor shape, and token conventions. `@function` is an experimental CSS feature — unsupported browsers safely ignore the rule.
+> A key whose prefix doesn't match its value type (an object under a bare key, or a function under a `$$` key) is **ignored with a dev-mode warning**.
+
+See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside component styles, the full descriptor shape, and token conventions. `@function` is an experimental CSS feature — unsupported browsers safely ignore the native rule (see the polyfill below).
+
+---
+
+## Polyfills
+
+`@function` only ships natively in Chromium 139+. To use CSS functions in browsers that don't support the at-rule yet (Firefox, Safari), enable the **functions polyfill**, which expands every `$$name(...)` call into plain CSS (`calc()`/`var()`/`color-mix()`) at parse time instead of emitting the native `@function` rule:
+
+```ts
+configure({
+  polyfills: {
+    functions: true, // default: false
+  },
+  functions: {
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
+  },
+});
+
+// Now `marginTop: '$$negative(10px)'` renders `margin-top: calc(-1 * 10px)`
+// — no native @function rule is emitted.
+```
+
+This works across all rendering modes (client, SSR/RSC, and `tastyStatic`) because expansion happens in the parser. Note `polyfills.functions` (the feature toggle) is distinct from the top-level `functions` (the definitions map).
+
+**Decided limitations when the polyfill is on:**
+
+- **No native fallback** — functions are always inlined; we do exactly what is configured.
+- **Conditional results** (`@media`/`@supports`/`if()` inside `result`) are inlined verbatim; the conditional nuance is not resolved per-element.
+- **Typed params / `returns`** are dropped (inlining is purely lexical substitution).
+- **Param name collisions** are avoided by fully inlining argument values (no function-internal custom properties are emitted) and by namespacing the function's own variables.
+- **Recursion** — self/mutually-recursive functions are not expanded; the cycle guard bails and leaves the call untouched.
 
 ---
 

@@ -594,7 +594,7 @@ function useFunction(
 ): void;
 ```
 
-See the [Functions section of the DSL reference](dsl.md#functions-function) for the full descriptor shape, token conventions, and value-sugar support. `@function` is an experimental CSS feature — unsupported browsers safely ignore the rule.
+See the [Functions section of the DSL reference](dsl.md#functions-function) for the full descriptor shape, token conventions, and value-sugar support. `@function` is an experimental CSS feature — unsupported browsers safely ignore the native rule, or enable the [`polyfills.functions`](configuration.md#polyfills) inline polyfill for full cross-browser support.
 
 ### Troubleshooting
 

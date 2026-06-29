@@ -255,7 +255,7 @@ export interface TastyExtensionConfig {
    * Set to `false` to disable function validation (overrides parent).
    * @example ['clamp', 'double']
    */
-  funcs?: false | string[];
+  functions?: false | string[];
 
   /**
    * State alias names for autocomplete.

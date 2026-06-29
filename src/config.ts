@@ -11,6 +11,11 @@
  * reconfigure will emit a warning and be ignored.
  */
 
+import {
+  registerFunctionPolyfill,
+  resetFunctionPolyfills,
+  splitFunctions,
+} from './functions';
 import { StyleInjector } from './injector/injector';
 import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
@@ -27,10 +32,12 @@ import {
   getGlobalFuncs,
   getGlobalParser,
   normalizeColorTokenValue,
+  resetGlobalFuncs,
   resetGlobalPredefinedTokens,
   setGlobalPredefinedTokens,
 } from './utils/styles';
 
+import type { FunctionsConfig, ParseFunction } from './functions';
 import type { ColorSpace } from './utils/color-space';
 
 import type {
@@ -41,7 +48,7 @@ import type {
   KeyframesSteps,
   PropertyDefinition,
 } from './injector/types';
-import type { StyleDetails, UnitHandler } from './parser/types';
+import type { UnitHandler } from './parser/types';
 import type { StyleResult } from './pipeline';
 import type { TastyPlugin } from './plugins/types';
 import type { RecipeStyles, ConfigTokens } from './styles/types';
@@ -80,11 +87,28 @@ export interface TastyConfig {
    */
   units?: Record<string, string | UnitHandler>;
   /**
-   * Custom functions for the style parser (merged with existing).
-   * Functions process parsed style groups and return CSS values.
-   * @example { myFunc: (groups) => groups.map(g => g.output).join(' ') }
+   * Custom functions (merged with existing). A single map holds both flavors,
+   * discriminated by value type:
+   *
+   * - **Bare key + function value** — a parse-time function that processes the
+   *   parsed argument groups and returns a CSS value. Called as `name(...)`.
+   * - **`$$name` key + object value** — a declarative CSS `@function`
+   *   definition. Called as `$$name(...)` (→ native `--name(...)`).
+   *
+   * A key whose prefix does not match its value type (object under a bare key,
+   * or function under a `$$` key) is ignored with a dev warning.
+   *
+   * @example
+   * ```ts
+   * configure({
+   *   functions: {
+   *     double: (groups) => `calc(2 * ${groups[0].output})`, // parse function
+   *     $$negative: { args: ['$value'], result: '(-1 * $value)' }, // CSS function
+   *   },
+   * });
+   * ```
    */
-  funcs?: Record<string, (groups: StyleDetails[]) => string>;
+  functions?: FunctionsConfig;
   /**
    * Color space used for decomposed color token companion variables.
    * Controls the CSS function and suffix for alpha composition.
@@ -234,19 +258,22 @@ export interface TastyConfig {
    */
   counterStyle?: Record<string, CounterStyleDescriptors>;
   /**
-   * Global @function definitions (CSS custom functions).
-   * Keys are function names (`$$name`, `$name`, or `--name`), values are
-   * function definitions. Injected eagerly when styles are first generated.
+   * Opt-in polyfills for not-yet-baseline CSS features. Each key toggles a
+   * feature polyfill; all default to `false`.
+   *
+   * - `functions` — polyfill CSS `@function` by inlining every `$$name(...)`
+   *   call into plain CSS (calc/var/color-mix) at parse time instead of
+   *   emitting the native `@function` at-rule. Enables `@function` usage in
+   *   browsers that don't support it yet (Firefox/Safari). Note this is the
+   *   `functions` *feature toggle*, distinct from the top-level `functions`
+   *   definitions map.
+   *
    * @example
    * ```ts
-   * configure({
-   *   function: {
-   *     '$$negative': { args: ['$value'], result: '(-1 * $value)' },
-   *   },
-   * });
+   * configure({ polyfills: { functions: true } });
    * ```
    */
-  function?: Record<string, FunctionDefinition>;
+  polyfills?: { functions?: boolean };
   /**
    * Custom style handlers that transform style properties into CSS declarations.
    * Handlers replace built-in handlers for the same style name.
@@ -436,6 +463,9 @@ let globalCounterStyle: Record<string, CounterStyleDescriptors> | null = null;
 // Global @function storage (null = no functions configured)
 let globalFunction: Record<string, FunctionDefinition> | null = null;
 
+// Global polyfill toggles (null = no polyfills configured)
+let globalPolyfills: { functions?: boolean } | null = null;
+
 // Global properties storage (null = no properties configured)
 let globalProperties: Record<string, PropertyDefinition> | null = null;
 
@@ -462,6 +492,7 @@ const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
 const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
 const GTKEY_FUNCTION = '__tasty_cfg_function__';
+const GTKEY_POLYFILLS = '__tasty_cfg_polyfills__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
 const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
 
@@ -479,6 +510,7 @@ function clearGlobalThisConfig(): void {
   delete g[GTKEY_FONT_FACE];
   delete g[GTKEY_COUNTER_STYLE];
   delete g[GTKEY_FUNCTION];
+  delete g[GTKEY_POLYFILLS];
   delete g[GTKEY_PROPERTIES];
   delete g[GTKEY_GLOBAL_STYLES];
 }
@@ -929,6 +961,31 @@ function setGlobalFunction(
 }
 
 // ============================================================================
+// Polyfills Management
+// ============================================================================
+
+/**
+ * Whether the CSS `@function` polyfill (inline expansion) is enabled.
+ * Reads from globalThis first for cross-module SSR/zero-runtime support.
+ */
+export function isFunctionsPolyfillEnabled(): boolean {
+  const polyfills =
+    globalPolyfills ??
+    getFromGlobalThis<{ functions?: boolean }>(GTKEY_POLYFILLS) ??
+    null;
+  return polyfills?.functions === true;
+}
+
+/**
+ * Set global polyfill toggles (called from configure).
+ * Internal use only.
+ */
+function setGlobalPolyfills(polyfills: { functions?: boolean }): void {
+  globalPolyfills = polyfills;
+  setOnGlobalThis(GTKEY_POLYFILLS, globalPolyfills);
+}
+
+// ============================================================================
 // Global Recipes Management
 // ============================================================================
 
@@ -1126,7 +1183,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Collect merged values from plugins first, then override with direct config
   let mergedStates: Record<string, string> = {};
   let mergedUnits: Record<string, string | UnitHandler> = {};
-  let mergedFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
+  let mergedFunctions: FunctionsConfig = {};
   let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
   let mergedReplaceTokens: Record<string, string | number | boolean> = {};
   let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
@@ -1143,8 +1200,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
       if (plugin.units) {
         mergedUnits = { ...mergedUnits, ...plugin.units };
       }
-      if (plugin.funcs) {
-        mergedFuncs = { ...mergedFuncs, ...plugin.funcs };
+      if (plugin.functions) {
+        mergedFunctions = { ...mergedFunctions, ...plugin.functions };
       }
       if (plugin.handlers) {
         mergedHandlers = { ...mergedHandlers, ...plugin.handlers };
@@ -1181,8 +1238,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   if (config.units) {
     mergedUnits = { ...mergedUnits, ...config.units };
   }
-  if (config.funcs) {
-    mergedFuncs = { ...mergedFuncs, ...config.funcs };
+  if (config.functions) {
+    mergedFunctions = { ...mergedFunctions, ...config.functions };
   }
   if (config.handlers) {
     mergedHandlers = { ...mergedHandlers, ...config.handlers };
@@ -1258,13 +1315,52 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     parser.setUnits({ ...currentUnits, ...mergedUnits });
   }
 
-  if (Object.keys(mergedFuncs).length > 0) {
+  // Record polyfill toggles before processing functions so we know whether to
+  // register inline closures or emit native @function rules.
+  if (config.polyfills) {
+    setGlobalPolyfills(config.polyfills);
+  }
+
+  // Split the unified `functions` map by value type into parse functions
+  // (bare keys) and declarative CSS @function definitions (`$$` keys).
+  const { parseFuncs, functionDefs } = splitFunctions(
+    mergedFunctions,
+    (key, kind) => {
+      warnOnce(
+        `functions-mismatch-${key}`,
+        kind === 'expected-definition'
+          ? `[Tasty] functions["${key}"]: a "$$"-prefixed key denotes a CSS @function ` +
+              `and expects a definition object, but received a function. Entry ignored.`
+          : `[Tasty] functions["${key}"]: a bare key denotes a parse function and ` +
+              `expects a function value, but received an object. ` +
+              `Did you mean "$$${key}"? Entry ignored.`,
+      );
+    },
+  );
+
+  if (Object.keys(parseFuncs).length > 0) {
     // Merge with existing funcs
     const currentFuncs = getGlobalFuncs();
-    const finalFuncs = { ...currentFuncs, ...mergedFuncs };
+    const finalFuncs: Record<string, ParseFunction> = {
+      ...currentFuncs,
+      ...parseFuncs,
+    };
     parser.setFuncs(finalFuncs);
     // Also update the global registry so customFunc() continues to work
-    Object.assign(currentFuncs, mergedFuncs);
+    Object.assign(currentFuncs, parseFuncs);
+  }
+
+  // Declarative CSS @function definitions. When the polyfill is enabled, compile
+  // each into an inline parse-function closure (and skip native emission);
+  // otherwise store them for eager native @function injection.
+  if (Object.keys(functionDefs).length > 0) {
+    if (isFunctionsPolyfillEnabled()) {
+      for (const [name, definition] of Object.entries(functionDefs)) {
+        registerFunctionPolyfill(name, definition);
+      }
+    } else {
+      setGlobalFunction(functionDefs);
+    }
   }
 
   // Handle keyframes
@@ -1285,11 +1381,6 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle counter styles
   if (config.counterStyle) {
     setGlobalCounterStyle(config.counterStyle);
-  }
-
-  // Handle functions
-  if (config.function) {
-    setGlobalFunction(config.function);
   }
 
   // Handle custom handlers
@@ -1336,13 +1427,13 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     states: _states,
     parserCacheSize: _parserCacheSize,
     units: _units,
-    funcs: _funcs,
+    functions: _functions,
+    polyfills: _polyfills,
     plugins: _plugins,
     keyframes: _keyframes,
     properties: _properties,
     fontFace: _fontFace,
     counterStyle: _counterStyle,
-    function: _function,
     handlers: _handlers,
     tokens: _tokens,
     replaceTokens: _replaceTokens,
@@ -1419,11 +1510,14 @@ export function resetConfig(): void {
   globalFontFace = null;
   globalCounterStyle = null;
   globalFunction = null;
+  globalPolyfills = null;
   globalRecipes = null;
   globalConfigTokens = null;
   globalStyles = null;
   clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
+  resetGlobalFuncs();
+  resetFunctionPolyfills();
   resetHandlers();
   resetColorSpace();
   clearPipelineCache();

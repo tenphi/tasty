@@ -102,7 +102,7 @@ describe('computeStyles @function handling', () => {
 
   it('emits a global @function configured via configure()', () => {
     configure({
-      function: {
+      functions: {
         $$negative: { args: ['$value'], result: '(-1 * $value)' },
       },
     });
@@ -118,7 +118,7 @@ describe('computeStyles @function handling', () => {
 
   it('lets a component-local @function override a global one of the same name', () => {
     configure({
-      function: {
+      functions: {
         $$shared: { args: ['$x'], result: '$x' },
       },
     });
@@ -140,5 +140,51 @@ describe('computeStyles @function handling', () => {
     // Local definition wins
     expect(css).toContain('result: calc(2 * var(--x));');
     expect(css).not.toContain('result: var(--x);');
+  });
+});
+
+describe('computeStyles @function polyfill (inlining)', () => {
+  afterEach(() => {
+    destroy();
+    resetConfig();
+  });
+
+  it('inlines a global function and emits no native @function rule', () => {
+    configure({
+      polyfills: { functions: true },
+      functions: {
+        $$negative: { args: ['$value'], result: '(-1 * $value)' },
+      },
+    });
+
+    const collector = new ServerStyleCollector();
+    computeStyles(
+      { marginTop: '$$negative(10px)' },
+      { ssrCollector: collector },
+    );
+
+    const css = collector.getCSS();
+    expect(css).not.toContain('@function');
+    expect(css).not.toContain('--negative(');
+    expect(css).toContain('calc(-1 * 10px)');
+  });
+
+  it('inlines a component-local @function and emits no native rule', () => {
+    configure({ polyfills: { functions: true } });
+
+    const collector = new ServerStyleCollector();
+    computeStyles(
+      {
+        '@function': {
+          $$negative: { args: ['$value'], result: '(-1 * $value)' },
+        },
+        marginTop: '$$negative(10px)',
+      },
+      { ssrCollector: collector },
+    );
+
+    const css = collector.getCSS();
+    expect(css).not.toContain('@function');
+    expect(css).toContain('calc(-1 * 10px)');
   });
 });

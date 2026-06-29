@@ -47,7 +47,7 @@ const okhslFunc = createColorFunc('okhsl', 'H S L', okhslToSrgb);
  */
 export const okhslPlugin: TastyPluginFactory = (): TastyPlugin => ({
   name: 'okhsl',
-  funcs: {
+  functions: {
     okhsl: okhslFunc,
   },
 });

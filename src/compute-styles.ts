@@ -16,7 +16,12 @@ import {
   generateChunkCacheKey,
   renderStylesForChunk,
 } from './chunks';
-import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from './config';
+import {
+  getConfig,
+  getGlobalKeyframes,
+  hasGlobalKeyframes,
+  isFunctionsPolyfillEnabled,
+} from './config';
 import {
   counterStyle,
   fontFace,
@@ -37,6 +42,7 @@ import {
   formatFunctionRule,
   hasLocalFunctions,
   parseFunctionName,
+  registerLocalFunctionPolyfills,
 } from './functions';
 import {
   extractLocalFontFace,
@@ -180,7 +186,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
     }
   }
 
-  if (hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -410,7 +416,7 @@ function injectAncillarySync(
     }
   }
 
-  if (hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -474,7 +480,7 @@ function collectAncillarySSR(
     }
   }
 
-  if (hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -516,6 +522,13 @@ export function computeStyles(
   }
 
   const resolved = resolveRecipes(styles);
+
+  // @function polyfill: register local definitions as inline closures BEFORE
+  // any chunk is rendered, so call sites in this component expand to plain CSS.
+  if (isFunctionsPolyfillEnabled() && hasLocalFunctions(resolved)) {
+    registerLocalFunctionPolyfills(resolved);
+  }
+
   const chunkMap = categorizeStyleKeys(resolved as Record<string, unknown>);
 
   const collector =

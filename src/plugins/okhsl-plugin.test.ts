@@ -7,8 +7,8 @@ describe('okhslPlugin', () => {
     it('returns a valid TastyPlugin', () => {
       const plugin = okhslPlugin();
       expect(plugin.name).toBe('okhsl');
-      expect(plugin.funcs).toBeDefined();
-      expect(plugin.funcs?.okhsl).toBe(okhslFunc);
+      expect(plugin.functions).toBeDefined();
+      expect(plugin.functions?.okhsl).toBe(okhslFunc);
     });
   });
 

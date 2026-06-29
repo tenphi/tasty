@@ -1,5 +1,9 @@
-import { getGlobalInjector } from '../config';
-import { formatFunctionRule, parseFunctionName } from '../functions';
+import { getGlobalInjector, isFunctionsPolyfillEnabled } from '../config';
+import {
+  formatFunctionRule,
+  parseFunctionName,
+  registerFunctionPolyfill,
+} from '../functions';
 import type { FunctionDefinition } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
@@ -42,6 +46,13 @@ export function useFunction(
     if (process.env.NODE_ENV !== 'production') {
       console.warn(`[Tasty] useFunction: function name is required`);
     }
+    return;
+  }
+
+  // @function polyfill: register an inline closure so call sites are expanded
+  // into plain CSS by the parser. No native @function rule is emitted.
+  if (isFunctionsPolyfillEnabled()) {
+    registerFunctionPolyfill(name, definition);
     return;
   }
 

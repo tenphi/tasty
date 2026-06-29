@@ -26,6 +26,7 @@ import { createJiti } from 'jiti';
 
 import {
   configure,
+  getGlobalFunction,
   getGlobalStyles,
   getGlobalConfigTokens,
   resetConfig,
@@ -460,7 +461,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
-            config.function,
+            getGlobalFunction() ?? undefined,
           );
         } else if (t.isObjectExpression(firstArg)) {
           // Styles mode: tastyStatic(styles)
@@ -475,7 +476,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
-            config.function,
+            getGlobalFunction() ?? undefined,
           );
         } else if (t.isIdentifier(firstArg)) {
           // Extension mode: tastyStatic(base, styles)
@@ -490,7 +491,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
-            config.function,
+            getGlobalFunction() ?? undefined,
           );
         } else {
           throw path.buildCodeFrameError(

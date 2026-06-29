@@ -103,6 +103,20 @@ export function classify(
       const fname = rest.slice(0, openIdx);
       if (/^[a-z_][a-z0-9-_]*$/i.test(fname)) {
         const inner = rest.slice(openIdx + 1, -1).trim();
+        const cssName = `--${fname}`;
+        // @function polyfill: when a compiled closure is registered for this
+        // function, inline the call into plain CSS instead of emitting the
+        // (limited-support) native `--name(...)` call.
+        if (opts.funcs && cssName in opts.funcs) {
+          const groups = inner
+            ? new StyleParser(opts).process(inner).groups
+            : [];
+          const funcResult = opts.funcs[cssName](groups);
+          // Empty result signals a recursion-cycle bail: leave the call as-is.
+          if (funcResult !== '') {
+            return classify(funcResult, { ...opts, funcs: undefined }, recurse);
+          }
+        }
         const args = inner ? recurse(inner).output : '';
         return { bucket: Bucket.Value, processed: `--${fname}(${args})` };
       }

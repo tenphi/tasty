@@ -171,7 +171,8 @@ module.exports = {
 | `config.fontFace` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
 | `config.counterStyle` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
 | `config.units` | `Record<string, string \| UnitHandler>` | — | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }` |
-| `config.funcs` | `Record<string, Function>` | — | Custom functions for the style parser (merged with existing) |
+| `config.functions` | `Record<string, FunctionDefinition \| Function>` | — | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
+| `config.polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time |
 | `config.plugins` | `TastyPlugin[]` | — | Plugins that extend tasty with custom functions, units, states, and handlers |
 | `config.handlers` | `Record<string, StyleHandlerDefinition>` | — | Custom style handlers that transform style properties into CSS declarations |
 | `config.presets` | `Record<string, TypographyPreset>` | — | Typography presets — shorthand for `generateTypographyTokens()`. Generated tokens merge under explicit `tokens`. |

@@ -22,11 +22,14 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
+import { isFunctionsPolyfillEnabled } from '../config';
 import {
   extractLocalFunctions,
   formatFunctionRule,
   hasLocalFunctions,
   parseFunctionName,
+  registerFunctionPolyfill,
+  registerLocalFunctionPolyfills,
 } from '../functions';
 import {
   extractAnimationNamesFromStyles,
@@ -600,6 +603,20 @@ export function extractFunctionsFromStyles(
   styles: Styles,
   globalFunction?: Record<string, FunctionDefinition> | null,
 ): ExtractedFunction[] {
+  // @function polyfill: register definitions as inline closures so call sites
+  // are expanded to plain CSS during chunk rendering. No native @function rules
+  // are emitted. Global definitions are also registered here as a safety net in
+  // case configure() ran in a separate module scope.
+  if (isFunctionsPolyfillEnabled()) {
+    if (globalFunction) {
+      for (const [name, definition] of Object.entries(globalFunction)) {
+        registerFunctionPolyfill(name, definition);
+      }
+    }
+    registerLocalFunctionPolyfills(styles);
+    return [];
+  }
+
   const byName = new Map<string, ExtractedFunction>();
 
   function addFunction(name: string, definition: FunctionDefinition) {

@@ -838,9 +838,9 @@ Generated CSS:
 
 A `FunctionParameter` is one of: `true` (bare param), a string CSS type shorthand (`'<length>'`), or `{ syntax?: string; default?: string | number }`.
 
-Functions can also be registered with the [`useFunction`](react-api.md#usefunction) hook or globally via [`configure({ function })`](configuration.md#functions).
+Functions can also be registered with the [`useFunction`](react-api.md#usefunction) hook or globally via [`configure({ functions })`](configuration.md#functions) (the same map also accepts bare-key parse functions).
 
-> `@function` is permanent — injected once and never cleaned up, like `@counter-style`. It is an experimental CSS feature ([Chrome 139+](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)); unsupported browsers safely ignore the rule, so use it as progressive enhancement.
+> `@function` is permanent — injected once and never cleaned up, like `@counter-style`. It is an experimental CSS feature ([Chrome 139+](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)); unsupported browsers safely ignore the native rule, so use it as progressive enhancement — or enable the [`configure({ polyfills: { functions: true } })`](configuration.md#polyfills) inline polyfill to expand `$$name(...)` calls into plain CSS for full cross-browser support.
 
 ---
 

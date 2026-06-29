@@ -166,6 +166,19 @@ export function customFunc(
 }
 
 /**
+ * Reset custom parser functions back to the built-in set (okhsl/okhst).
+ * Used by resetConfig() in tests to drop user-registered and polyfill functions.
+ */
+export function resetGlobalFuncs(): void {
+  for (const key of Object.keys(__tastyFuncs)) {
+    if (key !== 'okhsl' && key !== 'okhst') {
+      delete __tastyFuncs[key];
+    }
+  }
+  getOrCreateParser().setFuncs(__tastyFuncs);
+}
+
+/**
  * Get the global StyleParser instance.
  * Used by configure() to apply parser configuration.
  */

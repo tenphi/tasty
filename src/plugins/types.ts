@@ -1,4 +1,5 @@
-import type { StyleDetails, UnitHandler } from '../parser/types';
+import type { FunctionsConfig } from '../functions';
+import type { UnitHandler } from '../parser/types';
 import type { RecipeStyles, ConfigTokens, Styles } from '../styles/types';
 import type { StyleHandlerDefinition } from '../utils/styles';
 import type { TypographyPreset } from '../utils/typography';
@@ -9,8 +10,12 @@ import type { TypographyPreset } from '../utils/typography';
 export interface TastyPlugin {
   /** Unique name for the plugin (used for debugging and conflict detection) */
   name: string;
-  /** Custom functions that transform parsed style groups into CSS values */
-  funcs?: Record<string, (groups: StyleDetails[]) => string>;
+  /**
+   * Custom functions (unified map). Bare keys map to parse functions
+   * `(groups) => string`; `$$name` keys map to declarative CSS `@function`
+   * definitions. See {@link FunctionsConfig}.
+   */
+  functions?: FunctionsConfig;
   /** Custom units that transform numeric values (e.g., `2x` → `calc(2 * var(--gap))`) */
   units?: Record<string, string | UnitHandler>;
   /** Custom state aliases (e.g., `'@mobile': '@media(w < 768px)'`) */
@@ -71,13 +76,13 @@ export interface TastyPlugin {
  * // Plugin without options
  * const okhslPlugin: TastyPluginFactory = () => ({
  *   name: 'okhsl',
- *   funcs: { okhsl: okhslFunc },
+ *   functions: { okhsl: okhslFunc },
  * });
  *
  * // Plugin with options
  * const debugPlugin: TastyPluginFactory<{ verbose: boolean }> = (options) => ({
  *   name: 'debug',
- *   funcs: { debug: createDebugFunc(options.verbose) },
+ *   functions: { debug: createDebugFunc(options.verbose) },
  * });
  * ```
  */

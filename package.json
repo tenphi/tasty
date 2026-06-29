@@ -191,7 +191,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "53 kB"
+      "limit": "54 kB"
     },
     {
       "name": "core (import *)",

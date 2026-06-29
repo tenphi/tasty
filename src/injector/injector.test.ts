@@ -901,6 +901,57 @@ describe('StyleInjector', () => {
       expect(matches?.length).toBe(2);
     });
   });
+
+  describe('func', () => {
+    it('should inject a @function rule with parsed result', () => {
+      injector.func('$$negative', {
+        args: ['$value'],
+        result: '(-1 * $value)',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain(
+        '@function --negative(--value) { result: calc(-1 * var(--value)); }',
+      );
+    });
+
+    it('should deduplicate by function name (first wins)', () => {
+      injector.func('$$f', { args: ['$value'], result: '$value' });
+      injector.func('$$f', { args: ['$value'], result: '(2 * $value)' });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@function/g);
+      expect(matches?.length).toBe(1);
+      expect(cssText).toContain('result: var(--value);');
+    });
+
+    it('should allow different function names', () => {
+      injector.func('$$a', { args: ['$x'], result: '$x' });
+      injector.func('$$b', { args: ['$x'], result: '$x' });
+
+      const cssText = injector.getCssText();
+      const matches = cssText.match(/@function/g);
+      expect(matches?.length).toBe(2);
+    });
+
+    it('should emit local variables and return type', () => {
+      injector.func('$$shadow', {
+        args: { $color: { syntax: '<color>', default: 'inherit' } },
+        returns: '<color>',
+        $offset: '2px',
+        result: '$offset $offset ($color, black)',
+      });
+
+      const cssText = injector.getCssText();
+      expect(cssText).toContain(
+        '@function --shadow(--color <color>: inherit) returns <color>',
+      );
+      expect(cssText).toContain('--offset: 2px;');
+      expect(cssText).toContain(
+        'result: var(--offset) var(--offset) var(--color, black);',
+      );
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

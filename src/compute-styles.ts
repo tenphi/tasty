@@ -20,6 +20,7 @@ import { getConfig, getGlobalKeyframes, hasGlobalKeyframes } from './config';
 import {
   counterStyle,
   fontFace,
+  func,
   inject,
   keyframes,
   property,
@@ -31,6 +32,12 @@ import {
   formatCounterStyleRule,
   hasLocalCounterStyle,
 } from './counter-style';
+import {
+  extractLocalFunctions,
+  formatFunctionRule,
+  hasLocalFunctions,
+  parseFunctionName,
+} from './functions';
 import {
   extractLocalFontFace,
   fontFaceContentHash,
@@ -168,6 +175,19 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
         if (!rscCache.emittedKeys.has(key)) {
           rscCache.emittedKeys.add(key);
           parts.push(formatCounterStyleRule(name, descriptors));
+        }
+      }
+    }
+  }
+
+  if (hasLocalFunctions(styles)) {
+    const localFunctions = extractLocalFunctions(styles);
+    if (localFunctions) {
+      for (const [name, definition] of Object.entries(localFunctions)) {
+        const key = `__func:${parseFunctionName(name)}`;
+        if (!rscCache.emittedKeys.has(key)) {
+          rscCache.emittedKeys.add(key);
+          parts.push(formatFunctionRule(name, definition));
         }
       }
     }
@@ -389,6 +409,15 @@ function injectAncillarySync(
       }
     }
   }
+
+  if (hasLocalFunctions(styles)) {
+    const localFunctions = extractLocalFunctions(styles);
+    if (localFunctions) {
+      for (const [name, definition] of Object.entries(localFunctions)) {
+        func(name, definition, { root });
+      }
+    }
+  }
 }
 
 /**
@@ -441,6 +470,16 @@ function collectAncillarySSR(
       for (const [name, descriptors] of Object.entries(localCounterStyle)) {
         const css = formatCounterStyleRule(name, descriptors);
         collector.collectCounterStyle(name, css);
+      }
+    }
+  }
+
+  if (hasLocalFunctions(styles)) {
+    const localFunctions = extractLocalFunctions(styles);
+    if (localFunctions) {
+      for (const [name, definition] of Object.entries(localFunctions)) {
+        const css = formatFunctionRule(name, definition);
+        collector.collectFunction(parseFunctionName(name), css);
       }
     }
   }

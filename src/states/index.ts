@@ -55,6 +55,7 @@ const BUILTIN_STATES = new Set([
   '@properties',
   '@fontFace',
   '@counterStyle',
+  '@function',
   '@supports',
   // @inherit is a value (not a key), but reserved here to prevent
   // users from accidentally defining a state named '@inherit'.

@@ -16,11 +16,13 @@ import {
   getGlobalStyles,
   getGlobalCounterStyle,
   getGlobalFontFace,
+  getGlobalFunction,
   getGlobalConfigTokens,
   getNamePrefix,
 } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
+import { formatFunctionRule, parseFunctionName } from '../functions';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { hashString } from '../utils/hash';
@@ -50,6 +52,8 @@ export class ServerStyleCollector {
   private flushedFontFaceKeys = new Set<string>();
   private counterStyleRules = new Map<string, string>();
   private flushedCounterStyleKeys = new Set<string>();
+  private functionRules = new Map<string, string>();
+  private flushedFunctionKeys = new Set<string>();
   private keyframesCounter = 0;
   private counterStyleCounter = 0;
   private internalsCollected = false;
@@ -123,6 +127,14 @@ export class ServerStyleCollector {
       for (const [name, descriptors] of Object.entries(globalCS)) {
         const css = formatCounterStyleRule(name, descriptors);
         this.collectCounterStyle(name, css);
+      }
+    }
+
+    const globalFn = getGlobalFunction();
+    if (globalFn) {
+      for (const [name, definition] of Object.entries(globalFn)) {
+        const css = formatFunctionRule(name, definition);
+        this.collectFunction(parseFunctionName(name), css);
       }
     }
 
@@ -224,6 +236,15 @@ export class ServerStyleCollector {
   }
 
   /**
+   * Record a @function rule. Deduplicated by CSS function name.
+   */
+  collectFunction(name: string, css: string): void {
+    if (!this.functionRules.has(name)) {
+      this.functionRules.set(name, css);
+    }
+  }
+
+  /**
    * Allocate a counter-style name for SSR. Uses provided name or generates one.
    */
   allocateCounterStyleName(providedName?: string): string {
@@ -271,6 +292,10 @@ export class ServerStyleCollector {
       parts.push(css);
     }
 
+    for (const css of this.functionRules.values()) {
+      parts.push(css);
+    }
+
     for (const css of this.rawCSS.values()) {
       parts.push(css);
     }
@@ -315,6 +340,13 @@ export class ServerStyleCollector {
       if (!this.flushedCounterStyleKeys.has(key)) {
         parts.push(css);
         this.flushedCounterStyleKeys.add(key);
+      }
+    }
+
+    for (const [key, css] of this.functionRules) {
+      if (!this.flushedFunctionKeys.has(key)) {
+        parts.push(css);
+        this.flushedFunctionKeys.add(key);
       }
     }
 

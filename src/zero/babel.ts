@@ -40,6 +40,7 @@ import { CSSWriter } from './css-writer';
 import {
   extractCounterStyleFromStyles,
   extractFontFaceFromStyles,
+  extractFunctionsFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
   extractStylesForSelector,
@@ -50,6 +51,7 @@ import type {
   ExtractedChunk,
   ExtractedCounterStyle,
   ExtractedFontFace,
+  ExtractedFunction,
   ExtractedKeyframes,
   ExtractedProperty,
 } from './extractor';
@@ -58,6 +60,7 @@ import type { NodePath, PluginPass } from '@babel/core';
 import type {
   CounterStyleDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   KeyframesSteps,
 } from '../injector/types';
 
@@ -457,6 +460,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
+            config.function,
           );
         } else if (t.isObjectExpression(firstArg)) {
           // Styles mode: tastyStatic(styles)
@@ -471,6 +475,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
+            config.function,
           );
         } else if (t.isIdentifier(firstArg)) {
           // Extension mode: tastyStatic(base, styles)
@@ -485,6 +490,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             config.autoPropertyTypes,
             config.fontFace,
             config.counterStyle,
+            config.function,
           );
         } else {
           throw path.buildCodeFrameError(
@@ -636,6 +642,7 @@ function handleStylesMode(
   autoPropertyTypes?: boolean,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
+  globalFunction?: Record<string, FunctionDefinition>,
 ): void {
   const stylesArg = args[0];
 
@@ -669,6 +676,9 @@ function handleStylesMode(
     globalCounterStyle,
   );
 
+  // Extract @function rules
+  const functions = extractFunctionsFromStyles(styles, globalFunction);
+
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(styles);
 
@@ -682,6 +692,7 @@ function handleStylesMode(
       properties,
       fontFaces,
       counterStyles,
+      functions,
       chunks,
       nameMap,
     );
@@ -695,6 +706,7 @@ function handleStylesMode(
       properties,
       fontFaces,
       counterStyles,
+      functions,
       chunks,
       nameMap,
       state.sourceFile,
@@ -719,6 +731,7 @@ function handleExtensionMode(
   autoPropertyTypes?: boolean,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
+  globalFunction?: Record<string, FunctionDefinition>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -782,6 +795,9 @@ function handleExtensionMode(
     globalCounterStyle,
   );
 
+  // Extract @function rules
+  const functions = extractFunctionsFromStyles(mergedStyles, globalFunction);
+
   // Extract styles with chunking
   const chunks = extractStylesWithChunks(mergedStyles);
 
@@ -795,6 +811,7 @@ function handleExtensionMode(
       properties,
       fontFaces,
       counterStyles,
+      functions,
       chunks,
       nameMap,
     );
@@ -808,6 +825,7 @@ function handleExtensionMode(
       properties,
       fontFaces,
       counterStyles,
+      functions,
       chunks,
       nameMap,
       state.sourceFile,
@@ -837,6 +855,7 @@ function handleSelectorMode(
   autoPropertyTypes?: boolean,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
+  globalFunction?: Record<string, FunctionDefinition>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -883,6 +902,9 @@ function handleSelectorMode(
     globalCounterStyle,
   );
 
+  // Extract @function rules
+  const functions = extractFunctionsFromStyles(styles, globalFunction);
+
   // Extract styles for selector
   const result = extractStylesForSelector(selector, styles);
 
@@ -898,6 +920,7 @@ function handleSelectorMode(
     for (const prop of properties) cssParts.push(prop.css);
     for (const ff of fontFaces) cssParts.push(ff.css);
     for (const cs of counterStyles) cssParts.push(cs.css);
+    for (const fn of functions) cssParts.push(fn.css);
     cssParts.push(selectorCSS);
 
     const injectCall = createInjectCallAST(selector, cssParts.join('\n'));
@@ -915,6 +938,7 @@ function handleSelectorMode(
       properties,
       fontFaces,
       counterStyles,
+      functions,
       [],
       nameMap,
       sourceFile,
@@ -938,6 +962,7 @@ function collectAllCSS(
   properties: ExtractedProperty[],
   fontFaces: ExtractedFontFace[],
   counterStyles: ExtractedCounterStyle[],
+  functions: ExtractedFunction[],
   chunks: ExtractedChunk[],
   nameMap: Map<string, string>,
 ): string {
@@ -947,6 +972,7 @@ function collectAllCSS(
   for (const prop of properties) parts.push(prop.css);
   for (const ff of fontFaces) parts.push(ff.css);
   for (const cs of counterStyles) parts.push(cs.css);
+  for (const fn of functions) parts.push(fn.css);
 
   for (const chunk of chunks) {
     parts.push(
@@ -968,6 +994,7 @@ function writeCSSToWriter(
   properties: ExtractedProperty[],
   fontFaces: ExtractedFontFace[],
   counterStyles: ExtractedCounterStyle[],
+  functions: ExtractedFunction[],
   chunks: ExtractedChunk[],
   nameMap: Map<string, string>,
   sourceFile?: string,
@@ -983,6 +1010,9 @@ function writeCSSToWriter(
   }
   for (const cs of counterStyles) {
     cssWriter.add(cs.css, cs.css, sourceFile);
+  }
+  for (const fn of functions) {
+    cssWriter.add(fn.css, fn.css, sourceFile);
   }
 
   for (const chunk of chunks) {

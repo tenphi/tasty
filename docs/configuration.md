@@ -56,6 +56,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
 | `fontFace` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
 | `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
+| `function` | `Record<string, FunctionDefinition>` | - | Global @function (custom function) definitions |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
@@ -237,6 +238,30 @@ configure({
 Components can then reference `listStyleType: 'thumbs'` directly.
 
 See [Counter Style (`@counterStyle`)](dsl.md#counter-style-counterstyle) for inline usage inside component styles and the full list of supported descriptors.
+
+---
+
+## Functions
+
+Define reusable CSS [custom functions](https://developer.mozilla.org/en-US/docs/Web/CSS/@function) globally. Rules are injected eagerly when styles are first generated. Keys use `$$name` (the literal callable `--name`), matching the call site `$$name(...)`.
+
+```ts
+configure({
+  function: {
+    '$$negative': { args: ['$value'], result: '(-1 * $value)' },
+    '$$shadow': {
+      args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
+      returns: '<color>',
+      '$offset': '2px',
+      result: '$offset $offset ($shadow-color, black)',
+    },
+  },
+});
+```
+
+Components can then invoke them with the `$$name(...)` sugar, e.g. `marginTop: '$$negative(10px)'`.
+
+See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside component styles, the full descriptor shape, and token conventions. `@function` is an experimental CSS feature — unsupported browsers safely ignore the rule.
 
 ---
 

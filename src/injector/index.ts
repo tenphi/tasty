@@ -12,6 +12,7 @@ import { StyleInjector } from './injector';
 import type {
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
   InjectResult,
@@ -180,6 +181,28 @@ export function counterStyle(
 }
 
 /**
+ * Inject a CSS @function rule (custom function).
+ *
+ * Permanent and global — no dispose or ref-counting.
+ * Deduplicates by function name (first definition wins).
+ *
+ * @param name - The function name (`$$name`, `$name`, or `--name`)
+ * @param definition - Function definition (args, returns, result, local vars)
+ *
+ * @example
+ * ```ts
+ * func('$$negative', { args: ['$value'], result: '(-1 * $value)' });
+ * ```
+ */
+export function func(
+  name: string,
+  definition: FunctionDefinition,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  return getGlobalInjector().func(name, definition, options);
+}
+
+/**
  * Get CSS text from all sheets (for SSR)
  */
 export function getCssText(options?: { root?: Document | ShadowRoot }): string {
@@ -312,6 +335,8 @@ export type {
   FontFaceDescriptors,
   FontFaceInput,
   CounterStyleDescriptors,
+  FunctionDefinition,
+  FunctionParameter,
   StyleUsage,
   GCConfig,
   GCOptions,

@@ -77,6 +77,30 @@ describe('StyleProcessor', () => {
     );
   });
 
+  test('parses $$name(...) / ##name(...) as custom @function calls', () => {
+    // Simple literal arg
+    expect(parser.process('$$negative(10px)').output).toBe('--negative(10px)');
+
+    // Args are parsed: custom unit (x: '8px' raw → 16px) and tokens
+    expect(parser.process('$$negative(2x)').output).toBe('--negative(16px)');
+
+    // Color-token argument inside the call
+    expect(parser.process('$$shadow(#brandx)').output).toBe(
+      '--shadow(var(--brandx-color))',
+    );
+
+    // Multiple comma-separated args preserved
+    expect(parser.process('$$clamp(1x, 2x)').output).toBe('--clamp(8px, 16px)');
+
+    // ## form targets the -color literal name
+    expect(parser.process('##mix(#mixa, #mixb)').output).toBe(
+      '--mix-color(var(--mixa-color), var(--mixb-color))',
+    );
+
+    // No-arg call
+    expect(parser.process('$$now()').output).toBe('--now()');
+  });
+
   test('parses value modifiers', () => {
     const result = parser.process(
       'none auto max-content min-content fit-content stretch space-between',

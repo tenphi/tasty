@@ -109,6 +109,7 @@ export class SheetManager {
         injectedProperties: new Map<string, string>(),
         injectedFontFaces: new Set<string>(),
         injectedCounterStyles: new Set<string>(),
+        injectedFunctions: new Set<string>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),

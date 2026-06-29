@@ -29,11 +29,17 @@ import { parseStyle } from '../utils/styles';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
 import { formatCounterStyleDeclarations } from '../counter-style';
+import {
+  formatFunctionDeclarations,
+  formatFunctionPrelude,
+  parseFunctionName,
+} from '../functions';
 import { HYDRATED_RULE_INDEX, PLACEHOLDER_RULE_INDEX } from './types';
 import type {
   CacheMetrics,
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
   InjectResult,
@@ -846,6 +852,47 @@ export class StyleInjector {
 
     if (info) {
       registry.injectedCounterStyles.add(name);
+    }
+  }
+
+  /**
+   * Inject a CSS @function rule (custom function).
+   *
+   * Permanent and global — no dispose or ref-counting.
+   * Deduplicates by function name (first definition wins).
+   */
+  func(
+    name: string,
+    definition: FunctionDefinition,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    const cssName = parseFunctionName(name);
+
+    if (registry.injectedFunctions.has(cssName)) {
+      return;
+    }
+
+    const rule: StyleRule = {
+      selector: formatFunctionPrelude(
+        name,
+        definition.args,
+        definition.returns,
+      ),
+      declarations: formatFunctionDeclarations(definition),
+    } as StyleRule;
+
+    const info = this.sheetManager.insertGlobalRule(
+      registry,
+      [rule],
+      `function:${cssName}`,
+      root,
+    );
+
+    if (info) {
+      registry.injectedFunctions.add(cssName);
     }
   }
 

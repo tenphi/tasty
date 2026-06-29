@@ -1,6 +1,6 @@
 # React API
 
-The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 > **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
@@ -559,6 +559,42 @@ function useCounterStyle(
   options?: { name?: string; root?: Document | ShadowRoot },
 ): string;
 ```
+
+### useFunction
+
+Register a CSS `@function` (custom function). Permanent — no cleanup on unmount. Deduplicates by function name. The function name accepts `$$name` (matching the call site `$$name(...)`), `$name`, or `--name`.
+
+```tsx
+import { useFunction } from '@tenphi/tasty';
+
+function Box() {
+  useFunction('$$negative', { args: ['$value'], result: '(-1 * $value)' });
+  return <div style={{ marginTop: '--negative(10px)' }} />;
+}
+```
+
+Inside a `tasty()` component you can also call functions directly with the `$$name(...)` sugar:
+
+```tsx
+const Box = tasty({
+  styles: {
+    '@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } },
+    marginTop: '$$negative(10px)',
+  },
+});
+```
+
+Signature:
+
+```ts
+function useFunction(
+  name: string,
+  definition: FunctionDefinition,
+  options?: { root?: Document | ShadowRoot },
+): void;
+```
+
+See the [Functions section of the DSL reference](dsl.md#functions-function) for the full descriptor shape, token conventions, and value-sugar support. `@function` is an experimental CSS feature — unsupported browsers safely ignore the rule.
 
 ### Troubleshooting
 

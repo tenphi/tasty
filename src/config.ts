@@ -36,6 +36,7 @@ import type { ColorSpace } from './utils/color-space';
 import type {
   CounterStyleDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   GCConfig,
   KeyframesSteps,
   PropertyDefinition,
@@ -233,6 +234,20 @@ export interface TastyConfig {
    */
   counterStyle?: Record<string, CounterStyleDescriptors>;
   /**
+   * Global @function definitions (CSS custom functions).
+   * Keys are function names (`$$name`, `$name`, or `--name`), values are
+   * function definitions. Injected eagerly when styles are first generated.
+   * @example
+   * ```ts
+   * configure({
+   *   function: {
+   *     '$$negative': { args: ['$value'], result: '(-1 * $value)' },
+   *   },
+   * });
+   * ```
+   */
+  function?: Record<string, FunctionDefinition>;
+  /**
    * Custom style handlers that transform style properties into CSS declarations.
    * Handlers replace built-in handlers for the same style name.
    * @example
@@ -418,6 +433,9 @@ let globalFontFace: Record<string, FontFaceInput> | null = null;
 // Global counter-style storage (null = no counter styles configured)
 let globalCounterStyle: Record<string, CounterStyleDescriptors> | null = null;
 
+// Global @function storage (null = no functions configured)
+let globalFunction: Record<string, FunctionDefinition> | null = null;
+
 // Global properties storage (null = no properties configured)
 let globalProperties: Record<string, PropertyDefinition> | null = null;
 
@@ -443,6 +461,7 @@ let globalStyles: Record<string, Styles> | null = null;
 const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
 const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
+const GTKEY_FUNCTION = '__tasty_cfg_function__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
 const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
 
@@ -459,6 +478,7 @@ function clearGlobalThisConfig(): void {
   delete g[GTKEY_TOKENS];
   delete g[GTKEY_FONT_FACE];
   delete g[GTKEY_COUNTER_STYLE];
+  delete g[GTKEY_FUNCTION];
   delete g[GTKEY_PROPERTIES];
   delete g[GTKEY_GLOBAL_STYLES];
 }
@@ -674,6 +694,13 @@ export function markStylesGenerated(): void {
     }
   }
 
+  // Inject global @function rules (eagerly)
+  if (globalFunction && Object.keys(globalFunction).length > 0) {
+    for (const [name, definition] of Object.entries(globalFunction)) {
+      injector.func(name, definition);
+    }
+  }
+
   // Inject configured tokens as :root CSS custom properties
   if (globalConfigTokens && Object.keys(globalConfigTokens).length > 0) {
     const tokenRules = renderStyles(
@@ -861,6 +888,42 @@ function setGlobalCounterStyle(
   }
   globalCounterStyle = counterStyle;
   setOnGlobalThis(GTKEY_COUNTER_STYLE, globalCounterStyle);
+}
+
+// ============================================================================
+// Global Function Management
+// ============================================================================
+
+/**
+ * Get global @function configuration.
+ * Returns null if no functions configured.
+ * Reads from globalThis first for cross-module SSR support.
+ */
+export function getGlobalFunction(): Record<string, FunctionDefinition> | null {
+  return (
+    globalFunction ??
+    getFromGlobalThis<Record<string, FunctionDefinition>>(GTKEY_FUNCTION) ??
+    null
+  );
+}
+
+/**
+ * Set global functions (called from configure).
+ * Internal use only.
+ */
+function setGlobalFunction(
+  functions: Record<string, FunctionDefinition>,
+): void {
+  if (stylesGenerated) {
+    warnOnce(
+      'function-after-styles',
+      `[Tasty] Cannot update function after styles have been generated.\n` +
+        `The new functions will be ignored.`,
+    );
+    return;
+  }
+  globalFunction = functions;
+  setOnGlobalThis(GTKEY_FUNCTION, globalFunction);
 }
 
 // ============================================================================
@@ -1222,6 +1285,11 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalCounterStyle(config.counterStyle);
   }
 
+  // Handle functions
+  if (config.function) {
+    setGlobalFunction(config.function);
+  }
+
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
@@ -1272,6 +1340,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     properties: _properties,
     fontFace: _fontFace,
     counterStyle: _counterStyle,
+    function: _function,
     handlers: _handlers,
     tokens: _tokens,
     replaceTokens: _replaceTokens,
@@ -1347,6 +1416,7 @@ export function resetConfig(): void {
   globalProperties = null;
   globalFontFace = null;
   globalCounterStyle = null;
+  globalFunction = null;
   globalRecipes = null;
   globalConfigTokens = null;
   globalStyles = null;

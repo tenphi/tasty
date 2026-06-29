@@ -274,6 +274,30 @@ describe('ServerStyleCollector', () => {
     expect(css).not.toContain('second');
   });
 
+  it('collects @function rules', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction(
+      '--negative',
+      '@function --negative(--value) { result: calc(-1 * var(--value)); }',
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@function --negative(--value)');
+    expect(css).toContain('result: calc(-1 * var(--value));');
+  });
+
+  it('deduplicates @function rules by name', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction('--f', 'first');
+    collector.collectFunction('--f', 'second');
+
+    const css = collector.getCSS();
+    expect(css).toContain('first');
+    expect(css).not.toContain('second');
+  });
+
   it('flushCSS returns only new content', () => {
     const collector = new ServerStyleCollector();
 

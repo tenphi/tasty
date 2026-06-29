@@ -1,6 +1,6 @@
 # Style Properties Reference
 
-All standard CSS properties are supported in Tasty and benefit from its syntax sugar: design tokens (`$name`, `#name`), custom units (`2x`, `1r`, `1bw`), color opacity (`#purple.5`), auto-calc (`(100% - 2x)`), and custom functions. Values are parsed through the Tasty engine automatically.
+All standard CSS properties are supported in Tasty and benefit from its syntax sugar: design tokens (`$name`, `#name`), custom units (`2x`, `1r`, `1bw`), color opacity (`#purple.5`), auto-calc (`(100% - 2x)`), and [custom functions](dsl.md#functions-function) (`$$negative(10px)`). Values are parsed through the Tasty engine automatically.
 
 The properties documented below have **custom handlers** with enhanced syntax. They should be **preferred** over their raw CSS equivalents because they:
 

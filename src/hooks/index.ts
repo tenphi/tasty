@@ -13,3 +13,6 @@ export type { UsePropertyOptions } from './useProperty';
 export { useFontFace } from './useFontFace';
 
 export { useCounterStyle } from './useCounterStyle';
+
+export { useFunction } from './useFunction';
+export type { UseFunctionOptions } from './useFunction';

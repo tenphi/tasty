@@ -94,17 +94,36 @@ export function classify(
   }
 
   // 0. Double prefix for literal CSS property names ($$name -> --name, ##name -> --name-color)
-  // Used in transitions and animations to reference the property name itself, not its value
+  // Used in transitions and animations to reference the property name itself, not its value.
+  // Also supports custom @function invocation: $$name(args) -> --name(processed args).
   if (token.startsWith('$$')) {
-    const name = token.slice(2);
-    if (/^[a-z_][a-z0-9-_]*$/i.test(name)) {
-      return { bucket: Bucket.Value, processed: `--${name}` };
+    const rest = token.slice(2);
+    const openIdx = rest.indexOf('(');
+    if (openIdx > 0 && rest.endsWith(')')) {
+      const fname = rest.slice(0, openIdx);
+      if (/^[a-z_][a-z0-9-_]*$/i.test(fname)) {
+        const inner = rest.slice(openIdx + 1, -1).trim();
+        const args = inner ? recurse(inner).output : '';
+        return { bucket: Bucket.Value, processed: `--${fname}(${args})` };
+      }
+    }
+    if (/^[a-z_][a-z0-9-_]*$/i.test(rest)) {
+      return { bucket: Bucket.Value, processed: `--${rest}` };
     }
   }
   if (token.startsWith('##')) {
-    const name = token.slice(2);
-    if (/^[a-z_][a-z0-9-_]*$/i.test(name)) {
-      return { bucket: Bucket.Value, processed: `--${name}-color` };
+    const rest = token.slice(2);
+    const openIdx = rest.indexOf('(');
+    if (openIdx > 0 && rest.endsWith(')')) {
+      const fname = rest.slice(0, openIdx);
+      if (/^[a-z_][a-z0-9-_]*$/i.test(fname)) {
+        const inner = rest.slice(openIdx + 1, -1).trim();
+        const args = inner ? recurse(inner).output : '';
+        return { bucket: Bucket.Value, processed: `--${fname}-color(${args})` };
+      }
+    }
+    if (/^[a-z_][a-z0-9-_]*$/i.test(rest)) {
+      return { bucket: Bucket.Value, processed: `--${rest}-color` };
     }
   }
 

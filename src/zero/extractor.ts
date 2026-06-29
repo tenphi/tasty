@@ -9,6 +9,7 @@ import type {
   CounterStyleDescriptors,
   FontFaceDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   KeyframesSteps,
 } from '../injector/types';
 import {
@@ -21,6 +22,12 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
+import {
+  extractLocalFunctions,
+  formatFunctionRule,
+  hasLocalFunctions,
+  parseFunctionName,
+} from '../functions';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -570,6 +577,57 @@ export function extractCounterStyleFromStyles(
     if (local) {
       for (const [name, descriptors] of Object.entries(local)) {
         addCounterStyle(name, descriptors);
+      }
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
+// Function Extraction (zero-runtime)
+// ============================================================================
+
+export interface ExtractedFunction {
+  name: string;
+  css: string;
+}
+
+/**
+ * Extract @function rules from styles, merging with global config.
+ * Deduplicates by CSS function name (first definition wins).
+ */
+export function extractFunctionsFromStyles(
+  styles: Styles,
+  globalFunction?: Record<string, FunctionDefinition> | null,
+): ExtractedFunction[] {
+  const results: ExtractedFunction[] = [];
+  const seenNames = new Set<string>();
+
+  function addFunction(name: string, definition: FunctionDefinition) {
+    const cssName = parseFunctionName(name);
+    if (!seenNames.has(cssName)) {
+      seenNames.add(cssName);
+      results.push({
+        name: cssName,
+        css: formatFunctionRule(name, definition),
+      });
+    }
+  }
+
+  // Global functions first
+  if (globalFunction) {
+    for (const [name, definition] of Object.entries(globalFunction)) {
+      addFunction(name, definition);
+    }
+  }
+
+  // Local functions (override globals with same name)
+  if (hasLocalFunctions(styles)) {
+    const local = extractLocalFunctions(styles);
+    if (local) {
+      for (const [name, definition] of Object.entries(local)) {
+        addFunction(name, definition);
       }
     }
   }

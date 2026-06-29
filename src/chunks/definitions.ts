@@ -336,6 +336,7 @@ export function categorizeStyleKeys(
       key === '@properties' ||
       key === '@fontFace' ||
       key === '@counterStyle' ||
+      key === '@function' ||
       key === 'recipe'
     ) {
       continue;

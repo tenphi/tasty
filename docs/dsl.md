@@ -784,6 +784,66 @@ const EmojiList = tasty({
 
 ---
 
+## Functions (`@function`)
+
+Define reusable, parameterized CSS [custom functions](https://developer.mozilla.org/en-US/docs/Web/CSS/@function) via the CSS `@function` at-rule. A custom function takes parameters and returns a single value — like a dynamic custom property.
+
+The token convention follows Tasty's `$` vs `$$` distinction:
+
+- **`$$name`** — the literal callable name (`--name`). Used for the **definition key** and for **invocation** `$$name(...)`, mirroring the existing `$$gradient-angle` → `--gradient-angle` sugar. The definition key matches the call site.
+- **`$name`** — a custom-property declaration/reference (`var(--name)`). Used for **parameters** and **local variables**, exactly like declaring custom props in a styles object.
+- **Local variables** are declared directly as `$name` keys on the descriptor — the body reads like a mini styles object.
+- `result`, local-variable values, and parameter `default` values flow through the full Tasty DSL, so units (`2x`), color tokens (`#theme`), auto-calc (`(-1 * $value)` → `calc(-1 * var(--value))`), and fallbacks (`($shadow-color, black)` → `var(--shadow-color, black)`) all work.
+
+```ts
+const Box = tasty({
+  styles: {
+    '@function': {
+      // simplest: one bare param + result (auto-calc, no explicit calc())
+      '$$negative': { args: ['$value'], result: '(-1 * $value)' },
+
+      // typed param + default + return type + local variable
+      '$$shadow': {
+        args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
+        returns: '<color>',
+        '$offset': '2px', // local variable
+        result: '$offset $offset ($shadow-color, black)',
+      },
+    },
+    marginTop: '$$negative(10px)', // → margin-top: --negative(10px)
+    boxShadow: '$$shadow(#accent)', // → box-shadow: --shadow(var(--accent-color))
+  },
+});
+```
+
+Generated CSS:
+
+```css
+@function --negative(--value) { result: calc(-1 * var(--value)); }
+@function --shadow(--shadow-color <color>: inherit) returns <color> {
+  --offset: 2px;
+  result: var(--offset) var(--offset) var(--shadow-color, black);
+}
+.t0 { margin-top: --negative(10px); box-shadow: --shadow(var(--accent-color)); }
+```
+
+### Descriptor shape
+
+| Field | Type | Notes |
+|---|---|---|
+| `result` (required) | `string` | The `result:` value, parsed through the Tasty DSL. |
+| `args` | `string[]` \| `Record<string, FunctionParameter>` | Ordered parameters. Array form lists bare names; object form maps names to type/default. |
+| `returns` | `string` | Optional return type, e.g. `'<color>'`. |
+| `$name` keys | `string \| number` | Any `$name` key declares a local variable `--name` (value parsed). |
+
+A `FunctionParameter` is one of: `true` (bare param), a string CSS type shorthand (`'<length>'`), or `{ syntax?: string; default?: string | number }`.
+
+Functions can also be registered with the [`useFunction`](react-api.md#usefunction) hook or globally via [`configure({ function })`](configuration.md#functions).
+
+> `@function` is permanent — injected once and never cleaned up, like `@counter-style`. It is an experimental CSS feature ([Chrome 139+](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)); unsupported browsers safely ignore the rule, so use it as progressive enhancement.
+
+---
+
 ## Style Properties
 
 For a complete reference of all enhanced style properties — syntax, values, modifiers, and recommendations — see **[Style Properties Reference](styles.md)**.

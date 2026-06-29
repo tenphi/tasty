@@ -1,6 +1,7 @@
 import type {
   CounterStyleDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   KeyframesSteps,
   PropertyDefinition,
 } from '../injector/types';
@@ -539,6 +540,20 @@ export interface StylesInterface extends Omit<
    */
   '@counterStyle'?: Record<string, CounterStyleDescriptors>;
   /**
+   * Local @function definitions (CSS custom functions) for this component.
+   * Keys are function names using `$$name` (the literal callable `--name`),
+   * matching the call site `$$name(...)`. Values are function definitions.
+   *
+   * Local variables are declared directly as `$name` keys on the descriptor;
+   * `result`, local-var values, and parameter defaults are parsed through the
+   * Tasty DSL (units, color tokens, auto-calc, fallbacks).
+   *
+   * Examples:
+   * - `'@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } }`
+   * - `'@function': { '$$shadow': { args: { '$color': { syntax: '<color>', default: 'inherit' } }, returns: '<color>', '$offset': '2px', result: '$offset $offset ($color, black)' } }`
+   */
+  '@function'?: Record<string, FunctionDefinition>;
+  /**
    * Apply one or more predefined style recipes by name.
    * Recipes are defined globally via `configure({ recipes: { ... } })`.
    * Multiple recipes are space-separated. Use `/` to separate base recipes
@@ -593,6 +608,7 @@ type SpecialStyleKeys =
   | '@properties'
   | '@fontFace'
   | '@counterStyle'
+  | '@function'
   | 'recipe';
 
 export type StylesWithoutSelectors = {
@@ -627,6 +643,7 @@ export type RecipeStyles = StylesWithoutSelectors &
     '@properties'?: StylesInterface['@properties'];
     '@fontFace'?: StylesInterface['@fontFace'];
     '@counterStyle'?: StylesInterface['@counterStyle'];
+    '@function'?: StylesInterface['@function'];
   };
 
 /** Special properties that are not regular style values */
@@ -635,6 +652,7 @@ export interface SpecialStyleProperties {
   '@properties'?: StylesInterface['@properties'];
   '@fontFace'?: StylesInterface['@fontFace'];
   '@counterStyle'?: StylesInterface['@counterStyle'];
+  '@function'?: StylesInterface['@function'];
   recipe?: StylesInterface['recipe'];
 }
 
@@ -648,7 +666,8 @@ export interface StylesIndexSignature {
     | StylesInterface['@keyframes']
     | StylesInterface['@properties']
     | StylesInterface['@fontFace']
-    | StylesInterface['@counterStyle'];
+    | StylesInterface['@counterStyle']
+    | StylesInterface['@function'];
   /**
    * Selector combinator: `undefined` (descendant, default), `'>'` (child), `'+'` (adjacent), `'~'` (sibling).
    * Can chain with capitalized names: `'> Body > Row >'`. Spaces required around combinators.

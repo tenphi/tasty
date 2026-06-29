@@ -1,4 +1,5 @@
 import {
+  extractFunctionsFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
   extractStylesWithChunks,
@@ -35,6 +36,45 @@ describe('extractStylesWithChunks', () => {
     const chunks2 = extractStylesWithChunks(styles2);
 
     expect(chunks1[0].className).not.toBe(chunks2[0].className);
+  });
+});
+
+describe('extractFunctionsFromStyles', () => {
+  it('returns empty array when no functions', () => {
+    expect(extractFunctionsFromStyles({ display: 'block' })).toEqual([]);
+  });
+
+  it('extracts local @function rules', () => {
+    const results = extractFunctionsFromStyles({
+      '@function': {
+        $$negative: { args: ['$value'], result: '(-1 * $value)' },
+      },
+    });
+    expect(results).toEqual([
+      {
+        name: '--negative',
+        css: '@function --negative(--value) { result: calc(-1 * var(--value)); }',
+      },
+    ]);
+  });
+
+  it('merges global functions and dedups by name (first wins)', () => {
+    const results = extractFunctionsFromStyles(
+      {
+        '@function': {
+          $$shared: { args: ['$x'], result: '(2 * $x)' },
+        },
+      },
+      {
+        $$global: { args: ['$x'], result: '$x' },
+        $$shared: { args: ['$x'], result: '$x' },
+      },
+    );
+    expect(results.map((r) => r.name)).toEqual(['--global', '--shared']);
+    // Global definition wins for the shared name
+    expect(results.find((r) => r.name === '--shared')!.css).toContain(
+      'result: var(--x);',
+    );
   });
 });
 

@@ -24,6 +24,9 @@ export {
 
 // Plugins
 export { okhslPlugin, okhslFunc, okhstPlugin, okhstFunc } from '../plugins';
+export { createColorFunc } from '../plugins/color-func';
+export { DEFAULT_PLUGINS, registerDefaultFunctions } from '../plugins/defaults';
+export { resolveFunctionColor } from '../utils/function-color';
 export type { TastyPlugin, TastyPluginFactory } from '../plugins';
 
 // Chunk utilities

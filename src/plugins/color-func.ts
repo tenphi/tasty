@@ -39,23 +39,29 @@ const parsePercentage = (value: string): number => {
 
 /**
  * Creates a color function handler for the tasty parser.
- * @param name The name of the color space (e.g., 'okhsl', 'okhst')
- * @param channelLabel The label for the channels in warnings (e.g., 'H S L')
- * @param convert A function that converts the parsed H, C2, C3 values to sRGB [r, g, b] (0-1)
+ *
+ * A color function is a custom `functions` entry that converts its arguments
+ * to an `rgb(...)` string (an already-supported color), so it needs no special
+ * core integration — registering it as a parse function is enough.
+ *
+ * @param name The name of the color function (e.g., 'okhsl', 'okhst')
+ * @param convert Converts the parsed first three channel values (after angle/
+ *   percent normalization) to sRGB `[r, g, b]` in the 0-1 range
+ * @param label Optional diagnostic label shown in dev warnings when the wrong
+ *   number of arguments is supplied (e.g., 'H S L'). Has no effect on parsing
+ *   or output.
  */
 export function createColorFunc(
   name: string,
-  channelLabel: string,
   convert: (h: number, c2: number, c3: number) => [number, number, number],
+  label?: string,
 ): (groups: StyleDetails[]) => string {
   const conversionCache = new Lru<string, string>(500);
+  const expected = label ? ` (${label})` : '';
 
   return (groups: StyleDetails[]): string => {
     if (groups.length === 0 || groups[0].all.length < 3) {
-      console.warn(
-        `[${name}] Expected 3 values (${channelLabel}), got:`,
-        groups,
-      );
+      console.warn(`[${name}] Expected 3 values${expected}, got:`, groups);
       return 'rgb(0% 0% 0%)';
     }
 

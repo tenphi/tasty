@@ -202,13 +202,38 @@ export function classify(
               );
             }
 
-            // For color functions like rgb(), rgba(), hsl(), hwb(), etc., inject alpha
-            // Includes all standard CSS color functions plus okhsl and okhst (plugins)
+            // For color functions like rgb(), rgba(), hsl(), hwb(), etc., inject alpha.
+            // This covers all standard CSS color functions plus any custom color
+            // function registered as a parse function (e.g. okhsl/okhst via plugins),
+            // so no function name is hardcoded here.
             const funcMatch = resolvedValue.match(
-              /^(rgba?|hsla?|hwb|oklab|oklch|lab|lch|color|okhsl|okhst|device-cmyk|gray|color-mix|color-contrast)\((.+)\)$/i,
+              /^([a-z][a-z0-9-]*)\((.+)\)$/i,
             );
             if (funcMatch) {
               const [, funcName, args] = funcMatch;
+              const lowerFunc = funcName.toLowerCase();
+              const isCustomFunc = !!(
+                opts.funcs &&
+                lowerFunc in opts.funcs &&
+                !COLOR_FUNCS.has(lowerFunc) &&
+                !COLOR_FUNCS.has(funcName.replace(/a$/i, '').toLowerCase())
+              );
+              // Native color function name with the legacy 'a' suffix dropped
+              // (rgba->rgb, hsla->hsl). Custom functions keep their original name.
+              const normalizedFunc = isCustomFunc
+                ? lowerFunc
+                : funcName.replace(/a$/i, '').toLowerCase();
+              // Only treat as a color function if it is a native CSS color
+              // function or a registered custom parse function. Otherwise the
+              // resolved value is some other function call and alpha injection
+              // does not apply.
+              const isColorFunc =
+                COLOR_FUNCS.has(normalizedFunc) ||
+                COLOR_FUNCS.has(lowerFunc) ||
+                isCustomFunc;
+              if (!isColorFunc) {
+                return classify(`${resolvedValue}.${rawAlpha}`, opts, recurse);
+              }
               // Handle $prop syntax for custom property alpha
               let alpha: string;
               if (rawAlpha.startsWith('$')) {
@@ -217,8 +242,6 @@ export function classify(
               } else {
                 alpha = rawAlpha === '0' ? '0' : `.${rawAlpha}`;
               }
-              // Normalize function name: rgba->rgb, hsla->hsl (modern syntax doesn't need 'a' suffix)
-              const normalizedFunc = funcName.replace(/a$/i, '').toLowerCase();
               // Normalize to modern syntax: replace top-level commas with spaces
               // Preserves commas inside nested functions like min(), max(), clamp()
               const normalizeArgs = (a: string) => {

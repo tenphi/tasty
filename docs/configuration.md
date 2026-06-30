@@ -275,6 +275,34 @@ Components then invoke parse functions as `double(...)` and CSS functions with t
 
 See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside component styles, the full descriptor shape, and token conventions. `@function` is an experimental CSS feature — unsupported browsers safely ignore the native rule (see the polyfill below).
 
+### Custom color functions
+
+A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, token decomposition into the configured color space, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
+
+```ts
+import { configure, createColorFunc } from '@tenphi/tasty';
+
+// A custom color space is just a `functions` entry.
+const myColorPlugin = () => ({
+  name: 'mycolor',
+  functions: {
+    // Hand-written parse function:
+    mycolor: (groups) => {
+      const [r, g, b] = groups[0].all;
+      return `rgb(${r} ${g} ${b})`;
+    },
+  },
+});
+
+configure({ plugins: [myColorPlugin()] });
+
+// Now `mycolor(...)` is a color in every context:
+//   fill: 'mycolor(255 0 0)'
+//   fill: '#brand.5'   (with replaceTokens: { '#brand': 'mycolor(255 0 0)' })
+```
+
+For HSL-style color spaces (a hue angle plus two percentages), the exported `createColorFunc(name, convert, label?)` helper handles angle/percentage parsing, clamping, alpha, and caching. `convert` returns sRGB `[r, g, b]` in 0-1; `label` is an optional string used only in dev warnings (e.g. `'H S L'`) and has no effect on output. This is exactly how `okhslPlugin`/`okhstPlugin` are implemented.
+
 ---
 
 ## Polyfills

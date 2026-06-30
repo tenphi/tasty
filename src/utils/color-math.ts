@@ -962,8 +962,6 @@ export function strToRgb(
   if (color.startsWith('rgb')) return color;
   if (color.startsWith('#')) return hexToRgb(color);
   if (color.startsWith('oklch(')) return oklchStringToRgb(color);
-  if (color.startsWith('okhsl(')) return okhslStringToRgb(color);
-  if (color.startsWith('okhst(')) return okhstStringToRgb(color);
   if (color.startsWith('hsl')) return hslStringToRgb(color);
 
   const namedHex = getNamedColorHex().get(color.toLowerCase());

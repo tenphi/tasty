@@ -527,18 +527,18 @@ export interface StylesInterface extends Omit<
    * (for multiple weights/styles of the same family).
    *
    * Examples:
-   * - `'@fontFace': { Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' } }`
-   * - `'@fontFace': { 'Brand Sans': [{ src: '...', fontWeight: 400 }, { src: '...', fontWeight: 700 }] }`
+   * - `'@font-face': { Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' } }`
+   * - `'@font-face': { 'Brand Sans': [{ src: '...', fontWeight: 400 }, { src: '...', fontWeight: 700 }] }`
    */
-  '@fontFace'?: Record<string, FontFaceInput>;
+  '@font-face'?: Record<string, FontFaceInput>;
   /**
    * Local @counter-style definitions for this component.
    * Keys are counter-style names, values are descriptor objects.
    *
    * Examples:
-   * - `'@counterStyle': { thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' } }`
+   * - `'@counter-style': { thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' } }`
    */
-  '@counterStyle'?: Record<string, CounterStyleDescriptors>;
+  '@counter-style'?: Record<string, CounterStyleDescriptors>;
   /**
    * Local @function definitions (CSS custom functions) for this component.
    * Keys are function names using `$$name` (the literal callable `--name`),
@@ -606,8 +606,8 @@ export type NotSelector = Exclude<string, Selector | keyof StylesInterface>;
 type SpecialStyleKeys =
   | '@keyframes'
   | '@property'
-  | '@fontFace'
-  | '@counterStyle'
+  | '@font-face'
+  | '@counter-style'
   | '@function'
   | 'recipe';
 
@@ -641,8 +641,8 @@ export type RecipeStyles = StylesWithoutSelectors &
   RecipeIndexSignature & {
     '@keyframes'?: StylesInterface['@keyframes'];
     '@property'?: StylesInterface['@property'];
-    '@fontFace'?: StylesInterface['@fontFace'];
-    '@counterStyle'?: StylesInterface['@counterStyle'];
+    '@font-face'?: StylesInterface['@font-face'];
+    '@counter-style'?: StylesInterface['@counter-style'];
     '@function'?: StylesInterface['@function'];
   };
 
@@ -650,8 +650,8 @@ export type RecipeStyles = StylesWithoutSelectors &
 export interface SpecialStyleProperties {
   '@keyframes'?: StylesInterface['@keyframes'];
   '@property'?: StylesInterface['@property'];
-  '@fontFace'?: StylesInterface['@fontFace'];
-  '@counterStyle'?: StylesInterface['@counterStyle'];
+  '@font-face'?: StylesInterface['@font-face'];
+  '@counter-style'?: StylesInterface['@counter-style'];
   '@function'?: StylesInterface['@function'];
   recipe?: StylesInterface['recipe'];
 }
@@ -665,8 +665,8 @@ export interface StylesIndexSignature {
     | false // Removes all styles for this sub-element when extending
     | StylesInterface['@keyframes']
     | StylesInterface['@property']
-    | StylesInterface['@fontFace']
-    | StylesInterface['@counterStyle']
+    | StylesInterface['@font-face']
+    | StylesInterface['@counter-style']
     | StylesInterface['@function'];
   /**
    * Selector combinator: `undefined` (descendant, default), `'>'` (child), `'+'` (adjacent), `'~'` (sibling).

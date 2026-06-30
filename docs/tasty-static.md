@@ -168,8 +168,8 @@ module.exports = {
 | `config.replaceTokens` | `Record<string, string \| number>` | — | Parse-time token substitution. Keys use `$name` for custom properties and `#name` for color tokens. |
 | `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
 | `config.keyframes` | `Record<string, KeyframesSteps>` | — | Global `@keyframes` definitions available to all `tastyStatic` calls |
-| `config.fontFace` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
-| `config.counterStyle` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
+| `config.fontFaces` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
+| `config.counterStyles` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
 | `config.units` | `Record<string, string \| UnitHandler>` | — | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }` |
 | `config.functions` | `Record<string, FunctionDefinition \| Function>` | — | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
 | `config.polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time |

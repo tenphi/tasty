@@ -232,7 +232,7 @@ export interface TastyConfig {
    * @example
    * ```ts
    * configure({
-   *   fontFace: {
+   *   fontFaces: {
    *     'Brand Sans': [
    *       { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
    *       { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
@@ -242,7 +242,7 @@ export interface TastyConfig {
    * });
    * ```
    */
-  fontFace?: Record<string, FontFaceInput>;
+  fontFaces?: Record<string, FontFaceInput>;
   /**
    * Global @counter-style definitions.
    * Keys are counter-style names, values are descriptor objects.
@@ -250,13 +250,13 @@ export interface TastyConfig {
    * @example
    * ```ts
    * configure({
-   *   counterStyle: {
+   *   counterStyles: {
    *     thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' },
    *   },
    * });
    * ```
    */
-  counterStyle?: Record<string, CounterStyleDescriptors>;
+  counterStyles?: Record<string, CounterStyleDescriptors>;
   /**
    * Opt-in polyfills for not-yet-baseline CSS features. Each key toggles a
    * feature polyfill; all default to `false`.
@@ -874,7 +874,7 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
   if (stylesGenerated) {
     warnOnce(
       'fontface-after-styles',
-      `[Tasty] Cannot update fontFace after styles have been generated.\n` +
+      `[Tasty] Cannot update fontFaces after styles have been generated.\n` +
         `The new font faces will be ignored.`,
     );
     return;
@@ -915,7 +915,7 @@ function setGlobalCounterStyle(
   if (stylesGenerated) {
     warnOnce(
       'counterstyle-after-styles',
-      `[Tasty] Cannot update counterStyle after styles have been generated.\n` +
+      `[Tasty] Cannot update counterStyles after styles have been generated.\n` +
         `The new counter styles will be ignored.`,
     );
     return;
@@ -1374,13 +1374,13 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   }
 
   // Handle font faces
-  if (config.fontFace) {
-    setGlobalFontFace(config.fontFace);
+  if (config.fontFaces) {
+    setGlobalFontFace(config.fontFaces);
   }
 
   // Handle counter styles
-  if (config.counterStyle) {
-    setGlobalCounterStyle(config.counterStyle);
+  if (config.counterStyles) {
+    setGlobalCounterStyle(config.counterStyles);
   }
 
   // Handle custom handlers
@@ -1432,8 +1432,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     plugins: _plugins,
     keyframes: _keyframes,
     properties: _properties,
-    fontFace: _fontFace,
-    counterStyle: _counterStyle,
+    fontFaces: _fontFaces,
+    counterStyles: _counterStyles,
     handlers: _handlers,
     tokens: _tokens,
     replaceTokens: _replaceTokens,

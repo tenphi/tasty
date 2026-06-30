@@ -53,8 +53,8 @@ const BUILTIN_STATES = new Set([
   '@starting',
   '@keyframes',
   '@property',
-  '@fontFace',
-  '@counterStyle',
+  '@font-face',
+  '@counter-style',
   '@function',
   '@supports',
   // @inherit is a value (not a key), but reserved here to prevent

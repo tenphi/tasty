@@ -87,7 +87,7 @@ describe('extractCounterStyleFromStyles', () => {
   it('merges global counter styles and lets local override on name conflict', () => {
     const results = extractCounterStyleFromStyles(
       {
-        '@counterStyle': {
+        '@counter-style': {
           shared: { system: 'cyclic', symbols: '"L"' },
         },
       },

@@ -693,14 +693,14 @@ Use explicit `@property` when you need non-default settings like `inherits: fals
 
 ---
 
-## Font Face (`@fontFace`)
+## Font Face (`@font-face`)
 
 Register custom fonts directly inside a `styles` object. Keys are font-family names, values are descriptor objects (or arrays of them for multiple weights/styles).
 
 ```ts
 const Heading = tasty({
   styles: {
-    '@fontFace': {
+    '@font-face': {
       'Brand Sans': {
         src: 'url("/fonts/brand-sans.woff2") format("woff2")',
         fontDisplay: 'swap',
@@ -716,7 +716,7 @@ const Heading = tasty({
 Supply an array to register several variants of the same family:
 
 ```ts
-'@fontFace': {
+'@font-face': {
   'Brand Sans': [
     { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
     { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
@@ -745,7 +745,7 @@ Supply an array to register several variants of the same family:
 
 ---
 
-## Counter Style (`@counterStyle`)
+## Counter Style (`@counter-style`)
 
 Define custom list markers via the CSS `@counter-style` at-rule. Keys are counter-style names, values are descriptor objects.
 
@@ -753,7 +753,7 @@ Define custom list markers via the CSS `@counter-style` at-rule. Keys are counte
 const EmojiList = tasty({
   tag: 'ol',
   styles: {
-    '@counterStyle': {
+    '@counter-style': {
       thumbs: {
         system: 'cyclic',
         symbols: '"👍"',

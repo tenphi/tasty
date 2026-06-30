@@ -12,21 +12,21 @@ import type { Styles } from '../styles/types';
 // Constants
 // ============================================================================
 
-const FONT_FACE_KEY = '@fontFace';
+const FONT_FACE_KEY = '@font-face';
 
 // ============================================================================
 // Extraction Functions
 // ============================================================================
 
 /**
- * Check if styles object has local @fontFace definition.
+ * Check if styles object has local @font-face definition.
  */
 export function hasLocalFontFace(styles: Styles): boolean {
   return FONT_FACE_KEY in styles;
 }
 
 /**
- * Extract local @fontFace from styles object.
+ * Extract local @font-face from styles object.
  * Returns null if no local font faces (fast path).
  */
 export function extractLocalFontFace(

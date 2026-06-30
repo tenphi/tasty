@@ -459,8 +459,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state.sourceFile,
             config.keyframes,
             config.autoPropertyTypes,
-            config.fontFace,
-            config.counterStyle,
+            config.fontFaces,
+            config.counterStyles,
             getGlobalFunction() ?? undefined,
           );
         } else if (t.isObjectExpression(firstArg)) {
@@ -474,8 +474,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             mode,
             config.keyframes,
             config.autoPropertyTypes,
-            config.fontFace,
-            config.counterStyle,
+            config.fontFaces,
+            config.counterStyles,
             getGlobalFunction() ?? undefined,
           );
         } else if (t.isIdentifier(firstArg)) {
@@ -489,8 +489,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             mode,
             config.keyframes,
             config.autoPropertyTypes,
-            config.fontFace,
-            config.counterStyle,
+            config.fontFaces,
+            config.counterStyles,
             getGlobalFunction() ?? undefined,
           );
         } else {

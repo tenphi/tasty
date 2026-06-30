@@ -57,8 +57,8 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
-| `fontFace` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
-| `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
+| `fontFaces` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
+| `counterStyles` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
 | `polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
@@ -191,7 +191,7 @@ Register custom fonts globally so every component can reference them by family n
 
 ```ts
 configure({
-  fontFace: {
+  fontFaces: {
     'Brand Sans': [
       {
         src: 'url("/fonts/brand-regular.woff2") format("woff2")',
@@ -214,7 +214,7 @@ configure({
 
 Now any component can use `fontFamily: '"Brand Sans", sans-serif'` and the browser will already have the `@font-face` rules in the stylesheet.
 
-See [Font Face (`@fontFace`)](dsl.md#font-face-fontface) for inline usage inside component styles and the full list of supported descriptors.
+See [Font Face (`@font-face`)](dsl.md#font-face-font-face) for inline usage inside component styles and the full list of supported descriptors.
 
 ---
 
@@ -224,7 +224,7 @@ Define custom list-marker algorithms globally. Rules are injected eagerly when s
 
 ```ts
 configure({
-  counterStyle: {
+  counterStyles: {
     thumbs: {
       system: 'cyclic',
       symbols: '"👍"',
@@ -240,7 +240,7 @@ configure({
 
 Components can then reference `listStyleType: 'thumbs'` directly.
 
-See [Counter Style (`@counterStyle`)](dsl.md#counter-style-counterstyle) for inline usage inside component styles and the full list of supported descriptors.
+See [Counter Style (`@counter-style`)](dsl.md#counter-style-counter-style) for inline usage inside component styles and the full list of supported descriptors.
 
 ---
 

@@ -156,7 +156,7 @@ export interface TastyConfig {
    * `'ts'` (overridable via the same option) so its classes can't
    * collide with runtime classes when both are loaded on the same page.
    *
-   * Must match `^[a-zA-Z][a-zA-Z0-9_-]{0,31}$`. Locked once styles
+   * Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. Locked once styles
    * have been generated.
    *
    * @default 't'
@@ -858,7 +858,7 @@ export function getEffectiveProperties(): Record<string, PropertyDefinition> {
  * Returns null if no font faces configured.
  * Reads from globalThis first for cross-module SSR support.
  */
-export function getGlobalFontFace(): Record<string, FontFaceInput> | null {
+export function getGlobalFontFaces(): Record<string, FontFaceInput> | null {
   return (
     globalFontFace ??
     getFromGlobalThis<Record<string, FontFaceInput>>(GTKEY_FONT_FACE) ??
@@ -892,7 +892,7 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
  * Returns null if no counter styles configured.
  * Reads from globalThis first for cross-module SSR support.
  */
-export function getGlobalCounterStyle(): Record<
+export function getGlobalCounterStyles(): Record<
   string,
   CounterStyleDescriptors
 > | null {
@@ -933,7 +933,10 @@ function setGlobalCounterStyle(
  * Returns null if no functions configured.
  * Reads from globalThis first for cross-module SSR support.
  */
-export function getGlobalFunction(): Record<string, FunctionDefinition> | null {
+export function getGlobalFunctions(): Record<
+  string,
+  FunctionDefinition
+> | null {
   return (
     globalFunction ??
     getFromGlobalThis<Record<string, FunctionDefinition>>(GTKEY_FUNCTION) ??

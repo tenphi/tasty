@@ -18,6 +18,7 @@ import type {
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
+  PropertyOptions,
   StyleInjectorConfig,
 } from './types';
 
@@ -86,27 +87,6 @@ export function keyframes(
   nameOrOptions?: string | { root?: Document | ShadowRoot; name?: string },
 ): KeyframesResult {
   return getGlobalInjector().keyframes(steps, nameOrOptions);
-}
-
-export interface PropertyOptions {
-  /**
-   * CSS syntax string for the property (e.g., '<color>', '<length>', '<angle>')
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/@property/syntax
-   */
-  syntax?: string;
-  /**
-   * Whether the property inherits from parent elements
-   * @default true
-   */
-  inherits?: boolean;
-  /**
-   * Initial value for the property
-   */
-  initialValue?: string | number;
-  /**
-   * Shadow root or document to inject into
-   */
-  root?: Document | ShadowRoot;
 }
 
 /**
@@ -207,15 +187,15 @@ export function func(
 /**
  * Get CSS text from all sheets (for SSR)
  */
-export function getCssText(options?: { root?: Document | ShadowRoot }): string {
-  return getGlobalInjector().getCssText(options);
+export function getCSSText(options?: { root?: Document | ShadowRoot }): string {
+  return getGlobalInjector().getCSSText(options);
 }
 
 /**
  * Collect only CSS used by a rendered subtree (like jest-styled-components).
  * Pass the container returned by render(...).
  */
-export function getCssTextForNode(
+export function getCSSTextForNode(
   node: ParentNode | Element | DocumentFragment,
   options?: { root?: Document | ShadowRoot },
 ): string {
@@ -242,7 +222,7 @@ export function getCssTextForNode(
     : ([] as unknown as NodeListOf<Element>);
   if (elements) elements.forEach(readClasses);
 
-  return getGlobalInjector().getCssTextForClasses(classSet, options);
+  return getGlobalInjector().getCSSTextForClasses(classSet, options);
 }
 
 /**
@@ -274,13 +254,6 @@ export function touch(
  */
 export function gc(options?: GCOptions): number {
   return getGlobalInjector().gc(options);
-}
-
-/**
- * Check if we're currently running in a test environment
- */
-export function getIsTestEnvironment(): boolean {
-  return isTestEnvironment();
 }
 
 /**
@@ -334,6 +307,7 @@ export type {
   CacheMetrics,
   RawCSSResult,
   PropertyDefinition,
+  PropertyOptions,
   FontFaceDescriptors,
   FontFaceInput,
   CounterStyleDescriptors,

@@ -21,7 +21,7 @@ import type { TastyPlugin, TastyPluginFactory } from './types';
  * The okhsl function handler for tasty parser.
  * Receives parsed style groups and returns an RGB color string.
  */
-const okhslFunc = createColorFunc('okhsl', okhslToSrgb, 'H S L');
+const okhslFunction = createColorFunc('okhsl', okhslToSrgb, 'H S L');
 
 /**
  * OKHSL Plugin for Tasty.
@@ -48,8 +48,8 @@ const okhslFunc = createColorFunc('okhsl', okhslToSrgb, 'H S L');
 export const okhslPlugin: TastyPluginFactory = (): TastyPlugin => ({
   name: 'okhsl',
   functions: {
-    okhsl: okhslFunc,
+    okhsl: okhslFunction,
   },
 });
 
-export { okhslFunc };
+export { okhslFunction };

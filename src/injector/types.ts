@@ -231,6 +231,15 @@ export interface PropertyDefinition {
 }
 
 /**
+ * Options for registering a CSS `@property`.
+ * Extends {@link PropertyDefinition} with an optional injection root.
+ */
+export interface PropertyOptions extends PropertyDefinition {
+  /** Shadow root or document to inject into */
+  root?: Document | ShadowRoot;
+}
+
+/**
  * A single parameter for a CSS @function at-rule.
  *
  * - `true` — a bare parameter with no type or default.

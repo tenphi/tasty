@@ -20,7 +20,7 @@ The zero-runtime mode is part of the main `@tenphi/tasty` package but requires a
 | `@babel/core` | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`) |
 | `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin |
 | `@babel/types` | >= 7.24 | Babel plugin |
-| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/next`) when using `configFile` option |
+| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/zero/next`) when using `configFile` option |
 
 All of these are declared as optional peer dependencies of `@tenphi/tasty`. Install only what your setup requires:
 
@@ -237,7 +237,7 @@ The `withTastyZero` wrapper configures both **webpack** and **Turbopack** automa
 
 ```typescript
 // next.config.ts
-import { withTastyZero } from '@tenphi/tasty/next';
+import { withTastyZero } from '@tenphi/tasty/zero/next';
 
 export default withTastyZero({
   output: 'public/tasty.css',
@@ -396,7 +396,7 @@ With Next.js:
 
 ```typescript
 // next.config.ts
-import { withTastyZero } from '@tenphi/tasty/next';
+import { withTastyZero } from '@tenphi/tasty/zero/next';
 
 export default withTastyZero({
   mode: 'inject',

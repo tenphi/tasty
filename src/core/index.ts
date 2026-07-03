@@ -9,9 +9,9 @@ export {
   isTestEnvironment,
   hasGlobalKeyframes,
   getGlobalKeyframes,
-  getGlobalFontFace,
-  getGlobalCounterStyle,
-  getGlobalFunction,
+  getGlobalFontFaces,
+  getGlobalCounterStyles,
+  getGlobalFunctions,
   hasGlobalRecipes,
   getGlobalRecipes,
 } from '../config';
@@ -23,7 +23,12 @@ export {
 } from '../utils/name-prefix';
 
 // Plugins
-export { okhslPlugin, okhslFunc, okhstPlugin, okhstFunc } from '../plugins';
+export {
+  okhslPlugin,
+  okhslFunction,
+  okhstPlugin,
+  okhstFunction,
+} from '../plugins';
 export { createColorFunc } from '../plugins/color-func';
 export { DEFAULT_PLUGINS, registerDefaultFunctions } from '../plugins/defaults';
 export { resolveFunctionColor } from '../utils/function-color';
@@ -73,7 +78,6 @@ export type {
   ParserOptions,
   UnitHandler,
 } from '../parser/types';
-export { Bucket } from '../parser/types';
 
 // Style computation (hook-free)
 export { computeStyles } from '../compute-styles';
@@ -119,7 +123,6 @@ export type {
   InnerStyleProps,
   ShortGridStyles,
   GlobalStyledProps,
-  Props,
   TagName,
   Mods,
   ModValue,

@@ -1,11 +1,11 @@
-import { okhslFunc } from '../plugins/okhsl-plugin';
+import { okhslFunction } from '../plugins/okhsl-plugin';
 
 import { StyleParser } from './parser';
 import type { StyleDetails } from './types';
 
 const parser = new StyleParser({
   funcs: {
-    okhsl: okhslFunc,
+    okhsl: okhslFunction,
     sum(parsed: StyleDetails[]) {
       return `calc(${parsed
         .map((s) => s.values[0])

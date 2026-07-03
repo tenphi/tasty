@@ -470,7 +470,7 @@ See the [full SSR guide](docs/ssr.md).
 | `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration wrapper | Node |
+| `@tenphi/tasty/zero/next` | Next.js integration wrapper | Node |
 | `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |

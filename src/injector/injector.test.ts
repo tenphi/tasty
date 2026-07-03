@@ -406,7 +406,7 @@ describe('StyleInjector', () => {
     });
   });
 
-  describe('getCssText', () => {
+  describe('getCSSText', () => {
     it('should return CSS text from all sheets', () => {
       const css1 = '&{ color: red; }';
       const css2 = '&{ background: blue; }';
@@ -414,14 +414,14 @@ describe('StyleInjector', () => {
       injector.inject(cssToStyleResults(css1));
       injector.inject(cssToStyleResults(css2));
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
 
       expect(cssText).toContain('color: red');
       expect(cssText).toContain('background: blue');
     });
 
     it('should return empty string when no styles injected', () => {
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText.trim()).toBe('');
     });
 
@@ -436,8 +436,8 @@ describe('StyleInjector', () => {
         root: shadowRoot,
       });
 
-      const documentCss = injector.getCssText();
-      const shadowCss = injector.getCssText({ root: shadowRoot });
+      const documentCss = injector.getCSSText();
+      const shadowCss = injector.getCSSText({ root: shadowRoot });
 
       expect(documentCss).toContain('color: red');
       expect(documentCss).not.toContain('color: blue');
@@ -589,7 +589,7 @@ describe('StyleInjector', () => {
         '.raw { color: orange; }',
       );
 
-      const tastyCSS = injector.getCssText();
+      const tastyCSS = injector.getCSSText();
       expect(tastyCSS).toContain('.t-test');
       expect(tastyCSS).toContain('color: purple');
       expect(tastyCSS).not.toContain('.raw');
@@ -751,7 +751,7 @@ describe('StyleInjector', () => {
         initialValue: 'rgb(128 0 255)',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@property --accent-color');
       expect(cssText).toContain('syntax: "<color>"');
       expect(cssText).toContain('@property --accent-color-rgb');
@@ -767,7 +767,7 @@ describe('StyleInjector', () => {
         initialValue: 'rgb(255 0 0)',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@property --brand-color-oklch');
       expect(cssText).toContain('syntax: "<number>+"');
     });
@@ -779,7 +779,7 @@ describe('StyleInjector', () => {
         initialValue: 'rgb(255 128 64)',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@property --mix-color-hsl');
       // HSL components include percentages, so syntax is `*` not `<number>+`
       expect(cssText).toContain('syntax: "*"');
@@ -792,7 +792,7 @@ describe('StyleInjector', () => {
         initialValue: 'transparent',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@property --bg-color-rgb');
       expect(cssText).toContain('initial-value: 0 0 0');
     });
@@ -818,7 +818,7 @@ describe('StyleInjector', () => {
         fontDisplay: 'swap',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@font-face');
       expect(cssText).toContain('Brand Sans');
     });
@@ -832,7 +832,7 @@ describe('StyleInjector', () => {
       injector.fontFace('Brand Sans', desc);
       injector.fontFace('Brand Sans', desc);
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@font-face/g);
       expect(matches?.length).toBe(1);
     });
@@ -847,7 +847,7 @@ describe('StyleInjector', () => {
         fontWeight: 700 as const,
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@font-face/g);
       expect(matches?.length).toBe(2);
     });
@@ -861,7 +861,7 @@ describe('StyleInjector', () => {
         suffix: '" "',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain('@counter-style');
       expect(cssText).toContain('thumbs');
     });
@@ -878,7 +878,7 @@ describe('StyleInjector', () => {
         suffix: '" "',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(1);
       expect(cssText).toContain('"👍"');
@@ -896,7 +896,7 @@ describe('StyleInjector', () => {
         suffix: '" "',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(2);
     });
@@ -909,7 +909,7 @@ describe('StyleInjector', () => {
         { weak: true },
       );
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(1);
       expect(cssText).toContain('"★"');
@@ -920,7 +920,7 @@ describe('StyleInjector', () => {
       injector.counterStyle('thumbs', { system: 'cyclic', symbols: '"★"' });
       injector.counterStyle('thumbs', { system: 'cyclic', symbols: '"★"' });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@counter-style/g);
       expect(matches?.length).toBe(1);
     });
@@ -933,7 +933,7 @@ describe('StyleInjector', () => {
         result: '(-1 * $value)',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain(
         '@function --negative(--value) { result: calc(-1 * var(--value)); }',
       );
@@ -943,7 +943,7 @@ describe('StyleInjector', () => {
       injector.func('$$f', { args: ['$value'], result: '$value' });
       injector.func('$$f', { args: ['$value'], result: '(2 * $value)' });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@function/g);
       expect(matches?.length).toBe(1);
       expect(cssText).toContain('result: var(--value);');
@@ -953,7 +953,7 @@ describe('StyleInjector', () => {
       injector.func('$$a', { args: ['$x'], result: '$x' });
       injector.func('$$b', { args: ['$x'], result: '$x' });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@function/g);
       expect(matches?.length).toBe(2);
     });
@@ -966,7 +966,7 @@ describe('StyleInjector', () => {
         result: '$offset $offset ($color, black)',
       });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       expect(cssText).toContain(
         '@function --shadow(--color <color>: inherit) returns <color>',
       );
@@ -984,7 +984,7 @@ describe('StyleInjector', () => {
         { weak: true },
       );
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@function/g);
       expect(matches?.length).toBe(1);
       expect(cssText).toContain('result: calc(2 * var(--value));');
@@ -995,7 +995,7 @@ describe('StyleInjector', () => {
       injector.func('$$f', { args: ['$value'], result: '$value' });
       injector.func('$$f', { args: ['$value'], result: '$value' });
 
-      const cssText = injector.getCssText();
+      const cssText = injector.getCSSText();
       const matches = cssText.match(/@function/g);
       expect(matches?.length).toBe(1);
     });
@@ -1003,9 +1003,9 @@ describe('StyleInjector', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getCssTextForClasses — adopted mode (real constructable stylesheets)
+// getCSSTextForClasses — adopted mode (real constructable stylesheets)
 // ---------------------------------------------------------------------------
-describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
+describe('StyleInjector getCSSTextForClasses (adopted mode)', () => {
   let injector: StyleInjector;
   let shadowRoot: ShadowRoot;
   let host: HTMLDivElement;
@@ -1033,7 +1033,7 @@ describe('StyleInjector getCssTextForClasses (adopted mode)', () => {
       cacheKey: 'adopted-test',
     });
 
-    const css = injector.getCssTextForClasses(new Set([result.className]), {
+    const css = injector.getCSSTextForClasses(new Set([result.className]), {
       root: shadowRoot,
     });
 

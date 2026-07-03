@@ -1,6 +1,6 @@
 import { StyleParser } from '../parser/parser';
 
-import { okhslFunc, okhslPlugin } from './okhsl-plugin';
+import { okhslFunction, okhslPlugin } from './okhsl-plugin';
 
 describe('okhslPlugin', () => {
   describe('plugin factory', () => {
@@ -8,13 +8,13 @@ describe('okhslPlugin', () => {
       const plugin = okhslPlugin();
       expect(plugin.name).toBe('okhsl');
       expect(plugin.functions).toBeDefined();
-      expect(plugin.functions?.okhsl).toBe(okhslFunc);
+      expect(plugin.functions?.okhsl).toBe(okhslFunction);
     });
   });
 
-  describe('okhslFunc', () => {
+  describe('okhslFunction', () => {
     const parser = new StyleParser({
-      funcs: { okhsl: okhslFunc },
+      funcs: { okhsl: okhslFunction },
     });
 
     // Expected values calculated using @texel/color library:
@@ -140,8 +140,8 @@ describe('okhslPlugin', () => {
           /* noop */
         });
 
-        // Directly test okhslFunc with empty groups
-        const result = okhslFunc([]);
+        // Directly test okhslFunction with empty groups
+        const result = okhslFunction([]);
         expect(result).toBe('rgb(0% 0% 0%)');
         expect(warnSpy).toHaveBeenCalledWith(
           '[okhsl] Expected 3 values (H S L), got:',

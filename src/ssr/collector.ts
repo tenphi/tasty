@@ -14,9 +14,9 @@
 import {
   getEffectiveProperties,
   getGlobalStyles,
-  getGlobalCounterStyle,
-  getGlobalFontFace,
-  getGlobalFunction,
+  getGlobalCounterStyles,
+  getGlobalFontFaces,
+  getGlobalFunctions,
   getGlobalConfigTokens,
   getNamePrefix,
 } from '../config';
@@ -110,7 +110,7 @@ export class ServerStyleCollector {
       }
     }
 
-    const globalFF = getGlobalFontFace();
+    const globalFF = getGlobalFontFaces();
     if (globalFF) {
       for (const [family, input] of Object.entries(globalFF)) {
         const descriptors = Array.isArray(input) ? input : [input];
@@ -122,7 +122,7 @@ export class ServerStyleCollector {
       }
     }
 
-    const globalCS = getGlobalCounterStyle();
+    const globalCS = getGlobalCounterStyles();
     if (globalCS) {
       for (const [name, descriptors] of Object.entries(globalCS)) {
         const css = formatCounterStyleRule(name, descriptors);
@@ -130,7 +130,7 @@ export class ServerStyleCollector {
       }
     }
 
-    const globalFn = getGlobalFunction();
+    const globalFn = getGlobalFunctions();
     if (globalFn) {
       for (const [name, definition] of Object.entries(globalFn)) {
         const css = formatFunctionRule(name, definition);
@@ -423,4 +423,26 @@ export class ServerStyleCollector {
     }
     return names;
   }
+}
+
+/**
+ * Factory for creating a {@link ServerStyleCollector} instance.
+ *
+ * Canonical functional entry point; the `ServerStyleCollector` class remains
+ * exported for advanced/internal use.
+ *
+ * @param namePrefix - Optional override for the configured class-name prefix.
+ *   Defaults to the value from `configure({ namePrefix })` (or `'t'`).
+ *
+ * @example
+ * ```ts
+ * import { createServerStyleCollector } from '@tenphi/tasty/ssr';
+ *
+ * const collector = createServerStyleCollector();
+ * ```
+ */
+export function createServerStyleCollector(
+  namePrefix?: string,
+): ServerStyleCollector {
+  return new ServerStyleCollector(namePrefix);
 }

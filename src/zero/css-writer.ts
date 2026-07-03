@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface CSSWriterOptions {
+export interface CSSWriterOptions {
   /** Enable source comments in output (e.g., "from: Button.tsx") */
   devMode?: boolean;
 }
@@ -101,4 +101,24 @@ export class CSSWriter {
   getOutputPath(): string {
     return this.outputPath;
   }
+}
+
+/**
+ * Factory for creating a {@link CSSWriter} instance.
+ *
+ * Canonical functional entry point; the `CSSWriter` class remains exported
+ * for advanced/internal use.
+ *
+ * @example
+ * ```ts
+ * import { createCSSWriter } from '@tenphi/tasty/zero';
+ *
+ * const writer = createCSSWriter('output.css', { devMode: true });
+ * ```
+ */
+export function createCSSWriter(
+  outputPath: string,
+  options?: CSSWriterOptions,
+): CSSWriter {
+  return new CSSWriter(outputPath, options);
 }

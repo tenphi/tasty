@@ -76,7 +76,7 @@ export interface TastyPlugin {
  * // Plugin without options
  * const okhslPlugin: TastyPluginFactory = () => ({
  *   name: 'okhsl',
- *   functions: { okhsl: okhslFunc },
+ *   functions: { okhsl: okhslFunction },
  * });
  *
  * // Plugin with options

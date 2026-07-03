@@ -98,6 +98,26 @@ Style props accept state maps, so responsive values work through the same API:
 
 For predefined style prop lists (`FLOW_STYLES`, `POSITION_STYLES`, `DIMENSION_STYLES`, etc.) and guidance on which props to expose per component category, see [Methodology — styleProps as the public API](methodology.md#styleprops-as-the-public-api).
 
+### Always-available style props
+
+A small set of style properties — `display`, `font`, `preset`, `hide`, `whiteSpace`, `opacity`, and `transition` — are always harvested as style props on every `tasty()` component, even when `styleProps` is omitted. This means you can pass `<Card display="grid" />` or `<Text preset="h1" />` without declaring them. When you do declare `styleProps`, these base props are unioned with your list (not replaced).
+
+---
+
+## `Element`
+
+`Element` is the unstyled base component exported from the main entry — equivalent to `tasty({})` (a `div` with no default styles). It accepts all Tasty props (`styles`, `styleProps`, `mods`, `tokens`, `as`, `qa`, `theme`, the `is*` props, etc.) and is useful as a generic styled box or as a building block for layout primitives.
+
+```jsx
+import { Element } from '@tenphi/tasty';
+
+<Element as="section" padding="4x" fill="#surface">
+  Content
+</Element>
+```
+
+> Note: `Element` shadows the global DOM `Element` type when imported from `@tenphi/tasty`. In files that need the DOM type, alias the import: `import { Element as TastyElement } from '@tenphi/tasty'`.
+
 ---
 
 ## Mod Props

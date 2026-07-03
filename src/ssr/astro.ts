@@ -12,6 +12,7 @@ import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { ServerStyleCollector } from './collector';
 import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
+import { setMiddlewareTransferCache } from './astro-transfer-cache';
 
 // Wire up ALS-based collector discovery so computeStyles() can find
 // the collector set by tastyMiddleware's runWithCollector().
@@ -137,23 +138,6 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
       headers,
     });
   };
-}
-
-// ============================================================================
-// Module-level middleware config (set by tastyIntegration, read by
-// astro-middleware.ts via getter property)
-// ============================================================================
-
-let _middlewareTransferCache = true;
-
-/** @internal */
-export function setMiddlewareTransferCache(value: boolean): void {
-  _middlewareTransferCache = value;
-}
-
-/** @internal */
-export function getMiddlewareTransferCache(): boolean {
-  return _middlewareTransferCache;
 }
 
 // ============================================================================

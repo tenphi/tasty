@@ -414,7 +414,7 @@ describe('SheetManager', () => {
     });
   });
 
-  describe('getCssText', () => {
+  describe('getCSSText', () => {
     it('should return CSS text from all sheets', () => {
       const manager = new SheetManager(config);
 
@@ -433,7 +433,7 @@ describe('SheetManager', () => {
         document,
       );
 
-      const cssText = manager.getCssText(registry);
+      const cssText = manager.getCSSText(registry);
 
       expect(cssText).toContain('.rule1');
       expect(cssText).toContain('color: red');
@@ -548,7 +548,7 @@ describe('SheetManager (adopted mode)', () => {
     expect(registry.sheets[0].ruleCount).toBe(0);
   });
 
-  it('getCssText reads from constructable sheets', () => {
+  it('getCSSText reads from constructable sheets', () => {
     const registry = manager.getRegistry(shadowRoot);
 
     manager.insertRule(
@@ -558,7 +558,7 @@ describe('SheetManager (adopted mode)', () => {
       shadowRoot,
     );
 
-    const cssText = manager.getCssText(registry);
+    const cssText = manager.getCSSText(registry);
     expect(cssText).toContain('.t2');
     expect(cssText).toContain('display: flex');
   });

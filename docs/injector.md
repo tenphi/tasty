@@ -350,14 +350,14 @@ const shadowAnimation = keyframes({
 ### Server-Side Rendering
 
 ```typescript
-import { getCssText, getCssTextForNode } from '@tenphi/tasty';
+import { getCSSText, getCSSTextForNode } from '@tenphi/tasty';
 
 // Extract all CSS for SSR
-const cssText = getCssText();
+const cssText = getCSSText();
 
 // Extract CSS for specific DOM subtree (like jest-styled-components)
 const container = render(<MyComponent />);
-const componentCSS = getCssTextForNode(container);
+const componentCSS = getCSSTextForNode(container);
 ```
 
 ### Test Environment Detection

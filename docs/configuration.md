@@ -48,13 +48,16 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `nonce` | `string` | - | CSP nonce for style elements |
+| `maxRulesPerSheet` | `number` | `8192` | Maximum rules per injected stylesheet |
+| `forceTextInjection` | `boolean` | auto (`true` in test envs) | Force text-node CSS injection instead of constructable stylesheets |
+| `devMode` | `boolean` | auto | Enable development-mode features: performance metrics and debug info |
 | `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
 | `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
-| `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
+| `units` | `Record<string, string \| UnitHandler>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
 | `functions` | `Record<string, FunctionDefinition \| Function>` | - | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
 | `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
 | `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
-| `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
+| `replaceTokens` | `Record<string, string \| number \| boolean>` | - | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
 | `fontFaces` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
@@ -64,8 +67,10 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
 | `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
+| `plugins` | `TastyPlugin[]` | - | Plugins that extend tasty with custom functions, units, or states (processed in order, later override earlier) |
+| `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
-| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). See [Name prefix](#name-prefix). |
+| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
 
 ---
 

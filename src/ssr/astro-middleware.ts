@@ -9,7 +9,8 @@
  * called by tastyIntegration() before middleware is loaded.
  */
 
-import { getMiddlewareTransferCache, tastyMiddleware } from './astro';
+import { getMiddlewareTransferCache } from './astro-transfer-cache';
+import { tastyMiddleware } from './astro';
 
 export const onRequest = tastyMiddleware({
   get transferCache() {

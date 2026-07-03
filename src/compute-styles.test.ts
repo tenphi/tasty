@@ -3,7 +3,7 @@
  */
 import { configure, resetConfig } from './config';
 import { computeStyles } from './compute-styles';
-import { destroy, getCssText } from './injector';
+import { destroy, getCSSText } from './injector';
 import { ServerStyleCollector } from './ssr/collector';
 
 describe('computeStyles with root option', () => {
@@ -30,11 +30,11 @@ describe('computeStyles with root option', () => {
 
     expect(result.className).toMatch(/^t[a-z0-9]+/);
 
-    const shadowCSS = getCssText({ root: shadowRoot });
+    const shadowCSS = getCSSText({ root: shadowRoot });
     expect(shadowCSS).toContain('display: flex');
     expect(shadowCSS).toContain('color: red');
 
-    const documentCSS = getCssText();
+    const documentCSS = getCSSText();
     expect(documentCSS).not.toContain(result.className);
   });
 
@@ -43,10 +43,10 @@ describe('computeStyles with root option', () => {
 
     expect(result.className).toMatch(/^t[a-z0-9]+/);
 
-    const documentCSS = getCssText();
+    const documentCSS = getCSSText();
     expect(documentCSS).toContain('display: grid');
 
-    const shadowCSS = getCssText({ root: shadowRoot });
+    const shadowCSS = getCSSText({ root: shadowRoot });
     expect(shadowCSS).toBe('');
   });
 
@@ -58,8 +58,8 @@ describe('computeStyles with root option', () => {
 
     expect(docResult.className).toBe(shadowResult.className);
 
-    const documentCSS = getCssText();
-    const shadowCSS = getCssText({ root: shadowRoot });
+    const documentCSS = getCSSText();
+    const shadowCSS = getCSSText({ root: shadowRoot });
 
     expect(documentCSS).toContain('color: blue');
     expect(shadowCSS).toContain('color: blue');
@@ -69,7 +69,7 @@ describe('computeStyles with root option', () => {
 /**
  * End-to-end @function handling is asserted through the SSR collector path:
  * jsdom/happy-dom CSSOM rejects `@function` at `insertRule`, so the client
- * injector path is not observable via getCssText in tests.
+ * injector path is not observable via getCSSText in tests.
  */
 describe('computeStyles @function handling', () => {
   afterEach(() => {

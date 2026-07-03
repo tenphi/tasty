@@ -115,20 +115,14 @@ export interface BasePropsWithoutChildren<
   element?: `${Caps}${string}`;
   /** The style map */
   styles?: Styles;
-  /** The list of responsive points in pixels */
-  breakpoints?: number[];
-  /** Whether the element has the block layout outside */
-  block?: boolean;
-  /** Whether the element has the inline layout outside */
-  inline?: boolean;
   /** The list of element modifiers **/
   mods?: Mods;
   /** Whether the element is hidden (`hidden` attribute is set) */
   isHidden?: boolean;
   /** Whether the element is disabled (`disabled` attribute is set) */
   isDisabled?: boolean;
-  /** Plain css for the element */
-  css?: string;
+  /** Whether the element is checked (`checked` attribute is set) */
+  isChecked?: boolean;
   /** The CSS style map */
   style?:
     | CSSProperties
@@ -199,9 +193,6 @@ export interface ShortGridStyles {
   rows?: Styles['gridRows'];
   areas?: Styles['gridAreas'];
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Props = Record<string, any>;
 
 export type TagName = keyof HTMLElementTagNameMap;
 

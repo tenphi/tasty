@@ -32,7 +32,7 @@
       "import": "./dist/zero/index.js",
       "default": "./dist/zero/index.js"
     },
-    "./next": {
+    "./zero/next": {
       "types": "./dist/zero/next.d.ts",
       "import": "./dist/zero/next.js",
       "default": "./dist/zero/next.js"

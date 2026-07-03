@@ -950,7 +950,7 @@ export class SheetManager {
   /**
    * Get CSS text from all sheets (for SSR)
    */
-  getCssText(registry: RootRegistry): string {
+  getCSSText(registry: RootRegistry): string {
     const cssChunks: string[] = [];
 
     for (const sheetInfo of registry.sheets) {

@@ -1,7 +1,7 @@
 import { customFunc } from '../utils/styles';
 
-import { okhslFunc, okhslPlugin } from './okhsl-plugin';
-import { okhstFunc, okhstPlugin } from './okhst-plugin';
+import { okhslFunction, okhslPlugin } from './okhsl-plugin';
+import { okhstFunction, okhstPlugin } from './okhst-plugin';
 
 import type { TastyPlugin } from './types';
 
@@ -23,8 +23,8 @@ let defaultsRegistered = false;
  * clearing user-registered functions so the defaults survive a config reset.
  */
 export function registerDefaultFunctions(): void {
-  customFunc('okhsl', okhslFunc);
-  customFunc('okhst', okhstFunc);
+  customFunc('okhsl', okhslFunction);
+  customFunc('okhst', okhstFunction);
   defaultsRegistered = true;
 }
 

@@ -123,7 +123,7 @@ mods={{ hovered: true, theme: 'danger' }}
 // → data-hovered="" data-theme="danger"
 ```
 
-Modifiers can also be exposed as top-level component props via `modProps` — see [Runtime — Mod Props](react-api.md#mod-props).
+Modifiers can also be exposed as top-level component props via `modProps` — see [React API — Mod Props](react-api.md#mod-props).
 
 ---
 

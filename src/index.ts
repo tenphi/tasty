@@ -21,7 +21,6 @@ export {
   useFunction,
 } from './hooks';
 export type {
-  UseStylesOptions,
   UseStylesResult,
   UsePropertyOptions,
   UseFunctionOptions,
@@ -36,6 +35,7 @@ export type {
   TastyElementOptions,
   TastyElementProps,
   TastyPolymorphicComponent,
+  TastyComponentPropsWithDefaults,
   ResolveAsProps,
   AllBasePropsWithMods,
   SubElementDefinition,

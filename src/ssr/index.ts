@@ -8,13 +8,13 @@
  */
 
 // Core collector
-export { ServerStyleCollector } from './collector';
+export { ServerStyleCollector, createServerStyleCollector } from './collector';
 
 // AsyncLocalStorage integration for Astro / generic frameworks
 export { runWithCollector, getSSRCollector } from './async-storage';
 
 // Client-side cache hydration
-export { hydrateTastyClasses, hydrateTastyCache } from './hydrate';
+export { hydrateTastyClasses } from './hydrate';
 
 // Register the ALS getter so hooks can find the collector
 // without importing 'node:async_hooks' in the browser bundle.

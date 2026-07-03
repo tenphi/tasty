@@ -556,16 +556,16 @@ export class StyleInjector {
   /**
    * Get CSS text from all sheets (for SSR)
    */
-  getCssText(options?: { root?: Document | ShadowRoot }): string {
+  getCSSText(options?: { root?: Document | ShadowRoot }): string {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    return this.sheetManager.getCssText(registry);
+    return this.sheetManager.getCSSText(registry);
   }
 
   /**
    * Get CSS only for the provided tasty classNames (e.g., ["t0","t3"])
    */
-  getCssTextForClasses(
+  getCSSTextForClasses(
     classNames: Iterable<string>,
     options?: { root?: Document | ShadowRoot },
   ): string {

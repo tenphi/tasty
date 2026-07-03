@@ -18,18 +18,18 @@ The Astro integration (`@tenphi/tasty/ssr/astro`) has no additional dependencies
 
 ## How It Works
 
-`tasty()` components are hook-free and use `computeStyles()` internally — a synchronous, framework-agnostic function. On the server, `computeStyles()` discovers a `ServerStyleCollector` via a registered getter (module-level for Next.js, `globalThis` for Astro/generic frameworks using `AsyncLocalStorage`) and collects CSS into it instead of trying to access the DOM. On the client, CSS is injected synchronously into the DOM during render; the injector's content-based cache makes this idempotent. The collector accumulates all styles, serializes them as `<style>` tags and a cache state script in the HTML. On the client, `hydrateTastyCache()` pre-populates the injector cache so that `computeStyles()` skips the rendering pipeline entirely during hydration.
+`tasty()` components are hook-free and use `computeStyles()` internally — a synchronous, framework-agnostic function. On the server, `computeStyles()` discovers a `ServerStyleCollector` via a registered getter (module-level for Next.js, `globalThis` for Astro/generic frameworks using `AsyncLocalStorage`) and collects CSS into it instead of trying to access the DOM. On the client, CSS is injected synchronously into the DOM during render; the injector's content-based cache makes this idempotent. The collector accumulates all styles and serializes them as `<style>` tags plus a class-list script in the HTML. On the client, `hydrateTastyClasses()` pre-populates the injector's rules map with the rendered class names so that `computeStyles()` skips the rendering pipeline entirely during hydration.
 
 ```
 Server                         Client
 ──────                         ──────
-tasty() renders                hydrateTastyCache() pre-populates cache
-  └─ computeStyles()              └─ cacheKey → className map ready
+tasty() renders                hydrateTastyClasses() reads window.__TASTY__
+  └─ computeStyles()              └─ marks rendered class names as already-in-DOM
        └─ collector.collect()
                                  tasty() renders
 After render:                    └─ computeStyles()
-  <style data-tasty-ssr>              └─ cache hit → skip pipeline
-  <script data-tasty-cache>           └─ no CSS re-injection
+  <style data-tasty-ssr>             └─ class name known → skip pipeline
+  <script> (pushes to __TASTY__)     └─ no CSS re-injection
 ```
 
 ---
@@ -85,8 +85,8 @@ That's it. All `tasty()` components inside the tree automatically get SSR suppor
 - `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load. The `'use client'` boundary is required solely to access `useServerInsertedHTML` — **not** because `tasty()` components need the client.
 - During SSR, `TastyRegistry` creates a `ServerStyleCollector` and registers it via a module-level getter (not `globalThis` — this avoids leaking between Next.js's separate RSC and SSR module graphs). It also wraps children in a React context provider so that hooks inside the SSR tree can discover the collector. All style functions — `tasty()` components, `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — discover the collector through the module-level getter or context provider.
 - `TastyRegistry` uses `useServerInsertedHTML` to flush collected CSS into the HTML stream as `<style data-tasty-ssr>` tags. This is fully streaming-compatible — styles are injected alongside each Suspense boundary as it resolves.
-- A companion inline `<script>` tag merges the `cacheKey → className` mapping into `window.__TASTY_SSR_CACHE__` for each flush. This streaming-friendly approach accumulates cache entries incrementally as Suspense boundaries resolve.
-- When the `@tenphi/tasty/ssr/next` module loads on the client, `hydrateTastyCache()` runs automatically from `window.__TASTY_SSR_CACHE__` and pre-populates the injector cache. During hydration, `computeStyles()` hits the cache and skips the entire pipeline.
+- A companion inline `<script>` tag pushes the rendered class names into `window.__TASTY__` for each flush. This streaming-friendly approach accumulates the class list incrementally as Suspense boundaries resolve.
+- When the `@tenphi/tasty/ssr/next` module loads on the client, `hydrateTastyClasses()` runs automatically from `window.__TASTY__` and pre-populates the injector's rules map. During hydration, `computeStyles()` sees the class name is already registered and skips the entire pipeline.
 
 ### Using Tasty in Server Components
 
@@ -188,7 +188,7 @@ This gives you:
 
 - A `ServerStyleCollector` per request via `AsyncLocalStorage`, deduplicating CSS across all React trees on the page
 - A single consolidated `<style data-tasty-ssr>` injected into `</head>`
-- A `<script data-tasty-cache>` tag with the `cacheKey -> className` map for client hydration
+- A `<script>` tag pushing the rendered class names into `window.__TASTY__` for client hydration
 - Auto-injected client hydration script (via `injectScript('before-hydration')`) so islands skip the style pipeline during hydration -- no need to import anything manually in each island component
 
 All style functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`) work on the server.
@@ -223,7 +223,7 @@ export default defineConfig({
 });
 ```
 
-This gives the same middleware deduplication and hook support, but ships zero client-side JavaScript. No `<script data-tasty-cache>` is emitted.
+This gives the same middleware deduplication and hook support, but ships zero client-side JavaScript. No class-list `<script>` is emitted.
 
 ### Manual middleware (advanced)
 
@@ -258,7 +258,7 @@ export const onRequest = tastyMiddleware({ transferCache: false });
 Astro's `@astrojs/react` renderer calls `renderToString()` for each React component without wrapping the tree in a provider. The middleware creates a `ServerStyleCollector` and binds it via `AsyncLocalStorage`. All `computeStyles()` calls within the request discover this collector automatically.
 
 - **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>` as a single `<style>` tag. No JavaScript is shipped.
-- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, the hydration script (auto-injected by `tastyIntegration()` or manually via `@tenphi/tasty/ssr/astro-client`) reads the cache state from `<script data-tasty-cache>` and pre-populates the injector. The island's `computeStyles()` calls hit the cache during hydration.
+- **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, the hydration script (auto-injected by `tastyIntegration()` or manually via `@tenphi/tasty/ssr/astro-client`) reads the class list from `window.__TASTY__` and pre-populates the injector's rules map. The island's `computeStyles()` calls see the class names as already registered and skip the pipeline during hydration.
 - The middleware reads the full response body, then injects the collected CSS into `</head>` before sending the final HTML.
 
 ### CSP nonce
@@ -274,31 +274,30 @@ Any React-based framework can integrate using `runWithCollector`, which binds a 
 ```tsx
 import {
   ServerStyleCollector,
+  createServerStyleCollector,
   runWithCollector,
-  hydrateTastyCache,
+  hydrateTastyClasses,
 } from '@tenphi/tasty/ssr';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
 
 // ── Server ──────────────────────────────────────────────
 
-const collector = new ServerStyleCollector();
+const collector = createServerStyleCollector();
 
 const html = await runWithCollector(collector, () =>
   renderToString(<App />)
 );
 
 const css = collector.getCSS();
-const cacheState = collector.getCacheState();
+const classNames = collector.getRenderedClassNames();
 
 // Embed in your HTML template:
 const fullHtml = `
   <html>
     <head>
       <style data-tasty-ssr>${css}</style>
-      <script data-tasty-cache type="application/json">
-        ${JSON.stringify(cacheState)}
-      </script>
+      <script>(window.__TASTY__=window.__TASTY__||[]).push(${JSON.stringify(classNames)})</script>
     </head>
     <body>
       <div id="root">${html}</div>
@@ -309,7 +308,7 @@ const fullHtml = `
 // ── Client ──────────────────────────────────────────────
 
 // Before hydration:
-hydrateTastyCache(); // reads from <script data-tasty-cache>
+hydrateTastyClasses(); // reads from window.__TASTY__
 
 hydrateRoot(document.getElementById('root'), <App />);
 ```
@@ -319,7 +318,7 @@ hydrateRoot(document.getElementById('root'), <App />);
 For streaming with `renderToPipeableStream`, use `flushCSS()` instead of `getCSS()`:
 
 ```tsx
-const collector = new ServerStyleCollector();
+const collector = createServerStyleCollector();
 
 const stream = await runWithCollector(collector, () =>
   renderToPipeableStream(<App />, {
@@ -330,12 +329,14 @@ const stream = await runWithCollector(collector, () =>
       stream.pipe(res);
     },
     onAllReady() {
-      // Flush any remaining styles + cache state
+      // Flush any remaining styles + class list
       const css = collector.flushCSS();
       if (css) res.write(`<style data-tasty-ssr>${css}</style>`);
 
-      const state = collector.getCacheState();
-      res.write(`<script data-tasty-cache type="application/json">${JSON.stringify(state)}</script>`);
+      const classNames = collector.getRenderedClassNames();
+      res.write(
+        `<script>(window.__TASTY__=window.__TASTY__||[]).push(${JSON.stringify(classNames)})</script>`,
+      );
     },
   })
 );
@@ -349,7 +350,7 @@ const stream = await runWithCollector(collector, () =>
 
 | Import path | Description |
 |---|---|
-| `@tenphi/tasty/ssr` | Core SSR API: `ServerStyleCollector`, `runWithCollector`, `hydrateTastyCache` |
+| `@tenphi/tasty/ssr` | Core SSR API: `ServerStyleCollector`, `createServerStyleCollector`, `runWithCollector`, `hydrateTastyClasses` |
 | `@tenphi/tasty/ssr/next` | Next.js App Router: `TastyRegistry` component |
 | `@tenphi/tasty/ssr/astro` | Astro: `tastyIntegration`, `tastyMiddleware` |
 | `@tenphi/tasty/ssr/astro-client` | Astro: client-side cache hydration (auto-injected by integration, or import manually) |
@@ -358,7 +359,7 @@ const stream = await runWithCollector(collector, () =>
 
 Server-safe style collector. One instance per request.
 
-Constructor: `new ServerStyleCollector(namePrefix?)`. The optional `namePrefix` overrides the value from `configure({ namePrefix })`; in normal usage you pass nothing and let the global config drive it. See [Configuration: Name prefix](configuration.md#name-prefix).
+Constructor: `new ServerStyleCollector(namePrefix?)`, or use the `createServerStyleCollector(namePrefix?)` factory. The optional `namePrefix` overrides the value from `configure({ namePrefix })`; in normal usage you pass nothing and let the global config drive it. See [Configuration: Name prefix](configuration.md#name-prefix).
 
 | Method | Description |
 |---|---|
@@ -375,7 +376,7 @@ Constructor: `new ServerStyleCollector(namePrefix?)`. The optional `namePrefix` 
 | `collectInternals()` | Collect internal `@property` rules, `:root` token defaults, `@font-face`, and `@counter-style` rules from the global config. Called automatically on first chunk collection; idempotent. |
 | `getCSS()` | Get all collected CSS as a single string. For non-streaming SSR. |
 | `flushCSS()` | Get only CSS collected since the last flush. For streaming SSR. |
-| `getCacheState()` | Serialize `{ entries: Record<cacheKey, className>, classCounter }` for client hydration. |
+| `getRenderedClassNames()` | Get the list of class names rendered so far. Serialized to `window.__TASTY__` for client hydration via `hydrateTastyClasses()`. |
 
 ### `TastyRegistry`
 
@@ -402,9 +403,9 @@ Astro middleware factory. Use for manual middleware composition.
 |---|---|---|---|
 | `transferCache` | `boolean` | `true` | Embed cache state script for island hydration |
 
-### `hydrateTastyCache(state?)`
+### `hydrateTastyClasses(classes?)`
 
-Pre-populate the client injector cache. When called without arguments, reads from `window.__TASTY_SSR_CACHE__` (streaming) or `<script data-tasty-cache>` (non-streaming).
+Pre-populate the client injector's rules map with class names rendered on the server, marking them as already present in the DOM so `computeStyles()` skips re-injection during hydration. When called without arguments, reads the class list from `window.__TASTY__` (populated by the streaming `<script>` tags emitted during SSR).
 
 ### `runWithCollector(collector, fn)`
 
@@ -420,23 +421,27 @@ The `TastyRegistry` or `tastyIntegration` is missing. Ensure your layout wraps t
 
 ### Hydration mismatch warnings
 
-Class names are deterministic for the same render order. If you see mismatches, ensure `hydrateTastyCache()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, call `hydrateTastyCache()` before `hydrateRoot()`.
+Class names are deterministic for the same render order. If you see mismatches, ensure `hydrateTastyClasses()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, call `hydrateTastyClasses()` before `hydrateRoot()`.
 
 ### Styles duplicated after hydration
 
 **Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`) configured via `configure()` is automatically deduplicated. When Tasty detects `<style data-tasty-ssr>` in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
 
-**Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, call `cleanupSSRStyles()` after hydration:
+**Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, you can remove the SSR style tags and hydration scripts manually after hydration:
 
 ```tsx
-import { hydrateTastyCache } from '@tenphi/tasty/ssr';
+import { hydrateTastyClasses } from '@tenphi/tasty/ssr';
 
-hydrateTastyCache();
+hydrateTastyClasses();
 hydrateRoot(root, <App />);
 
-// Optional: remove SSR style tags after hydration
-document.querySelectorAll('style[data-tasty-ssr]').forEach(el => el.remove());
-document.querySelectorAll('script[data-tasty-cache]').forEach(el => el.remove());
+// Optional: remove SSR style tags and class-list scripts after hydration
+document.querySelectorAll('style[data-tasty-ssr]').forEach((el) => el.remove());
+document
+  .querySelectorAll('script')
+  .forEach((el) => {
+    if (el.textContent?.includes('__TASTY__')) el.remove();
+  });
 ```
 
 ### `AsyncLocalStorage` not available

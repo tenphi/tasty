@@ -1,5 +1,17 @@
 # @tenphi/tasty
 
+## 2.8.1
+
+### Patch Changes
+
+- [#226](https://github.com/tenphi/tasty/pull/226) [`5832345`](https://github.com/tenphi/tasty/commit/5832345128ef8abe6ee5d9b3dd281f164ad9e118) Thanks [@tenphi](https://github.com/tenphi)! - Fix named sub-element syntax for vendor-prefixed pseudo-elements.
+
+  The selector-affix tokenizer rejected pseudo-elements starting with a hyphen
+  (`::-webkit-slider-thumb`, `::-moz-range-thumb`) because the pseudo token
+  pattern required a lowercase letter immediately after `::`. Allow an optional
+  leading `-` so vendor pseudo-elements work in `$` affixes like
+  `@::-webkit-slider-thumb`.
+
 ## 2.8.0
 
 ### Minor Changes

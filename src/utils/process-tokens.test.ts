@@ -295,6 +295,49 @@ describe('processTokens', () => {
     });
   });
 
+  describe('native color functions with var() tokens', () => {
+    // Regression: oklch(... var(...) ...) was round-tripped through sRGB,
+    // NaN'ing the var() hue. Same-space native functions must preserve
+    // var()/calc() tokens verbatim. See color-space.ts same-space fast path.
+    it('preserves var() in oklch() token (oklch space) with $hue replaceToken', () => {
+      configure({
+        colorSpace: 'oklch',
+        replaceTokens: { $hue: 'var(--hue)' },
+      });
+
+      const result = processTokens({
+        '#accent': 'oklch($hue .2 20)',
+      }) as Record<string, string>;
+
+      expect(result['--accent-color']).toBe('oklch(var(--hue) .2 20)');
+      expect(result['--accent-color-oklch']).toBe('var(--hue) .2 20');
+      expect(result['--accent-color-oklch']).not.toContain('nan');
+    });
+
+    it('preserves var() alpha in oklch() token (oklch space)', () => {
+      configure({ colorSpace: 'oklch' });
+
+      const result = processTokens({
+        '#accent': 'oklch(var(--hue) .2 20 / var(--a))',
+      }) as Record<string, string>;
+
+      expect(result['--accent-color']).toBe(
+        'oklch(var(--hue) .2 20 / var(--a))',
+      );
+      expect(result['--accent-color-oklch']).toBe('var(--hue) .2 20');
+    });
+
+    it('preserves var() channels in rgb() token (rgb space)', () => {
+      // colorSpace=rgb is the default set in beforeEach; no replaceToken here.
+      const result = processTokens({
+        '#accent': 'rgb(var(--r) var(--g) var(--b))',
+      }) as Record<string, string>;
+
+      expect(result['--accent-color']).toBe('rgb(var(--r) var(--g) var(--b))');
+      expect(result['--accent-color-rgb']).toBe('var(--r) var(--g) var(--b)');
+    });
+  });
+
   describe('boolean color token values', () => {
     it('converts boolean true to transparent for color tokens', () => {
       const result = processTokens({

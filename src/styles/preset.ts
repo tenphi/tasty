@@ -3,7 +3,14 @@ import { parseStyle } from '../utils/styles';
 
 import type { Styles } from './types';
 
-const PRESET_MODIFIERS = new Set(['strong', 'bold', 'italic', 'icon', 'tight']);
+const PRESET_MODIFIERS = new Set([
+  'strong',
+  'bold',
+  'italic',
+  'icon',
+  'tight',
+  'normal',
+]);
 
 /**
  * Convert a value to CSS, handling numbers as pixels for numeric properties
@@ -173,6 +180,7 @@ export function presetStyle({
     const isItalic = activeMods.has('italic');
     const isIcon = activeMods.has('icon');
     const isTight = activeMods.has('tight');
+    const isNormal = activeMods.has('normal');
 
     // Set preset values for properties not explicitly overridden
     if (fontSize == null) {
@@ -212,6 +220,9 @@ export function presetStyle({
     }
     if (isTight) {
       styles['line-height'] = '1em';
+    }
+    if (isNormal) {
+      styles['line-height'] = 'normal';
     }
   }
 

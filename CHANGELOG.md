@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 2.9.0
+
+### Minor Changes
+
+- [#231](https://github.com/tenphi/tasty/pull/231) [`1487bbb`](https://github.com/tenphi/tasty/commit/1487bbb26ecb6ea68a928dbdf27ff1b9770279c6) Thanks [@tenphi](https://github.com/tenphi)! - Add `normal` modifier to `preset` that sets `line-height: normal`, overriding the preset's line-height value.
+
 ## 2.8.2
 
 ### Patch Changes

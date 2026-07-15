@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 2.9.1
+
+### Patch Changes
+
+- [#233](https://github.com/tenphi/tasty/pull/233) [`5ce5f74`](https://github.com/tenphi/tasty/commit/5ce5f7478d2cafaa979c5378f18b1daaa6cab112) Thanks [@tenphi](https://github.com/tenphi)! - Fix Astro SSR middleware corrupting binary responses. The middleware
+  previously decoded every response body as UTF-8 text, mangling non-HTML
+  payloads (images, fonts, JSON, etc.) — e.g. PNG bytes served from an OG
+  image endpoint. It now inspects the `Content-Type` and passes any
+  response that isn't `text/html` (or has no body) through untouched.
+
 ## 2.9.0
 
 ### Minor Changes

@@ -66,30 +66,45 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     // Run the entire request — including body stream consumption — inside
     // the ALS context so that components rendering lazily during stream
     // reads can still find the collector via getSSRCollector().
-    const rendered = await runWithCollector(collector, async () => {
-      const response = await next();
-      const body = response.body;
-      if (!body) {
+    type Rendered =
+      | { response: Response }
+      | { html: string | null; status: number; headers: Headers };
+
+    const rendered = await runWithCollector<Promise<Rendered>>(
+      collector,
+      async (): Promise<Rendered> => {
+        const response = await next();
+        const body = response.body;
+
+        // Only process HTML responses. Reading a non-HTML body (e.g. an
+        // image, font, or JSON endpoint) as UTF-8 text corrupts binary
+        // payloads: every byte >= 0x80 is decoded to U+FFFD and re-encoded
+        // as EF BF BD. Pass anything that isn't HTML straight through.
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!body || !contentType.includes('text/html')) {
+          return { response };
+        }
+
+        const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+        const parts: string[] = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parts.push(value);
+        }
         return {
-          html: null as string | null,
+          html: parts.join(''),
           status: response.status,
           headers: response.headers,
         };
-      }
+      },
+    );
 
-      const reader = body.pipeThrough(new TextDecoderStream()).getReader();
-      const parts: string[] = [];
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        parts.push(value);
-      }
-      return {
-        html: parts.join(''),
-        status: response.status,
-        headers: response.headers,
-      };
-    });
+    // Non-HTML responses are returned untouched to avoid corrupting
+    // binary payloads.
+    if ('response' in rendered) {
+      return rendered.response;
+    }
 
     if (!rendered.html) {
       return new Response(null, {

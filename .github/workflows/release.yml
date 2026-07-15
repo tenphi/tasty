@@ -29,15 +29,23 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v5
 
+      # Publish jobs stay on Node 24 (not CI's Node 22) because OIDC trusted
+      # publishing requires npm ≥ 11.5.1+, which Node 24 ships natively.
+      # Node 22 ships npm 10.x, which does NOT meet that requirement.
+      # Do not run `npm install -g npm@latest` — it corrupts npm's module
+      # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22.22.1
+          node-version: '24'
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+      - name: Verify npm version and OIDC availability
+        run: |
+          echo "node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          echo "OIDC available: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL != '' }}"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -86,15 +94,23 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v5
 
+      # Publish jobs stay on Node 24 (not CI's Node 22) because OIDC trusted
+      # publishing requires npm ≥ 11.5.1+, which Node 24 ships natively.
+      # Node 22 ships npm 10.x, which does NOT meet that requirement.
+      # Do not run `npm install -g npm@latest` — it corrupts npm's module
+      # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22.22.1
+          node-version: '24'
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+      - name: Verify npm version and OIDC availability
+        run: |
+          echo "node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          echo "OIDC available: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL != '' }}"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

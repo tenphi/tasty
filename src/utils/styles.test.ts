@@ -1,4 +1,5 @@
 import { getRgbValuesFromRgbaString, strToRgb } from './styles';
+import { resetColorSpace, setColorSpace, strToColorSpace } from './color-space';
 
 describe('getRgbValuesFromRgbaString', () => {
   it('extracts RGB values from comma-separated integers', () => {
@@ -87,22 +88,34 @@ describe('strToRgb', () => {
   });
 
   it('converts okhsl to rgb', () => {
-    // Purple: okhsl(280.3 80% 52%) should produce a blueish-purple color
-    const result = strToRgb('okhsl(280.3 80% 52%)');
-    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
+    // okhsl is a plugin-provided color function, so conversion goes through
+    // the parser via strToColorSpace rather than the leaf strToRgb helper.
+    setColorSpace('rgb');
+    try {
+      // Purple: okhsl(280.3 80% 52%) should produce a blueish-purple color
+      const result = strToColorSpace('okhsl(280.3 80% 52%)');
+      expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
 
-    // Extract RGB values and verify they're in the purple range
-    const match = result?.match(/rgb\((\d+) (\d+) (\d+)\)/);
-    expect(match).toBeTruthy();
+      // Extract RGB values and verify they're in the purple range
+      const match = result?.match(/rgb\((\d+) (\d+) (\d+)\)/);
+      expect(match).toBeTruthy();
 
-    const [, _r, g, b] = match!;
-    // Purple should have significant blue, lower red, and low green
-    expect(parseInt(b)).toBeGreaterThan(parseInt(g));
+      const [, _r, g, b] = match!;
+      // Purple should have significant blue, lower red, and low green
+      expect(parseInt(b)).toBeGreaterThan(parseInt(g));
+    } finally {
+      resetColorSpace();
+    }
   });
 
   it('converts okhsl with alpha to rgba', () => {
-    const result = strToRgb('okhsl(280.3 80% 52% / 0.5)');
-    expect(result).toMatch(/^rgba\(\d+, \d+, \d+, 0\.5\)$/);
+    setColorSpace('rgb');
+    try {
+      const result = strToColorSpace('okhsl(280.3 80% 52% / 0.5)');
+      expect(result).toMatch(/^rgb\(\d+ \d+ \d+ \/ 0\.5\)$/);
+    } finally {
+      resetColorSpace();
+    }
   });
 
   it('converts oklch to rgb', () => {

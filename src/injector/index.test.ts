@@ -12,7 +12,7 @@ import {
   cleanup,
   createInjector,
   destroy,
-  getCssText,
+  getCSSText,
   getRawCSSText,
   inject,
   injectRawCSS,
@@ -470,22 +470,22 @@ describe('Global Style Injector API', () => {
     });
   });
 
-  describe('getCssText', () => {
+  describe('getCSSText', () => {
     it('should return CSS text from global injector', () => {
       inject(cssToStyleResults('&{ color: red; }'));
 
-      const cssText = getCssText();
+      const cssText = getCSSText();
 
       expect(cssText).toContain('color: red');
     });
 
     it('should return empty string when no styles', () => {
-      const cssText = getCssText();
+      const cssText = getCSSText();
       expect(cssText.trim()).toBe('');
     });
 
     it('should auto-configure if not configured', () => {
-      const cssText = getCssText();
+      const cssText = getCSSText();
       expect(cssText).toBeDefined();
     });
   });
@@ -797,7 +797,7 @@ describe('Global Style Injector API', () => {
       inject(cssToStyleResults('&{ background: blue; }'));
 
       // Get CSS for SSR
-      const cssText = getCssText();
+      const cssText = getCSSText();
 
       expect(cssText).toContain('color: red');
       expect(cssText).toContain('background: blue');
@@ -828,9 +828,9 @@ describe('Global Style Injector API', () => {
       ).toBeGreaterThan(0);
 
       // CSS text should be different for each root
-      const documentCss = getCssText();
-      const shadow1Css = getCssText({ root: shadowRoot1 });
-      const shadow2Css = getCssText({ root: shadowRoot2 });
+      const documentCss = getCSSText();
+      const shadow1Css = getCSSText({ root: shadowRoot1 });
+      const shadow2Css = getCSSText({ root: shadowRoot2 });
 
       expect(documentCss).toContain('color: red');
 

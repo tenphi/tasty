@@ -436,9 +436,11 @@ describe('strToRgb', () => {
     expect(strToRgb('blue')).toBe('rgb(0 0 255)');
   });
 
-  it('converts okhsl', () => {
-    const result = strToRgb('okhsl(280 80% 52%)');
-    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
+  it('returns null for plugin-provided color functions (okhsl)', () => {
+    // strToRgb is a leaf converter for native CSS color formats only.
+    // Plugin-provided color functions such as okhsl are resolved through the
+    // parser via strToColorSpace/resolveToRgbaValues, not here.
+    expect(strToRgb('okhsl(280 80% 52%)')).toBeNull();
   });
 
   it('returns null for unknown', () => {

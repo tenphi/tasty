@@ -42,17 +42,3 @@ export function hydrateTastyClasses(classes?: string[]): void {
     }
   }
 }
-
-/**
- * @deprecated Use `hydrateTastyClasses()` instead. This alias exists
- * for backwards compatibility and will be removed in a future major version.
- */
-export function hydrateTastyCache(state?: {
-  entries?: Record<string, string>;
-}): void {
-  if (state?.entries) {
-    hydrateTastyClasses(Object.values(state.entries));
-  } else {
-    hydrateTastyClasses();
-  }
-}

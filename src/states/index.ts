@@ -52,9 +52,10 @@ export interface AtRuleContext {
 const BUILTIN_STATES = new Set([
   '@starting',
   '@keyframes',
-  '@properties',
-  '@fontFace',
-  '@counterStyle',
+  '@property',
+  '@font-face',
+  '@counter-style',
+  '@function',
   '@supports',
   // @inherit is a value (not a key), but reserved here to prevent
   // users from accidentally defining a state named '@inherit'.
@@ -70,7 +71,7 @@ const RESERVED_PREFIXES = [
   '@(',
   '@starting',
   '@keyframes',
-  '@properties',
+  '@property',
   '@supports',
   '@inherit',
 ];

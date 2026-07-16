@@ -18,11 +18,12 @@ export {
   useKeyframes,
   useFontFace,
   useCounterStyle,
+  useFunction,
 } from './hooks';
 export type {
-  UseStylesOptions,
   UseStylesResult,
   UsePropertyOptions,
+  UseFunctionOptions,
 } from './hooks';
 
 // React-specific utilities
@@ -34,6 +35,7 @@ export type {
   TastyElementOptions,
   TastyElementProps,
   TastyPolymorphicComponent,
+  TastyComponentPropsWithDefaults,
   ResolveAsProps,
   AllBasePropsWithMods,
   SubElementDefinition,

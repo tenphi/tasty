@@ -425,9 +425,9 @@ If you prefer explicit control, disable inference with `configure({ autoProperty
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
-### Explicit `@properties`
+### Explicit `@property`
 
-Use explicit `@properties` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
+Use explicit `@property` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
@@ -470,7 +470,7 @@ See the [full SSR guide](docs/ssr.md).
 | `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration wrapper | Node |
+| `@tenphi/tasty/zero/next` | Next.js integration wrapper | Node |
 | `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |

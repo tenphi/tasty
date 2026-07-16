@@ -274,6 +274,52 @@ describe('ServerStyleCollector', () => {
     expect(css).not.toContain('second');
   });
 
+  it('collects @function rules', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction(
+      '--negative',
+      '@function --negative(--value) { result: calc(-1 * var(--value)); }',
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('@function --negative(--value)');
+    expect(css).toContain('result: calc(-1 * var(--value));');
+  });
+
+  it('deduplicates weak (global) @function rules by name (first wins)', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction('--f', 'first', { weak: true });
+    collector.collectFunction('--f', 'second', { weak: true });
+
+    const css = collector.getCSS();
+    expect(css).toContain('first');
+    expect(css).not.toContain('second');
+  });
+
+  it('lets a (default) @function override a weak global one of the same name', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction('--f', 'global', { weak: true });
+    collector.collectFunction('--f', 'local');
+
+    const css = collector.getCSS();
+    expect(css).toContain('local');
+    expect(css).not.toContain('global');
+  });
+
+  it('does not let a weak global @function clobber an existing one', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectFunction('--f', 'local');
+    collector.collectFunction('--f', 'global', { weak: true });
+
+    const css = collector.getCSS();
+    expect(css).toContain('local');
+    expect(css).not.toContain('global');
+  });
+
   it('flushCSS returns only new content', () => {
     const collector = new ServerStyleCollector();
 
@@ -732,7 +778,7 @@ describe('collectAutoInferredProperties', () => {
       [{ selector: '', declarations: '--angle: 45deg' }],
       collector,
       {
-        '@properties': {
+        '@property': {
           $angle: { syntax: '<angle>', inherits: false, initialValue: '0deg' },
         },
       } as any,

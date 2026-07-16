@@ -14,13 +14,15 @@
 import {
   getEffectiveProperties,
   getGlobalStyles,
-  getGlobalCounterStyle,
-  getGlobalFontFace,
+  getGlobalCounterStyles,
+  getGlobalFontFaces,
+  getGlobalFunctions,
   getGlobalConfigTokens,
   getNamePrefix,
 } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
+import { formatFunctionRule, parseFunctionName } from '../functions';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { hashString } from '../utils/hash';
@@ -50,6 +52,8 @@ export class ServerStyleCollector {
   private flushedFontFaceKeys = new Set<string>();
   private counterStyleRules = new Map<string, string>();
   private flushedCounterStyleKeys = new Set<string>();
+  private functionRules = new Map<string, string>();
+  private flushedFunctionKeys = new Set<string>();
   private keyframesCounter = 0;
   private counterStyleCounter = 0;
   private internalsCollected = false;
@@ -106,7 +110,7 @@ export class ServerStyleCollector {
       }
     }
 
-    const globalFF = getGlobalFontFace();
+    const globalFF = getGlobalFontFaces();
     if (globalFF) {
       for (const [family, input] of Object.entries(globalFF)) {
         const descriptors = Array.isArray(input) ? input : [input];
@@ -118,11 +122,19 @@ export class ServerStyleCollector {
       }
     }
 
-    const globalCS = getGlobalCounterStyle();
+    const globalCS = getGlobalCounterStyles();
     if (globalCS) {
       for (const [name, descriptors] of Object.entries(globalCS)) {
         const css = formatCounterStyleRule(name, descriptors);
-        this.collectCounterStyle(name, css);
+        this.collectCounterStyle(name, css, { weak: true });
+      }
+    }
+
+    const globalFn = getGlobalFunctions();
+    if (globalFn) {
+      for (const [name, definition] of Object.entries(globalFn)) {
+        const css = formatFunctionRule(name, definition);
+        this.collectFunction(parseFunctionName(name), css, { weak: true });
       }
     }
 
@@ -215,12 +227,47 @@ export class ServerStyleCollector {
   }
 
   /**
-   * Record a @counter-style rule. Deduplicated by name.
+   * Record a @counter-style rule. Deduplicated by name and overrides an
+   * existing rule by default. Pass `weak: true` for global `configure()`
+   * definitions, which never clobber an existing rule.
    */
-  collectCounterStyle(name: string, css: string): void {
-    if (!this.counterStyleRules.has(name)) {
+  collectCounterStyle(
+    name: string,
+    css: string,
+    options?: { weak?: boolean },
+  ): void {
+    const existing = this.counterStyleRules.get(name);
+    if (existing === undefined) {
       this.counterStyleRules.set(name, css);
+      return;
     }
+    if (options?.weak || existing === css) return;
+    this.counterStyleRules.set(name, css);
+    // If a rule with this name was already flushed (streaming), allow the
+    // overriding rule to be flushed again so it wins by source order.
+    this.flushedCounterStyleKeys.delete(name);
+  }
+
+  /**
+   * Record a @function rule. Deduplicated by CSS function name and overrides an
+   * existing rule by default. Pass `weak: true` for global `configure()`
+   * definitions, which never clobber an existing rule.
+   */
+  collectFunction(
+    name: string,
+    css: string,
+    options?: { weak?: boolean },
+  ): void {
+    const existing = this.functionRules.get(name);
+    if (existing === undefined) {
+      this.functionRules.set(name, css);
+      return;
+    }
+    if (options?.weak || existing === css) return;
+    this.functionRules.set(name, css);
+    // If a rule with this name was already flushed (streaming), allow the
+    // overriding rule to be flushed again so it wins by source order.
+    this.flushedFunctionKeys.delete(name);
   }
 
   /**
@@ -271,6 +318,10 @@ export class ServerStyleCollector {
       parts.push(css);
     }
 
+    for (const css of this.functionRules.values()) {
+      parts.push(css);
+    }
+
     for (const css of this.rawCSS.values()) {
       parts.push(css);
     }
@@ -315,6 +366,13 @@ export class ServerStyleCollector {
       if (!this.flushedCounterStyleKeys.has(key)) {
         parts.push(css);
         this.flushedCounterStyleKeys.add(key);
+      }
+    }
+
+    for (const [key, css] of this.functionRules) {
+      if (!this.flushedFunctionKeys.has(key)) {
+        parts.push(css);
+        this.flushedFunctionKeys.add(key);
       }
     }
 
@@ -365,4 +423,26 @@ export class ServerStyleCollector {
     }
     return names;
   }
+}
+
+/**
+ * Factory for creating a {@link ServerStyleCollector} instance.
+ *
+ * Canonical functional entry point; the `ServerStyleCollector` class remains
+ * exported for advanced/internal use.
+ *
+ * @param namePrefix - Optional override for the configured class-name prefix.
+ *   Defaults to the value from `configure({ namePrefix })` (or `'t'`).
+ *
+ * @example
+ * ```ts
+ * import { createServerStyleCollector } from '@tenphi/tasty/ssr';
+ *
+ * const collector = createServerStyleCollector();
+ * ```
+ */
+export function createServerStyleCollector(
+  namePrefix?: string,
+): ServerStyleCollector {
+  return new ServerStyleCollector(namePrefix);
 }

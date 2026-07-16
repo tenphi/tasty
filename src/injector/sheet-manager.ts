@@ -108,7 +108,8 @@ export class SheetManager {
         keyframesCounter: 0,
         injectedProperties: new Map<string, string>(),
         injectedFontFaces: new Set<string>(),
-        injectedCounterStyles: new Set<string>(),
+        injectedCounterStyles: new Map<string, boolean>(),
+        injectedFunctions: new Map<string, boolean>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),
@@ -949,7 +950,7 @@ export class SheetManager {
   /**
    * Get CSS text from all sheets (for SSR)
    */
-  getCssText(registry: RootRegistry): string {
+  getCSSText(registry: RootRegistry): string {
     const cssChunks: string[] = [];
 
     for (const sheetInfo of registry.sheets) {

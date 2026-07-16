@@ -29,11 +29,17 @@ import { parseStyle } from '../utils/styles';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
 import { formatCounterStyleDeclarations } from '../counter-style';
+import {
+  formatFunctionDeclarations,
+  formatFunctionPrelude,
+  parseFunctionName,
+} from '../functions';
 import { HYDRATED_RULE_INDEX, PLACEHOLDER_RULE_INDEX } from './types';
 import type {
   CacheMetrics,
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
   InjectResult,
@@ -550,16 +556,16 @@ export class StyleInjector {
   /**
    * Get CSS text from all sheets (for SSR)
    */
-  getCssText(options?: { root?: Document | ShadowRoot }): string {
+  getCSSText(options?: { root?: Document | ShadowRoot }): string {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    return this.sheetManager.getCssText(registry);
+    return this.sheetManager.getCSSText(registry);
   }
 
   /**
    * Get CSS only for the provided tasty classNames (e.g., ["t0","t3"])
    */
-  getCssTextForClasses(
+  getCSSTextForClasses(
     classNames: Iterable<string>,
     options?: { root?: Document | ShadowRoot },
   ): string {
@@ -817,19 +823,29 @@ export class StyleInjector {
   /**
    * Inject a CSS @counter-style rule.
    *
-   * Permanent and global — no dispose or ref-counting.
-   * Deduplicates by name (first definition wins).
+   * Permanent and global — no dispose or ref-counting. Deduplicates by name.
+   * By default a definition overrides a previously injected one of the same
+   * name. Pass `weak: true` for global `configure()` definitions, which must
+   * never clobber an existing rule (so component-local definitions win
+   * regardless of injection order).
    */
   counterStyle(
     name: string,
     descriptors: CounterStyleDescriptors,
-    options?: { root?: Document | ShadowRoot },
+    options?: { root?: Document | ShadowRoot; weak?: boolean },
   ): void {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
+    const isWeak = options?.weak === true;
 
-    if (registry.injectedCounterStyles.has(name)) {
-      return;
+    const existingIsStrong = registry.injectedCounterStyles.get(name);
+    if (existingIsStrong !== undefined) {
+      // A weak (global) definition never overrides; a strong one keeps the
+      // first definition. Only a strong definition replacing a weak one wins.
+      if (isWeak || existingIsStrong === true) {
+        return;
+      }
+      this.sheetManager.deleteGlobalRule(registry, `counterstyle:${name}`);
     }
 
     const rule: StyleRule = {
@@ -845,7 +861,58 @@ export class StyleInjector {
     );
 
     if (info) {
-      registry.injectedCounterStyles.add(name);
+      registry.injectedCounterStyles.set(name, !isWeak);
+    }
+  }
+
+  /**
+   * Inject a CSS @function rule (custom function).
+   *
+   * Permanent and global — no dispose or ref-counting. Deduplicates by function
+   * name. By default a definition overrides a previously injected one of the
+   * same name. Pass `weak: true` for global `configure()` definitions, which
+   * must never clobber an existing rule (so component-local definitions win
+   * regardless of injection order).
+   */
+  func(
+    name: string,
+    definition: FunctionDefinition,
+    options?: { root?: Document | ShadowRoot; weak?: boolean },
+  ): void {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const isWeak = options?.weak === true;
+
+    const cssName = parseFunctionName(name);
+
+    const existingIsStrong = registry.injectedFunctions.get(cssName);
+    if (existingIsStrong !== undefined) {
+      // A weak (global) definition never overrides; a strong one keeps the
+      // first definition. Only a strong definition replacing a weak one wins.
+      if (isWeak || existingIsStrong === true) {
+        return;
+      }
+      this.sheetManager.deleteGlobalRule(registry, `function:${cssName}`);
+    }
+
+    const rule: StyleRule = {
+      selector: formatFunctionPrelude(
+        name,
+        definition.args,
+        definition.returns,
+      ),
+      declarations: formatFunctionDeclarations(definition),
+    } as StyleRule;
+
+    const info = this.sheetManager.insertGlobalRule(
+      registry,
+      [rule],
+      `function:${cssName}`,
+      root,
+    );
+
+    if (info) {
+      registry.injectedFunctions.set(cssName, !isWeak);
     }
   }
 

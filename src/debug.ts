@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
-import { getCssTextForNode, injector } from './injector';
+import { getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
 import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
@@ -26,33 +26,33 @@ type CSSTarget =
   | string[]
   | Element;
 
-interface DebugOptions {
+export interface DebugOptions {
   root?: Document | ShadowRoot;
   /** Suppress console logging and return data only (default: false) */
   raw?: boolean;
 }
 
-interface CssOptions extends DebugOptions {
+export interface CssOptions extends DebugOptions {
   prettify?: boolean;
   /** Read from stored source CSS (dev-mode only) instead of live CSSOM */
   source?: boolean;
 }
 
-interface ChunkInfo {
+export interface DebugChunkInfo {
   className: string;
   chunkName: string | null;
 }
 
-interface InspectResult {
+export interface InspectResult {
   element?: Element | null;
   classes: string[];
-  chunks: ChunkInfo[];
+  chunks: DebugChunkInfo[];
   css: string;
   size: number;
   rules: number;
 }
 
-interface CacheStatus {
+export interface CacheStatus {
   classes: {
     active: string[];
     unused: string[];
@@ -61,7 +61,7 @@ interface CacheStatus {
   metrics: CacheMetrics | null;
 }
 
-interface ChunkBreakdown {
+export interface ChunkBreakdown {
   byChunk: Record<
     string,
     { classes: string[]; cssSize: number; ruleCount: number }
@@ -70,7 +70,7 @@ interface ChunkBreakdown {
   totalClasses: number;
 }
 
-interface Summary {
+export interface Summary {
   activeClasses: string[];
   unusedClasses: string[];
   totalStyledClasses: string[];
@@ -273,7 +273,7 @@ function buildChunkBreakdown(
     if (!byChunk[chunk])
       byChunk[chunk] = { classes: [], cssSize: 0, ruleCount: 0 };
     byChunk[chunk].classes.push(className);
-    const css = injector.instance.getCssTextForClasses([className], { root });
+    const css = injector.instance.getCSSTextForClasses([className], { root });
     byChunk[chunk].cssSize += css.length;
     byChunk[chunk].ruleCount += countRules(css);
   }
@@ -446,7 +446,7 @@ export const tastyDebug = {
             'tastyDebug: source CSS not available (requires dev mode or TASTY_DEBUG=true). Falling back to live CSSOM.',
           );
         }
-        css = injector.instance.getCssTextForClasses([target], { root });
+        css = injector.instance.getCSSTextForClasses([target], { root });
       }
     } else if (source && Array.isArray(target)) {
       const src = getSourceCssForClasses(target, root);
@@ -458,32 +458,32 @@ export const tastyDebug = {
             'tastyDebug: source CSS not available. Falling back to live CSSOM.',
           );
         }
-        css = injector.instance.getCssTextForClasses(target, { root });
+        css = injector.instance.getCSSTextForClasses(target, { root });
       }
     } else if (typeof target === 'string') {
       if (target === 'all') {
-        css = injector.instance.getCssText({ root });
+        css = injector.instance.getCSSText({ root });
       } else if (target === 'global') {
         css = getGlobalTypeCSS('global', root).css;
         return css; // already prettified
       } else if (target === 'active') {
         const active = findDomTastyClasses(root);
-        css = injector.instance.getCssTextForClasses(active, { root });
+        css = injector.instance.getCSSTextForClasses(active, { root });
       } else if (target === 'unused') {
         const unused = getUnusedClasses(root);
-        css = injector.instance.getCssTextForClasses(unused, { root });
+        css = injector.instance.getCSSTextForClasses(unused, { root });
       } else if (target === 'page') {
         css = getPageCSS(root);
       } else if (classRegex.test(target)) {
-        css = injector.instance.getCssTextForClasses([target], { root });
+        css = injector.instance.getCSSTextForClasses([target], { root });
       } else {
         const el = (root as Document).querySelector?.(target);
-        if (el) css = getCssTextForNode(el, { root });
+        if (el) css = getCSSTextForNode(el, { root });
       }
     } else if (Array.isArray(target)) {
-      css = injector.instance.getCssTextForClasses(target, { root });
+      css = injector.instance.getCSSTextForClasses(target, { root });
     } else if (target instanceof Element) {
-      css = getCssTextForNode(target, { root });
+      css = getCSSTextForNode(target, { root });
     }
 
     const result = prettify ? prettifyCSS(css) : css;
@@ -525,12 +525,12 @@ export const tastyDebug = {
       .split(/\s+/)
       .filter((cls) => classRegex.test(cls));
 
-    const chunks: ChunkInfo[] = tastyClasses.map((className) => ({
+    const chunks: DebugChunkInfo[] = tastyClasses.map((className) => ({
       className,
       chunkName: getChunkForClass(className, root),
     }));
 
-    const css = getCssTextForNode(element, { root });
+    const css = getCSSTextForNode(element, { root });
     const rules = countRules(css);
 
     const result: InspectResult = {
@@ -570,13 +570,13 @@ export const tastyDebug = {
     const unusedClasses = getUnusedClasses(root);
     const totalStyledClasses = [...activeClasses, ...unusedClasses];
 
-    const activeCSS = injector.instance.getCssTextForClasses(activeClasses, {
+    const activeCSS = injector.instance.getCSSTextForClasses(activeClasses, {
       root,
     });
-    const unusedCSS = injector.instance.getCssTextForClasses(unusedClasses, {
+    const unusedCSS = injector.instance.getCSSTextForClasses(unusedClasses, {
       root,
     });
-    const allCSS = injector.instance.getCssText({ root });
+    const allCSS = injector.instance.getCSSText({ root });
 
     const activeRuleCount = countRules(activeCSS);
     const unusedRuleCount = countRules(unusedCSS);

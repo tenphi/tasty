@@ -9,6 +9,7 @@ import type {
   CounterStyleDescriptors,
   FontFaceDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   KeyframesSteps,
 } from '../injector/types';
 import {
@@ -21,6 +22,15 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
+import { isFunctionsPolyfillEnabled } from '../config';
+import {
+  extractLocalFunctions,
+  formatFunctionRule,
+  hasLocalFunctions,
+  parseFunctionName,
+  registerFunctionPolyfill,
+  registerLocalFunctionPolyfills,
+} from '../functions';
 import {
   extractAnimationNamesFromStyles,
   extractLocalKeyframes,
@@ -517,7 +527,9 @@ export function extractFontFaceFromStyles(
     }
   }
 
-  // Local font faces (override globals with same hash)
+  // Local font faces. @font-face is keyed by content hash, not family name, so
+  // distinct definitions all emit and byte-identical ones collapse — there is
+  // no "winner" to pick between a global and a local definition.
   if (hasLocalFontFace(styles)) {
     const local = extractLocalFontFace(styles);
     if (local) {
@@ -541,30 +553,26 @@ export interface ExtractedCounterStyle {
 
 /**
  * Extract @counter-style rules from styles, merging with global config.
- * Deduplicates by name (first definition wins).
+ * Deduplicates by name; component-local definitions override global ones with
+ * the same name (local wins).
  */
 export function extractCounterStyleFromStyles(
   styles: Styles,
   globalCounterStyle?: Record<string, CounterStyleDescriptors> | null,
 ): ExtractedCounterStyle[] {
-  const results: ExtractedCounterStyle[] = [];
-  const seenNames = new Set<string>();
+  const byName = new Map<string, ExtractedCounterStyle>();
 
   function addCounterStyle(name: string, descriptors: CounterStyleDescriptors) {
-    if (!seenNames.has(name)) {
-      seenNames.add(name);
-      results.push({ name, css: formatCounterStyleRule(name, descriptors) });
-    }
+    byName.set(name, { name, css: formatCounterStyleRule(name, descriptors) });
   }
 
-  // Global counter styles first
+  // Global counter styles first, then local — local replaces global on conflict.
   if (globalCounterStyle) {
     for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
       addCounterStyle(name, descriptors);
     }
   }
 
-  // Local counter styles (override globals with same name)
   if (hasLocalCounterStyle(styles)) {
     const local = extractLocalCounterStyle(styles);
     if (local) {
@@ -574,5 +582,66 @@ export function extractCounterStyleFromStyles(
     }
   }
 
-  return results;
+  return [...byName.values()];
+}
+
+// ============================================================================
+// Function Extraction (zero-runtime)
+// ============================================================================
+
+export interface ExtractedFunction {
+  name: string;
+  css: string;
+}
+
+/**
+ * Extract @function rules from styles, merging with global config.
+ * Deduplicates by CSS function name; component-local definitions override
+ * global ones with the same name (local wins).
+ */
+export function extractFunctionsFromStyles(
+  styles: Styles,
+  globalFunction?: Record<string, FunctionDefinition> | null,
+): ExtractedFunction[] {
+  // @function polyfill: register definitions as inline closures so call sites
+  // are expanded to plain CSS during chunk rendering. No native @function rules
+  // are emitted. Global definitions are also registered here as a safety net in
+  // case configure() ran in a separate module scope.
+  if (isFunctionsPolyfillEnabled()) {
+    if (globalFunction) {
+      for (const [name, definition] of Object.entries(globalFunction)) {
+        registerFunctionPolyfill(name, definition);
+      }
+    }
+    registerLocalFunctionPolyfills(styles);
+    return [];
+  }
+
+  const byName = new Map<string, ExtractedFunction>();
+
+  function addFunction(name: string, definition: FunctionDefinition) {
+    const cssName = parseFunctionName(name);
+    byName.set(cssName, {
+      name: cssName,
+      css: formatFunctionRule(name, definition),
+    });
+  }
+
+  // Global functions first, then local — local replaces global on conflict.
+  if (globalFunction) {
+    for (const [name, definition] of Object.entries(globalFunction)) {
+      addFunction(name, definition);
+    }
+  }
+
+  if (hasLocalFunctions(styles)) {
+    const local = extractLocalFunctions(styles);
+    if (local) {
+      for (const [name, definition] of Object.entries(local)) {
+        addFunction(name, definition);
+      }
+    }
+  }
+
+  return [...byName.values()];
 }

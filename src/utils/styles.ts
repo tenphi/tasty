@@ -1,6 +1,5 @@
 import { StyleParser } from '../parser/parser';
-import { okhslFunc } from '../plugins/okhsl-plugin';
-import { okhstFunc } from '../plugins/okhst-plugin';
+import { registerDefaultFunctions } from '../plugins/defaults';
 
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
@@ -103,11 +102,7 @@ function isSimpleColorFast(val: string): boolean {
     case 108: // 'l'
       return val.charCodeAt(1) === 99 && val.charCodeAt(2) === 104; // 'lch'
     case 111: // 'o'
-      return (
-        val.startsWith('oklch(') ||
-        val.startsWith('okhsl(') ||
-        val.startsWith('okhst(')
-      );
+      return val.startsWith('oklch(');
     case 118: // 'v'
       return RE_VAR_COLOR.test(val);
     case 99: // 'c'
@@ -144,24 +139,39 @@ function getOrCreateParser(): StyleParser {
   if (!__tastyParser) {
     __tastyParser = new StyleParser({ units: CUSTOM_UNITS });
     __tastyParser.setFuncs(__tastyFuncs);
+    // Register built-in color functions (okhsl/okhst) as ordinary parse
+    // functions. Done lazily here so zero-config usage works regardless of
+    // module initialization order or tree-shaking.
+    registerDefaultFunctions();
   }
   return __tastyParser;
 }
 
 // Registry for user-provided custom functions that the parser can call.
-// It is updated through the `customFunc` helper exported below.
-// okhsl and okhst are registered as built-in functions so they work regardless of
-// tree-shaking or module initialization order.
-const __tastyFuncs: Record<string, (groups: StyleDetails[]) => string> = {
-  okhsl: okhslFunc,
-  okhst: okhstFunc,
-};
+// It is updated through the `customFunc` helper exported below and through
+// `configure()`. Built-in color functions (okhsl/okhst) are registered lazily
+// by `registerDefaultFunctions()` rather than seeded here, so they go through
+// the exact same path as any third-party plugin.
+const __tastyFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
 
 export function customFunc(
   name: string,
   fn: (groups: StyleDetails[]) => string,
 ) {
   __tastyFuncs[name] = fn;
+  getOrCreateParser().setFuncs(__tastyFuncs);
+}
+
+/**
+ * Reset custom parser functions back to the built-in set (okhsl/okhst).
+ * Used by resetConfig() in tests to drop user-registered and polyfill functions.
+ */
+export function resetGlobalFuncs(): void {
+  for (const key of Object.keys(__tastyFuncs)) {
+    delete __tastyFuncs[key];
+  }
+  // Re-register the default color functions so they survive a config reset.
+  registerDefaultFunctions();
   getOrCreateParser().setFuncs(__tastyFuncs);
 }
 
@@ -324,8 +334,7 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     firstColor.startsWith('rgb') ||
     firstColor.startsWith('hsl') ||
     firstColor.startsWith('lch') ||
-    firstColor.startsWith('oklch') ||
-    firstColor.startsWith('okhsl')
+    firstColor.startsWith('oklch')
   ) {
     const alphaMatch = firstColor.match(RGB_ALPHA_PATTERN);
     if (alphaMatch) {

@@ -1,6 +1,7 @@
 import type {
   CounterStyleDescriptors,
   FontFaceInput,
+  FunctionDefinition,
   KeyframesSteps,
   PropertyDefinition,
 } from '../injector/types';
@@ -516,28 +517,42 @@ export interface StylesInterface extends Omit<
    * - `#name` for color properties → `--name-color` (auto-sets syntax: '<color>', defaults initialValue: 'transparent')
    *
    * Examples:
-   * - `'@properties': { '$rotation': { syntax: '<angle>', inherits: false, initialValue: '45deg' } }`
-   * - `'@properties': { '#theme': { initialValue: 'purple' } }` // syntax: '<color>' is auto-set
+   * - `'@property': { '$rotation': { syntax: '<angle>', inherits: false, initialValue: '45deg' } }`
+   * - `'@property': { '#theme': { initialValue: 'purple' } }` // syntax: '<color>' is auto-set
    */
-  '@properties'?: Record<string, PropertyDefinition>;
+  '@property'?: Record<string, PropertyDefinition>;
   /**
    * Local @font-face definitions for this component.
    * Keys are font-family names, values are descriptors or arrays of descriptors
    * (for multiple weights/styles of the same family).
    *
    * Examples:
-   * - `'@fontFace': { Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' } }`
-   * - `'@fontFace': { 'Brand Sans': [{ src: '...', fontWeight: 400 }, { src: '...', fontWeight: 700 }] }`
+   * - `'@font-face': { Icons: { src: 'url("/fonts/icons.woff2") format("woff2")', fontDisplay: 'block' } }`
+   * - `'@font-face': { 'Brand Sans': [{ src: '...', fontWeight: 400 }, { src: '...', fontWeight: 700 }] }`
    */
-  '@fontFace'?: Record<string, FontFaceInput>;
+  '@font-face'?: Record<string, FontFaceInput>;
   /**
    * Local @counter-style definitions for this component.
    * Keys are counter-style names, values are descriptor objects.
    *
    * Examples:
-   * - `'@counterStyle': { thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' } }`
+   * - `'@counter-style': { thumbs: { system: 'cyclic', symbols: '"👍"', suffix: '" "' } }`
    */
-  '@counterStyle'?: Record<string, CounterStyleDescriptors>;
+  '@counter-style'?: Record<string, CounterStyleDescriptors>;
+  /**
+   * Local @function definitions (CSS custom functions) for this component.
+   * Keys are function names using `$$name` (the literal callable `--name`),
+   * matching the call site `$$name(...)`. Values are function definitions.
+   *
+   * Local variables are declared directly as `$name` keys on the descriptor;
+   * `result`, local-var values, and parameter defaults are parsed through the
+   * Tasty DSL (units, color tokens, auto-calc, fallbacks).
+   *
+   * Examples:
+   * - `'@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } }`
+   * - `'@function': { '$$shadow': { args: { '$color': { syntax: '<color>', default: 'inherit' } }, returns: '<color>', '$offset': '2px', result: '$offset $offset ($color, black)' } }`
+   */
+  '@function'?: Record<string, FunctionDefinition>;
   /**
    * Apply one or more predefined style recipes by name.
    * Recipes are defined globally via `configure({ recipes: { ... } })`.
@@ -590,9 +605,10 @@ export type NotSelector = Exclude<string, Selector | keyof StylesInterface>;
 /** Special style keys that should not be wrapped in StyleValue/StyleValueStateMap */
 type SpecialStyleKeys =
   | '@keyframes'
-  | '@properties'
-  | '@fontFace'
-  | '@counterStyle'
+  | '@property'
+  | '@font-face'
+  | '@counter-style'
+  | '@function'
   | 'recipe';
 
 export type StylesWithoutSelectors = {
@@ -617,24 +633,26 @@ export type RecipeIndexSignature = Record<
 
 /**
  * Style type for recipe definitions.
- * Like StylesWithoutSelectors but also allows `@keyframes`, `@properties`,
+ * Like StylesWithoutSelectors but also allows `@keyframes`, `@property`,
  * local predefined states, and vendor-prefixed CSS properties.
  * Excludes `recipe` to prevent recursive references.
  */
 export type RecipeStyles = StylesWithoutSelectors &
   RecipeIndexSignature & {
     '@keyframes'?: StylesInterface['@keyframes'];
-    '@properties'?: StylesInterface['@properties'];
-    '@fontFace'?: StylesInterface['@fontFace'];
-    '@counterStyle'?: StylesInterface['@counterStyle'];
+    '@property'?: StylesInterface['@property'];
+    '@font-face'?: StylesInterface['@font-face'];
+    '@counter-style'?: StylesInterface['@counter-style'];
+    '@function'?: StylesInterface['@function'];
   };
 
 /** Special properties that are not regular style values */
 export interface SpecialStyleProperties {
   '@keyframes'?: StylesInterface['@keyframes'];
-  '@properties'?: StylesInterface['@properties'];
-  '@fontFace'?: StylesInterface['@fontFace'];
-  '@counterStyle'?: StylesInterface['@counterStyle'];
+  '@property'?: StylesInterface['@property'];
+  '@font-face'?: StylesInterface['@font-face'];
+  '@counter-style'?: StylesInterface['@counter-style'];
+  '@function'?: StylesInterface['@function'];
   recipe?: StylesInterface['recipe'];
 }
 
@@ -646,9 +664,10 @@ export interface StylesIndexSignature {
     | Styles
     | false // Removes all styles for this sub-element when extending
     | StylesInterface['@keyframes']
-    | StylesInterface['@properties']
-    | StylesInterface['@fontFace']
-    | StylesInterface['@counterStyle'];
+    | StylesInterface['@property']
+    | StylesInterface['@font-face']
+    | StylesInterface['@counter-style']
+    | StylesInterface['@function'];
   /**
    * Selector combinator: `undefined` (descendant, default), `'>'` (child), `'+'` (adjacent), `'~'` (sibling).
    * Can chain with capitalized names: `'> Body > Row >'`. Spaces required around combinators.

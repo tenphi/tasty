@@ -52,7 +52,7 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 | `@tenphi/tasty/static` | Build-time static style generation (tastyStatic) | Browser |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic zero-runtime extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration wrapper for zero-runtime | Node |
+| `@tenphi/tasty/zero/next` | Next.js integration wrapper for zero-runtime | Node |
 | `@tenphi/tasty/ssr` | Server-side rendering collector + hydration | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
@@ -134,7 +134,7 @@ src/
 - Test files: `*.test.ts` / `*.test.tsx`, co-located in `src/`
 - Unused variables prefixed with `_` are allowed
 - JSX transform: `react-jsx` (no `import React` needed)
-- Functional API pattern: factory functions + hooks, no class components
+- Functional API pattern: factory functions + hooks, no class components. The *styling* API (`tasty`, `useStyles`, `configure`, etc.) is entirely functional. Stateful infrastructure services (`ServerStyleCollector`, `CSSWriter`, `StyleInjector`) are classes but each exposes a `create*()` factory wrapper (`createServerStyleCollector`, `createCSSWriter`) as the canonical public entry point; the class is also exported for advanced/internal use.
 - All style values go through the Tasty parser — supports design tokens (`#color`, `$token`), custom units (`2x`, `1r`), auto-calc, and color opacity (`#purple.5`)
 
 ## CI/CD

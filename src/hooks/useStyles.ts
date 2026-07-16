@@ -4,12 +4,6 @@ import { computeStyles } from '../compute-styles';
 import { getTastySSRContext } from '../ssr/context';
 import type { Styles } from '../styles/types';
 
-/**
- * Tasty styles object to generate CSS classes for.
- * Can be undefined or empty object for no styles.
- */
-export type UseStylesOptions = Styles | undefined;
-
 export interface UseStylesResult {
   /**
    * Generated className(s) to apply to the element.
@@ -40,7 +34,7 @@ export interface UseStylesResult {
  * ```
  */
 export function useStyles(
-  styles: UseStylesOptions,
+  styles: Styles | undefined,
   options?: { root?: Document | ShadowRoot },
 ): UseStylesResult {
   return computeStyles(styles, {

@@ -12,11 +12,13 @@ import { StyleInjector } from './injector';
 import type {
   CounterStyleDescriptors,
   FontFaceDescriptors,
+  FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
+  PropertyOptions,
   StyleInjectorConfig,
 } from './types';
 
@@ -87,27 +89,6 @@ export function keyframes(
   return getGlobalInjector().keyframes(steps, nameOrOptions);
 }
 
-export interface PropertyOptions {
-  /**
-   * CSS syntax string for the property (e.g., '<color>', '<length>', '<angle>')
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/@property/syntax
-   */
-  syntax?: string;
-  /**
-   * Whether the property inherits from parent elements
-   * @default true
-   */
-  inherits?: boolean;
-  /**
-   * Initial value for the property
-   */
-  initialValue?: string | number;
-  /**
-   * Shadow root or document to inject into
-   */
-  root?: Document | ShadowRoot;
-}
-
 /**
  * Define a CSS @property custom property.
  * This enables advanced features like animating custom properties.
@@ -168,29 +149,53 @@ export function fontFace(
 /**
  * Inject a CSS @counter-style rule.
  *
- * Permanent and global — no dispose or ref-counting.
- * Deduplicates by name (first definition wins).
+ * Permanent and global — no dispose or ref-counting. Deduplicates by name and
+ * overrides an existing rule by default. Pass `weak: true` for global
+ * `configure()` definitions, which never clobber an existing rule.
  */
 export function counterStyle(
   name: string,
   descriptors: CounterStyleDescriptors,
-  options?: { root?: Document | ShadowRoot },
+  options?: { root?: Document | ShadowRoot; weak?: boolean },
 ): void {
   return getGlobalInjector().counterStyle(name, descriptors, options);
 }
 
 /**
+ * Inject a CSS @function rule (custom function).
+ *
+ * Permanent and global — no dispose or ref-counting. Deduplicates by function
+ * name and overrides an existing rule by default. Pass `weak: true` for global
+ * `configure()` definitions, which never clobber an existing rule.
+ *
+ * @param name - The function name (`$$name`, `$name`, or `--name`)
+ * @param definition - Function definition (args, returns, result, local vars)
+ *
+ * @example
+ * ```ts
+ * func('$$negative', { args: ['$value'], result: '(-1 * $value)' });
+ * ```
+ */
+export function func(
+  name: string,
+  definition: FunctionDefinition,
+  options?: { root?: Document | ShadowRoot; weak?: boolean },
+): void {
+  return getGlobalInjector().func(name, definition, options);
+}
+
+/**
  * Get CSS text from all sheets (for SSR)
  */
-export function getCssText(options?: { root?: Document | ShadowRoot }): string {
-  return getGlobalInjector().getCssText(options);
+export function getCSSText(options?: { root?: Document | ShadowRoot }): string {
+  return getGlobalInjector().getCSSText(options);
 }
 
 /**
  * Collect only CSS used by a rendered subtree (like jest-styled-components).
  * Pass the container returned by render(...).
  */
-export function getCssTextForNode(
+export function getCSSTextForNode(
   node: ParentNode | Element | DocumentFragment,
   options?: { root?: Document | ShadowRoot },
 ): string {
@@ -217,7 +222,7 @@ export function getCssTextForNode(
     : ([] as unknown as NodeListOf<Element>);
   if (elements) elements.forEach(readClasses);
 
-  return getGlobalInjector().getCssTextForClasses(classSet, options);
+  return getGlobalInjector().getCSSTextForClasses(classSet, options);
 }
 
 /**
@@ -249,13 +254,6 @@ export function touch(
  */
 export function gc(options?: GCOptions): number {
   return getGlobalInjector().gc(options);
-}
-
-/**
- * Check if we're currently running in a test environment
- */
-export function getIsTestEnvironment(): boolean {
-  return isTestEnvironment();
 }
 
 /**
@@ -309,9 +307,12 @@ export type {
   CacheMetrics,
   RawCSSResult,
   PropertyDefinition,
+  PropertyOptions,
   FontFaceDescriptors,
   FontFaceInput,
   CounterStyleDescriptors,
+  FunctionDefinition,
+  FunctionParameter,
   StyleUsage,
   GCConfig,
   GCOptions,

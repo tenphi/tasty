@@ -26,12 +26,15 @@ configure({
     custom: (n) => `${n * 10}px`, // Function-based unit
   },
 
-  // Custom functions for the parser
-  funcs: {
+  // Custom functions — a single map for both flavors, discriminated by value type:
+  functions: {
+    // Bare key + function value → parse-time function, called as `double(...)`
     double: (groups) => {
       const value = parseFloat(groups[0]?.output || '0');
       return `${value * 2}px`;
     },
+    // `$$name` key + object value → declarative CSS @function, called as `$$negative(...)`
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
   },
 });
 ```
@@ -45,23 +48,29 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `nonce` | `string` | - | CSP nonce for style elements |
+| `maxRulesPerSheet` | `number` | `8192` | Maximum rules per injected stylesheet |
+| `forceTextInjection` | `boolean` | auto (`true` in test envs) | Force text-node CSS injection instead of constructable stylesheets |
+| `devMode` | `boolean` | auto | Enable development-mode features: performance metrics and debug info |
 | `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
 | `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
-| `units` | `Record<string, string \| Function>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
-| `funcs` | `Record<string, Function>` | - | Custom parser functions (merged with existing) |
+| `units` | `Record<string, string \| UnitHandler>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
+| `functions` | `Record<string, FunctionDefinition \| Function>` | - | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
 | `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
 | `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
-| `replaceTokens` | `Record<string, string \| number>` | - | Parse-time token substitution (inline replacement) |
+| `replaceTokens` | `Record<string, string \| number \| boolean>` | - | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
 | `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
-| `fontFace` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
-| `counterStyle` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
+| `fontFaces` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
+| `counterStyles` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
+| `polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time |
 | `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
 | `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
+| `plugins` | `TastyPlugin[]` | - | Plugins that extend tasty with custom functions, units, or states (processed in order, later override earlier) |
+| `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
-| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). See [Name prefix](#name-prefix). |
+| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
 
 ---
 
@@ -187,7 +196,7 @@ Register custom fonts globally so every component can reference them by family n
 
 ```ts
 configure({
-  fontFace: {
+  fontFaces: {
     'Brand Sans': [
       {
         src: 'url("/fonts/brand-regular.woff2") format("woff2")',
@@ -210,7 +219,7 @@ configure({
 
 Now any component can use `fontFamily: '"Brand Sans", sans-serif'` and the browser will already have the `@font-face` rules in the stylesheet.
 
-See [Font Face (`@fontFace`)](dsl.md#font-face-fontface) for inline usage inside component styles and the full list of supported descriptors.
+See [Font Face (`@font-face`)](dsl.md#font-face-font-face) for inline usage inside component styles and the full list of supported descriptors.
 
 ---
 
@@ -220,7 +229,7 @@ Define custom list-marker algorithms globally. Rules are injected eagerly when s
 
 ```ts
 configure({
-  counterStyle: {
+  counterStyles: {
     thumbs: {
       system: 'cyclic',
       symbols: '"👍"',
@@ -236,7 +245,98 @@ configure({
 
 Components can then reference `listStyleType: 'thumbs'` directly.
 
-See [Counter Style (`@counterStyle`)](dsl.md#counter-style-counterstyle) for inline usage inside component styles and the full list of supported descriptors.
+See [Counter Style (`@counter-style`)](dsl.md#counter-style-counter-style) for inline usage inside component styles and the full list of supported descriptors.
+
+---
+
+## Functions
+
+The single `functions` map holds both kinds of custom functions, discriminated by the value type:
+
+- **Parse functions** — a **bare key** with a **function value** `(groups) => string`. Runs at parse time and is called as `name(...)`. Use these for computed/derived CSS that JavaScript produces (e.g. color-space conversions).
+- **CSS `@function` definitions** — a **`$$name` key** with an **object value** (a [`FunctionDefinition`](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)). Injected eagerly as a native `@function` rule and called as `$$name(...)` (→ `--name(...)`).
+
+```ts
+configure({
+  functions: {
+    // Parse function — bare key, function value
+    double: (groups) => `calc(2 * ${groups[0]?.output ?? '0'})`,
+
+    // CSS @function — `$$` key, object value
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
+    $$shadow: {
+      args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
+      returns: '<color>',
+      $offset: '2px',
+      result: '$offset $offset ($shadow-color, black)',
+    },
+  },
+});
+```
+
+Components then invoke parse functions as `double(...)` and CSS functions with the `$$name(...)` sugar, e.g. `marginTop: '$$negative(10px)'`.
+
+> A key whose prefix doesn't match its value type (an object under a bare key, or a function under a `$$` key) is **ignored with a dev-mode warning**.
+
+See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside component styles, the full descriptor shape, and token conventions. `@function` is an experimental CSS feature — unsupported browsers safely ignore the native rule (see the polyfill below).
+
+### Custom color functions
+
+A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, token decomposition into the configured color space, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
+
+```ts
+import { configure, createColorFunc } from '@tenphi/tasty';
+
+// A custom color space is just a `functions` entry.
+const myColorPlugin = () => ({
+  name: 'mycolor',
+  functions: {
+    // Hand-written parse function:
+    mycolor: (groups) => {
+      const [r, g, b] = groups[0].all;
+      return `rgb(${r} ${g} ${b})`;
+    },
+  },
+});
+
+configure({ plugins: [myColorPlugin()] });
+
+// Now `mycolor(...)` is a color in every context:
+//   fill: 'mycolor(255 0 0)'
+//   fill: '#brand.5'   (with replaceTokens: { '#brand': 'mycolor(255 0 0)' })
+```
+
+For HSL-style color spaces (a hue angle plus two percentages), the exported `createColorFunc(name, convert, label?)` helper handles angle/percentage parsing, clamping, alpha, and caching. `convert` returns sRGB `[r, g, b]` in 0-1; `label` is an optional string used only in dev warnings (e.g. `'H S L'`) and has no effect on output. This is exactly how `okhslPlugin`/`okhstPlugin` are implemented.
+
+---
+
+## Polyfills
+
+`@function` only ships natively in Chromium 139+. To use CSS functions in browsers that don't support the at-rule yet (Firefox, Safari), enable the **functions polyfill**, which expands every `$$name(...)` call into plain CSS (`calc()`/`var()`/`color-mix()`) at parse time instead of emitting the native `@function` rule:
+
+```ts
+configure({
+  polyfills: {
+    functions: true, // default: false
+  },
+  functions: {
+    $$negative: { args: ['$value'], result: '(-1 * $value)' },
+  },
+});
+
+// Now `marginTop: '$$negative(10px)'` renders `margin-top: calc(-1 * 10px)`
+// — no native @function rule is emitted.
+```
+
+This works across all rendering modes (client, SSR/RSC, and `tastyStatic`) because expansion happens in the parser. Note `polyfills.functions` (the feature toggle) is distinct from the top-level `functions` (the definitions map).
+
+**Decided limitations when the polyfill is on:**
+
+- **No native fallback** — functions are always inlined; we do exactly what is configured.
+- **Conditional results** (`@media`/`@supports`/`if()` inside `result`) are inlined verbatim; the conditional nuance is not resolved per-element.
+- **Typed params / `returns`** are dropped (inlining is purely lexical substitution).
+- **Param name collisions** are avoided by fully inlining argument values (no function-internal custom properties are emitted) and by namespacing the function's own variables.
+- **Recursion** — self/mutually-recursive functions are not expanded; the cycle guard bails and leaves the call untouched.
 
 ---
 
@@ -260,7 +360,7 @@ configure({
 });
 ```
 
-Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@properties`. Recipes cannot reference other recipes.
+Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@property`. Recipes cannot reference other recipes.
 
 For how to apply, compose, and override recipes in components, see [Recipes](dsl.md#recipes) in the Style DSL reference.
 
@@ -349,12 +449,12 @@ Supported types:
 | `300ms`, `1s` (time units) | `<time>` |
 | `#name` tokens (by naming convention) | `<color>` |
 
-Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@properties` when you need different settings:
+Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@property` when you need different settings:
 
 ```jsx
 // In component styles
 styles: {
-  '@properties': {
+  '@property': {
     '$scale': { syntax: '<number>', inherits: false, initialValue: 1 },
   },
 }
@@ -367,7 +467,7 @@ configure({
 });
 ```
 
-To disable auto-inference entirely (only explicit `@properties` will be used):
+To disable auto-inference entirely (only explicit `@property` will be used):
 
 ```jsx
 configure({ autoPropertyTypes: false });

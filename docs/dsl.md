@@ -123,7 +123,7 @@ mods={{ hovered: true, theme: 'danger' }}
 // → data-hovered="" data-theme="danger"
 ```
 
-Modifiers can also be exposed as top-level component props via `modProps` — see [Runtime — Mod Props](react-api.md#mod-props).
+Modifiers can also be exposed as top-level component props via `modProps` — see [React API — Mod Props](react-api.md#mod-props).
 
 ---
 
@@ -683,24 +683,24 @@ const AnimatedGradient = tasty({
 
 Here `$gradient-angle: '0deg'` is detected as `<angle>` and `#theme` as `<color>` (via the `#name` naming convention), so both transitions work without any manual `@property` declarations. Numeric types (`<number>`, `<length>`, `<percentage>`, `<angle>`, `<time>`) are inferred from values; `<color>` is inferred from `#name` tokens.
 
-Use explicit `@properties` when you need non-default settings like `inherits: false`:
+Use explicit `@property` when you need non-default settings like `inherits: false`:
 
 ```jsx
-'@properties': {
+'@property': {
   '$gradient-angle': { syntax: '<angle>', inherits: false, initialValue: '0deg' },
 },
 ```
 
 ---
 
-## Font Face (`@fontFace`)
+## Font Face (`@font-face`)
 
 Register custom fonts directly inside a `styles` object. Keys are font-family names, values are descriptor objects (or arrays of them for multiple weights/styles).
 
 ```ts
 const Heading = tasty({
   styles: {
-    '@fontFace': {
+    '@font-face': {
       'Brand Sans': {
         src: 'url("/fonts/brand-sans.woff2") format("woff2")',
         fontDisplay: 'swap',
@@ -716,7 +716,7 @@ const Heading = tasty({
 Supply an array to register several variants of the same family:
 
 ```ts
-'@fontFace': {
+'@font-face': {
   'Brand Sans': [
     { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
     { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
@@ -745,7 +745,7 @@ Supply an array to register several variants of the same family:
 
 ---
 
-## Counter Style (`@counterStyle`)
+## Counter Style (`@counter-style`)
 
 Define custom list markers via the CSS `@counter-style` at-rule. Keys are counter-style names, values are descriptor objects.
 
@@ -753,7 +753,7 @@ Define custom list markers via the CSS `@counter-style` at-rule. Keys are counte
 const EmojiList = tasty({
   tag: 'ol',
   styles: {
-    '@counterStyle': {
+    '@counter-style': {
       thumbs: {
         system: 'cyclic',
         symbols: '"👍"',
@@ -781,6 +781,66 @@ const EmojiList = tasty({
 | `speakAs` | `speak-as` | `string` |
 
 > Counter-style rules are permanent — they are injected once and never cleaned up, matching how browsers handle `@counter-style`.
+
+---
+
+## Functions (`@function`)
+
+Define reusable, parameterized CSS [custom functions](https://developer.mozilla.org/en-US/docs/Web/CSS/@function) via the CSS `@function` at-rule. A custom function takes parameters and returns a single value — like a dynamic custom property.
+
+The token convention follows Tasty's `$` vs `$$` distinction:
+
+- **`$$name`** — the literal callable name (`--name`). Used for the **definition key** and for **invocation** `$$name(...)`, mirroring the existing `$$gradient-angle` → `--gradient-angle` sugar. The definition key matches the call site.
+- **`$name`** — a custom-property declaration/reference (`var(--name)`). Used for **parameters** and **local variables**, exactly like declaring custom props in a styles object.
+- **Local variables** are declared directly as `$name` keys on the descriptor — the body reads like a mini styles object.
+- `result`, local-variable values, and parameter `default` values flow through the full Tasty DSL, so units (`2x`), color tokens (`#theme`), auto-calc (`(-1 * $value)` → `calc(-1 * var(--value))`), and fallbacks (`($shadow-color, black)` → `var(--shadow-color, black)`) all work.
+
+```ts
+const Box = tasty({
+  styles: {
+    '@function': {
+      // simplest: one bare param + result (auto-calc, no explicit calc())
+      '$$negative': { args: ['$value'], result: '(-1 * $value)' },
+
+      // typed param + default + return type + local variable
+      '$$shadow': {
+        args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
+        returns: '<color>',
+        '$offset': '2px', // local variable
+        result: '$offset $offset ($shadow-color, black)',
+      },
+    },
+    marginTop: '$$negative(10px)', // → margin-top: --negative(10px)
+    boxShadow: '$$shadow(#accent)', // → box-shadow: --shadow(var(--accent-color))
+  },
+});
+```
+
+Generated CSS:
+
+```css
+@function --negative(--value) { result: calc(-1 * var(--value)); }
+@function --shadow(--shadow-color <color>: inherit) returns <color> {
+  --offset: 2px;
+  result: var(--offset) var(--offset) var(--shadow-color, black);
+}
+.t0 { margin-top: --negative(10px); box-shadow: --shadow(var(--accent-color)); }
+```
+
+### Descriptor shape
+
+| Field | Type | Notes |
+|---|---|---|
+| `result` (required) | `string` | The `result:` value, parsed through the Tasty DSL. |
+| `args` | `string[]` \| `Record<string, FunctionParameter>` | Ordered parameters. Array form lists bare names; object form maps names to type/default. |
+| `returns` | `string` | Optional return type, e.g. `'<color>'`. |
+| `$name` keys | `string \| number` | Any `$name` key declares a local variable `--name` (value parsed). |
+
+A `FunctionParameter` is one of: `true` (bare param), a string CSS type shorthand (`'<length>'`), or `{ syntax?: string; default?: string | number }`.
+
+Functions can also be registered with the [`useFunction`](react-api.md#usefunction) hook or globally via [`configure({ functions })`](configuration.md#functions) (the same map also accepts bare-key parse functions).
+
+> `@function` is permanent — injected once and never cleaned up, like `@counter-style`. It is an experimental CSS feature ([Chrome 139+](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)); unsupported browsers safely ignore the native rule, so use it as progressive enhancement — or enable the [`configure({ polyfills: { functions: true } })`](configuration.md#polyfills) inline polyfill to expand `$$name(...)` calls into plain CSS for full cross-browser support.
 
 ---
 

@@ -1,5 +1,5 @@
 export { useStyles } from './useStyles';
-export type { UseStylesOptions, UseStylesResult } from './useStyles';
+export type { UseStylesResult } from './useStyles';
 
 export { useGlobalStyles } from './useGlobalStyles';
 
@@ -13,3 +13,6 @@ export type { UsePropertyOptions } from './useProperty';
 export { useFontFace } from './useFontFace';
 
 export { useCounterStyle } from './useCounterStyle';
+
+export { useFunction } from './useFunction';
+export type { UseFunctionOptions } from './useFunction';

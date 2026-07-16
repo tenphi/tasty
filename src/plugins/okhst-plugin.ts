@@ -22,7 +22,7 @@ import type { TastyPlugin, TastyPluginFactory } from './types';
  * The okhst function handler for tasty parser.
  * Receives parsed style groups and returns an RGB color string.
  */
-const okhstFunc = createColorFunc('okhst', 'H S T', okhstToSrgb);
+const okhstFunction = createColorFunc('okhst', okhstToSrgb, 'H S T');
 
 /**
  * OKHST Plugin for Tasty.
@@ -48,9 +48,9 @@ const okhstFunc = createColorFunc('okhst', 'H S T', okhstToSrgb);
  */
 export const okhstPlugin: TastyPluginFactory = (): TastyPlugin => ({
   name: 'okhst',
-  funcs: {
-    okhst: okhstFunc,
+  functions: {
+    okhst: okhstFunction,
   },
 });
 
-export { okhstFunc };
+export { okhstFunction };

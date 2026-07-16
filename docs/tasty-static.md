@@ -20,7 +20,7 @@ The zero-runtime mode is part of the main `@tenphi/tasty` package but requires a
 | `@babel/core` | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`) |
 | `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin |
 | `@babel/types` | >= 7.24 | Babel plugin |
-| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/next`) when using `configFile` option |
+| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/zero/next`) when using `configFile` option |
 
 All of these are declared as optional peer dependencies of `@tenphi/tasty`. Install only what your setup requires:
 
@@ -168,10 +168,11 @@ module.exports = {
 | `config.replaceTokens` | `Record<string, string \| number>` | — | Parse-time token substitution. Keys use `$name` for custom properties and `#name` for color tokens. |
 | `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
 | `config.keyframes` | `Record<string, KeyframesSteps>` | — | Global `@keyframes` definitions available to all `tastyStatic` calls |
-| `config.fontFace` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
-| `config.counterStyle` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
+| `config.fontFaces` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
+| `config.counterStyles` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
 | `config.units` | `Record<string, string \| UnitHandler>` | — | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }` |
-| `config.funcs` | `Record<string, Function>` | — | Custom functions for the style parser (merged with existing) |
+| `config.functions` | `Record<string, FunctionDefinition \| Function>` | — | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
+| `config.polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time |
 | `config.plugins` | `TastyPlugin[]` | — | Plugins that extend tasty with custom functions, units, states, and handlers |
 | `config.handlers` | `Record<string, StyleHandlerDefinition>` | — | Custom style handlers that transform style properties into CSS declarations |
 | `config.presets` | `Record<string, TypographyPreset>` | — | Typography presets — shorthand for `generateTypographyTokens()`. Generated tokens merge under explicit `tokens`. |
@@ -236,7 +237,7 @@ The `withTastyZero` wrapper configures both **webpack** and **Turbopack** automa
 
 ```typescript
 // next.config.ts
-import { withTastyZero } from '@tenphi/tasty/next';
+import { withTastyZero } from '@tenphi/tasty/zero/next';
 
 export default withTastyZero({
   output: 'public/tasty.css',
@@ -395,7 +396,7 @@ With Next.js:
 
 ```typescript
 // next.config.ts
-import { withTastyZero } from '@tenphi/tasty/next';
+import { withTastyZero } from '@tenphi/tasty/zero/next';
 
 export default withTastyZero({
   mode: 'inject',

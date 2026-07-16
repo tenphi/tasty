@@ -140,6 +140,7 @@ Each `StyleParser` instance maintains its own LRU cache.
 
 | Order | Rule                                                                                       | Bucket   |
 |-------|--------------------------------------------------------------------------------------------|----------|
+| 0     | Double prefix (literal name) – `$$ident` → `--ident`; `##ident` → `--ident-color`. Function call form: `$$ident(args)` → `--ident(<processed args>)`, `##ident(args)` → `--ident-color(<processed args>)` (custom `@function` invocation; args parsed recursively). **`@function` polyfill:** when a compiled closure is registered for `--ident` (via `configure({ polyfills: { functions: true } })`), the call is inlined into plain CSS instead of emitting `--ident(...)`; a recursion-cycle bail leaves the call untouched. | value    |
 | 1     | URL – `url(` opens `inUrl`; everything to its `)` is a single token.                       | value    |
 | 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. | value    |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |

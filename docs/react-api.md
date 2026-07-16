@@ -1,6 +1,6 @@
 # React API
 
-The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, and `useCounterStyle()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 > **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
@@ -97,6 +97,26 @@ Style props accept state maps, so responsive values work through the same API:
 ```
 
 For predefined style prop lists (`FLOW_STYLES`, `POSITION_STYLES`, `DIMENSION_STYLES`, etc.) and guidance on which props to expose per component category, see [Methodology — styleProps as the public API](methodology.md#styleprops-as-the-public-api).
+
+### Always-available style props
+
+A small set of style properties — `display`, `font`, `preset`, `hide`, `whiteSpace`, `opacity`, and `transition` — are always harvested as style props on every `tasty()` component, even when `styleProps` is omitted. This means you can pass `<Card display="grid" />` or `<Text preset="h1" />` without declaring them. When you do declare `styleProps`, these base props are unioned with your list (not replaced).
+
+---
+
+## `Element`
+
+`Element` is the unstyled base component exported from the main entry — equivalent to `tasty({})` (a `div` with no default styles). It accepts all Tasty props (`styles`, `styleProps`, `mods`, `tokens`, `as`, `qa`, `theme`, the `is*` props, etc.) and is useful as a generic styled box or as a building block for layout primitives.
+
+```jsx
+import { Element } from '@tenphi/tasty';
+
+<Element as="section" padding="4x" fill="#surface">
+  Content
+</Element>
+```
+
+> Note: `Element` shadows the global DOM `Element` type when imported from `@tenphi/tasty`. In files that need the DOM type, alias the import: `import { Element as TastyElement } from '@tenphi/tasty'`.
 
 ---
 
@@ -559,6 +579,42 @@ function useCounterStyle(
   options?: { name?: string; root?: Document | ShadowRoot },
 ): string;
 ```
+
+### useFunction
+
+Register a CSS `@function` (custom function). Permanent — no cleanup on unmount. Deduplicates by function name. The function name accepts `$$name` (matching the call site `$$name(...)`), `$name`, or `--name`.
+
+```tsx
+import { useFunction } from '@tenphi/tasty';
+
+function Box() {
+  useFunction('$$negative', { args: ['$value'], result: '(-1 * $value)' });
+  return <div style={{ marginTop: '--negative(10px)' }} />;
+}
+```
+
+Inside a `tasty()` component you can also call functions directly with the `$$name(...)` sugar:
+
+```tsx
+const Box = tasty({
+  styles: {
+    '@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } },
+    marginTop: '$$negative(10px)',
+  },
+});
+```
+
+Signature:
+
+```ts
+function useFunction(
+  name: string,
+  definition: FunctionDefinition,
+  options?: { root?: Document | ShadowRoot },
+): void;
+```
+
+See the [Functions section of the DSL reference](dsl.md#functions-function) for the full descriptor shape, token conventions, and value-sugar support. `@function` is an experimental CSS feature — unsupported browsers safely ignore the native rule, or enable the [`polyfills.functions`](configuration.md#polyfills) inline polyfill for full cross-browser support.
 
 ### Troubleshooting
 

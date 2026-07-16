@@ -32,7 +32,7 @@
       "import": "./dist/zero/index.js",
       "default": "./dist/zero/index.js"
     },
-    "./next": {
+    "./zero/next": {
       "types": "./dist/zero/next.d.ts",
       "import": "./dist/zero/next.js",
       "default": "./dist/zero/next.js"
@@ -191,13 +191,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "53 kB"
+      "limit": "54 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "50.5 kB"
+      "limit": "52 kB"
     },
     {
       "name": "static",
@@ -225,7 +225,7 @@
         "path",
         "crypto"
       ],
-      "limit": "46.65 kB"
+      "limit": "48 kB"
     }
   ]
 }

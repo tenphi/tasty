@@ -1,8 +1,7 @@
 /**
  * Next.js integration for Tasty SSR.
  *
- * Provides TastyRegistry for App Router (streaming via useServerInsertedHTML)
- * and createTastySSRDocument for Pages Router (non-streaming).
+ * Provides TastyRegistry for App Router (streaming via useServerInsertedHTML).
  *
  * Import from '@tenphi/tasty/ssr/next'.
  */

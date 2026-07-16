@@ -1,20 +1,20 @@
 import { StyleParser } from '../parser/parser';
 
-import { okhstFunc, okhstPlugin } from './okhst-plugin';
+import { okhstFunction, okhstPlugin } from './okhst-plugin';
 
 describe('okhstPlugin', () => {
   describe('plugin factory', () => {
     it('returns a valid TastyPlugin', () => {
       const plugin = okhstPlugin();
       expect(plugin.name).toBe('okhst');
-      expect(plugin.funcs).toBeDefined();
-      expect(plugin.funcs?.okhst).toBe(okhstFunc);
+      expect(plugin.functions).toBeDefined();
+      expect(plugin.functions?.okhst).toBe(okhstFunction);
     });
   });
 
-  describe('okhstFunc', () => {
+  describe('okhstFunction', () => {
     const parser = new StyleParser({
-      funcs: { okhst: okhstFunc },
+      funcs: { okhst: okhstFunction },
     });
 
     describe('angle parsing', () => {
@@ -103,8 +103,8 @@ describe('okhstPlugin', () => {
           /* noop */
         });
 
-        // Directly test okhstFunc with empty groups
-        const result = okhstFunc([]);
+        // Directly test okhstFunction with empty groups
+        const result = okhstFunction([]);
         expect(result).toBe('rgb(0% 0% 0%)');
         expect(warnSpy).toHaveBeenCalledWith(
           '[okhst] Expected 3 values (H S T), got:',

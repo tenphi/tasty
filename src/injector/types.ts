@@ -32,7 +32,7 @@ export interface StyleInjectorConfig {
   states?: Record<string, string>;
   /**
    * Automatically infer and register CSS @property declarations
-   * from custom property values. When false, only explicit @properties are used.
+   * from custom property values. When false, only explicit @property are used.
    * @default true
    */
   autoPropertyTypes?: boolean;
@@ -155,8 +155,18 @@ export interface RootRegistry {
   injectedProperties: Map<string, string>; // propertyName -> normalized declaration
   /** Content hashes of injected @font-face rules for deduplication */
   injectedFontFaces: Set<string>;
-  /** Names of injected @counter-style rules for deduplication */
-  injectedCounterStyles: Set<string>;
+  /**
+   * Injected @counter-style rules. Maps the name to whether it was injected
+   * "strong" (`true`, the default — overrides) or "weak" (`false`, global
+   * `configure()` definitions that never clobber an existing rule).
+   */
+  injectedCounterStyles: Map<string, boolean>;
+  /**
+   * Injected @function rules. Maps the CSS function name to whether it was
+   * injected "strong" (`true`, the default — overrides) or "weak" (`false`,
+   * global `configure()` definitions that never clobber an existing rule).
+   */
+  injectedFunctions: Map<string, boolean>;
   /** Global rules tracking for index adjustment */
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
@@ -218,6 +228,54 @@ export interface PropertyDefinition {
   inherits?: boolean;
   /** Initial value for the property */
   initialValue?: string | number;
+}
+
+/**
+ * Options for registering a CSS `@property`.
+ * Extends {@link PropertyDefinition} with an optional injection root.
+ */
+export interface PropertyOptions extends PropertyDefinition {
+  /** Shadow root or document to inject into */
+  root?: Document | ShadowRoot;
+}
+
+/**
+ * A single parameter for a CSS @function at-rule.
+ *
+ * - `true` — a bare parameter with no type or default.
+ * - `string` — a CSS type shorthand (e.g. `'<length>'`, `'<color>'`).
+ * - object — full form with optional `syntax` (type) and `default` value.
+ */
+export type FunctionParameter =
+  | true
+  | string
+  | { syntax?: string; default?: string | number };
+
+/**
+ * Definition for a CSS @function at-rule (custom function).
+ *
+ * The descriptor body reads like a mini styles object: any `$name` key declares
+ * a local variable (`--name`) whose value is parsed through the Tasty DSL.
+ * `result` is the only required field.
+ *
+ * @example
+ * ```ts
+ * // @function --negative(--value) { result: calc(-1 * var(--value)); }
+ * { args: ['$value'], result: '(-1 * $value)' }
+ * ```
+ */
+export interface FunctionDefinition {
+  /**
+   * Ordered parameters. Array form lists bare parameter names (`['$value']`);
+   * object form maps each parameter name to its type/default.
+   */
+  args?: string[] | Record<string, FunctionParameter>;
+  /** Optional return type, e.g. `'<color>'`. */
+  returns?: string;
+  /** The `result:` descriptor value (parsed through the Tasty DSL). Required. */
+  result: string;
+  /** Local variables: any `$name` key declares `--name` in the body. */
+  [localVar: `$${string}`]: string | number | undefined;
 }
 
 /**

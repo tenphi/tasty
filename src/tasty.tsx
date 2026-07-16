@@ -18,7 +18,6 @@ import type {
   BaseStyleProps,
   ModValue,
   Mods,
-  Props,
   TokenValue,
   Tokens,
 } from './types';
@@ -244,9 +243,13 @@ function buildTokenPropsMapping(
   return Object.entries(def);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyProps = Record<string, any>;
+
 type PropsWithStyles = {
   styles?: Styles;
-} & Omit<Props, 'styles'>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} & Omit<Record<string, any>, 'styles'>;
 
 export type VariantMap = Record<string, Styles>;
 
@@ -358,7 +361,7 @@ export type TastyProps<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
-  DefaultProps = Props,
+  DefaultProps = AnyProps,
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
 > = TastyBaseProps<K, V, E, M, TP> & {
@@ -391,8 +394,8 @@ export type ResolveAsProps<AsType extends ElementType> =
  * element type from the `as` prop — both for intrinsic tags and for React
  * components (so the wrapped component's prop API is preserved).
  *
- * Note: Uses a separate index signature with `unknown` instead of inheriting
- * from Props (which has `any`) to ensure strict type checking for styles.
+ * Note: Uses a separate index signature with `unknown` instead of an `any`
+ * record to ensure strict type checking for styles.
  */
 export type TastyElementOptions<
   K extends StyleList,
@@ -428,13 +431,10 @@ type TastySpecificKeys =
   | 'qaVal'
   | 'element'
   | 'styles'
-  | 'breakpoints'
-  | 'block'
-  | 'inline'
   | 'mods'
   | 'isHidden'
   | 'isDisabled'
-  | 'css'
+  | 'isChecked'
   | 'style'
   | 'theme'
   | 'tokens'
@@ -486,7 +486,7 @@ export type TastyElementProps<
     TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
   >;
 
-type TastyComponentPropsWithDefaults<
+export type TastyComponentPropsWithDefaults<
   Props extends PropsWithStyles,
   DefaultProps extends Partial<Props>,
 > = keyof DefaultProps extends never
@@ -562,15 +562,28 @@ export function tasty<
 function tastyWrap<
   P extends PropsWithStyles,
   DefaultProps extends Partial<P> = Partial<P>,
+  K extends StyleList = readonly never[],
+  V extends VariantMap = VariantMap,
+  E extends ElementsDefinition = Record<string, never>,
+  M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 >(
   Component: ComponentType<P>,
-  options?: TastyProps<never, never, P>,
+  options?: TastyProps<K, V, E, P, M, TP>,
 ): ComponentType<TastyComponentPropsWithDefaults<P, DefaultProps>> {
+  // The wrap path forwards default props + merges `styles`/`*Styles` props.
+  // Factory-only options (`styleProps`, `modProps`, `tokenProps`, `variants`,
+  // `elements`) are stripped here, not forwarded to the wrapped component.
   const {
     as: extendTag,
     element: extendElement,
+    styleProps: _styleProps,
+    modProps: _modProps,
+    tokenProps: _tokenProps,
+    variants: _variants,
+    elements: _elements,
     ...defaultProps
-  } = (options ?? {}) as TastyProps<never, never, P>;
+  } = (options ?? {}) as TastyProps<K, V, E, P, M, TP>;
 
   const propsWithStyles = ['styles'].concat(
     Object.keys(defaultProps).filter((prop) => prop.endsWith('Styles')),
@@ -722,12 +735,14 @@ function tastyElement<
       className: userClassName,
       tokens,
       style,
+      theme,
       ...otherProps
     } = allProps as Record<string, unknown> as AllBasePropsWithMods<K> &
       WithVariant<V> & {
         className?: string;
         tokens?: Tokens;
         style?: Record<string, unknown>;
+        theme?: string;
       };
 
     let styles = rawStyles;
@@ -864,6 +879,7 @@ function tastyElement<
       'data-element': (element as string | undefined) || defaultElement,
       'data-qa': (qa as string | undefined) || defaultQa,
       'data-qaval': (qaVal as string | undefined) || defaultQaVal,
+      'data-theme': theme,
       ...(otherDefaultProps as unknown as Record<string, unknown>),
       ...(modDataAttrs || {}),
       ...(otherProps as unknown as Record<string, unknown>),
@@ -873,6 +889,10 @@ function tastyElement<
     } as Record<string, unknown>;
 
     handleIsProperties(elementProps);
+
+    if (elementProps['data-theme'] === undefined) {
+      delete elementProps['data-theme'];
+    }
 
     const el = createElement(
       (as as string | 'div') ?? originalAs,

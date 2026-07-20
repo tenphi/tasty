@@ -35,7 +35,7 @@ jobs:
       # Do not run `npm install -g npm@latest` — it corrupts npm's module
       # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: pnpm
@@ -100,7 +100,7 @@ jobs:
       # Do not run `npm install -g npm@latest` — it corrupts npm's module
       # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: pnpm

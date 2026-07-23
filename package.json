@@ -121,7 +121,7 @@
   "homepage": "https://github.com/tenphi/tasty#readme",
   "peerDependencies": {
     "@babel/core": "^7.24.0",
-    "@babel/helper-plugin-utils": "^7.24.0",
+    "@babel/helper-plugin-utils": "^8.0.1",
     "@babel/types": "^7.24.0",
     "jiti": "^2.6.1",
     "next": ">=14.0.0",
@@ -152,7 +152,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
-    "@babel/helper-plugin-utils": "^7.24.0",
+    "@babel/helper-plugin-utils": "^8.0.1",
     "@babel/types": "^7.24.0",
     "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.29.8",

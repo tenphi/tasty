@@ -87,19 +87,29 @@ function applyGroup(
     dirs.bottom = values[2] || values[0];
     dirs.left = values[3] || values[1] || values[0];
   } else {
-    directions.forEach((dir, i) => {
-      const value = values[i] ?? values[0];
+    // Values are consumed positionally by the named directions, matching
+    // `inset: '1x 2x left right'` (left 1x, right 2x). With a span modifier the
+    // *next* value applies to the perpendicular sides, so
+    // `inset: '2x 4x bottom dock'` pins the bottom at 2x and spans the sides at
+    // 4x. Without that extra value the span reuses the direction's own value.
+    const spanValue = span ? values[directions.length] : undefined;
 
-      dirs[dir] = value;
-
-      if (span) {
+    // Span first so an explicitly named direction always wins over the value
+    // it would otherwise inherit as a perpendicular side.
+    if (span) {
+      directions.forEach((dir, i) => {
+        const perpendicular = spanValue ?? values[i] ?? values[0];
         // The two sides perpendicular to `dir` are its neighbours in
         // DIRECTIONS (top -> left/right, right -> top/bottom, ...).
         const d = DIRECTIONS.indexOf(dir);
 
-        dirs[DIRECTIONS[(d + 1) % 4] as Direction] = value;
-        dirs[DIRECTIONS[(d + 3) % 4] as Direction] = value;
-      }
+        dirs[DIRECTIONS[(d + 1) % 4] as Direction] = perpendicular;
+        dirs[DIRECTIONS[(d + 3) % 4] as Direction] = perpendicular;
+      });
+    }
+
+    directions.forEach((dir, i) => {
+      dirs[dir] = values[i] ?? values[0];
     });
   }
 }

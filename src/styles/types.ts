@@ -501,7 +501,9 @@ export interface StylesInterface extends Omit<
    * - `inset={true}` // all sides: 0
    *
    * The `dock` modifier pins the named edge and spans its full length, applying
-   * the value to the two perpendicular sides as well.
+   * the value to the two perpendicular sides as well. A second value applies to
+   * those spanned sides: `inset="2x 4x bottom dock"` pins the bottom at `2x` and
+   * insets the sides by `4x`.
    */
   inset?:
     | 'top'

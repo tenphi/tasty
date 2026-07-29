@@ -199,6 +199,10 @@ Positioning offsets with directional modifiers and multi-group support. Same dir
 to the two perpendicular sides. `inset: 'bottom dock'` gives `inset: auto 0 0 0` — anchored to
 the bottom, full width. Without a direction, `dock` fills every side.
 
+A second value applies to the spanned sides: `inset: '2x 4x bottom dock'` pins the bottom at
+`2x` and insets the sides by `4x`. Intended for a single edge — combining `dock` with several
+directions has no well-defined meaning.
+
 **Output modifier:** `longhand` — forces output as individual CSS properties (`top`, `right`, `bottom`, `left`) instead of the `inset` shorthand.
 
 | Value | Effect |
@@ -212,6 +216,7 @@ the bottom, full width. Without a direction, `dock` fills every side.
 | `"bottom dock"` | Bottom/left/right `0`, top `auto` — bottom-anchored, full width |
 | `"right dock"` | Right/top/bottom `0`, left `auto` — right-anchored, full height |
 | `"2x bottom dock"` | Bottom/left/right `2x`, top `auto` |
+| `"2x 4x bottom dock"` | Bottom `2x`, left/right `4x`, top `auto` |
 | `"dock"` | All sides `0` |
 
 Later comma-separated groups override earlier groups for conflicting directions.

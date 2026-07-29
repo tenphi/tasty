@@ -26,6 +26,15 @@ export interface DirectionalConfig {
    * `top`, `right`, `bottom`, `left`.
    */
   directionProperty?: (dir: Direction) => string;
+  /**
+   * Modifiers that expand the named side(s) to also cover the perpendicular
+   * pair, so `inset: 'bottom dock'` pins the bottom edge and spans the full
+   * width (`inset: auto 0 0 0`).
+   *
+   * Opt-in per property: only `inset` docks to an edge, so `padding`, `margin`
+   * and `scrollMargin` ignore the modifier and treat it as an unknown mod.
+   */
+  spanModifiers?: readonly string[];
 }
 
 function parseSingleValue(
@@ -49,15 +58,18 @@ function parseSingleValue(
 function extractGroupData(
   group: StyleDetails,
   defaultValue: string,
+  spanModifiers?: readonly string[],
 ): {
   values: string[];
   directions: Direction[];
+  span: boolean;
 } {
   const { values = [], mods = [] } = group;
 
   return {
     values: values.length ? values : [defaultValue],
     directions: filterMods(mods, DIRECTIONS) as Direction[],
+    span: !!spanModifiers?.some((mod) => mods.includes(mod)),
   };
 }
 
@@ -65,6 +77,7 @@ function applyGroup(
   dirs: Record<Direction, string>,
   values: string[],
   directions: Direction[],
+  span = false,
 ): void {
   if (!values.length) return;
 
@@ -75,7 +88,18 @@ function applyGroup(
     dirs.left = values[3] || values[1] || values[0];
   } else {
     directions.forEach((dir, i) => {
-      dirs[dir] = values[i] ?? values[0];
+      const value = values[i] ?? values[0];
+
+      dirs[dir] = value;
+
+      if (span) {
+        // The two sides perpendicular to `dir` are its neighbours in
+        // DIRECTIONS (top -> left/right, right -> top/bottom, ...).
+        const d = DIRECTIONS.indexOf(dir);
+
+        dirs[DIRECTIONS[(d + 1) % 4] as Direction] = value;
+        dirs[DIRECTIONS[(d + 3) % 4] as Direction] = value;
+      }
     });
   }
 }
@@ -134,6 +158,7 @@ export function processDirectionalStyle(
     defaultInit,
     individualOnly,
     directionProperty,
+    spanModifiers,
   } = config;
   const dirProp =
     directionProperty ?? ((dir: Direction) => `${property}-${dir}`);
@@ -211,11 +236,12 @@ export function processDirectionalStyle(
                 }
               }
             } else {
-              const { values, directions } = extractGroupData(
+              const { values, directions, span } = extractGroupData(
                 group,
                 defaultValue,
+                spanModifiers,
               );
-              applyGroup(dirs, values, directions);
+              applyGroup(dirs, values, directions, span);
             }
           }
         }

@@ -12,6 +12,41 @@ const RADIUS_LONGHANDS = [
   'border-bottom-left-radius',
 ];
 
+/**
+ * Single-corner modifiers, indexed to match `RADIUS_LONGHANDS`.
+ *
+ * A directional modifier (`top`, `right`, …) addresses the corner *pair* along
+ * that edge, so it cannot express one corner on its own. These name a corner
+ * directly: `radius: 'top-right'` rounds only the top-right corner.
+ */
+const CORNERS = [
+  'top-left',
+  'top-right',
+  'bottom-right',
+  'bottom-left',
+] as const;
+
+/**
+ * Corner indices (into `RADIUS_LONGHANDS`) addressed by the given modifiers.
+ * Empty when no corner was named, so callers fall back to all corners.
+ */
+function cornerIndices(mods: string[]): number[] {
+  const out = new Set<number>();
+
+  DIRECTIONS.forEach((dir, i) => {
+    if (!mods.includes(dir)) return;
+
+    out.add(i);
+    out.add((i + 1) % 4);
+  });
+
+  CORNERS.forEach((corner, i) => {
+    if (mods.includes(corner)) out.add(i);
+  });
+
+  return [...out];
+}
+
 export function radiusStyle({
   radius,
 }: {
@@ -35,9 +70,9 @@ export function radiusStyle({
   const useLonghand = mods.includes('longhand');
 
   if (keyword) {
-    const dirMods = mods.filter((m) => DIRECTIONS.includes(m));
+    const corners = cornerIndices(mods);
 
-    if (!dirMods.length) {
+    if (!corners.length) {
       if (useLonghand) {
         return Object.fromEntries(
           RADIUS_LONGHANDS.map((prop) => [prop, keyword]),
@@ -48,17 +83,10 @@ export function radiusStyle({
     }
 
     const result: Record<string, string> = {};
-    const corners = new Set<number>();
 
-    dirMods.forEach((dir) => {
-      const i = DIRECTIONS.indexOf(dir);
-      corners.add(i);
-      corners.add((i + 1) % 4);
-    });
-
-    corners.forEach((i) => {
+    for (const i of corners) {
       result[RADIUS_LONGHANDS[i]] = keyword;
-    });
+    }
 
     return result;
   }
@@ -86,20 +114,15 @@ export function radiusStyle({
       values[1] || SHARP,
     ];
   } else if (mods.length) {
-    const arr = ['0', '0', '0', '0'];
+    const corners = cornerIndices(mods);
 
-    let flag = false;
+    if (corners.length) {
+      const arr = ['0', '0', '0', '0'];
 
-    DIRECTIONS.forEach((dir, i) => {
-      if (!mods.includes(dir)) return;
+      for (const i of corners) {
+        arr[i] = values[0] || PROP;
+      }
 
-      flag = true;
-
-      arr[i] = values[0] || PROP;
-      arr[(i + 1) % 4] = values[0] || PROP;
-    });
-
-    if (flag) {
       values = arr;
     }
   }

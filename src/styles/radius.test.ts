@@ -112,4 +112,50 @@ describe('radiusStyle', () => {
       expect(result).toHaveProperty('border-bottom-left-radius', 'inherit');
     });
   });
+  describe('single-corner modifiers', () => {
+    it('rounds only the named corner, defaulting to var(--radius)', () => {
+      expect(radiusStyle({ radius: 'top-right' })).toEqual({
+        'border-radius': '0 var(--radius) 0 0',
+      });
+      expect(radiusStyle({ radius: 'bottom-left' })).toEqual({
+        'border-radius': '0 0 0 var(--radius)',
+      });
+    });
+
+    it('rounds only the named corner with an explicit value', () => {
+      expect(radiusStyle({ radius: '1r top-right' })).toEqual({
+        'border-radius': '0 6px 0 0',
+      });
+      expect(radiusStyle({ radius: '4px top-left' })).toEqual({
+        'border-radius': '4px 0 0 0',
+      });
+    });
+
+    it('keeps edge modifiers addressing the corner pair', () => {
+      expect(radiusStyle({ radius: 'top' })).toEqual({
+        'border-radius': 'var(--radius) var(--radius) 0 0',
+      });
+    });
+
+    it('combines an edge modifier with a single corner', () => {
+      expect(radiusStyle({ radius: 'top bottom-right' })).toEqual({
+        'border-radius': 'var(--radius) var(--radius) var(--radius) 0',
+      });
+    });
+
+    it('supports a corner modifier with longhand output', () => {
+      expect(radiusStyle({ radius: '4px top-right longhand' })).toEqual({
+        'border-top-left-radius': '0',
+        'border-top-right-radius': '4px',
+        'border-bottom-right-radius': '0',
+        'border-bottom-left-radius': '0',
+      });
+    });
+
+    it('applies a CSS-wide keyword to a single corner', () => {
+      expect(radiusStyle({ radius: 'inherit top-right' })).toEqual({
+        'border-top-right-radius': 'inherit',
+      });
+    });
+  });
 });

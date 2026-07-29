@@ -171,4 +171,33 @@ describe('insetStyle', () => {
       });
     });
   });
+  describe('dock modifier', () => {
+    it('pins an edge and spans the perpendicular pair', () => {
+      expect(insetStyle({ inset: 'bottom dock' })).toEqual({
+        inset: 'auto 0 0 0',
+      });
+      expect(insetStyle({ inset: 'right dock' })).toEqual({
+        inset: '0 0 0 auto',
+      });
+      expect(insetStyle({ inset: 'top dock' })).toEqual({
+        inset: '0 0 auto 0',
+      });
+    });
+
+    it('applies an explicit value to every docked side', () => {
+      expect(insetStyle({ inset: '2x bottom dock' })).toEqual({
+        inset: 'auto 16px 16px 16px',
+      });
+    });
+
+    it('docks every side when no direction is named', () => {
+      expect(insetStyle({ inset: 'dock' })).toEqual({ inset: '0' });
+    });
+
+    it('leaves a bare directional inset untouched', () => {
+      expect(insetStyle({ inset: 'right' })).toEqual({
+        inset: 'auto 0 auto auto',
+      });
+    });
+  });
 });

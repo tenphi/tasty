@@ -203,7 +203,7 @@
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "17 kB"
+      "limit": "17.25 kB"
     },
     {
       "name": "zero",

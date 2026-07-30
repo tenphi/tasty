@@ -36,6 +36,9 @@ importers:
       '@size-limit/file':
         specifier: ^12.0.0
         version: 12.1.0(size-limit@12.1.0(jiti@2.6.1))
+      '@tenphi/eslint-plugin-tasty':
+        specifier: ^0.11.3
+        version: 0.11.3(eslint@10.4.0(jiti@2.6.1))(typescript@6.0.3)
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -1342,6 +1345,12 @@ packages:
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
+
+  '@tenphi/eslint-plugin-tasty@0.11.3':
+    resolution: {integrity: sha512-S8h/DMlDHaB14p1Tp2YKIB5CaqaxskZWWBmMLqpN0vz2o6DkLPPWg8pfac8gI3vt7+4lHWja6Qy7MXHYyAu4XQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      eslint: '>=8.0.0'
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -3672,6 +3681,15 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
+
+  '@tenphi/eslint-plugin-tasty@0.11.3(eslint@10.4.0(jiti@2.6.1))(typescript@6.0.3)':
+    dependencies:
+      '@typescript-eslint/utils': 8.60.0(eslint@10.4.0(jiti@2.6.1))(typescript@6.0.3)
+      eslint: 10.4.0(jiti@2.6.1)
+      jiti: 2.6.1
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   '@testing-library/dom@10.4.1':
     dependencies:

@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
-const PREFIX = 'Tasty';
+const PREFIX = '[Tasty]';
 
 export function warn(...args: unknown[]) {
-  console.warn(`${PREFIX}:`, ...args);
+  console.warn(PREFIX, ...args);
 }
 
 export function deprecationWarning(
@@ -33,7 +33,7 @@ export function deprecationWarning(
 
   // we can make deprecations even better if we add the md syntax in the console.
   // anyway, everything down below will be stripped in the production build
-  console.group(`⚠️ ${PREFIX}: Deprecation in ${name}`);
+  console.group(`⚠️ ${PREFIX} Deprecation in ${name}`);
   warn(
     `"${property}" is deprecated, consider better alternative: ${
       typeof betterAlternative === 'function'

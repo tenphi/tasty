@@ -69,7 +69,7 @@ export function tastyStatic(
     // The plugin will remove this call entirely
     if (process.env.NODE_ENV !== 'production') {
       console.warn(
-        `[tasty] tastyStatic('${stylesOrBaseOrSelector}', styles) was called at runtime. ` +
+        `[Tasty] tastyStatic('${stylesOrBaseOrSelector}', styles) was called at runtime. ` +
           'This indicates the Babel plugin is not configured. ' +
           'Add @tenphi/tasty/babel-plugin to your Babel config.',
       );
@@ -81,7 +81,7 @@ export function tastyStatic(
     // Extension mode: tastyStatic(base, styles)
     if (process.env.NODE_ENV !== 'production') {
       console.warn(
-        '[tasty] tastyStatic(base, styles) was called at runtime. ' +
+        '[Tasty] tastyStatic(base, styles) was called at runtime. ' +
           'This indicates the Babel plugin is not configured. ' +
           'Add @tenphi/tasty/babel-plugin to your Babel config.',
       );
@@ -97,7 +97,7 @@ export function tastyStatic(
   // Styles mode: tastyStatic(styles)
   if (process.env.NODE_ENV !== 'production') {
     console.warn(
-      '[tasty] tastyStatic(styles) was called at runtime. ' +
+      '[Tasty] tastyStatic(styles) was called at runtime. ' +
         'This indicates the Babel plugin is not configured. ' +
         'Add @tenphi/tasty/babel-plugin to your Babel config.',
     );

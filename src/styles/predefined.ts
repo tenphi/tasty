@@ -103,7 +103,9 @@ function defineCustomStyle(
   } else if (handler) {
     handlerWithLookup = Object.assign(handler, { __lookupStyles: names });
   } else {
-    console.warn('Tasty: incorrect custom style definition: ', names);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Tasty] incorrect custom style definition:', names);
+    }
     return;
   }
 

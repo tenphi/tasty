@@ -77,10 +77,12 @@ export function classify(
 
     if (depth !== 0) {
       // Unbalanced parens → treat as invalid token (skipped).
-      console.warn(
-        'tasty: skipped invalid function token with unmatched parentheses:',
-        token,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          '[Tasty] skipped invalid function token with unmatched parentheses:',
+          token,
+        );
+      }
       return { bucket: Bucket.Mod, processed: '' };
     }
   }

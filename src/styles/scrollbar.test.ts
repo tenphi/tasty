@@ -210,7 +210,7 @@ describe('scrollbarStyle', () => {
       expect(result['scrollbar-gutter']).toBeUndefined();
       expect(result['scrollbar-color']).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Tasty:'),
+        expect.stringContaining('[Tasty]'),
         expect.stringContaining('none'),
       );
 
@@ -227,7 +227,7 @@ describe('scrollbarStyle', () => {
       expect(result['scrollbar-width']).toBe('none');
       expect(result['scrollbar-color']).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Tasty:'),
+        expect.stringContaining('[Tasty]'),
         expect.stringContaining('none'),
       );
 
@@ -244,7 +244,7 @@ describe('scrollbarStyle', () => {
       expect(result['scrollbar-width']).toBe('none');
       expect(result['scrollbar-gutter']).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Tasty:'),
+        expect.stringContaining('[Tasty]'),
         expect.stringContaining('none'),
       );
 

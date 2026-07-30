@@ -211,10 +211,13 @@ export class SheetManager {
 
     // Verify it was actually added - log only if there's a problem and we're not using forceTextInjection
     if (!style.isConnected && !this.config.forceTextInjection) {
-      console.error('SheetManager: Style element failed to connect to DOM!', {
-        parentNode: style.parentNode?.nodeName,
-        isConnected: style.isConnected,
-      });
+      console.error(
+        '[Tasty] SheetManager: style element failed to connect to the DOM.',
+        {
+          parentNode: style.parentNode?.nodeName,
+          isConnected: style.isConnected,
+        },
+      );
     }
 
     return style;
@@ -398,7 +401,7 @@ export class SheetManager {
                   // Skip unsupported selector in this engine (e.g., ::-moz-selection in Blink)
                   if (process.env.NODE_ENV !== 'production') {
                     console.warn(
-                      '[tasty] Browser rejected CSS rule:',
+                      '[Tasty] Browser rejected CSS rule:',
                       singleRule,
                       singleErr,
                     );
@@ -422,7 +425,7 @@ export class SheetManager {
                   !this.engineSupportsAtProperty(registry, styleSheet);
                 if (!shouldSuppress) {
                   console.warn(
-                    '[tasty] Browser rejected CSS rule:',
+                    '[Tasty] Browser rejected CSS rule:',
                     fullRule,
                     e,
                   );
@@ -444,14 +447,14 @@ export class SheetManager {
           currentRuleIndex = atomicRuleIndex + 1;
         }
 
-        // CRITICAL DEBUG: Verify the style element is in DOM only if there are issues and we're not using forceTextInjection
+        // Report a detached style element only if there are issues and we're not using forceTextInjection
         if (
           styleElement &&
           !styleElement.parentNode &&
           !this.config.forceTextInjection
         ) {
           console.error(
-            'SheetManager: Style element is NOT in DOM! This is the problem!',
+            '[Tasty] SheetManager: style element is not attached to the DOM; rules will not apply.',
             {
               className,
               ruleIndex: currentRuleIndex,
@@ -487,7 +490,7 @@ export class SheetManager {
         indices: insertedIndices,
       };
     } catch (error) {
-      console.warn('Failed to insert CSS rules:', error, {
+      console.warn('[Tasty] Failed to insert CSS rules:', error, {
         flattenedRules,
         className,
       });
@@ -647,7 +650,10 @@ export class SheetManager {
                 styleSheet.deleteRule(idx);
                 deletedIndices.push(idx);
               } catch (e) {
-                console.warn(`Failed to delete rule at index ${idx}:`, e);
+                console.warn(
+                  `[Tasty] Failed to delete rule at index ${idx}:`,
+                  e,
+                );
               }
             }
           }
@@ -712,7 +718,7 @@ export class SheetManager {
         }
       }
     } catch (error) {
-      console.warn('Failed to delete CSS rule:', error);
+      console.warn('[Tasty] Failed to delete CSS rule:', error);
     }
   }
 
@@ -967,7 +973,7 @@ export class SheetManager {
           }
         }
       } catch (error) {
-        console.warn('Failed to read CSS from sheet:', error);
+        console.warn('[Tasty] Failed to read CSS from sheet:', error);
       }
     }
 
@@ -1148,7 +1154,7 @@ export class SheetManager {
         declarations,
       };
     } catch (error) {
-      console.warn('Failed to insert keyframes:', error);
+      console.warn('[Tasty] Failed to insert keyframes:', error);
       return null;
     }
   }
@@ -1191,7 +1197,7 @@ export class SheetManager {
         }
       }
     } catch (error) {
-      console.warn('Failed to delete keyframes:', error);
+      console.warn('[Tasty] Failed to delete keyframes:', error);
     }
   }
 
@@ -1239,7 +1245,7 @@ export class SheetManager {
             styleElement.parentNode.removeChild(styleElement);
           }
         } catch (error) {
-          console.warn('Failed to cleanup sheet:', error);
+          console.warn('[Tasty] Failed to cleanup sheet:', error);
         }
       }
 

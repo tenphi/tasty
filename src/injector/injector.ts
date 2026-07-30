@@ -204,7 +204,7 @@ export class StyleInjector {
     if (existingRule) {
       if (isDevEnv()) {
         console.warn(
-          `[tasty] Hash collision: cache keys produce the same class "${className}". Styles may be incorrect.`,
+          `[Tasty] Hash collision: cache keys produce the same class "${className}". Styles may be incorrect.`,
         );
       }
       // Treat as already allocated to avoid overwriting

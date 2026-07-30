@@ -24,6 +24,7 @@ Tasty is a styling engine for design systems that turns component state into det
 ## By Task
 
 - **Learn the style language**: [Style DSL](dsl.md)
+- **Brief an AI agent (or yourself) on writing correct styles**: [Style Rules for AI Agents](ai-agents.md)
 - **Look up a property handler**: [Style Properties](styles.md)
 - **Define tokens, units, recipes, keyframes, or properties globally**: [Configuration](configuration.md)
 - **Debug generated CSS or cache behavior**: [Debug Utilities](debug.md)

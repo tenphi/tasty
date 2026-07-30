@@ -159,6 +159,7 @@
     "@eslint/js": "^10.0.1",
     "@size-limit/esbuild": "^12.0.0",
     "@size-limit/file": "^12.0.0",
+    "@tenphi/eslint-plugin-tasty": "^0.11.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/babel__core": "^7.20.5",

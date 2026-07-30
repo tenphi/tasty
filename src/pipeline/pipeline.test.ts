@@ -2535,6 +2535,36 @@ describe('Sub-element selector affix ($) tests', () => {
         '> [data-element="Item"]:hover:focus',
       );
     });
+
+    it('should handle vendor-prefixed pseudo-elements (@::-webkit-slider-thumb)', () => {
+      const styles = {
+        Thumb: {
+          $: '@::-webkit-slider-thumb',
+          fill: '#accent',
+        },
+      };
+
+      const result = renderStyles(styles, '.slider');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(
+        '[data-element="Thumb"]::-webkit-slider-thumb',
+      );
+    });
+
+    it('should handle vendor-prefixed pseudo-elements (@::-moz-range-thumb)', () => {
+      const styles = {
+        Thumb: {
+          $: '>@::-moz-range-thumb',
+          fill: '#accent',
+        },
+      };
+
+      const result = renderStyles(styles, '.slider');
+      expect(result.length).toBe(1);
+      expect(result[0].selector).toContain(
+        '> [data-element="Thumb"]::-moz-range-thumb',
+      );
+    });
   });
 
   describe('Class selectors', () => {

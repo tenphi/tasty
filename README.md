@@ -619,6 +619,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 - **[React API](docs/react-api.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and style functions
 - **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
+- **[Style Rules for AI Agents](docs/ai-agents.md)** — Condensed, rule-based brief for AI coding agents: correct value syntax, state maps, and property choices in one short page
 
 ### Rendering modes
 

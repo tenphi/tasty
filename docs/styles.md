@@ -195,6 +195,14 @@ Positioning offsets with directional modifiers and multi-group support. Same dir
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
+**`dock` modifier:** pins the named edge and spans its full length, by also applying the value
+to the two perpendicular sides. `inset: 'bottom dock'` gives `inset: auto 0 0 0` — anchored to
+the bottom, full width. Without a direction, `dock` fills every side.
+
+A second value applies to the spanned sides: `inset: '2x 4x bottom dock'` pins the bottom at
+`2x` and insets the sides by `4x`. Intended for a single edge — combining `dock` with several
+directions has no well-defined meaning.
+
 **Output modifier:** `longhand` — forces output as individual CSS properties (`top`, `right`, `bottom`, `left`) instead of the `inset` shorthand.
 
 | Value | Effect |
@@ -205,6 +213,11 @@ Positioning offsets with directional modifiers and multi-group support. Same dir
 | `"0, 2x top"` | All sides `0`, then top overridden to `2x` |
 | `"0 longhand"` | All sides `0`, output as individual `top`/`right`/`bottom`/`left` |
 | `true` | All sides `0` |
+| `"bottom dock"` | Bottom/left/right `0`, top `auto` — bottom-anchored, full width |
+| `"right dock"` | Right/top/bottom `0`, left `auto` — right-anchored, full height |
+| `"2x bottom dock"` | Bottom/left/right `2x`, top `auto` |
+| `"2x 4x bottom dock"` | Bottom `2x`, left/right `4x`, top `auto` |
+| `"dock"` | All sides `0` |
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
@@ -319,7 +332,11 @@ Border radius with shape presets and directional modifiers.
 | `"backleaf"` | Asymmetric: round, sharp, round, sharp |
 | `"inherit"` | Inherit border-radius from parent |
 
-**Direction modifiers:** `top`, `right`, `bottom`, `left` — rounds only the specified corners.
+**Edge modifiers:** `top`, `right`, `bottom`, `left` — rounds the *pair* of corners along that edge.
+
+**Corner modifiers:** `top-left`, `top-right`, `bottom-right`, `bottom-left` — rounds a single corner.
+Use these when an edge modifier would round one corner too many. Edge and corner modifiers combine
+(`radius: 'top bottom-right'`).
 
 **Output modifier:** `longhand` — forces output as individual CSS longhand properties (`border-top-left-radius`, `border-top-right-radius`, `border-bottom-right-radius`, `border-bottom-left-radius`) instead of the `border-radius` shorthand. Useful when children need to selectively inherit individual corners via `radius: 'inherit left'`.
 
@@ -334,6 +351,9 @@ Border radius with shape presets and directional modifiers.
 | `"1r longhand"` | All corners `1r`, output as 4 individual `border-*-radius` properties |
 | `"inherit"` | All corners inherit from parent (`border-radius: inherit`) |
 | `"inherit right"` | Right corners inherit from parent (uses longhand properties) |
+| `"top-right"` | Top-right corner `1r`, every other corner `0` |
+| `"4px top-left"` | Top-left corner `4px`, every other corner `0` |
+| `"top bottom-right"` | Both top corners and bottom-right `1r`, bottom-left `0` |
 
 ### `outline`
 

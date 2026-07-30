@@ -6,6 +6,7 @@ const INSET_CONFIG: DirectionalConfig = {
   trueValue: '0',
   defaultInit: 'auto',
   individualOnly: true,
+  spanModifiers: ['dock'],
   directionProperty: (dir) => dir,
 };
 

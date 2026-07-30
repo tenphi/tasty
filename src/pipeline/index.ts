@@ -575,7 +575,7 @@ const VALID_TOKEN_PATTERNS = [
   /^\*/, // Universal selector (*)
   /^[A-Z][a-zA-Z0-9]*/, // Uppercase element names → [data-element="..."]
   /^@/, // @ placeholder for key injection position
-  /^::?[a-z][a-z0-9-]*(?:\([^)]*\))?/, // Pseudo-elements/classes (:hover, ::before, :not(.x))
+  /^::?-?[a-z][a-z0-9-]*(?:\([^)]*\))?/, // Pseudo-elements/classes (:hover, ::before, :not(.x), ::-webkit-slider-thumb)
   /^\.[a-zA-Z_-][a-zA-Z0-9_-]*/, // Class selectors (.active, .is-open)
   /^\[[^\]]+\]/, // Attribute selectors ([type="text"], [role])
   /^[a-z][a-z0-9-]*/, // HTML tag names (a, div, button, my-component)

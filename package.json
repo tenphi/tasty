@@ -1,6 +1,6 @@
 {
   "name": "@tenphi/tasty",
-  "version": "2.8.0",
+  "version": "2.11.0",
   "description": "A design-system-integrated styling system and DSL for concise, state-aware UI styling",
   "type": "module",
   "main": "./dist/index.js",
@@ -159,6 +159,7 @@
     "@eslint/js": "^10.0.1",
     "@size-limit/esbuild": "^12.0.0",
     "@size-limit/file": "^12.0.0",
+    "@tenphi/eslint-plugin-tasty": "^0.11.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/babel__core": "^7.20.5",
@@ -203,7 +204,7 @@
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "17 kB"
+      "limit": "17.25 kB"
     },
     {
       "name": "zero",

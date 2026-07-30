@@ -1,5 +1,91 @@
 # @tenphi/tasty
 
+## 2.11.0
+
+### Minor Changes
+
+- [#246](https://github.com/tenphi/tasty/pull/246) [`6ae0b6a`](https://github.com/tenphi/tasty/commit/6ae0b6ae941447942588a64849df72b16f046534) Thanks [@tenphi](https://github.com/tenphi)! - `inset`'s `dock` modifier now takes a second value for the spanned sides.
+
+  Values are consumed positionally by the named directions — `inset: '1x 2x left right'` sets left `1x` and right `2x` — so the value _after_ the directional ones now applies to the perpendicular pair a `dock` spans:
+
+  ```
+  inset: '2x 4x bottom dock'  ->  inset: auto 32px 16px 32px   (bottom 2x, sides 4x)
+  inset: '2x 4x right dock'   ->  inset: 32px 16px 32px auto   (right 2x, top/bottom 4x)
+  ```
+
+  With no second value the span keeps reusing the edge's own value, so `inset: 'bottom dock'` and `inset: '2x bottom dock'` are unchanged.
+
+  `dock` is intended for a single edge; combining it with several directions has no well-defined meaning.
+
+## 2.10.0
+
+### Minor Changes
+
+- [#244](https://github.com/tenphi/tasty/pull/244) [`e0c6bd0`](https://github.com/tenphi/tasty/commit/e0c6bd0255cf3c25e1b151533742b4aaee3a24ca) Thanks [@tenphi](https://github.com/tenphi)! - Add single-corner `radius` modifiers and an `inset` `dock` modifier. Both cases previously had no expressible form, which forced authors into raw 4-value box syntax.
+
+  **`radius` now accepts single-corner modifiers** — `top-left`, `top-right`, `bottom-right`, `bottom-left`. A directional modifier addresses the corner _pair_ along an edge (`radius: 'top'` rounds top-left and top-right), so one corner on its own could not be expressed. Previously an unrecognized corner name was silently dropped and the value applied to **every** corner: `radius: '4px top-left'` emitted `border-radius: 4px` instead of only the top-left corner. Now:
+
+  ```
+  radius: 'top-right'        ->  border-radius: 0 var(--radius) 0 0
+  radius: '4px top-left'     ->  border-radius: 4px 0 0 0
+  radius: 'top bottom-right' ->  border-radius: var(--radius) var(--radius) var(--radius) 0
+  ```
+
+  The value is optional and defaults to `var(--radius)` (`1r`), matching edge modifiers. Corner modifiers combine with edge modifiers, work with `longhand`, and accept CSS-wide keywords (`radius: 'inherit top-right'`).
+
+  **`inset` now accepts a `dock` modifier** that pins the named edge and spans its full length, applying the value to the two perpendicular sides as well:
+
+  ```
+  inset: 'bottom dock'    ->  inset: auto 0 0 0     (bottom-anchored, full width)
+  inset: 'right dock'     ->  inset: 0 0 0 auto     (right-anchored, full height)
+  inset: '2x bottom dock' ->  inset: auto 16px 16px 16px
+  inset: 'dock'           ->  inset: 0
+  ```
+
+  Properties opt in via the new `spanModifiers` field on `DirectionalConfig`; only `inset` sets it, so `padding`, `margin` and `scrollMargin` treat `dock` as an unknown modifier and are unchanged.
+
+  No behaviour change for any previously valid input — edge modifiers, shapes (`round`, `ellipse`, `leaf`, `backleaf`), `longhand`, multi-group syntax and individual direction props all emit exactly what they did before.
+
+## 2.9.1
+
+### Patch Changes
+
+- [#233](https://github.com/tenphi/tasty/pull/233) [`5ce5f74`](https://github.com/tenphi/tasty/commit/5ce5f7478d2cafaa979c5378f18b1daaa6cab112) Thanks [@tenphi](https://github.com/tenphi)! - Fix Astro SSR middleware corrupting binary responses. The middleware
+  previously decoded every response body as UTF-8 text, mangling non-HTML
+  payloads (images, fonts, JSON, etc.) — e.g. PNG bytes served from an OG
+  image endpoint. It now inspects the `Content-Type` and passes any
+  response that isn't `text/html` (or has no body) through untouched.
+
+## 2.9.0
+
+### Minor Changes
+
+- [#231](https://github.com/tenphi/tasty/pull/231) [`1487bbb`](https://github.com/tenphi/tasty/commit/1487bbb26ecb6ea68a928dbdf27ff1b9770279c6) Thanks [@tenphi](https://github.com/tenphi)! - Add `normal` modifier to `preset` that sets `line-height: normal`, overriding the preset's line-height value.
+
+## 2.8.2
+
+### Patch Changes
+
+- [#229](https://github.com/tenphi/tasty/pull/229) [`4cc27ed`](https://github.com/tenphi/tasty/commit/4cc27eddec63707c0b1724bc44f0ae1a4355ce71) Thanks [@tenphi](https://github.com/tenphi)! - Skip the sRGB round-trip whenever a native CSS color function (`rgb`/`hsl`/`oklch`) already matches the configured output color space. Same-space values are now preserved verbatim instead of being parsed and rebuilt, which:
+  - Keeps `var()` / `calc()` channels intact (e.g. `oklch(var(--hue) .2 20)` is no longer NaN'd by `parseFloat`).
+  - Preserves mixed-case custom-property names (`var(--myHue)`) — CSS custom properties are case-sensitive and were previously lowercased.
+  - Preserves wide-gamut `oklch()` colors that the round-trip would clamp to the sRGB gamut.
+  - Avoids redundant work for static values.
+
+  Decomposed color components (`--*-color-{space}`) still normalize static percentage channels to canonical numbers (so `okhsl()` / `okhst()` output stays a valid `<number>+`), while dynamic `var()` / `calc()` channels are kept verbatim.
+
+## 2.8.1
+
+### Patch Changes
+
+- [#226](https://github.com/tenphi/tasty/pull/226) [`5832345`](https://github.com/tenphi/tasty/commit/5832345128ef8abe6ee5d9b3dd281f164ad9e118) Thanks [@tenphi](https://github.com/tenphi)! - Fix named sub-element syntax for vendor-prefixed pseudo-elements.
+
+  The selector-affix tokenizer rejected pseudo-elements starting with a hyphen
+  (`::-webkit-slider-thumb`, `::-moz-range-thumb`) because the pseudo token
+  pattern required a lowercase letter immediately after `::`. Allow an optional
+  leading `-` so vendor pseudo-elements work in `$` affixes like
+  `@::-webkit-slider-thumb`.
+
 ## 2.8.0
 
 ### Minor Changes

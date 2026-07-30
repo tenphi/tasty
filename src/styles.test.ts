@@ -417,6 +417,31 @@ describe('Tasty style tests', () => {
     );
   });
 
+  it('should support normal modifier: t3 / normal', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / normal',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'line-height': 'normal',
+        'font-size': 'var(--t3-font-size, var(--default-font-size))',
+      }),
+    );
+  });
+
+  it('normal modifier should override tight modifier', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / tight normal',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'line-height': 'normal',
+      }),
+    );
+  });
+
   it('should handle flow styles', () => {
     expect(flowStyle({ flow: 'row nowrap' })).toEqual(null);
   });

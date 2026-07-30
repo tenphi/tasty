@@ -319,14 +319,17 @@ export interface StylesInterface extends Omit<
    * Syntax: `[value] [modifiers]` | `[shape]` | `true`
    *
    * Shapes: `round` (fully rounded), `ellipse` (50%), `leaf`, `backleaf` (asymmetric), `inherit` (inherit from parent)
-   * Directional modifiers: `top`, `right`, `bottom`, `left`
+   * Edge modifiers: `top`, `right`, `bottom`, `left` — the corner pair along that edge
+   * Corner modifiers: `top-left`, `top-right`, `bottom-right`, `bottom-left` — a single corner
    *
    * Examples:
    * - `radius="2r"` // border-radius: calc(var(--radius) * 2)
    * - `radius={true}` // default radius (1r)
    * - `radius="round"` // fully rounded (9999rem)
    * - `radius="leaf"` // asymmetric leaf shape
-   * - `radius="1r top"` // round only top corners
+   * - `radius="1r top"` // round both top corners
+   * - `radius="top-right"` // round only the top-right corner (1r)
+   * - `radius="4px top-left"` // round only the top-left corner
    * - `radius="inherit"` // inherit border-radius from parent
    * - `radius="inherit right"` // inherit only right corners (uses longhand properties)
    */
@@ -495,9 +498,22 @@ export interface StylesInterface extends Omit<
    * - `inset="0"` // all sides: 0
    * - `inset="2x top"` // only top offset: 2x
    * - `inset="1x left right"` // left and right offsets: 1x
+   * - `inset="bottom dock"` // bottom-anchored, full width: auto 0 0 0
    * - `inset={true}` // all sides: 0
+   *
+   * The `dock` modifier pins the named edge and spans its full length, applying
+   * the value to the two perpendicular sides as well. A second value applies to
+   * those spanned sides: `inset="2x 4x bottom dock"` pins the bottom at `2x` and
+   * insets the sides by `4x`.
    */
-  inset?: 'top' | 'right' | 'bottom' | 'left' | string | CSSProperties['inset'];
+  inset?:
+    | 'top'
+    | 'right'
+    | 'bottom'
+    | 'left'
+    | 'dock'
+    | string
+    | CSSProperties['inset'];
   /**
    * Local keyframes definitions for this component.
    * Keys are animation names, values are keyframes step definitions.

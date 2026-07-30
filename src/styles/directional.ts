@@ -26,6 +26,15 @@ export interface DirectionalConfig {
    * `top`, `right`, `bottom`, `left`.
    */
   directionProperty?: (dir: Direction) => string;
+  /**
+   * Modifiers that expand the named side(s) to also cover the perpendicular
+   * pair, so `inset: 'bottom dock'` pins the bottom edge and spans the full
+   * width (`inset: auto 0 0 0`).
+   *
+   * Opt-in per property: only `inset` docks to an edge, so `padding`, `margin`
+   * and `scrollMargin` ignore the modifier and treat it as an unknown mod.
+   */
+  spanModifiers?: readonly string[];
 }
 
 function parseSingleValue(
@@ -49,15 +58,18 @@ function parseSingleValue(
 function extractGroupData(
   group: StyleDetails,
   defaultValue: string,
+  spanModifiers?: readonly string[],
 ): {
   values: string[];
   directions: Direction[];
+  span: boolean;
 } {
   const { values = [], mods = [] } = group;
 
   return {
     values: values.length ? values : [defaultValue],
     directions: filterMods(mods, DIRECTIONS) as Direction[],
+    span: !!spanModifiers?.some((mod) => mods.includes(mod)),
   };
 }
 
@@ -65,6 +77,7 @@ function applyGroup(
   dirs: Record<Direction, string>,
   values: string[],
   directions: Direction[],
+  span = false,
 ): void {
   if (!values.length) return;
 
@@ -74,6 +87,27 @@ function applyGroup(
     dirs.bottom = values[2] || values[0];
     dirs.left = values[3] || values[1] || values[0];
   } else {
+    // Values are consumed positionally by the named directions, matching
+    // `inset: '1x 2x left right'` (left 1x, right 2x). With a span modifier the
+    // *next* value applies to the perpendicular sides, so
+    // `inset: '2x 4x bottom dock'` pins the bottom at 2x and spans the sides at
+    // 4x. Without that extra value the span reuses the direction's own value.
+    const spanValue = span ? values[directions.length] : undefined;
+
+    // Span first so an explicitly named direction always wins over the value
+    // it would otherwise inherit as a perpendicular side.
+    if (span) {
+      directions.forEach((dir, i) => {
+        const perpendicular = spanValue ?? values[i] ?? values[0];
+        // The two sides perpendicular to `dir` are its neighbours in
+        // DIRECTIONS (top -> left/right, right -> top/bottom, ...).
+        const d = DIRECTIONS.indexOf(dir);
+
+        dirs[DIRECTIONS[(d + 1) % 4] as Direction] = perpendicular;
+        dirs[DIRECTIONS[(d + 3) % 4] as Direction] = perpendicular;
+      });
+    }
+
     directions.forEach((dir, i) => {
       dirs[dir] = values[i] ?? values[0];
     });
@@ -134,6 +168,7 @@ export function processDirectionalStyle(
     defaultInit,
     individualOnly,
     directionProperty,
+    spanModifiers,
   } = config;
   const dirProp =
     directionProperty ?? ((dir: Direction) => `${property}-${dir}`);
@@ -211,11 +246,12 @@ export function processDirectionalStyle(
                 }
               }
             } else {
-              const { values, directions } = extractGroupData(
+              const { values, directions, span } = extractGroupData(
                 group,
                 defaultValue,
+                spanModifiers,
               );
-              applyGroup(dirs, values, directions);
+              applyGroup(dirs, values, directions, span);
             }
           }
         }

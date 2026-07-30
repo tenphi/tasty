@@ -171,4 +171,44 @@ describe('insetStyle', () => {
       });
     });
   });
+  describe('dock modifier', () => {
+    it('pins an edge and spans the perpendicular pair', () => {
+      expect(insetStyle({ inset: 'bottom dock' })).toEqual({
+        inset: 'auto 0 0 0',
+      });
+      expect(insetStyle({ inset: 'right dock' })).toEqual({
+        inset: '0 0 0 auto',
+      });
+      expect(insetStyle({ inset: 'top dock' })).toEqual({
+        inset: '0 0 auto 0',
+      });
+    });
+
+    it('applies an explicit value to every docked side', () => {
+      expect(insetStyle({ inset: '2x bottom dock' })).toEqual({
+        inset: 'auto 16px 16px 16px',
+      });
+    });
+
+    it('takes a second value for the spanned sides', () => {
+      // Values are consumed positionally by the named directions, so the next
+      // one applies to the perpendicular pair: bottom 2x, sides 4x.
+      expect(insetStyle({ inset: '2x 4x bottom dock' })).toEqual({
+        inset: 'auto 32px 16px 32px',
+      });
+      expect(insetStyle({ inset: '2x 4x right dock' })).toEqual({
+        inset: '32px 16px 32px auto',
+      });
+    });
+
+    it('docks every side when no direction is named', () => {
+      expect(insetStyle({ inset: 'dock' })).toEqual({ inset: '0' });
+    });
+
+    it('leaves a bare directional inset untouched', () => {
+      expect(insetStyle({ inset: 'right' })).toEqual({
+        inset: 'auto 0 auto auto',
+      });
+    });
+  });
 });

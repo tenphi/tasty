@@ -26,12 +26,15 @@ function extractColorSpaceValue(
     return `var(--${varMatch[1]}-color-${suffix})`;
   }
 
-  // Try the original color value first, then parsed output
-  const components = getColorSpaceComponents(colorValue);
-  if (components !== colorValue) return components;
-
+  // Try the parsed (replace-token-substituted) output first, then the raw
+  // original. Using the parsed output ensures replaceTokens like `$hue` ->
+  // `var(--hue)` are substituted before component extraction; the original is
+  // only needed when the parser rewrote the value (e.g. okhsl -> rgb).
   const componentsFromParsed = getColorSpaceComponents(parsedOutput);
   if (componentsFromParsed !== parsedOutput) return componentsFromParsed;
+
+  const components = getColorSpaceComponents(colorValue);
+  if (components !== colorValue) return components;
 
   // Fallback: return the parsed output
   return parsedOutput;

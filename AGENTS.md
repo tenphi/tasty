@@ -29,9 +29,10 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 1. **Typecheck** — Run `pnpm typecheck`. If it fails, stop and fix errors before formatting or committing.
 2. **Lint** — Run `pnpm lint`. If it fails, stop and fix errors before formatting or committing.
 3. **Format** — Run `pnpm format` so committed code matches Prettier output.
-4. **Changeset** — If the change affects published package behavior (features, fixes, refactors, perf), create a changeset file in `.changeset/` as described in `submit-changes.md` and include it in the commit. Use `patch` for fixes/small changes, `minor` for new features/non-breaking API changes, `major` for breaking changes. Skip the changeset only when the change is purely internal (docs, CI, repo-only churn, tests with no behavior change).
-5. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short. Include the changeset file in the same commit.
-6. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
+4. **Bundle size** — Run `pnpm build && pnpm size`. The limits are a tripwire for *unintended* size jumps, not a budget to stay under: if the growth is explained by your change, raise the failing limit(s) in the `"size-limit"` array of `package.json`, **rounding up** to the next whole (or half) kB above the reported size — never leave the limit set to the exact measurement. Include the `package.json` change in the commit and say in the PR how much each bundle grew and why. If you *can't* explain the growth, don't raise the limit — find out what pulled the extra code in.
+5. **Changeset** — If the change affects published package behavior (features, fixes, refactors, perf), create a changeset file in `.changeset/` as described in `submit-changes.md` and include it in the commit. Use `patch` for fixes/small changes, `minor` for new features/non-breaking API changes, `major` for breaking changes. Skip the changeset only when the change is purely internal (docs, CI, repo-only churn, tests with no behavior change).
+6. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short. Include the changeset file in the same commit.
+7. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
 
 ## Stack
 

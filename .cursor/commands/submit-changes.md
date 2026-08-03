@@ -34,7 +34,17 @@ Run `pnpm format` to format code before committing.
 
 ## 5. Build and check bundle size
 
-Run `pnpm build && pnpm size`. **If `size-limit` fails** (a bundle exceeds its limit), increase the failing limit(s) in the `"size-limit"` array in `package.json` by **1 kB** above the reported size, then re-run `pnpm size` to confirm it passes. Include the `package.json` change in the commit.
+Run `pnpm build && pnpm size`.
+
+The limits exist to catch **unintended** size jumps — they are a tripwire, not a budget you must squeeze under. A limit sitting just above the current size is normal and expected.
+
+**If `size-limit` fails** (a bundle exceeds its limit):
+
+1. Account for the growth first. If you can't explain it from your own change, don't raise the limit — find out what pulled the extra code in (a stray import, a barrel file, a newly reachable module).
+2. Once it's explained, raise the failing limit(s) in the `"size-limit"` array in `package.json`, **rounding up** to the next whole (or half) kB above the reported size — e.g. `53.53 kB` → `54 kB`, `50.63 kB` → `51 kB`. Never set a limit to the exact measurement; that leaves zero headroom and the next unrelated change trips it.
+3. Re-run `pnpm size` to confirm it passes, and include the `package.json` change in the commit.
+
+To tell your growth apart from pre-existing drift, measure a clean baseline: `git stash -u && pnpm build && pnpm size`, then restore. Report the per-bundle delta in the PR.
 
 ## 6. Commit
 

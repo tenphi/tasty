@@ -1,5 +1,5 @@
-const PREFIX = 'Tasty';
+const PREFIX = '[Tasty]';
 
 export function warn(...args: unknown[]) {
-  console.warn(`${PREFIX}:`, ...args);
+  console.warn(PREFIX, ...args);
 }

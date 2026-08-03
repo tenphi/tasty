@@ -123,7 +123,9 @@ function defineCustomStyle(
       __lookupStyles: names,
     }) as AnyStyleHandler;
   } else {
-    console.warn('Tasty: incorrect custom style definition: ', names);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Tasty] incorrect custom style definition:', names);
+    }
     return;
   }
 

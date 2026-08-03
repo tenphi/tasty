@@ -23,7 +23,12 @@ interface TastyWarning {
 type TastyWarningHandler = (warning: TastyWarning) => void;
 
 const defaultWarningHandler: TastyWarningHandler = (warning) => {
-  console.warn(`[Tasty] ${warning.message}`);
+  // Diagnostic only — stripped from production builds. A custom handler
+  // installed via `setWarningHandler` still receives every warning in
+  // production, since `emitWarning` itself stays unconditional.
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`[Tasty] ${warning.message}`);
+  }
 };
 
 let warningHandler: TastyWarningHandler = defaultWarningHandler;

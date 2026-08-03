@@ -44,7 +44,7 @@ export function scrollbarStyle({
   if (mods.includes('none')) {
     const ignored = [...mods.filter((m) => m !== 'none'), ...values, ...colors];
 
-    if (ignored.length) {
+    if (ignored.length && process.env.NODE_ENV !== 'production') {
       warn(
         `scrollbar="none" hides the scrollbar; other tokens are ignored: ${ignored.join(', ')}`,
       );

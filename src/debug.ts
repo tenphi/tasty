@@ -443,7 +443,7 @@ export const tastyDebug = {
       } else {
         if (!raw) {
           console.warn(
-            'tastyDebug: source CSS not available (requires dev mode or TASTY_DEBUG=true). Falling back to live CSSOM.',
+            '[Tasty] source CSS not available (requires dev mode or TASTY_DEBUG=true). Falling back to live CSSOM.',
           );
         }
         css = injector.instance.getCSSTextForClasses([target], { root });
@@ -455,7 +455,7 @@ export const tastyDebug = {
       } else {
         if (!raw) {
           console.warn(
-            'tastyDebug: source CSS not available. Falling back to live CSSOM.',
+            '[Tasty] source CSS not available. Falling back to live CSSOM.',
           );
         }
         css = injector.instance.getCSSTextForClasses(target, { root });
@@ -515,7 +515,7 @@ export const tastyDebug = {
         size: 0,
         rules: 0,
       };
-      if (!raw) console.warn('tastyDebug.inspect: element not found');
+      if (!raw) console.warn('[Tasty] debug.inspect: element not found');
       return empty;
     }
 

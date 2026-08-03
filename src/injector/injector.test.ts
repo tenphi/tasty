@@ -1254,7 +1254,7 @@ describe('StyleInjector @property rejection handling', () => {
         const [first, second] = args;
         return (
           typeof first === 'string' &&
-          first.startsWith('[tasty] Browser rejected CSS rule:') &&
+          first.startsWith('[Tasty] Browser rejected CSS rule:') &&
           typeof second === 'string' &&
           second.startsWith('@property ')
         );
@@ -1304,7 +1304,7 @@ describe('StyleInjector @property rejection handling', () => {
         const [first, second] = args;
         return (
           typeof first === 'string' &&
-          first.startsWith('[tasty] Browser rejected CSS rule:') &&
+          first.startsWith('[Tasty] Browser rejected CSS rule:') &&
           typeof second === 'string' &&
           second.includes('--bad-prop')
         );

@@ -288,10 +288,12 @@ export function setGlobalPredefinedTokens(
     // #current represents currentcolor which cannot be used as a base for recursive token resolution
     // Note: #current.5 (with opacity) is allowed since it resolves to a concrete color-mix value
     if (lowerKey.startsWith('#') && lowerValue === '#current') {
-      console.warn(
-        `Tasty: Using #current to define color token "${key}" is not supported. ` +
-          `The #current token represents currentcolor which cannot be used as a base for other tokens.`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `[Tasty] Using #current to define color token "${key}" is not supported. ` +
+            `The #current token represents currentcolor which cannot be used as a base for other tokens.`,
+        );
+      }
       continue; // Skip this token
     }
 
@@ -373,11 +375,11 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     if (!extractedColor) {
       // Rate-limited warning to avoid spam
       if (!ignoreError && devMode && colorWarningCount < MAX_COLOR_WARNINGS) {
-        console.warn('Tasty: unable to parse color:', val);
+        console.warn('[Tasty] unable to parse color:', val);
         colorWarningCount++;
         if (colorWarningCount === MAX_COLOR_WARNINGS) {
           console.warn(
-            'Tasty: color parsing warnings will be suppressed from now on',
+            '[Tasty] color parsing warnings will be suppressed from now on',
           );
         }
       }

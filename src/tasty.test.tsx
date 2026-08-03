@@ -1053,7 +1053,9 @@ describe('useGlobalStyles() hook', () => {
     expect(styleContent).toContain('background-color: var(--white-color)');
   });
 
-  it('should cleanup styles when component unmounts', () => {
+  it('should keep global styles after the component unmounts', () => {
+    // Global styles are intentionally permanent — there is no unmount cleanup.
+    // Only a styles change on the same slot replaces them.
     function GlobalTemporaryStyles() {
       useGlobalStyles('.temporary-element', {
         fill: '#red',
@@ -1072,26 +1074,27 @@ describe('useGlobalStyles() hook', () => {
 
     const { container, rerender } = render(<TestComponent showGlobal={true} />);
 
-    // Verify styles are injected when component is mounted
-    let styleElements = document.head.querySelectorAll('[data-tasty]');
-    const styleContent = Array.from(styleElements)
-      .map((el) => el.textContent)
-      .join('');
-    expect(styleContent).toContain('.temporary-element');
+    const readCss = () =>
+      Array.from(document.head.querySelectorAll('[data-tasty]'))
+        .map((el) => el.textContent)
+        .join('');
 
-    const initialStyleCount = styleElements.length;
+    // Verify styles are injected when component is mounted
+    expect(readCss()).toContain('.temporary-element');
+
+    const initialStyleCount =
+      document.head.querySelectorAll('[data-tasty]').length;
 
     // Remove the global style component
     rerender(<TestComponent showGlobal={false} />);
 
-    // Verify styles are cleaned up
-    styleElements = document.head.querySelectorAll('[data-tasty]');
+    // Styles persist, and unmounting does not add another sheet
+    expect(readCss()).toContain('.temporary-element');
+    expect(document.head.querySelectorAll('[data-tasty]').length).toBe(
+      initialStyleCount,
+    );
 
-    // Either the style element is removed or the content no longer contains our selector
-    const finalStyleCount = styleElements.length;
-    expect(finalStyleCount).toBeLessThanOrEqual(initialStyleCount);
-
-    // The element should still exist but without the global styles
+    // The element should still exist
     expect(container.querySelector('.temporary-element')).toBeTruthy();
   });
 
@@ -1580,6 +1583,10 @@ describe('useGlobalStyles() hook', () => {
       .join('');
     expect(styleContent).toContain('background-color: var(--red-color)');
     expect(styleContent).toContain('border: 1px solid var(--dark-color)'); // raw unit: 1 * 1px = 1px
+
+    // ...and the previous injection is gone, not layered underneath
+    expect(styleContent).not.toContain('background-color: var(--blue-color)');
+    expect(styleContent).not.toContain('padding: 16px'); // 2x from DynamicGlobalStyles1
   });
 });
 

@@ -1,13 +1,13 @@
 import { injectRawCSS } from '../injector';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
+import { createClientState } from '../utils/client-state';
 import { depsEqual } from '../utils/deps-equal';
 import { hashString } from '../utils/hash';
 
 interface UseRawCSSOptions {
   /**
-   * Shadow root or document to inject into.
-   * Note: `root` is not part of the update-tracking comparison — changing
-   * only the root for the same id/content will not re-inject.
+   * Shadow root or document to inject into. Update tracking is per-root: the
+   * same id in two roots holds a separate injection in each.
    */
   root?: Document | ShadowRoot;
   /**
@@ -25,9 +25,22 @@ interface ClientEntry {
   dispose: () => void;
 }
 
-const clientEntries = new Map<string, ClientEntry>();
-const clientContentDedup = new Set<string>();
-const factoryDepsCache = new Map<string, readonly unknown[]>();
+interface ClientRawCSSState {
+  /** id -> the single injection that slot currently owns */
+  entries: Map<string, ClientEntry>;
+  /** content hashes injected without an id (permanent, deduped) */
+  contentDedup: Set<string>;
+  /** id -> last factory deps, to skip re-evaluating the factory */
+  factoryDeps: Map<string, readonly unknown[]>;
+}
+
+const getClientState = createClientState(
+  (): ClientRawCSSState => ({
+    entries: new Map(),
+    contentDedup: new Set(),
+    factoryDeps: new Map(),
+  }),
+);
 
 // Overload 1: Static CSS string
 export function useRawCSS(css: string, options?: UseRawCSSOptions): void;
@@ -104,9 +117,12 @@ export function useRawCSS(
 
   const target = getStyleTarget();
 
+  const state =
+    target.mode === 'client' ? getClientState(opts?.root ?? document) : null;
+
   // Client deps cache: skip factory re-evaluation when deps haven't changed
-  if (isFactory && deps && opts?.id && target.mode === 'client') {
-    const cachedDeps = factoryDepsCache.get(opts.id);
+  if (isFactory && deps && opts?.id && state) {
+    const cachedDeps = state.factoryDeps.get(opts.id);
     if (cachedDeps && depsEqual(cachedDeps, deps)) {
       return;
     }
@@ -119,34 +135,38 @@ export function useRawCSS(
   if (!css.trim()) return;
 
   if (target.mode === 'ssr') {
+    // A slot key (explicit `id`) replaces, matching client update tracking;
+    // content-hashed keys only dedup.
     const key = opts?.id ? `raw:${opts.id}` : `raw:${hashString(css)}`;
-    target.collector.collectRawCSS(key, css);
+    target.collector.collectRawCSS(key, css, opts?.id != null);
     return;
   }
 
   if (target.mode === 'rsc') {
     const key = opts?.id ? `__raw:${opts.id}` : `__raw:${hashString(css)}`;
-    pushRSCCSS(target.cache, key, css);
+    pushRSCCSS(target.cache, key, css, opts?.id != null);
     return;
   }
 
   // Client path
+  if (!state) return;
+
   const id = opts?.id;
 
   if (id) {
-    const existing = clientEntries.get(id);
+    const existing = state.entries.get(id);
     if (existing) {
       if (existing.contentKey === css) return;
       existing.dispose();
     }
 
     const { dispose } = injectRawCSS(css, opts);
-    clientEntries.set(id, { contentKey: css, dispose });
-    if (deps) factoryDepsCache.set(id, deps);
+    state.entries.set(id, { contentKey: css, dispose });
+    if (deps) state.factoryDeps.set(id, deps);
   } else {
     const contentKey = hashString(css);
-    if (clientContentDedup.has(contentKey)) return;
-    clientContentDedup.add(contentKey);
+    if (state.contentDedup.has(contentKey)) return;
+    state.contentDedup.add(contentKey);
     injectRawCSS(css, opts);
   }
 }

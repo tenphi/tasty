@@ -161,6 +161,6 @@ src/
 
 - **No runtime dependencies** except `csstype` (CSS type definitions) and `jiti` (config file loading)
 - **Hash-based class names** (`t0`, `t1`, ...) — deterministic within a render, deduped by content hash
-- **Reference counting** for injected styles — auto-cleanup when components unmount
+- **Reference counting** for component styles (`tasty()`, `useStyles`) — swept by GC once unreferenced. Styles from the standalone functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, …) are *not* cleaned up on unmount; they are replaced per slot (`id`/selector/`name`, per `root`)
 - **Streaming-compatible SSR** — works with `renderToPipeableStream` and framework streaming
 - **Plugin system** — extensible via `configure({ plugins: [...] })` for custom color spaces, style handlers, props middleware, and more; see `docs/plugins.md`

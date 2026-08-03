@@ -2,6 +2,7 @@ import { getGlobalInjector, getNamePrefix } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import type { CounterStyleDescriptors } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
+import { createClientState } from '../utils/client-state';
 import { hashString } from '../utils/hash';
 import { makeCounterStyleName } from '../utils/name-prefix';
 
@@ -12,7 +13,9 @@ interface UseCounterStyleOptions {
 
 let clientCounterStyleCounter = 0;
 
-const clientContentToName = new Map<string, string>();
+const getClientContentToName = createClientState(
+  () => new Map<string, string>(),
+);
 
 /**
  * Inject a CSS @counter-style rule and return the generated name.
@@ -73,10 +76,11 @@ export function useCounterStyle(
   }
 
   // Client path: stable name via content-based dedup
+  const contentToName = getClientContentToName(options?.root ?? document);
   const serializedContent = JSON.stringify(descriptors);
   const cacheKey = `${options?.name ?? ''}:${serializedContent}`;
 
-  const existingName = clientContentToName.get(cacheKey);
+  const existingName = contentToName.get(cacheKey);
   if (existingName) {
     return existingName;
   }
@@ -84,7 +88,7 @@ export function useCounterStyle(
   const name =
     options?.name ??
     makeCounterStyleName(getNamePrefix(), String(clientCounterStyleCounter++));
-  clientContentToName.set(cacheKey, name);
+  contentToName.set(cacheKey, name);
 
   const injector = getGlobalInjector();
   injector.counterStyle(name, descriptors, { root: options?.root });

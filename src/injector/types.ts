@@ -112,6 +112,17 @@ export interface SheetInfo {
   constructableSheet?: CSSStyleSheet;
   ruleCount: number;
   holes: number[]; // Available rule indices from deletions
+  /**
+   * True when this sheet is written through `textContent` instead of CSSOM.
+   * Decided once at sheet creation so a sheet is never half CSSOM / half text.
+   */
+  textMode?: boolean;
+  /**
+   * Inserted rule texts in rule-index order. Maintained only in text mode —
+   * it is what makes deletion possible there, since `textContent` cannot be
+   * edited rule-by-rule and has to be rebuilt.
+   */
+  textRules?: string[];
 }
 
 interface CleanupStats {

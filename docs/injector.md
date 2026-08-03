@@ -226,6 +226,21 @@ configure({
 - `devMode`: Automatically enabled in development environments (detected via `isDevEnv()`)
 - `forceTextInjection`: Automatically enabled in test environments (Jest, Vitest, Mocha, happy-dom, jsdom)
 
+**Injection Modes:**
+
+Each sheet picks its write mode once, when it is created, and keeps it for its
+lifetime:
+
+| Mode | How rules are written | How rules are removed |
+|---|---|---|
+| CSSOM (default) | `styleSheet.insertRule(rule, index)` | `styleSheet.deleteRule(index)` |
+| Text (`forceTextInjection`, or when `styleElement.sheet` is unavailable) | appended to `<style>.textContent` | rule texts are tracked per sheet and the element's text is rebuilt without them |
+| Adopted (ShadowRoot with constructable sheets) | `insertRule` on the constructable sheet | `deleteRule` on the constructable sheet |
+
+Text mode cannot edit a single rule in place the way CSSOM can, so the sheet
+keeps the inserted rule texts in index order and rewrites the element on delete.
+Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
+
 **Configuration Notes:**
 - Most options have sensible defaults and auto-detection
 - `configure()` is optional - the injector works with defaults

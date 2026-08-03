@@ -282,18 +282,24 @@ export class ServerStyleCollector {
 
   /**
    * Record global styles (from useGlobalStyles). Deduplicated by key.
+   *
+   * Pass `replace` for slot-keyed entries (an explicit `id`), where the last
+   * write must win to match the client's update-tracking behavior.
    */
-  collectGlobalStyles(key: string, css: string): void {
-    if (!this.globalStyles.has(key)) {
+  collectGlobalStyles(key: string, css: string, replace?: boolean): void {
+    if (replace || !this.globalStyles.has(key)) {
       this.globalStyles.set(key, css);
     }
   }
 
   /**
    * Record raw CSS text (from useRawCSS). Deduplicated by key.
+   *
+   * Pass `replace` for slot-keyed entries (an explicit `id`), where the last
+   * write must win to match the client's update-tracking behavior.
    */
-  collectRawCSS(key: string, css: string): void {
-    if (!this.rawCSS.has(key)) {
+  collectRawCSS(key: string, css: string, replace?: boolean): void {
+    if (replace || !this.rawCSS.has(key)) {
       this.rawCSS.set(key, css);
     }
   }

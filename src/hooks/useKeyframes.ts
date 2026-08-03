@@ -3,6 +3,7 @@ import { keyframes } from '../injector';
 import type { KeyframesSteps } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatKeyframesCSS } from '../ssr/format-keyframes';
+import { createClientState } from '../utils/client-state';
 import { depsEqual } from '../utils/deps-equal';
 import { hashString } from '../utils/hash';
 import { makeKeyframeName } from '../utils/name-prefix';
@@ -12,20 +13,43 @@ interface UseKeyframesOptions {
   root?: Document | ShadowRoot;
 }
 
-const clientContentToName = new Map<string, string>();
-
 interface FactoryDepsEntry {
   deps: readonly unknown[];
   name: string;
 }
 
-const factoryDepsCache = new Map<string, FactoryDepsEntry>();
+interface NamedSlotEntry {
+  cacheKey: string;
+  dispose: () => void;
+}
+
+interface ClientKeyframesState {
+  /** cacheKey (name + serialized steps) -> generated animation name */
+  contentToName: Map<string, string>;
+  /** provided name -> the single injection that slot currently owns */
+  namedSlots: Map<string, NamedSlotEntry>;
+  /** provided name -> last factory deps, to skip re-evaluating the factory */
+  factoryDeps: Map<string, FactoryDepsEntry>;
+}
+
+const getClientState = createClientState(
+  (): ClientKeyframesState => ({
+    contentToName: new Map(),
+    namedSlots: new Map(),
+    factoryDeps: new Map(),
+  }),
+);
 
 /**
  * Inject CSS @keyframes and return the generated animation name.
  * Deduplicates by content — identical steps always return the same name.
  *
  * Works in all environments: client, SSR with collector, and React Server Components.
+ *
+ * Passing `name` claims a slot owned by that one call site (like `useRawCSS`'s
+ * `id`): when its steps change, the previous injection is disposed and the name
+ * is reused, so the rules don't accumulate. Anonymous keyframes are permanent
+ * and shared by content.
  *
  * @example Basic usage - steps object is the dependency
  * ```tsx
@@ -97,9 +121,12 @@ export function useKeyframes(
 
   const target = getStyleTarget();
 
+  const clientState =
+    target.mode === 'client' ? getClientState(opts?.root ?? document) : null;
+
   // Client deps cache: skip factory re-evaluation when deps haven't changed
-  if (isFactory && deps && opts?.name && target.mode === 'client') {
-    const cached = factoryDepsCache.get(opts.name);
+  if (isFactory && deps && opts?.name && clientState) {
+    const cached = clientState.factoryDeps.get(opts.name);
     if (cached && depsEqual(cached.deps, deps)) {
       return cached.name;
     }
@@ -137,24 +164,46 @@ export function useKeyframes(
   }
 
   // Client path: stable name via content-based dedup
+  const state = clientState ?? getClientState(opts?.root ?? document);
   const serializedContent = JSON.stringify(steps);
   const cacheKey = `${opts?.name ?? ''}:${serializedContent}`;
 
-  const cachedName = clientContentToName.get(cacheKey);
+  const cachedName = state.contentToName.get(cacheKey);
   if (cachedName) {
     return cachedName;
   }
 
+  const providedName = opts?.name;
+
+  // A named slot owns exactly one injection. When its content changes, drop the
+  // previous one first: disposing frees the name so the new steps can reclaim
+  // it, and it keeps old @keyframes rules from piling up in the sheet.
+  if (providedName) {
+    const slot = state.namedSlots.get(providedName);
+
+    if (slot && slot.cacheKey !== cacheKey) {
+      slot.dispose();
+      // Forget the stale content too, so any other call site still passing the
+      // old steps re-injects instead of pointing at a removed rule.
+      state.contentToName.delete(slot.cacheKey);
+      state.namedSlots.delete(providedName);
+    }
+  }
+
   const result = keyframes(steps, {
-    name: opts?.name,
+    name: providedName,
     root: opts?.root,
   });
 
   const name = result.toString();
-  clientContentToName.set(cacheKey, name);
+  state.contentToName.set(cacheKey, name);
 
-  if (deps && opts?.name) {
-    factoryDepsCache.set(opts.name, { deps, name });
+  if (providedName) {
+    state.namedSlots.set(providedName, { cacheKey, dispose: result.dispose });
+
+    if (deps) {
+      state.factoryDeps.set(providedName, { deps, name });
+    }
   }
 
   return name;

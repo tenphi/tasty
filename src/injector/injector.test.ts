@@ -261,17 +261,42 @@ describe('StyleInjector', () => {
         },
       ];
 
-      const result = injector.inject(globalRules);
+      const { dispose } = injector.injectGlobal(globalRules);
 
       expect(
         document.head.querySelectorAll('[data-tasty]').length,
       ).toBeGreaterThan(0);
+      expect(injector.getCSSText()).toContain('background: lightgray');
 
-      result.dispose();
+      dispose();
 
+      // The sheet stays around; the rule itself must be gone
       expect(
         document.head.querySelectorAll('[data-tasty]').length,
       ).toBeGreaterThan(0);
+      expect(injector.getCSSText()).not.toContain('background: lightgray');
+    });
+
+    it('should replace global rules across successive injections', () => {
+      const first = injector.injectGlobal([
+        { selector: '.card', declarations: 'color: red;' },
+      ]);
+
+      first.dispose();
+      const second = injector.injectGlobal([
+        { selector: '.card', declarations: 'color: blue;' },
+      ]);
+
+      second.dispose();
+      injector.injectGlobal([
+        { selector: '.card', declarations: 'color: green;' },
+      ]);
+
+      const css = injector.getCSSText();
+
+      expect(css).toContain('color: green');
+      expect(css).not.toContain('color: red');
+      expect(css).not.toContain('color: blue');
     });
   });
 

@@ -62,6 +62,49 @@ export class SheetManager {
   }
 
   /**
+   * Record an inserted rule text at its rule index (text mode only).
+   *
+   * `textRules` mirrors the sheet's rule order. `textContent` cannot be edited
+   * rule-by-rule the way CSSOM can, so keeping the texts is what makes
+   * deletion possible at all in this mode.
+   */
+  private trackTextRule(
+    sheet: SheetInfo,
+    ruleIndex: number,
+    ruleText: string,
+  ): void {
+    if (!sheet.textMode) return;
+
+    const rules = (sheet.textRules ??= []);
+    // Defensive: keep the array dense so indices stay meaningful
+    while (rules.length < ruleIndex) rules.push('');
+    rules[ruleIndex] = ruleText;
+  }
+
+  /**
+   * Remove rule indices from a text-mode sheet and rewrite the element's text.
+   * Returns the indices that were actually removed.
+   */
+  private deleteTextRules(sheet: SheetInfo, indices: number[]): number[] {
+    const rules = sheet.textRules;
+    if (!rules) return [];
+
+    const removed = [...new Set(indices)]
+      .filter((idx) => idx >= 0 && idx < rules.length)
+      .sort((a, b) => b - a);
+
+    for (const idx of removed) {
+      rules.splice(idx, 1);
+    }
+
+    if (removed.length > 0 && sheet.sheet) {
+      sheet.sheet.textContent = rules.length ? '\n' + rules.join('\n') : '';
+    }
+
+    return removed;
+  }
+
+  /**
    * Determine the injection mode for a root.
    * ShadowRoot uses adopted stylesheets when supported; Document uses <style> elements.
    */
@@ -176,10 +219,18 @@ export class SheetManager {
 
     const sheet = this.createStyleElement(root);
 
+    // Pin the write mode now: `insertRule` and `deleteRule` must agree on it for
+    // the lifetime of the sheet, otherwise tracked rule indices desync from
+    // whichever representation is actually applied.
+    const textMode =
+      this.config.forceTextInjection === true || sheet.sheet == null;
+
     const sheetInfo: SheetInfo = {
       sheet,
       ruleCount: 0,
       holes: [],
+      textMode,
+      ...(textMode ? { textRules: [] } : {}),
     };
 
     registry.sheets.push(sheetInfo);
@@ -315,7 +366,7 @@ export class SheetManager {
         const styleElement = targetSheet.sheet;
         const styleSheet = this.getCSSSheet(targetSheet);
 
-        if (styleSheet && !this.config.forceTextInjection) {
+        if (!targetSheet.textMode && styleSheet) {
           // Calculate index atomically for each rule to prevent concurrent insertion races
           const maxIndex = styleSheet.cssRules.length;
           const atomicRuleIndex = this.findAvailableRuleIndex(targetSheet);
@@ -437,6 +488,8 @@ export class SheetManager {
           // Use textContent (either as fallback or when forceTextInjection is enabled)
           // Calculate index atomically for textContent insertion too
           const atomicRuleIndex = this.findAvailableRuleIndex(targetSheet);
+          // Record the text so `deleteRule` can rebuild the element without it
+          this.trackTextRule(targetSheet, atomicRuleIndex, fullRule);
           styleElement.textContent =
             (styleElement.textContent || '') + '\n' + fullRule;
           // Update sheet ruleCount immediately
@@ -635,7 +688,49 @@ export class SheetManager {
 
       const styleSheet = this.getCSSSheet(sheet);
 
-      if (styleSheet) {
+      if (sheet.textMode) {
+        // Text mode: splice the rules out of the tracked texts and rewrite the
+        // element. Never also touch CSSOM here — assigning textContent
+        // reparses the sheet, so a CSSOM delete would be undone anyway.
+        let targetIndices: number[];
+
+        if (ruleInfo.indices && ruleInfo.indices.length > 0) {
+          targetIndices = ruleInfo.indices;
+        } else {
+          // FALLBACK: range-based deletion, mirroring the CSSOM path below
+          const startIdx = Math.max(0, ruleInfo.ruleIndex);
+          const endIdx = Math.min(
+            (sheet.textRules?.length ?? 0) - 1,
+            Number.isFinite(ruleInfo.endRuleIndex as number)
+              ? (ruleInfo.endRuleIndex as number)
+              : startIdx,
+          );
+
+          targetIndices = [];
+          for (let idx = startIdx; idx <= endIdx; idx++) {
+            targetIndices.push(idx);
+          }
+        }
+
+        const deletedIndices = this.deleteTextRules(sheet, targetIndices);
+
+        if (deletedIndices.length > 0) {
+          sheet.ruleCount = Math.max(
+            0,
+            sheet.ruleCount - deletedIndices.length,
+          );
+
+          this.adjustIndicesAfterDeletion(
+            registry,
+            ruleInfo.sheetIndex,
+            Math.min(...deletedIndices),
+            Math.max(...deletedIndices),
+            deletedIndices.length,
+            ruleInfo,
+            deletedIndices,
+          );
+        }
+      } else if (styleSheet) {
         const rules = styleSheet.cssRules;
 
         // Use exact indices if available, otherwise fall back to range
@@ -888,15 +983,20 @@ export class SheetManager {
           continue;
         }
 
-        // SAFETY 4: Verify the stylesheet itself is accessible
+        // SAFETY 4: Verify the rule storage itself is accessible.
+        // Text-mode sheets are backed by `textRules`, not CSSOM, so a missing
+        // CSSStyleSheet is expected there and must not block cleanup.
         const styleSheet = this.getCSSSheet(sheetInfo);
-        if (!styleSheet) {
+        if (!sheetInfo.textMode && !styleSheet) {
           // Stylesheet not available; skip this rule
           continue;
         }
 
         // SAFETY 5: Verify rule index is still within valid range
-        const maxRuleIndex = styleSheet.cssRules.length - 1;
+        const maxRuleIndex =
+          (sheetInfo.textMode
+            ? (sheetInfo.textRules?.length ?? 0)
+            : (styleSheet?.cssRules.length ?? 0)) - 1;
         const startIdx = ruleInfo.ruleIndex;
         const endIdx = ruleInfo.endRuleIndex ?? ruleInfo.ruleIndex;
 
@@ -1131,13 +1231,16 @@ export class SheetManager {
 
       const styleSheet = this.getCSSSheet(targetSheet);
 
-      if (styleSheet && !this.config.forceTextInjection) {
+      if (!targetSheet.textMode && styleSheet) {
         const safeIndex = Math.min(
           Math.max(0, ruleIndex),
           styleSheet.cssRules.length,
         );
         styleSheet.insertRule(fullRule, safeIndex);
       } else if (targetSheet.sheet) {
+        // Keyframes share the sheet's rule-index sequence, so their text has to
+        // be tracked too or every later index desyncs
+        this.trackTextRule(targetSheet, ruleIndex, fullRule);
         targetSheet.sheet.textContent =
           (targetSheet.sheet.textContent || '') + '\n' + fullRule;
       }
@@ -1169,31 +1272,40 @@ export class SheetManager {
     try {
       const styleSheet = this.getCSSSheet(sheet);
 
-      if (styleSheet) {
+      // Adjust indices for all other rules in the same sheet.
+      // This is critical - when a keyframe rule is deleted, all rules
+      // with higher indices shift down by 1
+      const adjustIndices = () =>
+        this.adjustIndicesAfterDeletion(
+          registry,
+          info.sheetIndex,
+          info.ruleIndex,
+          info.ruleIndex,
+          1,
+          // Create a dummy RuleInfo to satisfy the function signature
+          {
+            className: '',
+            ruleIndex: info.ruleIndex,
+            sheetIndex: info.sheetIndex,
+          } as RuleInfo,
+          [info.ruleIndex],
+        );
+
+      if (sheet.textMode) {
+        const deleted = this.deleteTextRules(sheet, [info.ruleIndex]);
+
+        if (deleted.length > 0) {
+          sheet.ruleCount = Math.max(0, sheet.ruleCount - 1);
+          adjustIndices();
+        }
+      } else if (styleSheet) {
         if (
           info.ruleIndex >= 0 &&
           info.ruleIndex < styleSheet.cssRules.length
         ) {
           styleSheet.deleteRule(info.ruleIndex);
           sheet.ruleCount = Math.max(0, sheet.ruleCount - 1);
-
-          // Adjust indices for all other rules in the same sheet
-          // This is critical - when a keyframe rule is deleted, all rules
-          // with higher indices shift down by 1
-          this.adjustIndicesAfterDeletion(
-            registry,
-            info.sheetIndex,
-            info.ruleIndex,
-            info.ruleIndex,
-            1,
-            // Create a dummy RuleInfo to satisfy the function signature
-            {
-              className: '',
-              ruleIndex: info.ruleIndex,
-              sheetIndex: info.sheetIndex,
-            } as RuleInfo,
-            [info.ruleIndex],
-          );
+          adjustIndices();
         }
       }
     } catch (error) {

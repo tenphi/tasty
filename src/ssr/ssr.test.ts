@@ -409,6 +409,46 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('--h1-font-size');
     expect(css).toContain('32px');
   });
+
+  it('dedupes global styles by key but replaces slot-keyed ones', () => {
+    const collector = new ServerStyleCollector();
+
+    // Content-hashed keys only dedup — first write wins
+    collector.collectGlobalStyles('global:.a:hash', '.a { color: red; }');
+    collector.collectGlobalStyles('global:.a:hash', '.a { color: blue; }');
+
+    expect(collector.getCSS()).toContain('color: red');
+    expect(collector.getCSS()).not.toContain('color: blue');
+
+    // Slot keys (an explicit `id`) replace, matching client update tracking
+    collector.collectGlobalStyles('global:card', '.card { color: red; }', true);
+    collector.collectGlobalStyles(
+      'global:card',
+      '.card { color: blue; }',
+      true,
+    );
+
+    const css = collector.getCSS();
+    expect(css).toContain('.card { color: blue; }');
+    expect(css).not.toContain('.card { color: red; }');
+  });
+
+  it('dedupes raw CSS by key but replaces slot-keyed ones', () => {
+    const collector = new ServerStyleCollector();
+
+    collector.collectRawCSS('raw:hash', 'body { margin: 0; }');
+    collector.collectRawCSS('raw:hash', 'body { margin: 8px; }');
+
+    expect(collector.getCSS()).toContain('margin: 0');
+    expect(collector.getCSS()).not.toContain('margin: 8px');
+
+    collector.collectRawCSS('raw:theme', ':root { --x: 1; }', true);
+    collector.collectRawCSS('raw:theme', ':root { --x: 2; }', true);
+
+    const css = collector.getCSS();
+    expect(css).toContain('--x: 2');
+    expect(css).not.toContain('--x: 1');
+  });
 });
 
 // ============================================================================

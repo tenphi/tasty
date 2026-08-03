@@ -419,6 +419,15 @@ function ThemeStyles() {
 }
 ```
 
+A slot — the `id`, or the selector when no `id` is given — holds exactly one
+injection **per `root`**. So:
+
+- Changing the styles replaces the previous CSS rather than adding to it.
+- Passing styles that produce no CSS (for example `{}`) clears the slot.
+- The same selector used in two shadow roots keeps a separate injection in each.
+- Two independent call sites that share a selector share a slot, and the last
+  render wins. Give them distinct `id`s if they should coexist.
+
 ### useRawCSS
 
 Inject raw CSS strings. Accepts an optional `id` in the options for update tracking — when the CSS changes for the same id, the previous injection is replaced:
@@ -434,6 +443,9 @@ function GlobalReset() {
   return null;
 }
 ```
+
+An `id` slot holds one injection per `root`. Without an `id` the CSS is deduped
+by content and permanent — there is nothing to replace it with later.
 
 ### useKeyframes
 
@@ -455,7 +467,7 @@ function Spinner() {
 }
 ```
 
-`useKeyframes()` also supports a factory function. The deps array is accepted for backward compatibility but the factory is called on every invocation — deduplication is handled internally by content hash:
+`useKeyframes()` also supports a factory function. Without a `name` the factory runs on every invocation and deduplication is handled internally by content hash; with a `name`, matching deps skip the factory entirely:
 
 ```tsx
 function Pulse({ scale }: { scale: number }) {
@@ -464,12 +476,19 @@ function Pulse({ scale }: { scale: number }) {
       '0%': { transform: 'scale(1)' },
       '100%': { transform: `scale(${scale})` },
     }),
-    [scale]
+    [scale],
+    { name: 'pulse' }
   );
 
   return <div style={{ animation: `${pulse} 500ms ease-in-out alternate infinite` }} />;
 }
 ```
+
+Passing `name` claims a slot owned by that one call site, per `root` — much like
+`id` in `useGlobalStyles()` and `useRawCSS()`. When the steps change the previous
+`@keyframes` rule is disposed and the name is reused, so the rules don't
+accumulate and the returned name stays stable. Anonymous keyframes are permanent
+and shared by content.
 
 ### useProperty
 

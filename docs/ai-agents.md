@@ -83,7 +83,7 @@ Prefer units over raw pixels: `8px` → `1x` … `64px` → `8x`; `radius: '6px'
 
 ### `true`
 
-`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `fill`, `color`, `preset`, `font`, `scrollbar`, `hide`. Anywhere else it is an error.
+`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `fill`, `color`, `fade`, `preset`, `font`, `scrollbar`, `hide`. Anywhere else it is an error.
 
 ### `!important`
 

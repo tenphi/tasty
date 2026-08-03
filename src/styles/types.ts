@@ -178,6 +178,7 @@ export interface StylesInterface extends Omit<
    * Examples:
    * - `fade="top"` // fade only top edge with default width
    * - `fade="2x left right"` // fade left and right edges with 2x width
+   * - `fade={true}` // all edges at the design-system default width
    * - `fade="1x top"` // fade only top edge with 1x width
    * - `fade="3x 1x"` // all edges: top/bottom 3x, left/right 1x
    * - `fade="3x top, 1x bottom"` // top: 3x width, bottom: 1x width
@@ -186,7 +187,7 @@ export interface StylesInterface extends Omit<
    * - `fade="top #red #blue, bottom #green #yellow"` // different colors per direction
    * - `fade="2x top #a #b, 1x bottom #c #d"` // different widths and colors per direction
    */
-  fade?: 'top' | 'right' | 'bottom' | 'left' | string;
+  fade?: 'top' | 'right' | 'bottom' | 'left' | string | boolean;
   /**
    * Scrollbar styling using standard CSS properties (`scrollbar-width`, `scrollbar-color`, `scrollbar-gutter`).
    *

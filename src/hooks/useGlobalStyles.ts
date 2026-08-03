@@ -9,6 +9,7 @@ import {
 } from '../ssr/collect-auto-properties';
 import { formatGlobalRules } from '../ssr/format-global-rules';
 import type { Styles } from '../styles/types';
+import { createClientState } from '../utils/client-state';
 import { hashString } from '../utils/hash';
 import { resolveRecipes } from '../utils/resolve-recipes';
 
@@ -29,7 +30,13 @@ interface ClientGlobalEntry {
   dispose: () => void;
 }
 
-const clientGlobalEntries = new Map<string, ClientGlobalEntry>();
+const getClientGlobalSlots = createClientState(
+  () => new Map<string, ClientGlobalEntry>(),
+);
+
+const noop = () => {
+  /* nothing to dispose */
+};
 
 /**
  * Inject global styles for a given selector.
@@ -43,6 +50,10 @@ const clientGlobalEntries = new Map<string, ClientGlobalEntry>();
  * Injected styles are permanent — they are not cleaned up on component unmount.
  * Use the `id` option for update tracking when styles change over the
  * component lifecycle.
+ *
+ * Update tracking is per-slot and per-root: a slot (`id`, or the selector when
+ * no `id` is given) holds exactly one injection per `root`. Changing the styles
+ * replaces it; rendering styles that produce no CSS clears it.
  *
  * @param selector - CSS selector to apply styles to (e.g., '.my-class', ':root', 'body')
  * @param styles - Tasty styles object
@@ -80,29 +91,44 @@ export function useGlobalStyles(
 
   const target = getStyleTarget();
 
+  // Resolve the client slot once — both the fast path below and the injection
+  // at the end need it.
+  const slots =
+    target.mode === 'client'
+      ? getClientGlobalSlots(options?.root ?? document)
+      : null;
+  const slotKey = options?.id ?? selector;
+  const stylesKey = slots ? JSON.stringify(styles) : '';
+  const existing = slots?.get(slotKey);
+
   // Client fast path: skip resolveRecipes/renderStyles if styles haven't changed
-  if (target.mode === 'client') {
-    const slotKey = options?.id ?? selector;
-    const stylesKey = JSON.stringify(styles);
-    const existing = clientGlobalEntries.get(slotKey);
-    if (existing && existing.stylesKey === stylesKey) return;
-  }
+  if (existing && existing.stylesKey === stylesKey) return;
 
   const resolvedStyles = resolveRecipes(styles);
 
   const styleResults = renderStyles(resolvedStyles, selector) as StyleResult[];
 
-  if (styleResults.length === 0) return;
+  if (styleResults.length === 0) {
+    // An update that renders no CSS must still clear the slot's previous
+    // injection, otherwise the stale rules keep applying to the selector.
+    if (slots) {
+      existing?.dispose();
+      slots.set(slotKey, { stylesKey, dispose: noop });
+    }
+    return;
+  }
 
   if (target.mode === 'ssr') {
     target.collector.collectInternals();
 
     const css = formatGlobalRules(styleResults);
     if (css) {
+      // A slot key (explicit `id`) replaces, matching client update tracking;
+      // content-hashed keys only dedup.
       const key = options?.id
         ? `global:${options.id}`
         : `global:${selector}:${hashString(css)}`;
-      target.collector.collectGlobalStyles(key, css);
+      target.collector.collectGlobalStyles(key, css, options?.id != null);
     }
 
     if (getConfig().autoPropertyTypes !== false) {
@@ -121,7 +147,7 @@ export function useGlobalStyles(
       const key = options?.id
         ? `__global:${options.id}`
         : `__global:${selector}:${hashString(css)}`;
-      pushRSCCSS(target.cache, key, css);
+      pushRSCCSS(target.cache, key, css, options?.id != null);
     }
 
     if (getConfig().autoPropertyTypes !== false) {
@@ -135,16 +161,10 @@ export function useGlobalStyles(
   }
 
   // Client path
-  const slotKey = options?.id ?? selector;
+  if (slots) {
+    existing?.dispose();
 
-  const existing = clientGlobalEntries.get(slotKey);
-  if (existing) {
-    existing.dispose();
+    const { dispose } = injectGlobal(styleResults, { root: options?.root });
+    slots.set(slotKey, { stylesKey, dispose });
   }
-
-  const { dispose } = injectGlobal(styleResults, { root: options?.root });
-  clientGlobalEntries.set(slotKey, {
-    stylesKey: JSON.stringify(styles),
-    dispose,
-  });
 }

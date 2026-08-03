@@ -330,6 +330,166 @@ describe('SheetManager', () => {
     });
   });
 
+  describe('deleteRule in text-injection mode', () => {
+    // In text mode rules are appended to <style>.textContent, which cannot be
+    // edited rule-by-rule the way CSSOM can. Deletion has to rebuild the text —
+    // if it only went through CSSOM, disposed rules would keep applying and
+    // every new injection would layer on top of them.
+    let textSheetManager: SheetManager;
+
+    beforeEach(() => {
+      textSheetManager = new SheetManager({
+        maxRulesPerSheet: 100,
+        forceTextInjection: true,
+      });
+    });
+
+    it('should remove the rule text from the style element', () => {
+      const registry = textSheetManager.getRegistry(document);
+
+      const rule1 = textSheetManager.insertRule(
+        registry,
+        [createStyleRule('.rule1', 'color: red;')],
+        'rule1',
+        document,
+      );
+      textSheetManager.insertRule(
+        registry,
+        [createStyleRule('.rule2', 'color: blue;')],
+        'rule2',
+        document,
+      );
+
+      const sheet = registry.sheets[0];
+      expect(sheet.textMode).toBe(true);
+      expect(sheet.sheet!.textContent).toContain('color: red');
+
+      textSheetManager.deleteRule(registry, rule1!);
+
+      expect(sheet.sheet!.textContent).not.toContain('color: red');
+      // The surviving rule keeps its text
+      expect(sheet.sheet!.textContent).toContain('color: blue');
+      expect(sheet.ruleCount).toBe(1);
+      expect(sheet.textRules).toHaveLength(1);
+    });
+
+    it('should keep ruleCount and textRules in sync across deletions', () => {
+      const registry = textSheetManager.getRegistry(document);
+
+      const rules = [];
+      for (let i = 0; i < 5; i++) {
+        const rule = textSheetManager.insertRule(
+          registry,
+          [createStyleRule(`.rule${i}`, `order: ${i};`)],
+          `rule${i}`,
+          document,
+        );
+        // Registered so index adjustment reaches them, as in the CSSOM tests
+        registry.rules.set(`rule${i}`, rule!);
+        rules.push(rule);
+      }
+
+      const sheet = registry.sheets[0];
+      expect(sheet.ruleCount).toBe(5);
+      expect(sheet.textRules).toHaveLength(5);
+
+      textSheetManager.deleteRule(registry, rules[1]!);
+      textSheetManager.deleteRule(registry, rules[3]!);
+
+      expect(sheet.ruleCount).toBe(3);
+      expect(sheet.textRules).toHaveLength(3);
+      expect(sheet.textRules).toEqual([
+        expect.stringContaining('order: 0'),
+        expect.stringContaining('order: 2'),
+        expect.stringContaining('order: 4'),
+      ]);
+      expect(sheet.sheet!.textContent).not.toContain('order: 1');
+      expect(sheet.sheet!.textContent).not.toContain('order: 3');
+    });
+
+    it('should adjust surviving rule indices after deletion', () => {
+      const registry = textSheetManager.getRegistry(document);
+
+      const rule1 = textSheetManager.insertRule(
+        registry,
+        [
+          createStyleRule('.rule1', 'color: red;'),
+          createStyleRule('.rule1:hover', 'color: pink;'),
+        ],
+        'rule1',
+        document,
+      );
+      registry.rules.set('class1', rule1!);
+
+      const rule2 = textSheetManager.insertRule(
+        registry,
+        [createStyleRule('.rule2', 'color: green;')],
+        'rule2',
+        document,
+      );
+      registry.rules.set('class2', rule2!);
+
+      expect(rule1!.indices).toEqual([0, 1]);
+      expect(rule2!.indices).toEqual([2]);
+
+      textSheetManager.deleteRule(registry, rule1!);
+
+      expect(rule2!.indices).toEqual([0]);
+      expect(rule2!.ruleIndex).toBe(0);
+
+      // A subsequent insertion lands after the surviving rule, not on top of it
+      const rule3 = textSheetManager.insertRule(
+        registry,
+        [createStyleRule('.rule3', 'color: teal;')],
+        'rule3',
+        document,
+      );
+
+      expect(rule3!.indices).toEqual([1]);
+      expect(registry.sheets[0].textRules).toEqual([
+        expect.stringContaining('color: green'),
+        expect.stringContaining('color: teal'),
+      ]);
+    });
+
+    it('should empty the style element once every rule is deleted', () => {
+      const registry = textSheetManager.getRegistry(document);
+
+      const rule = textSheetManager.insertRule(
+        registry,
+        [createStyleRule('.only', 'color: red;')],
+        'only',
+        document,
+      );
+
+      textSheetManager.deleteRule(registry, rule!);
+
+      const sheet = registry.sheets[0];
+      expect(sheet.sheet!.textContent).toBe('');
+      expect(sheet.ruleCount).toBe(0);
+      expect(sheet.textRules).toEqual([]);
+    });
+
+    it('should remove keyframes text on delete', () => {
+      const registry = textSheetManager.getRegistry(document);
+
+      const result = textSheetManager.insertKeyframes(
+        registry,
+        { from: { opacity: 0 }, to: { opacity: 1 } },
+        'fade',
+        document,
+      );
+
+      const sheet = registry.sheets[0];
+      expect(sheet.sheet!.textContent).toContain('@keyframes fade');
+
+      textSheetManager.deleteKeyframes(registry, result!.info);
+
+      expect(sheet.sheet!.textContent).not.toContain('@keyframes fade');
+      expect(sheet.ruleCount).toBe(0);
+    });
+  });
+
   describe('findAvailableRuleIndex', () => {
     it('should return next rule count for new rule insertion', () => {
       const registry = sheetManager.getRegistry(document);

@@ -21,6 +21,8 @@ export interface RSCStyleCache {
   emittedKeys: Set<string>;
   internalsEmitted: boolean;
   pendingCSS: string[];
+  /** Maps dedup key -> its slot in `pendingCSS`, so slot-keyed CSS can be replaced. */
+  keyToIndex: Map<string, number>;
   /** Maps dedup key -> generated name for keyframes and counter-styles in RSC mode. */
   generatedNames: Map<string, string>;
 }
@@ -36,6 +38,7 @@ export const getRSCCache = cache(
     emittedKeys: new Set(),
     internalsEmitted: false,
     pendingCSS: [],
+    keyToIndex: new Map(),
     generatedNames: new Map(),
   }),
 );
@@ -62,20 +65,39 @@ export function flushPendingCSS(rscCache: RSCStyleCache): string {
   if (rscCache.pendingCSS.length === 0) return '';
   const css = rscCache.pendingCSS.join('\n');
   rscCache.pendingCSS.length = 0;
+  // The slots are gone with the buffer; a later replace has to append instead.
+  rscCache.keyToIndex.clear();
   return css;
 }
 
 /**
  * Push CSS into the RSC pending buffer with dedup via emittedKeys.
  * Returns true if the CSS was added, false if it was already emitted.
+ *
+ * Pass `replace` for slot-keyed entries (an explicit `id`), where the last write
+ * must win to match the client's update-tracking behavior. If the slot has
+ * already been flushed into a `<style>` tag the new CSS is appended instead,
+ * which still wins by cascade order.
  */
 export function pushRSCCSS(
   rscCache: RSCStyleCache,
   key: string,
   css: string,
+  replace?: boolean,
 ): boolean {
-  if (rscCache.emittedKeys.has(key)) return false;
+  if (replace) {
+    const pendingIndex = rscCache.keyToIndex.get(key);
+
+    if (pendingIndex !== undefined) {
+      rscCache.pendingCSS[pendingIndex] = css;
+      return true;
+    }
+  } else if (rscCache.emittedKeys.has(key)) {
+    return false;
+  }
+
   rscCache.emittedKeys.add(key);
+  rscCache.keyToIndex.set(key, rscCache.pendingCSS.length);
   rscCache.pendingCSS.push(css);
   return true;
 }

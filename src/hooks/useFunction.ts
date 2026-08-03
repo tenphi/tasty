@@ -7,8 +7,6 @@ import {
 import type { FunctionDefinition } from '../injector/types';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 
-export type { FunctionDefinition };
-
 export interface UseFunctionOptions {
   /** Shadow root or document to inject into. */
   root?: Document | ShadowRoot;
@@ -29,11 +27,17 @@ export interface UseFunctionOptions {
  * @param name - The function name token (`$$name`, `$name`, or `--name`)
  * @param definition - Function definition (args, returns, result, local vars)
  *
+ * Call the function through the Tasty DSL, not a raw `style` prop: an inline
+ * `style` value reaches the browser unparsed, so the `$$name(...)` sugar is never
+ * expanded and `polyfills.functions` cannot rewrite it either.
+ *
  * @example
  * ```tsx
- * function Box() {
+ * const Box = tasty({ styles: { marginTop: '$$negative(10px)' } });
+ *
+ * function Layout() {
  *   useFunction('$$negative', { args: ['$value'], result: '(-1 * $value)' });
- *   return <div style={{ marginTop: '--negative(10px)' }} />;
+ *   return <Box />;
  * }
  * ```
  */

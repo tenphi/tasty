@@ -1,4 +1,4 @@
-import { getGlobalFuncs, getGlobalParser } from './styles';
+import { getGlobalParseFunctions, getGlobalParser } from './styles';
 
 const RE_FUNC_NAME = /^([a-z][a-z0-9-]*)\s*\(/i;
 const RE_COLOR_OUT =
@@ -26,8 +26,8 @@ export function resolveFunctionColor(str: string): string | null {
   // Ensure the global parser (and therefore the default color functions) is
   // initialized before consulting the function registry.
   getGlobalParser();
-  const funcs = getGlobalFuncs();
-  if (!(name in funcs)) return null;
+  const functions = getGlobalParseFunctions();
+  if (!(name in functions)) return null;
 
   const out = getGlobalParser().process(str).output;
   if (!out || !RE_COLOR_OUT.test(out)) return null;

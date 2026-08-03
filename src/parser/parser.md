@@ -31,7 +31,7 @@ The Style Parser converts an arbitrary CSS-like value string into:
 
 - Color tokens and all CSS Color 5 functions.
 - Custom units and auto-calc syntax (`2x`, `-.5r`, `(100% - 2r)` …).
-- User-defined functions supplied via `funcs`.
+- User-defined functions supplied via `functions`.
 - Custom properties with `$` syntax.
 - Classification into values, colors, and modifiers.
 - Whitespace compression.
@@ -93,7 +93,7 @@ class StyleParser {
   process(src: string): ProcessedStyle;
 
   /** Replace the entire funcs table. */
-  setFuncs(funcs: Required<ParserOptions>['funcs']): void;
+  setFunctions(functions: Required<ParserOptions>['funcs']): void;
 
   /** Replace the entire units table. */
   setUnits(units: Required<ParserOptions>['units']): void;
@@ -274,6 +274,6 @@ rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray color-mix color
 3. Group builder (collect `StyleDetails`).
 4. Output builder (whitespace collapse, commas).
 5. LRU cache (simple doubly-linked list + map).
-6. Exposed mutator methods (`setFuncs`, `setUnits`, `updateOptions`).
+6. Exposed mutator methods (`setFunctions`, `setUnits`, `updateOptions`).
 7. Unit tests – provided suite plus all edge cases in §13.
 8. Benchmark with long strings to check O(n) behavior.

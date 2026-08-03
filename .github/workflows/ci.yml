@@ -39,6 +39,9 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      - name: Dead code check
+        run: pnpm knip
+
       - name: Test
         run: pnpm test
 

@@ -16,11 +16,8 @@ import type {
   POSITION_STYLES,
   TEXT_STYLES,
 } from './styles/list';
-import type { Styles } from './styles/types';
-
-export interface GlobalStyledProps {
-  breakpoints?: number[];
-}
+import type { Styles, StylesInterface } from './styles/types';
+import type { StylePropValue } from './utils/styles';
 
 /**
  * Extensible interface for theme names.
@@ -41,6 +38,50 @@ export interface TastyThemeNames {}
 
 type ThemeNameKey = Extract<keyof TastyThemeNames, string>;
 type ThemeName = [ThemeNameKey] extends [never] ? string : ThemeNameKey;
+
+/**
+ * Extensible interface for custom props added via `configure({ propHandlers })`.
+ * Augment it to type those props on every tasty component.
+ *
+ * @example
+ * ```typescript
+ * declare module '@tenphi/tasty' {
+ *   interface TastyCustomProps {
+ *     glaze: 'soft' | 'strong' | { tone: string; intensity?: number };
+ *   }
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TastyCustomProps {}
+
+/**
+ * Extensible interface for style names promoted via
+ * `configure({ baseStyleProps })`. Set each name to `true`; the prop is then typed
+ * exactly like the style it names.
+ *
+ * @example
+ * ```typescript
+ * declare module '@tenphi/tasty' {
+ *   interface TastyBaseStylePropNames {
+ *     radius: true;
+ *     shadow: true;
+ *   }
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TastyBaseStylePropNames {}
+
+/**
+ * Props contributed by `configure({ baseStyleProps })`, each typed like the style
+ * it names. Intersecting with `keyof StylesInterface` makes a name that isn't a
+ * real style inert rather than `never`-typed.
+ */
+export type ExtraBaseStyleProps = {
+  [key in keyof TastyBaseStylePropNames &
+    keyof StylesInterface]?: StylePropValue<StylesInterface[key]>;
+};
 
 /** Allowed mod value types */
 export type ModValue = boolean | string | number | undefined | null;

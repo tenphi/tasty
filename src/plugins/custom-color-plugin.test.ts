@@ -98,6 +98,8 @@ describe('custom color function plugin (no core special-casing)', () => {
   });
 
   it('uses the optional label only for dev warnings', () => {
+    // The warning is dev-gated, so enable dev mode to observe it.
+    vi.stubEnv('NODE_ENV', 'development');
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
       /* noop */
     });
@@ -119,10 +121,11 @@ describe('custom color function plugin (no core special-casing)', () => {
     const fn = labeledPlugin().functions!.labeled;
     expect(fn([])).toBe('rgb(0% 0% 0%)');
     expect(warnSpy).toHaveBeenCalledWith(
-      '[labeled] Expected 3 values (H C L), got:',
+      '[Tasty] labeled(): expected 3 values (H C L), got:',
       [],
     );
 
     warnSpy.mockRestore();
+    vi.unstubAllEnvs();
   });
 });

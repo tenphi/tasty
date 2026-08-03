@@ -585,15 +585,19 @@ function useCounterStyle(
 Register a CSS `@function` (custom function). Permanent — no cleanup on unmount. Deduplicates by function name. The function name accepts `$$name` (matching the call site `$$name(...)`), `$name`, or `--name`.
 
 ```tsx
-import { useFunction } from '@tenphi/tasty';
+import { tasty, useFunction } from '@tenphi/tasty';
 
-function Box() {
+const Box = tasty({ styles: { marginTop: '$$negative(10px)' } });
+
+function Layout() {
   useFunction('$$negative', { args: ['$value'], result: '(-1 * $value)' });
-  return <div style={{ marginTop: '--negative(10px)' }} />;
+  return <Box />;
 }
 ```
 
-Inside a `tasty()` component you can also call functions directly with the `$$name(...)` sugar:
+Call the function through the Tasty DSL rather than a raw `style` prop. An inline `style` value reaches the browser unparsed, so the `$$name(...)` sugar is never expanded — and under `configure({ polyfills: { functions: true } })` it silently does nothing, because the polyfill rewrites calls at parse time.
+
+Inside a `tasty()` component you call functions with the same `$$name(...)` sugar:
 
 ```tsx
 const Box = tasty({

@@ -30,6 +30,8 @@ import {
 } from '../states';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { Styles } from '../styles/types';
+import { isDevEnv } from '../utils/is-dev-env';
+import { toSnakeCase } from '../utils/string';
 import type {
   StyleHandler,
   StyleMap,
@@ -65,6 +67,9 @@ import {
 import { parseStateKey } from './parseStateKey';
 import { simplifyCondition } from './simplify';
 import { emitWarning } from './warnings';
+
+/** Any uppercase letter — a CSS property name should never contain one. */
+const RE_UPPER_CASE = /[A-Z]/;
 
 // ============================================================================
 // Types (compatible with old renderStyles API)
@@ -425,6 +430,21 @@ function invokeHandler(
       const declarations: Record<string, string> = {};
 
       for (const [prop, val] of Object.entries(styleProps)) {
+        // Regex first so the common case is one cheap test; isDevEnv() is called
+        // lazily (not captured at module load) only once a bad key is seen, which
+        // is both free in production and assertable in tests.
+        if (RE_UPPER_CASE.test(prop) && !prop.startsWith('--') && isDevEnv()) {
+          // Custom properties are case-sensitive, hence the `--` exemption. Not
+          // auto-corrected: silently rewriting a name is worse than a warning,
+          // and no type can catch a non-literal return.
+          emitWarning(
+            'HANDLER_CAMEL_CASE_KEY',
+            `A style handler returned "${prop}". CSS property names must be ` +
+              `kebab-case ("${toSnakeCase(prop)}"). The declaration was ` +
+              `emitted verbatim and the browser will ignore it.`,
+          );
+        }
+
         if (val != null && val !== '') {
           declarations[prop] = String(val);
         }

@@ -107,14 +107,18 @@ export function classify(
         // @function polyfill: when a compiled closure is registered for this
         // function, inline the call into plain CSS instead of emitting the
         // (limited-support) native `--name(...)` call.
-        if (opts.funcs && cssName in opts.funcs) {
+        if (opts.functions && cssName in opts.functions) {
           const groups = inner
             ? new StyleParser(opts).process(inner).groups
             : [];
-          const funcResult = opts.funcs[cssName](groups);
+          const funcResult = opts.functions[cssName](groups);
           // Empty result signals a recursion-cycle bail: leave the call as-is.
           if (funcResult !== '') {
-            return classify(funcResult, { ...opts, funcs: undefined }, recurse);
+            return classify(
+              funcResult,
+              { ...opts, functions: undefined },
+              recurse,
+            );
           }
         }
         const args = inner ? recurse(inner).output : '';
@@ -213,8 +217,8 @@ export function classify(
               const [, funcName, args] = funcMatch;
               const lowerFunc = funcName.toLowerCase();
               const isCustomFunc = !!(
-                opts.funcs &&
-                lowerFunc in opts.funcs &&
+                opts.functions &&
+                lowerFunc in opts.functions &&
                 !COLOR_FUNCS.has(lowerFunc) &&
                 !COLOR_FUNCS.has(funcName.replace(/a$/i, '').toLowerCase())
               );
@@ -319,8 +323,8 @@ export function classify(
               // so the function handler can convert them to valid CSS
               if (
                 !COLOR_FUNCS.has(normalizedFunc) &&
-                opts.funcs &&
-                normalizedFunc in opts.funcs
+                opts.functions &&
+                normalizedFunc in opts.functions
               ) {
                 return classify(constructed, opts, recurse);
               }
@@ -416,13 +420,13 @@ export function classify(
     }
 
     // user function (provided via opts)
-    if (opts.funcs && fname in opts.funcs) {
+    if (opts.functions && fname in opts.functions) {
       // split by top-level commas within inner
       const tmp = new StyleParser(opts).process(inner); // fresh parser w/ same opts but no cache share issues
-      const funcResult = opts.funcs[fname](tmp.groups);
+      const funcResult = opts.functions[fname](tmp.groups);
       // Re-classify the result to determine proper bucket (e.g., if it returns a color)
-      // Pass funcs: undefined to prevent infinite recursion if result matches a function pattern
-      return classify(funcResult, { ...opts, funcs: undefined }, recurse);
+      // Pass functions: undefined to prevent infinite recursion if result matches a function pattern
+      return classify(funcResult, { ...opts, functions: undefined }, recurse);
     }
 
     // generic: process inner and rebuild

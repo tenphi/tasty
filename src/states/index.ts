@@ -62,7 +62,9 @@ const BUILTIN_STATES = new Set([
   '@inherit',
 ]);
 
-// Reserved prefixes that are built-in
+// Reserved prefixes that are built-in.
+// Must stay in sync with BUILTIN_STATES above: that list gates exact names,
+// this one gates prefixes (see isCustomStateKey).
 const RESERVED_PREFIXES = [
   '@media',
   '@root',
@@ -72,6 +74,9 @@ const RESERVED_PREFIXES = [
   '@starting',
   '@keyframes',
   '@property',
+  '@font-face',
+  '@counter-style',
+  '@function',
   '@supports',
   '@inherit',
 ];

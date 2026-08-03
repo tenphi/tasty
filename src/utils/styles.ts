@@ -46,16 +46,59 @@ export type StyleValueStateMap<T = string> = Record<
  */
 export type StylePropValue<T = string> = StyleValue<T> | StyleValueStateMap<T>;
 
-export type CSSMap = { $?: string | string[] } & Record<
-  string,
-  string | string[]
+/**
+ * One dependency value as a style handler receives it: already resolved for a
+ * single state, but still the **raw authored DSL string** (`'2x'`, `'#purple.5'`).
+ * Handlers parse it themselves via {@link parseStyle} / {@link parseColor}.
+ */
+export type ResolvedStyleValue = StyleValue<string>;
+
+/**
+ * The dependency map a handler receives — one resolved value per style name in
+ * its `__lookupStyles`.
+ */
+export type StyleHandlerProps<TDeps extends string = string> = Partial<
+  Record<TDeps, ResolvedStyleValue>
 >;
+
+/**
+ * One set of CSS declarations returned by a style handler.
+ *
+ * Keys are **kebab-case** CSS property names (`'background-color'`, not
+ * `backgroundColor`) or `--custom-property` names. Values are stringified, so
+ * numbers are accepted. `$` is reserved as a selector suffix.
+ */
+export type CSSMap = {
+  /** Selector suffix (or suffixes) these declarations apply to, e.g. `'& > *'`. */
+  $?: string | string[];
+} & Record<string, string | number | (string | number)[] | undefined>;
 
 export type StyleHandlerResult = CSSMap | CSSMap[] | null | void;
 
-export type RawStyleHandler = (value: StyleValueStateMap) => StyleHandlerResult;
+export type RawStyleHandler<TProps extends object = StyleHandlerProps> = (
+  props: TProps,
+) => StyleHandlerResult;
 
-export type StyleHandler = RawStyleHandler & {
+export type StyleHandler<TProps extends object = StyleHandlerProps> =
+  RawStyleHandler<TProps> & {
+    __lookupStyles: string[];
+  };
+
+/**
+ * The handler type used by the registry (`STYLE_HANDLER_MAP`), with parameter
+ * variance erased.
+ *
+ * Handlers declare narrow, hand-written dependency types — `({ fill }: { fill?:
+ * string }) => …` — which under `strictFunctionTypes` are not assignable to a
+ * wider parameter type. The registry stores handlers of many different dependency
+ * shapes together, so it needs the erased form. Prefer {@link StyleHandler} (or
+ * {@link defineHandler}) when writing a handler; this type is for code that
+ * inspects the registry.
+ */
+export type AnyStyleHandler = ((
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: any,
+) => StyleHandlerResult) & {
   __lookupStyles: string[];
 };
 
@@ -64,11 +107,14 @@ export type StyleHandler = RawStyleHandler & {
  * - Function only: lookup styles inferred from key name
  * - Single property tuple: ['styleName', handler]
  * - Multi-property tuple: [['style1', 'style2'], handler]
+ *
+ * Use {@link defineHandler} to have the dependency names inferred into the
+ * handler's parameter type instead of annotating it by hand.
  */
-export type StyleHandlerDefinition =
-  | RawStyleHandler
-  | [string, RawStyleHandler]
-  | [string[], RawStyleHandler];
+export type StyleHandlerDefinition<TDeps extends string = string> =
+  | RawStyleHandler<StyleHandlerProps<TDeps>>
+  | [TDeps, RawStyleHandler<StyleHandlerProps<TDeps>>]
+  | [readonly TDeps[], RawStyleHandler<StyleHandlerProps<TDeps>>];
 
 export interface ParsedColor {
   color?: string;
@@ -138,7 +184,7 @@ let __tastyParser: StyleParser | null = null;
 function getOrCreateParser(): StyleParser {
   if (!__tastyParser) {
     __tastyParser = new StyleParser({ units: CUSTOM_UNITS });
-    __tastyParser.setFuncs(__tastyFuncs);
+    __tastyParser.setFunctions(__tastyParseFunctions);
     // Register built-in color functions (okhsl/okhst) as ordinary parse
     // functions. Done lazily here so zero-config usage works regardless of
     // module initialization order or tree-shaking.
@@ -152,27 +198,38 @@ function getOrCreateParser(): StyleParser {
 // `configure()`. Built-in color functions (okhsl/okhst) are registered lazily
 // by `registerDefaultFunctions()` rather than seeded here, so they go through
 // the exact same path as any third-party plugin.
-const __tastyFuncs: Record<string, (groups: StyleDetails[]) => string> = {};
+const __tastyParseFunctions: Record<
+  string,
+  (groups: StyleDetails[]) => string
+> = {};
 
-export function customFunc(
+/**
+ * Register a parse-time function.
+ *
+ * @internal Use `configure({ functions })`. This bypasses the configuration lock
+ * and is kept only for the lazy default-function bootstrap and the `@function`
+ * polyfill, both of which must register after `configure()` has run.
+ */
+export function customFunction(
   name: string,
   fn: (groups: StyleDetails[]) => string,
 ) {
-  __tastyFuncs[name] = fn;
-  getOrCreateParser().setFuncs(__tastyFuncs);
+  __tastyParseFunctions[name] = fn;
+  getOrCreateParser().setFunctions(__tastyParseFunctions);
 }
 
 /**
- * Reset custom parser functions back to the built-in set (okhsl/okhst).
- * Used by resetConfig() in tests to drop user-registered and polyfill functions.
+ * Reset parse functions back to the built-in set (okhsl/okhst).
+ *
+ * @internal Called by `resetConfig()`.
  */
-export function resetGlobalFuncs(): void {
-  for (const key of Object.keys(__tastyFuncs)) {
-    delete __tastyFuncs[key];
+export function resetGlobalParseFunctions(): void {
+  for (const key of Object.keys(__tastyParseFunctions)) {
+    delete __tastyParseFunctions[key];
   }
   // Re-register the default color functions so they survive a config reset.
   registerDefaultFunctions();
-  getOrCreateParser().setFuncs(__tastyFuncs);
+  getOrCreateParser().setFunctions(__tastyParseFunctions);
 }
 
 /**
@@ -187,11 +244,18 @@ export function getGlobalParser(): StyleParser {
  * Get the current custom functions registry.
  * Used by configure() to merge with new functions.
  */
-export function getGlobalFuncs(): Record<
+/**
+ * The live parse-function registry.
+ *
+ * @internal Returns the mutable internal map; writing to it bypasses the
+ * parser's cache invalidation, so the write silently does not take effect.
+ * Read-only, internal use.
+ */
+export function getGlobalParseFunctions(): Record<
   string,
   (groups: StyleDetails[]) => string
 > {
-  return __tastyFuncs;
+  return __tastyParseFunctions;
 }
 
 // ============================================================================
@@ -233,7 +297,7 @@ export function setGlobalPredefinedTokens(
 
     normalizedTokens[lowerKey] = value;
   }
-  // Merge with existing tokens (consistent with how states, units, funcs are handled)
+  // Merge with existing tokens (consistent with how states, units, and parse functions are handled)
   __globalPredefinedTokens = __globalPredefinedTokens
     ? { ...__globalPredefinedTokens, ...normalizedTokens }
     : normalizedTokens;

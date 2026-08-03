@@ -1,6 +1,8 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
 
+import { warnExtraGroupValues } from './shared';
+
 const DIRECTION_MAP: Record<(typeof DIRECTIONS)[number], string> = {
   right: 'to left',
   left: 'to right',
@@ -13,6 +15,7 @@ const DEFAULT_TRANSPARENT_COLOR = 'rgb(0 0 0 / 0)';
 const DEFAULT_OPAQUE_COLOR = 'rgb(0 0 0 / 1)';
 
 interface GroupData {
+  input: string;
   values: string[];
   mods: string[];
   colors: string[];
@@ -23,12 +26,10 @@ interface GroupData {
  */
 function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
   let { values } = group;
-  const { mods, colors } = group;
+  const { input, mods, colors } = group;
 
-  let directions = filterMods(
-    mods,
-    DIRECTIONS,
-  ) as (typeof DIRECTIONS)[number][];
+  const named = filterMods(mods, DIRECTIONS) as (typeof DIRECTIONS)[number][];
+  let directions = named;
 
   if (!values.length) {
     values = ['calc(2 * var(--gap))'];
@@ -48,9 +49,21 @@ function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
   const transparentColor = colors?.[0] || DEFAULT_TRANSPARENT_COLOR;
   const opaqueColor = colors?.[1] || DEFAULT_OPAQUE_COLOR;
 
+  // A group that names edges takes a single width, applied to every edge it
+  // names — different widths per edge come from comma groups
+  // (`fade: '3x top, 1x bottom'`). A group that names none covers all four
+  // edges and keeps plain CSS shorthand order, so `fade: '3x 1x'` fades block
+  // edges at 3x and inline edges at 1x, matching `padding`.
+  if (named.length > 0 && values.length > 1) {
+    warnExtraGroupValues('fade', input, 1);
+  }
+
   return directions.map(
     (direction: (typeof DIRECTIONS)[number], index: number) => {
-      const size = values[index] || values[index % 2] || values[0];
+      const size =
+        named.length > 0
+          ? values[0]
+          : values[index] || values[index % 2] || values[0];
 
       return `linear-gradient(${DIRECTION_MAP[direction]}, ${transparentColor} 0%, ${opaqueColor} ${size})`;
     },
@@ -77,6 +90,7 @@ export function fadeStyle({ fade }: { fade?: string }) {
   for (const group of groups) {
     const groupGradients = processGroup(
       {
+        input: group.input ?? '',
         values: group.values ?? [],
         mods: group.mods ?? [],
         colors: group.colors ?? [],

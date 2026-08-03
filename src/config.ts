@@ -16,6 +16,9 @@ import {
   resetFunctionPolyfills,
   splitFunctions,
 } from './functions';
+import { resetStyleChunks } from './chunks/style-chunk-map';
+import type { PropHandlerDefinition } from './prop-handlers';
+import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
 import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
@@ -24,15 +27,20 @@ import {
   registerHandler,
   resetHandlers,
 } from './styles/predefined';
+import {
+  registerBaseStyleProps,
+  resetBaseStyleProps,
+} from './styles/base-props';
+import { resetStyleWarnings } from './styles/shared';
 import { resetColorSpace, setColorSpace } from './utils/color-space';
 import { isDevEnv } from './utils/is-dev-env';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import {
   CUSTOM_UNITS,
-  getGlobalFuncs,
+  getGlobalParseFunctions,
   getGlobalParser,
   normalizeColorTokenValue,
-  resetGlobalFuncs,
+  resetGlobalParseFunctions,
   resetGlobalPredefinedTokens,
   setGlobalPredefinedTokens,
 } from './utils/styles';
@@ -303,6 +311,56 @@ export interface TastyConfig {
    * ```
    */
   handlers?: Record<string, StyleHandlerDefinition>;
+  /**
+   * Props middleware for every tasty component. A prop handler receives the
+   * component's props and returns them, changed or not — the extension point for
+   * props that are not style properties.
+   *
+   * The map key is the handler's name and, by default, the prop that triggers it.
+   * Use `['*', fn]` for an unconditional handler, or `[['a', 'b'], fn]` to trigger
+   * on any of several props.
+   *
+   * Handlers must be pure and must not mutate their input: style values are cached
+   * by object identity, so mutating one in place yields stale CSS. Memoize the
+   * styles you build per input value.
+   *
+   * Not applicable to zero-runtime mode — `tastyStatic()` takes styles objects, not
+   * props, so there is nothing for middleware to run on. Components rendered
+   * through `tasty()` are unaffected and keep the runtime injector.
+   *
+   * @example
+   * ```ts
+   * configure({
+   *   propHandlers: {
+   *     glaze: (props) => {
+   *       const { glaze, ...rest } = props;
+   *       if (!glaze) return rest;
+   *       return { ...rest, styles: mergeStyles(glazeStyles(glaze), rest.styles) };
+   *     },
+   *   },
+   * });
+   *
+   * <Element glaze="purple" />
+   * ```
+   */
+  propHandlers?: Record<string, PropHandlerDefinition>;
+  /**
+   * Style properties exposed as top-level props on **every** tasty component, in
+   * addition to the built-in base styles, without each component listing them in
+   * `styleProps`.
+   *
+   * Augment `TastyBaseStylePropNames` to type them. Each name costs one property
+   * check per render of every component, so keep the list short; the effect is
+   * app-global and cannot be scoped to a subtree.
+   *
+   * @example
+   * ```ts
+   * configure({ baseStyleProps: ['radius', 'shadow'] });
+   *
+   * <Card radius="1r" shadow />
+   * ```
+   */
+  baseStyleProps?: readonly string[];
   /**
    * Design tokens injected as CSS custom properties on `:root`.
    * Values are parsed through the Tasty DSL. Supports state maps
@@ -809,8 +867,8 @@ function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
     );
     return;
   }
-  globalKeyframes = keyframes;
-  _hasGlobalKeyframes = Object.keys(keyframes).length > 0;
+  globalKeyframes = { ...(globalKeyframes ?? {}), ...keyframes };
+  _hasGlobalKeyframes = Object.keys(globalKeyframes).length > 0;
 }
 
 // ============================================================================
@@ -832,7 +890,12 @@ function setGlobalProperties(
     );
     return;
   }
-  globalProperties = properties;
+  // Merge against the raw user map, not getEffectiveProperties(), which would
+  // bake DEFAULT_PROPERTIES into it.
+  globalProperties = {
+    ...(globalProperties ?? getFromGlobalThis(GTKEY_PROPERTIES) ?? {}),
+    ...properties,
+  };
   setOnGlobalThis(GTKEY_PROPERTIES, globalProperties);
 }
 
@@ -879,7 +942,7 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
     );
     return;
   }
-  globalFontFace = fontFace;
+  globalFontFace = { ...(getGlobalFontFaces() ?? {}), ...fontFace };
   setOnGlobalThis(GTKEY_FONT_FACE, globalFontFace);
 }
 
@@ -920,7 +983,7 @@ function setGlobalCounterStyle(
     );
     return;
   }
-  globalCounterStyle = counterStyle;
+  globalCounterStyle = { ...(getGlobalCounterStyles() ?? {}), ...counterStyle };
   setOnGlobalThis(GTKEY_COUNTER_STYLE, globalCounterStyle);
 }
 
@@ -954,12 +1017,12 @@ function setGlobalFunction(
   if (stylesGenerated) {
     warnOnce(
       'function-after-styles',
-      `[Tasty] Cannot update function after styles have been generated.\n` +
+      `[Tasty] Cannot update functions after styles have been generated.\n` +
         `The new functions will be ignored.`,
     );
     return;
   }
-  globalFunction = functions;
+  globalFunction = { ...(getGlobalFunctions() ?? {}), ...functions };
   setOnGlobalThis(GTKEY_FUNCTION, globalFunction);
 }
 
@@ -984,7 +1047,16 @@ export function isFunctionsPolyfillEnabled(): boolean {
  * Internal use only.
  */
 function setGlobalPolyfills(polyfills: { functions?: boolean }): void {
-  globalPolyfills = polyfills;
+  if (stylesGenerated) {
+    warnOnce(
+      'polyfills-after-styles',
+      `[Tasty] Cannot update polyfills after styles have been generated.\n` +
+        `The new polyfill toggles will be ignored.`,
+    );
+    return;
+  }
+
+  globalPolyfills = { ...(globalPolyfills ?? {}), ...polyfills };
   setOnGlobalThis(GTKEY_POLYFILLS, globalPolyfills);
 }
 
@@ -1056,7 +1128,7 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
     }
   }
 
-  globalRecipes = recipes;
+  globalRecipes = { ...(globalRecipes ?? {}), ...recipes };
 }
 
 // ============================================================================
@@ -1188,6 +1260,16 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   let mergedUnits: Record<string, string | UnitHandler> = {};
   let mergedFunctions: FunctionsConfig = {};
   let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
+  /** Where each handler key came from, so registration warnings can name it. */
+  const handlerSources = new Map<string, string>();
+  let mergedPropHandlers: Record<string, PropHandlerDefinition> = {};
+  /** Where each prop handler key came from, for its warnings. */
+  const propHandlerSources = new Map<string, string>();
+  const mergedBaseStyleProps: string[] = [];
+  let mergedProperties: Record<string, PropertyDefinition> = {};
+  let mergedKeyframes: Record<string, KeyframesSteps> = {};
+  let mergedFontFaces: Record<string, FontFaceInput> = {};
+  let mergedCounterStyles: Record<string, CounterStyleDescriptors> = {};
   let mergedReplaceTokens: Record<string, string | number | boolean> = {};
   let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
   let mergedRecipes: Record<string, RecipeStyles> = {};
@@ -1208,6 +1290,33 @@ export function configure(config: Partial<TastyConfig> = {}): void {
       }
       if (plugin.handlers) {
         mergedHandlers = { ...mergedHandlers, ...plugin.handlers };
+        for (const key of Object.keys(plugin.handlers)) {
+          handlerSources.set(key, `plugin "${plugin.name}"`);
+        }
+      }
+      if (plugin.propHandlers) {
+        mergedPropHandlers = { ...mergedPropHandlers, ...plugin.propHandlers };
+        for (const key of Object.keys(plugin.propHandlers)) {
+          propHandlerSources.set(key, `plugin "${plugin.name}"`);
+        }
+      }
+      if (plugin.baseStyleProps) {
+        mergedBaseStyleProps.push(...plugin.baseStyleProps);
+      }
+      if (plugin.properties) {
+        mergedProperties = { ...mergedProperties, ...plugin.properties };
+      }
+      if (plugin.keyframes) {
+        mergedKeyframes = { ...mergedKeyframes, ...plugin.keyframes };
+      }
+      if (plugin.fontFaces) {
+        mergedFontFaces = { ...mergedFontFaces, ...plugin.fontFaces };
+      }
+      if (plugin.counterStyles) {
+        mergedCounterStyles = {
+          ...mergedCounterStyles,
+          ...plugin.counterStyles,
+        };
       }
       if (plugin.replaceTokens) {
         mergedReplaceTokens = {
@@ -1246,6 +1355,30 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   }
   if (config.handlers) {
     mergedHandlers = { ...mergedHandlers, ...config.handlers };
+    for (const key of Object.keys(config.handlers)) {
+      handlerSources.set(key, 'configure()');
+    }
+  }
+  if (config.propHandlers) {
+    mergedPropHandlers = { ...mergedPropHandlers, ...config.propHandlers };
+    for (const key of Object.keys(config.propHandlers)) {
+      propHandlerSources.set(key, 'configure()');
+    }
+  }
+  if (config.baseStyleProps) {
+    mergedBaseStyleProps.push(...config.baseStyleProps);
+  }
+  if (config.properties) {
+    mergedProperties = { ...mergedProperties, ...config.properties };
+  }
+  if (config.keyframes) {
+    mergedKeyframes = { ...mergedKeyframes, ...config.keyframes };
+  }
+  if (config.fontFaces) {
+    mergedFontFaces = { ...mergedFontFaces, ...config.fontFaces };
+  }
+  if (config.counterStyles) {
+    mergedCounterStyles = { ...mergedCounterStyles, ...config.counterStyles };
   }
   if (config.replaceTokens) {
     mergedReplaceTokens = { ...mergedReplaceTokens, ...config.replaceTokens };
@@ -1342,14 +1475,14 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   );
 
   if (Object.keys(parseFuncs).length > 0) {
-    // Merge with existing funcs
-    const currentFuncs = getGlobalFuncs();
+    // Merge with existing parse functions
+    const currentFuncs = getGlobalParseFunctions();
     const finalFuncs: Record<string, ParseFunction> = {
       ...currentFuncs,
       ...parseFuncs,
     };
-    parser.setFuncs(finalFuncs);
-    // Also update the global registry so customFunc() continues to work
+    parser.setFunctions(finalFuncs);
+    // Also update the global registry so customFunction() continues to work
     Object.assign(currentFuncs, parseFuncs);
   }
 
@@ -1367,31 +1500,48 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   }
 
   // Handle keyframes
-  if (config.keyframes) {
-    setGlobalKeyframes(config.keyframes);
+  if (Object.keys(mergedKeyframes).length > 0) {
+    setGlobalKeyframes(mergedKeyframes);
   }
 
   // Handle properties
-  if (config.properties) {
-    setGlobalProperties(config.properties);
+  if (Object.keys(mergedProperties).length > 0) {
+    setGlobalProperties(mergedProperties);
   }
 
   // Handle font faces
-  if (config.fontFaces) {
-    setGlobalFontFace(config.fontFaces);
+  if (Object.keys(mergedFontFaces).length > 0) {
+    setGlobalFontFace(mergedFontFaces);
   }
 
   // Handle counter styles
-  if (config.counterStyles) {
-    setGlobalCounterStyle(config.counterStyles);
+  if (Object.keys(mergedCounterStyles).length > 0) {
+    setGlobalCounterStyle(mergedCounterStyles);
   }
 
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
       const handler = normalizeHandlerDefinition(name, definition);
-      registerHandler(handler);
+      registerHandler(handler, {
+        key: name,
+        source: handlerSources.get(name),
+      });
     }
+  }
+
+  // Handle props middleware
+  if (Object.keys(mergedPropHandlers).length > 0) {
+    for (const [name, definition] of Object.entries(mergedPropHandlers)) {
+      registerPropHandler(name, definition, {
+        source: propHandlerSources.get(name),
+      });
+    }
+  }
+
+  // Handle promoted base style props
+  if (mergedBaseStyleProps.length > 0) {
+    registerBaseStyleProps(mergedBaseStyleProps);
   }
 
   // Handle replaceTokens (parse-time substitution)
@@ -1438,6 +1588,8 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     fontFaces: _fontFaces,
     counterStyles: _counterStyles,
     handlers: _handlers,
+    propHandlers: _propHandlers,
+    baseStyleProps: _baseStyleProps,
     tokens: _tokens,
     replaceTokens: _replaceTokens,
     recipes: _recipes,
@@ -1519,12 +1671,16 @@ export function resetConfig(): void {
   globalStyles = null;
   clearGlobalThisConfig();
   resetGlobalPredefinedTokens();
-  resetGlobalFuncs();
+  resetGlobalParseFunctions();
   resetFunctionPolyfills();
   resetHandlers();
+  resetStyleChunks();
+  resetPropHandlers();
+  resetBaseStyleProps();
   resetColorSpace();
   clearPipelineCache();
   emittedWarnings.clear();
+  resetStyleWarnings();
 
   const storage: TastyGlobalStorage =
     typeof window !== 'undefined' ? window : globalThis;

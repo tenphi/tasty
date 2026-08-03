@@ -1,5 +1,12 @@
 import type { FunctionsConfig } from '../functions';
+import type {
+  CounterStyleDescriptors,
+  FontFaceInput,
+  KeyframesSteps,
+  PropertyDefinition,
+} from '../injector/types';
 import type { UnitHandler } from '../parser/types';
+import type { PropHandlerDefinition } from '../prop-handlers';
 import type { RecipeStyles, ConfigTokens, Styles } from '../styles/types';
 import type { StyleHandlerDefinition } from '../utils/styles';
 import type { TypographyPreset } from '../utils/typography';
@@ -35,6 +42,32 @@ export interface TastyPlugin {
    */
   handlers?: Record<string, StyleHandlerDefinition>;
   /**
+   * Props middleware for every tasty component — props in, props out. The
+   * extension point for props that are not style properties: read a custom prop,
+   * strip it so it never reaches the DOM, and fold its meaning into `styles`,
+   * `mods`, `tokens`, `variant`, or `as`.
+   *
+   * Must be pure and must not mutate its input.
+   * See {@link TastyConfig.propHandlers}.
+   * @example
+   * ```ts
+   * propHandlers: {
+   *   glaze: (props) => {
+   *     const { glaze, ...rest } = props;
+   *     if (!glaze) return rest;
+   *     return { ...rest, styles: mergeStyles(glazeStyles(glaze), rest.styles) };
+   *   },
+   * }
+   * ```
+   */
+  propHandlers?: Record<string, PropHandlerDefinition>;
+  /**
+   * Style properties exposed as top-level props on every tasty component, in
+   * addition to the built-in base styles.
+   * See {@link TastyConfig.baseStyleProps}.
+   */
+  baseStyleProps?: readonly string[];
+  /**
    * Design tokens injected as CSS custom properties on `:root`.
    * Values are parsed through the Tasty DSL. Supports state maps.
    * - `$name` → `--name` CSS custom property
@@ -65,6 +98,19 @@ export interface TastyPlugin {
    * Supports the full Tasty style syntax.
    */
   globalStyles?: Record<string, Styles>;
+  /**
+   * Global CSS `@property` definitions. A plugin whose handler or prop handler
+   * emits a custom property usually wants one, so the property animates and
+   * inherits correctly instead of being treated as an untyped string.
+   * See {@link TastyConfig.properties}.
+   */
+  properties?: Record<string, PropertyDefinition>;
+  /** Global keyframes, injected only when referenced. See {@link TastyConfig.keyframes}. */
+  keyframes?: Record<string, KeyframesSteps>;
+  /** Global `@font-face` definitions. See {@link TastyConfig.fontFaces}. */
+  fontFaces?: Record<string, FontFaceInput>;
+  /** Global `@counter-style` definitions. See {@link TastyConfig.counterStyles}. */
+  counterStyles?: Record<string, CounterStyleDescriptors>;
 }
 
 /**

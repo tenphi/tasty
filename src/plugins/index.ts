@@ -21,4 +21,3 @@ export type { TastyPlugin, TastyPluginFactory } from './types';
 export { okhslPlugin, okhslFunction } from './okhsl-plugin';
 export { okhstPlugin, okhstFunction } from './okhst-plugin';
 export { createColorFunc } from './color-func';
-export { DEFAULT_PLUGINS, registerDefaultFunctions } from './defaults';

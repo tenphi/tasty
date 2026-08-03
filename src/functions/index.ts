@@ -16,7 +16,7 @@
 import type { FunctionDefinition, FunctionParameter } from '../injector/types';
 import type { StyleDetails } from '../parser/types';
 import type { Styles } from '../styles/types';
-import { customFunc, parseStyle } from '../utils/styles';
+import { customFunction, parseStyle } from '../utils/styles';
 
 // ============================================================================
 // Constants
@@ -402,7 +402,7 @@ export function registerFunctionPolyfill(
   const serialized = JSON.stringify(definition);
   if (registeredFunctionDefs.get(cssName) === serialized) return;
   registeredFunctionDefs.set(cssName, serialized);
-  customFunc(cssName, compileFunctionClosure(name, definition));
+  customFunction(cssName, compileFunctionClosure(name, definition));
 }
 
 /** Register all local `@function` definitions from a styles object (polyfill). */

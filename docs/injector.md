@@ -11,7 +11,7 @@ The Style Injector is the core engine behind Tasty's styling system, providing:
 - **Hash-based deduplication** - Identical CSS gets the same className
 - **Reference counting** - Automatic cleanup when components unmount (refCount = 0)
 - **CSS nesting flattening** - Handles `&`, `.Class`, `SubElement` patterns
-- **Keyframes injection** - First-class `@keyframes` support with immediate disposal
+- **At-rule injection** - First-class `@keyframes`, `@property`, `@font-face`, `@counter-style`, and `@function` support
 - **Smart cleanup** - CSS rules batched cleanup, keyframes disposed immediately
 - **SSR support** - Deterministic class names and CSS extraction
 - **Multiple roots** - Works with Document and ShadowRoot
@@ -232,6 +232,33 @@ configure({
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of touch events between GC cycles. Each style render counts as a touch. When the counter reaches this value, GC is scheduled via `requestIdleCallback`.
 - `gc.capacity`: Maximum number of unused styles (refCount = 0, not in DOM) to retain. When exceeded, the oldest are evicted first. Actively referenced styles don't count against this limit.
+
+---
+
+### At-rule injection
+
+Beyond ordinary rules, the injector has a dedicated entry point per at-rule. All of them deduplicate by name and are **permanent** — there is no ref-counting or dispose, because a rule that other CSS references by name cannot be safely removed while any of it might still apply.
+
+| Function | Injects | Notes |
+|---|---|---|
+| `keyframes(steps, nameOrOptions?)` | `@keyframes` | The exception: ref-counted and disposed immediately when unused. Returns the injected name, which may differ from the requested one. |
+| `property(name, options?)` | `@property` | `name` accepts `$name`, `#name`, or `--name`. Usually unnecessary — types are inferred automatically unless `configure({ autoPropertyTypes: false })`. |
+| `fontFace(family, descriptors, options?)` | `@font-face` | Deduplicated by family **and** descriptor content, so several faces of one family coexist. |
+| `counterStyle(name, descriptors, options?)` | `@counter-style` | |
+| `func(name, definition, options?)` | `@function` | `name` accepts `$$name`, `$name`, or `--name`. Abbreviated because `function` is a reserved word. |
+
+Every one of these takes an optional `root` (a `Document` or `ShadowRoot`).
+
+`func()` also accepts `weak: true`, which registers the rule **without** overriding an existing one of the same name. `configure()` uses it for global `@function` definitions so a component-local definition always wins over the global default, regardless of which is injected first.
+
+```ts
+import { counterStyle, fontFace, func, property } from '@tenphi/tasty';
+
+property('$card-elevation', { syntax: '<number>', initialValue: '0' });
+fontFace('Inter', { src: 'url(/inter.woff2)', fontWeight: '400 700' });
+counterStyle('dashes', { system: 'cyclic', symbols: '"—"', suffix: ' ' });
+func('$$negative', { args: ['$value'], result: '(-1 * $value)' });
+```
 
 ---
 

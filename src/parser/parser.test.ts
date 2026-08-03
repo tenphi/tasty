@@ -4,7 +4,7 @@ import { StyleParser } from './parser';
 import type { StyleDetails } from './types';
 
 const parser = new StyleParser({
-  funcs: {
+  functions: {
     okhsl: okhslFunction,
     sum(parsed: StyleDetails[]) {
       return `calc(${parsed
@@ -669,7 +669,7 @@ describe('StyleProcessor', () => {
     // Create a parser with a custom function that uses input
     const inputCapture: string[] = [];
     const testParser = new StyleParser({
-      funcs: {
+      functions: {
         capture(parsed: StyleDetails[]) {
           inputCapture.push(...parsed.map((g) => g.input));
           return 'captured';

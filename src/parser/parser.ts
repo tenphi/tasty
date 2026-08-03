@@ -131,8 +131,8 @@ export class StyleParser {
     return result;
   }
 
-  setFuncs(funcs: Required<ParserOptions>['funcs']): void {
-    this.opts.funcs = funcs;
+  setFunctions(functions: Required<ParserOptions>['functions']): void {
+    this.opts.functions = functions;
     this.cache.clear();
   }
 

@@ -14,7 +14,7 @@ describe('okhslPlugin', () => {
 
   describe('okhslFunction', () => {
     const parser = new StyleParser({
-      funcs: { okhsl: okhslFunction },
+      functions: { okhsl: okhslFunction },
     });
 
     // Expected values calculated using @texel/color library:
@@ -135,7 +135,8 @@ describe('okhslPlugin', () => {
       });
 
       it('returns fallback for missing values', () => {
-        // Silence expected warning
+        // The warning is dev-gated, so enable dev mode to observe it.
+        vi.stubEnv('NODE_ENV', 'development');
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
           /* noop */
         });
@@ -144,11 +145,12 @@ describe('okhslPlugin', () => {
         const result = okhslFunction([]);
         expect(result).toBe('rgb(0% 0% 0%)');
         expect(warnSpy).toHaveBeenCalledWith(
-          '[okhsl] Expected 3 values (H S L), got:',
+          '[Tasty] okhsl(): expected 3 values (H S L), got:',
           [],
         );
 
         warnSpy.mockRestore();
+        vi.unstubAllEnvs();
       });
     });
 

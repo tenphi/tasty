@@ -1,3 +1,4 @@
+import { isDevEnv } from '../utils/is-dev-env';
 import { Lru } from '../parser/lru';
 import type { StyleDetails } from '../parser/types';
 
@@ -61,7 +62,13 @@ export function createColorFunc(
 
   return (groups: StyleDetails[]): string => {
     if (groups.length === 0 || groups[0].all.length < 3) {
-      console.warn(`[${name}] Expected 3 values${expected}, got:`, groups);
+      if (isDevEnv()) {
+        console.warn(
+          `[Tasty] ${name}(): expected 3 values${expected}, got:`,
+          groups,
+        );
+      }
+
       return 'rgb(0% 0% 0%)';
     }
 

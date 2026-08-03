@@ -249,13 +249,25 @@ describe('marginStyle', () => {
       });
     });
 
-    it('assigns values to directions in order they appear', () => {
-      // First value (1x) → first direction (right), second value (2x) → second direction (top)
+    it('applies the single value to every direction it names', () => {
+      // A group that names directions takes one value; extra values are ignored
+      // (with a dev-mode warning). See paddingStyle for the rationale.
       expect(marginStyle({ margin: 'right 1x top 2x' })).toEqual({
-        margin: '16px 8px 0 0',
+        margin: '8px 8px 0 0',
       });
 
       expect(marginStyle({ margin: 'left 2x right 1x' })).toEqual({
+        margin: '0 16px',
+      });
+    });
+
+    it('supports comma groups for per-side values', () => {
+      // The replacement for the old positional form.
+      expect(marginStyle({ margin: '1x right, 2x top' })).toEqual({
+        margin: '16px 8px 0 0',
+      });
+
+      expect(marginStyle({ margin: '2x left, 1x right' })).toEqual({
         margin: '0 8px 0 16px',
       });
     });

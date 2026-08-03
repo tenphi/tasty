@@ -546,3 +546,4 @@ const card = tastyStatic({
 - [Style DSL](dsl.md) — State maps, tokens, units, extending semantics (shared by runtime and static)
 - [React API](react-api.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, style functions
 - [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers
+- [Plugins & Extension Points](plugins.md) — Which extension points work at build time (`functions`, `units`, `states`, `handlers`, `recipes`) and which do not (`propHandlers` — `tastyStatic()` takes styles objects, not props)

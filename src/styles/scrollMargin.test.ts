@@ -42,6 +42,29 @@ describe('scrollMarginStyle', () => {
         'scroll-margin': '16px 0 0 0',
       });
     });
+
+    it('applies one value to every direction it names', () => {
+      expect(scrollMarginStyle({ scrollMargin: '2x top bottom' })).toEqual({
+        'scroll-margin': '16px 0',
+      });
+
+      // Extra values in a directional group are ignored (dev warning).
+      expect(scrollMarginStyle({ scrollMargin: '2x 4x top right' })).toEqual({
+        'scroll-margin': '16px 16px 0 0',
+      });
+    });
+
+    it('supports comma groups for per-side values', () => {
+      expect(scrollMarginStyle({ scrollMargin: '2x top, 4x right' })).toEqual({
+        'scroll-margin': '16px 32px 0 0',
+      });
+    });
+
+    it('ignores dock — span modifiers are inset-only', () => {
+      expect(scrollMarginStyle({ scrollMargin: '2x bottom dock' })).toEqual({
+        'scroll-margin': '0 0 16px 0',
+      });
+    });
   });
 
   describe('scrollMarginBlock and scrollMarginInline', () => {

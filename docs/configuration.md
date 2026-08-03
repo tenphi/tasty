@@ -55,7 +55,9 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
 | `units` | `Record<string, string \| UnitHandler>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
 | `functions` | `Record<string, FunctionDefinition \| Function>` | - | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
-| `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in) |
+| `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in). See [Custom Style Handlers](#custom-style-handlers) |
+| `propHandlers` | `Record<string, PropHandlerDefinition>` | - | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware) |
+| `baseStyleProps` | `readonly string[]` | - | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props) |
 | `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
 | `replaceTokens` | `Record<string, string \| number \| boolean>` | - | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens |
 | `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
@@ -67,7 +69,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
 | `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
 | `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
-| `plugins` | `TastyPlugin[]` | - | Plugins that extend tasty with custom functions, units, or states (processed in order, later override earlier) |
+| `plugins` | `TastyPlugin[]` | - | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
 | `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
 | `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
@@ -485,21 +487,13 @@ Override or extend the built-in style property handlers. A handler definition ca
 | Single dep | `['styleName', handler]` | Triggered by the specified style property |
 | Multi dep | `[['dep1', 'dep2', ...], handler]` | Triggered by any of the listed properties; receives all of them |
 
-The multi-dep form is useful when output depends on several style properties together (e.g., `gap` needs to know `display` and `flow` to decide the CSS strategy).
+The multi-dep form is useful when output depends on several style properties together (e.g., `gap` needs to know `display` and `flow` to decide the CSS strategy). Use `defineHandler` for it and the dependency types are inferred from the dependency list, so a typo in the destructure is a type error instead of a silent `undefined`.
 
 ```jsx
-import { configure, styleHandlers } from '@tenphi/tasty';
+import { configure, defineHandler, styleHandlers } from '@tenphi/tasty';
 
 configure({
   handlers: {
-    // Function only — overrides built-in fill handler
-    fill: ({ fill }) => {
-      if (fill?.startsWith('gradient:')) {
-        return { background: fill.slice(9) };
-      }
-      return styleHandlers.fill({ fill });
-    },
-
     // Function only — new single-prop handler
     elevation: ({ elevation }) => {
       const level = parseInt(elevation) || 1;
@@ -509,15 +503,111 @@ configure({
       };
     },
 
+    // Overriding a built-in: declare every style the built-in handled and pass
+    // them all through, or the ones you leave out stop working (see below).
+    fill: defineHandler(
+      [
+        'fill', 'backgroundColor', 'image', 'backgroundImage',
+        'backgroundPosition', 'backgroundSize', 'backgroundRepeat',
+      ],
+      (props) => {
+        if (typeof props.fill === 'string' && props.fill.startsWith('gradient:')) {
+          return { background: props.fill.slice(9) };
+        }
+        return styleHandlers.fill(props);
+      },
+    ),
+
     // Multi dep — handler reads multiple style properties
-    gap: [['display', 'flow', 'gap'], ({ display, flow, gap }) => {
+    gap: defineHandler(['display', 'flow', 'gap'], ({ display, flow, gap }) => {
       if (!gap) return;
-      const isGrid = display?.includes('grid');
+      const isGrid = String(display ?? '').includes('grid');
       return { gap: isGrid ? gap : `/* custom logic for ${flow} */` };
-    }],
+    }),
   },
 });
 ```
+
+### Return shape
+
+A handler returns a `CSSMap`, an array of them, or nothing:
+
+- Keys are **kebab-case** CSS property names (`'background-color'`, not `backgroundColor`) or `--custom-property` names. A camelCase key warns in development and is emitted verbatim, which the browser ignores.
+- Values are stringified, so numbers are fine (`{ '-webkit-line-clamp': 3 }`).
+- The reserved `$` key is a **selector suffix**: `{ $: '& > *:not(:last-child)', 'margin-right': gap }` applies the declarations to a nested selector. It accepts an array to fan out over several.
+- Return an array of maps to emit several declaration sets, each with its own `$`.
+
+Values arrive **state-resolved but unparsed** — the raw authored DSL string (`'2x'`, `'#purple.5'`, `true`, `4`). Call the exported `parseStyle()` / `parseColor()` yourself; nothing parses them for you.
+
+### Replacing a built-in handler
+
+Built-in handlers are shared across several style names. Registering a handler for one of those names unregisters the built-in from **all** of them, and the displaced names then fall back to auto-generated CSS aliases — so `hide: true` starts emitting a literal `hide: true` declaration. A development-mode warning lists exactly what was displaced.
+
+The shared groups worth knowing:
+
+| Registering a handler for | Also takes over |
+|---|---|
+| `fill` | `backgroundColor`, `image`, `backgroundImage`, `backgroundPosition`, `backgroundSize`, `backgroundRepeat` |
+| `display` | `hide`, `overflow`, `whiteSpace`, `textOverflow`, `flow`, `gap` |
+| `preset` | `font`, `fontSize`, `fontWeight`, `fontStyle`, `lineHeight`, `letterSpacing`, `textTransform` |
+| `padding` / `margin` / `inset` | their `*Top`/`*Right`/`*Bottom`/`*Left`/`*Block`/`*Inline` longhands |
+
+Either declare the whole group and delegate the rest to `styleHandlers.*`, or pick a name that isn't shared.
+
+### Chunk membership
+
+Tasty renders and caches CSS in independent chunks, and a chunk's cache key covers only its own style values. All of a handler's dependencies must therefore live in one chunk. Custom style names are pulled into their handler's chunk automatically at registration; a handler whose dependencies span two *built-in* chunks (say `fill` and `padding`) warns, because it would be invoked once per chunk with a subset of its inputs.
+
+`configure({ handlers })` must run before the first render, like every other config option.
+
+---
+
+## Props Middleware
+
+`propHandlers` are middleware over a component's props — props in, props out. Where a style *handler* turns a style property into CSS declarations, a prop handler turns a **component prop** into other props, including `styles`. It is the extension point for props whose value isn't a style value.
+
+```jsx
+import { configure, mergeStyles } from '@tenphi/tasty';
+
+configure({
+  propHandlers: {
+    glaze: (props) => {
+      const { glaze, ...rest } = props;
+      if (!glaze) return rest;
+
+      return { ...rest, styles: mergeStyles(glazeStyles(glaze), rest.styles) };
+    },
+  },
+});
+
+<Element glaze="purple" />
+```
+
+The map key is the handler's name and, by default, the prop that triggers it, so an absent prop costs one property check rather than a call. A tuple overrides that: `['glaze', fn]`, `[['glaze', 'tint'], fn]`, or `['*', fn]` for unconditional.
+
+Handlers run at the very top of every component's render, before any prop is destructured, so one can rewrite `styles`, `mods`, `tokens`, `variant`, `as`, `element`, and `qa`. They run in registration order — plugins first, then direct config — each receiving the previous one's output.
+
+Handlers must be **pure** and must not mutate their input, and should memoize the styles they build per input value: style values are cached by object identity, so mutating one in place yields stale CSS, and a reference-stable object avoids re-serializing on every render.
+
+Injected styles occupy the `styles` slot, so they beat a component's own default styles and lose to a style prop at the call site. Prop handlers do not apply to sub-elements or to zero-runtime `tastyStatic()`, which has no props.
+
+See [Plugins → Props middleware](plugins.md#props-middleware) for the full contract and a worked example.
+
+---
+
+## Base Style Props
+
+`baseStyleProps` exposes style properties as props on **every** `tasty()` component, on top of the built-in base styles (`display`, `font`, `preset`, `hide`, `whiteSpace`, `opacity`, `transition`):
+
+```jsx
+configure({ baseStyleProps: ['radius', 'shadow'] });
+
+<Card radius="1r" shadow />
+```
+
+`configure()` may run after your components are defined — each factory resolves its prop list lazily.
+
+Each name costs one property check per render of every component, and the effect is app-global, so keep the list short and use a factory's own `styleProps` for anything narrower. Avoid names that collide with real DOM or component props (`width`, `size`, `color`), since every component will then swallow them as styles.
 
 ---
 

@@ -423,6 +423,8 @@ The `TastyRegistry` or `tastyIntegration` is missing. Ensure your layout wraps t
 
 Class names are deterministic for the same render order. If you see mismatches, ensure `hydrateTastyClasses()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, call `hydrateTastyClasses()` before `hydrateRoot()`.
 
+Class names are also derived from the *resolved* styles, so the server and the client must configure Tasty identically. Anything that changes what a component's styles resolve to will produce a mismatch if it is registered on only one side — `namePrefix`, `recipes`, `handlers`, and the `propHandlers` / `baseStyleProps` extension points described in [Plugins](plugins.md). Call the same `configure()` on both; global CSS is deduplicated automatically, so no `typeof window` guard is needed.
+
 ### Styles duplicated after hydration
 
 **Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`) configured via `configure()` is automatically deduplicated. When Tasty detects `<style data-tasty-ssr>` in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.

@@ -32,7 +32,7 @@ export interface DebugOptions {
   raw?: boolean;
 }
 
-export interface CssOptions extends DebugOptions {
+export interface CSSOptions extends DebugOptions {
   prettify?: boolean;
   /** Read from stored source CSS (dev-mode only) instead of live CSSOM */
   source?: boolean;
@@ -426,7 +426,7 @@ const CHUNK_ORDER = [
 // ---------------------------------------------------------------------------
 
 export const tastyDebug = {
-  css(target: CSSTarget, opts?: CssOptions): string {
+  css(target: CSSTarget, opts?: CSSOptions): string {
     const {
       root = document,
       prettify = true,

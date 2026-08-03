@@ -1,6 +1,6 @@
 # Tasty Style Rules for AI Agents
 
-A compact ruleset for **writing correct `@tenphi/tasty` styles**. It is not an API tour — every rule here is machine-checked by [`@tenphi/eslint-plugin-tasty`](https://www.npmjs.com/package/@tenphi/eslint-plugin-tasty), so following it means clean lint output. For explanations and the complete API, see [Style DSL](dsl.md), [Style Properties](styles.md), [React API](react-api.md).
+A compact ruleset for **writing correct `@tenphi/tasty` styles**. It is not an API tour — most rules here are machine-checked by [`@tenphi/eslint-plugin-tasty`](https://www.npmjs.com/package/@tenphi/eslint-plugin-tasty), so following it generally means clean lint output. The plugin ships separately and can lag a new DSL rule, so treat this page as the source of truth and the plugin as the enforcement that catches most of it. For explanations and the complete API, see [Style DSL](dsl.md), [Style Properties](styles.md), [React API](react-api.md).
 
 Notation: ❌ wrong → ✅ correct.
 
@@ -64,7 +64,8 @@ The last row goes the other way — longhands over the shorthand — because `fl
 | `#clear` / `#current` | `transparent` / `currentcolor` |
 | `$name` | custom property → `var(--name)` |
 | `(#a, #b)` | fallback chain |
-| `$$name` / `##name` | the property *name* — only inside `transition` |
+| `$$name` / `##name` | the custom property *name* (not its value) — inside `transition` |
+| `$$name(…)` | call a CSS `@function` declared via `@function`, `useFunction`, or config |
 
 - ❌ `#f5f5f5`, `rgb(0 0 0)`, `oklch(…)`, `okhsl(…)`, `red` → ✅ `#surface` (add the token to the config if it doesn't exist).
 - ❌ `var(--gap)` → ✅ `$gap` · ❌ `$accent-color` → ✅ `#accent` · ❌ `transparent` → ✅ `#clear` · ❌ `currentColor` → ✅ `#current`.
@@ -90,7 +91,7 @@ Never use it. Tasty owns specificity through doubled selectors and state orderin
 
 ### Modifiers
 
-A value is `[values…] [modifiers…]`, and several groups can be comma-separated (later groups override earlier ones). Only the modifiers a property knows are valid:
+A value is `[values…] [modifiers…]`, and several groups can be comma-separated (later groups override earlier ones). A group that names **direction** modifiers takes a **single** value, applied to every direction it names — per-side values come from comma groups. A group naming no direction keeps plain CSS shorthand order (1–4 values). (`inset` + `dock` is the one exception: a second value insets the spanned sides.) Only the modifiers a property knows are valid:
 
 | Property | Modifiers |
 |----------|-----------|
@@ -111,6 +112,8 @@ Directional modifiers beat placeholder zeros:
 - ❌ `padding: '0 0 2x 0'` → ✅ `padding: '2x bottom'`
 - ❌ `padding: '1x 1x 2x 1x'` → ✅ `padding: '1x, 2x bottom'`
 - ❌ `border: '0 0 1bw 0'` — four tokens parse as *one* border value, so this renders no border at all → ✅ `border: '1bw bottom'`
+- ❌ `padding: '2x 4x top right'` — a directional group takes one value, so `4x` is dropped → ✅ `padding: '2x top, 4x right'`
+- ❌ `fade: '3x 1x top bottom'` → ✅ `fade: '3x top, 1x bottom'`
 
 Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, `tabSize`, `paddingInline`, `paddingBlock`. `fill` and `color` take a color (plus `none` / `transparent`); `caretColor` and `accentColor` take a color only.
 
@@ -184,10 +187,20 @@ styles: { Title: { preset: 'h3' }, Icon: { $: '>@:last-child', color: '#accent' 
 | Key | Shape |
 |-----|-------|
 | `@keyframes` | `{ name: { '0%': styles, … } }` |
-| `@properties` | `{ '$name': { syntax, inherits, initialValue } }` |
-| `@fontFace` | `{ 'Family Name': descriptors \| descriptors[] }` |
-| `@counterStyle` | `{ name: descriptors }` |
+| `@property` | `{ '$name': { syntax, inherits, initialValue } }` |
+| `@font-face` | `{ 'Family Name': descriptors \| descriptors[] }` |
+| `@counter-style` | `{ name: descriptors }` |
+| `@function` | `{ '$$name': { args, returns?, result, '$local'? } }` |
 | `recipe` | a **string** of configured recipe names: `'card elevated'`, `'reset input / autofill'`, `'none / disabled'` |
+
+At-rule keys match the real CSS at-rule names, so they are kebab-case, not camelCase. Inside `@function`, the callable is `$$name` but its parameters and local variables are `$name`:
+
+```jsx
+styles: {
+  '@function': { $$negative: { args: ['$value'], result: '(-1 * $value)' } },
+  marginTop: '$$negative(2x)',
+}
+```
 
 ## 7. `tastyStatic()`
 
@@ -203,4 +216,5 @@ The selector must be a string literal and valid CSS. Values must be static — s
 - Modifiers valid for the property; directional shorthand instead of placeholder zeros.
 - Every state map starts with `''` (or `_`), is flat, and lives inside a property value.
 - `@own()` only inside sub-elements; sub-element keys are capitalized and hold objects.
+- At-rule keys are kebab-case (`@property`, `@font-face`, `@counter-style`, `@function`); `@function` names use `$$`, their args and locals use `$`.
 - Values are static; dynamic behavior comes from `mods` / `tokens` / `styleProps`.

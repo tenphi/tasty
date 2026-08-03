@@ -1,7 +1,7 @@
 import type { StyleDetails } from '../parser/types';
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
-import { extractCSSWideKeyword } from './shared';
+import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
 
 type Direction = (typeof DIRECTIONS)[number];
 
@@ -57,6 +57,7 @@ function parseSingleValue(
 
 function extractGroupData(
   group: StyleDetails,
+  property: string,
   defaultValue: string,
   spanModifiers?: readonly string[],
 ): {
@@ -65,11 +66,19 @@ function extractGroupData(
   span: boolean;
 } {
   const { values = [], mods = [] } = group;
+  const directions = filterMods(mods, DIRECTIONS) as Direction[];
+  const span = !!spanModifiers?.some((mod) => mods.includes(mod));
+
+  // A group that names directions carries one value — two with a span modifier.
+  // Guarded inline so the valid path costs a single comparison.
+  if (directions.length > 0 && values.length > (span ? 2 : 1)) {
+    warnExtraGroupValues(property, group.input, span ? 2 : 1);
+  }
 
   return {
     values: values.length ? values : [defaultValue],
-    directions: filterMods(mods, DIRECTIONS) as Direction[],
-    span: !!spanModifiers?.some((mod) => mods.includes(mod)),
+    directions,
+    span,
   };
 }
 
@@ -82,35 +91,40 @@ function applyGroup(
   if (!values.length) return;
 
   if (directions.length === 0) {
+    // No direction named — plain CSS shorthand order (1-4 values). Unambiguous,
+    // so it keeps working: `padding: '1x 2x'` is block 1x / inline 2x.
     dirs.top = values[0];
     dirs.right = values[1] || values[0];
     dirs.bottom = values[2] || values[0];
     dirs.left = values[3] || values[1] || values[0];
-  } else {
-    // Values are consumed positionally by the named directions, matching
-    // `inset: '1x 2x left right'` (left 1x, right 2x). With a span modifier the
-    // *next* value applies to the perpendicular sides, so
-    // `inset: '2x 4x bottom dock'` pins the bottom at 2x and spans the sides at
-    // 4x. Without that extra value the span reuses the direction's own value.
-    const spanValue = span ? values[directions.length] : undefined;
 
-    // Span first so an explicitly named direction always wins over the value
-    // it would otherwise inherit as a perpendicular side.
-    if (span) {
-      directions.forEach((dir, i) => {
-        const perpendicular = spanValue ?? values[i] ?? values[0];
-        // The two sides perpendicular to `dir` are its neighbours in
-        // DIRECTIONS (top -> left/right, right -> top/bottom, ...).
-        const d = DIRECTIONS.indexOf(dir);
+    return;
+  }
 
-        dirs[DIRECTIONS[(d + 1) % 4] as Direction] = perpendicular;
-        dirs[DIRECTIONS[(d + 3) % 4] as Direction] = perpendicular;
-      });
+  // A group that names directions has one meaningful value, applied to every
+  // named direction: `padding: '2x top, 4x right'`, not `'2x 4x top right'`.
+  // Extra values were reported by extractGroupData and are ignored here.
+  const value = values[0];
+
+  // Span first so an explicitly named direction always wins over the value it
+  // would otherwise inherit as a perpendicular side.
+  if (span) {
+    // `inset: '2x 4x bottom dock'` pins the bottom at 2x and insets the spanned
+    // sides by 4x. Without a second value the span reuses the edge's own value.
+    const spanValue = values[1] ?? value;
+
+    for (const dir of directions) {
+      // The two sides perpendicular to `dir` are its neighbours in DIRECTIONS
+      // (top -> left/right, right -> top/bottom, ...).
+      const d = DIRECTIONS.indexOf(dir);
+
+      dirs[DIRECTIONS[(d + 1) % 4] as Direction] = spanValue;
+      dirs[DIRECTIONS[(d + 3) % 4] as Direction] = spanValue;
     }
+  }
 
-    directions.forEach((dir, i) => {
-      dirs[dir] = values[i] ?? values[0];
-    });
+  for (const dir of directions) {
+    dirs[dir] = value;
   }
 }
 
@@ -248,6 +262,7 @@ export function processDirectionalStyle(
             } else {
               const { values, directions, span } = extractGroupData(
                 group,
+                property,
                 defaultValue,
                 spanModifiers,
               );

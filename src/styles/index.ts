@@ -4,6 +4,7 @@ const { STYLE_HANDLER_MAP } = predefine();
 
 export { STYLE_HANDLER_MAP, styleHandlers };
 export * from './createStyle';
+export { defineHandler } from './define-handler';
 export {
   normalizeHandlerDefinition,
   registerHandler,

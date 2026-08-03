@@ -191,8 +191,9 @@ describe('insetStyle', () => {
     });
 
     it('takes a second value for the spanned sides', () => {
-      // Values are consumed positionally by the named directions, so the next
-      // one applies to the perpendicular pair: bottom 2x, sides 4x.
+      // A span modifier is the one case where a directional group takes two
+      // values: the first insets the named edge, the second the sides it spans
+      // (bottom 2x, sides 4x). Without `dock` a second value is ignored.
       expect(insetStyle({ inset: '2x 4x bottom dock' })).toEqual({
         inset: 'auto 32px 16px 32px',
       });

@@ -164,9 +164,12 @@ export interface StylesInterface extends Omit<
   /**
    * The fade style applies gradient-based fading masks to the edges of an element. Replaces complex CSS mask gradients with a simple, declarative API.
    *
-   * Syntax: `[width] [directions] [#from-color] [#to-color]`
+   * Syntax: `[width] [direction...] [#from-color] [#to-color]`
    *
-   * Multiple groups can be separated by commas to specify different colors per direction.
+   * Multiple groups can be separated by commas to specify different widths and
+   * colors per direction. A group that names edges takes a single width, applied
+   * to every edge it names; a group that names none covers all four edges and
+   * keeps plain CSS shorthand order.
    *
    * Color tokens (optional):
    * - First color: transparent start of gradient (default: `rgb(0 0 0 / 0)`)
@@ -176,7 +179,8 @@ export interface StylesInterface extends Omit<
    * - `fade="top"` // fade only top edge with default width
    * - `fade="2x left right"` // fade left and right edges with 2x width
    * - `fade="1x top"` // fade only top edge with 1x width
-   * - `fade="3x 1x top bottom"` // top: 3x width, bottom: 1x width
+   * - `fade="3x 1x"` // all edges: top/bottom 3x, left/right 1x
+   * - `fade="3x top, 1x bottom"` // top: 3x width, bottom: 1x width
    * - `fade="2x #transparent #dark"` // custom colors for gradient mask
    * - `fade="1x top #clear #solid"` // top edge with custom mask colors
    * - `fade="top #red #blue, bottom #green #yellow"` // different colors per direction
@@ -219,20 +223,28 @@ export interface StylesInterface extends Omit<
   /**
    * Shorthand for element padding. Supports custom units, directional modifiers, and design-system-driven defaults.
    *
+   * A group that names directions takes a single value, applied to every
+   * direction it names — use comma groups for per-side values.
+   *
    * Examples:
    * - `padding="2x 1x"` // top/bottom: 2x, left/right: 1x
    * - `padding="2x top"` // only top padding: 2x
    * - `padding="1x left right"` // left and right padding: 1x
+   * - `padding="2x top, 4x right"` // top: 2x, right: 4x, bottom/left: 0
    * - `padding={true}` // default padding on all sides
    */
   padding?: CSSProperties['padding'] | string | boolean;
   /**
    * Shorthand for element margin. Supports custom units, directional modifiers, and design-system-driven defaults.
    *
+   * A group that names directions takes a single value, applied to every
+   * direction it names — use comma groups for per-side values.
+   *
    * Examples:
    * - `margin="2x 1x"` // top/bottom: 2x, left/right: 1x
    * - `margin="2x top"` // only top margin: 2x
    * - `margin="1x left right"` // left and right margin: 1x
+   * - `margin="2x top, 4x right"` // top: 2x, right: 4x, bottom/left: 0
    * - `margin={true}` // default margin on all sides
    */
   margin?: CSSProperties['margin'] | string | boolean;
@@ -482,6 +494,7 @@ export interface StylesInterface extends Omit<
    * Examples:
    * - `scrollMargin="2x"` // scroll-margin on all sides: 2x
    * - `scrollMargin="2x top"` // only top scroll-margin: 2x
+   * - `scrollMargin="2x top, 4x bottom"` // top: 2x, bottom: 4x
    * - `scrollMargin={true}` // default scroll-margin on all sides
    */
   scrollMargin?: CSSProperties['scrollMargin'] | string | boolean;
@@ -498,13 +511,18 @@ export interface StylesInterface extends Omit<
    * - `inset="0"` // all sides: 0
    * - `inset="2x top"` // only top offset: 2x
    * - `inset="1x left right"` // left and right offsets: 1x
+   * - `inset="2x top, 4x right"` // top: 2x, right: 4x, bottom/left: auto
    * - `inset="bottom dock"` // bottom-anchored, full width: auto 0 0 0
    * - `inset={true}` // all sides: 0
    *
+   * A group that names directions takes a single value, applied to every
+   * direction it names — use comma groups for per-side values.
+   *
    * The `dock` modifier pins the named edge and spans its full length, applying
-   * the value to the two perpendicular sides as well. A second value applies to
-   * those spanned sides: `inset="2x 4x bottom dock"` pins the bottom at `2x` and
-   * insets the sides by `4x`.
+   * the value to the two perpendicular sides as well. `dock` is the one case
+   * where a directional group takes two values: the second applies to those
+   * spanned sides, so `inset="2x 4x bottom dock"` pins the bottom at `2x` and
+   * insets the sides by `4x`. Without `dock` a second value is ignored.
    */
   inset?:
     | 'top'

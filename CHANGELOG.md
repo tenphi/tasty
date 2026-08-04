@@ -1,5 +1,197 @@
 # @tenphi/tasty
 
+## 3.0.0
+
+### Major Changes
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - At-rule naming consistency.
+  1. Rename the per-component/per-recipe `'@fontFace'` and `'@counterStyle'` style keys to `'@font-face'` and `'@counter-style'` so they match the real CSS at-rule names Tasty already emits. Emitted CSS is unchanged; `@starting` is unaffected.
+  2. Pluralize the global config collection options `fontFace` → `fontFaces` and `counterStyle` → `counterStyles` for consistency with the other plural collections (`properties`, `functions`, `keyframes`). The injector methods (`injector.fontFace()` / `injector.counterStyle()`) and hooks (`useFontFace` / `useCounterStyle`) are unchanged.
+
+  Both are breaking renames. Update styles-object keys from `'@fontFace'` / `'@counterStyle'` to `'@font-face'` / `'@counter-style'`, and `configure({ fontFace, counterStyle })` to `configure({ fontFaces, counterStyles })`.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - A style group that names direction modifiers now takes a single value.
+
+  Values and modifiers are bucketed separately per comma group, so the interleaving that `padding: '2x 4x top right'` suggests never survived parsing: `'2x top 4x right'` and `'top 2x right 4x'` were the same input, and the pairing was decided by the order the _modifiers_ happened to appear in. `'1x 2x right top'` and `'1x 2x top right'` produced different CSS, and `'1x 2x top top'` silently assigned `top` twice.
+
+  A group that names directions now applies its **first** value to every direction it names, and extra values are ignored with a development-mode warning (silent in production, never throws). Per-side values come from comma-separated groups:
+
+  ```
+  padding: '2x 4x top right'   ->  padding: '2x top, 4x right'
+  margin:  'right 1x top 2x'   ->  margin:  '1x right, 2x top'
+  inset:   'left 2x right 1x'  ->  inset:   '2x left, 1x right'
+  fade:    '3x 1x top bottom'  ->  fade:    '3x top, 1x bottom'
+  ```
+
+  Affects `padding`, `margin`, `inset`, `scrollMargin`, and `fade`.
+
+  **Unchanged:** single-value directional groups (`padding: '2x top'`, `'1x left right'`), every value-only CSS shorthand form (`padding: '1x 2x'`, `'1x 2x 3x 4x'`, and now `fade: '3x 1x'` too — a group that names no direction is unambiguous and keeps plain shorthand order), CSS-wide keywords, and the `longhand` modifier.
+
+  `inset`'s `dock` modifier keeps its two-value form, with sharper semantics: the first value applies to the named edge and the second to the perpendicular sides it spans, so `inset: '2x 4x bottom dock'` still gives `auto 32px 16px 32px`. A third value with `dock`, or a second value without it, now warns. `dock` is `inset`-only, so `padding`, `margin`, and `scrollMargin` get the strict one-value rule with no exception.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - Rename the per-component/per-recipe `'@properties'` style key to `'@property'` so it matches the real CSS at-rule name (`@property`), which is what Tasty already emits. The emitted CSS (`@property --name { ... }`) is unchanged. The global config field `configure({ properties })` and the `autoPropertyTypes` flag are unchanged — only the styles-object key is renamed.
+
+  This is a breaking rename for any styles using `'@properties': { ... }`; update those keys to `'@property'`.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - ## v3 consistency pass
+
+  Finishes the renames the rest of the v3 cleanup started, removes what was never meant to be public, and fixes a class of bug where a second `configure()` call discarded the first one's values.
+
+  ### Repeated `configure()` now merges instead of replacing
+
+  `recipes`, `keyframes`, `properties`, `fontFaces`, `counterStyles`, and CSS `@function` definitions replaced wholesale, while `tokens` and `globalStyles` merged. A design-system `configure()` followed by an application `configure()` therefore silently dropped the design system's recipes, keyframes, properties, font faces, counter styles, and functions. All of them now merge, with the later call winning on a key conflict — matching what the `functions` documentation already claimed.
+
+  `configure({ polyfills })` gains the `stylesGenerated` guard every sibling option has, and shallow-merges, so an unrelated later `configure({ polyfills: {} })` no longer switches a polyfill off while an explicit `{ functions: false }` still does.
+
+  ### `funcs` → `functions` on the parser surface
+  - `ParserOptions.funcs` → `ParserOptions.functions`
+  - `StyleParser.setFuncs()` → `StyleParser.setFunctions()`
+
+  ### Removed from the public surface
+  - `customFunc`, `getGlobalFuncs`, `resetGlobalFuncs` — use `configure({ functions })`. `getGlobalFuncs()` returned the live mutable internal registry, and writing to it bypassed the parser's cache invalidation, so the write silently never took effect. They remain internally as `customFunction`, `getGlobalParseFunctions`, and `resetGlobalParseFunctions`.
+  - `setGlobalPredefinedTokens`, `resetGlobalPredefinedTokens` — use `configure({ replaceTokens })` and `resetConfig()`.
+  - `warn`, `deprecationWarning` — internal helpers with no callers.
+  - `DEFAULT_PLUGINS` — never consumed by anything, including `configure()`. Passing it to `configure({ plugins })` was a no-op; the default `okhsl`/`okhst` functions are registered by the parser bootstrap, which is unchanged. Also removes the unused `areDefaultFunctionsRegistered()` and `_resetDefaultFunctionsFlag()`.
+  - `registerDefaultFunctions` — internal bootstrap helper.
+  - `GlobalStyledProps` — an interface whose only member was the `breakpoints` prop already removed as dead.
+
+  The `@tenphi/tasty/core` barrel now lists the `utils/styles` exports explicitly instead of re-exporting the whole module, so internal helpers can no longer leak onto the public surface by accident.
+
+  ### Renamed
+  - `CssOptions` → `CSSOptions`, matching the `getCSSText` / `useRawCSS` family. It was newly exported in this major, so this is its first released spelling.
+
+  ### Added
+  - `FunctionsConfig` and `ParseFunction` are now exported. They are the declared types of the public `functions` config and plugin fields, so they were impossible to reference.
+
+  ### Fixed
+  - The `okhsl` / `okhst` / `createColorFunc` "expected 3 values" warning fired in production and used an `[okhsl]` prefix. It is now development-only and follows the `[Tasty]` convention: `[Tasty] okhsl(): expected 3 values (H S L), got: …`.
+  - The "cannot update" warning for `functions` said `function`.
+  - `RESERVED_PREFIXES` in the state parser now includes `@font-face`, `@counter-style`, and `@function`, matching the built-in state list.
+  - The `useFunction` JSDoc and the `docs/react-api.md` example showed the function being called from a raw inline `style` prop, which bypasses the parser entirely — the `$$name(...)` sugar is never expanded, and under `polyfills.functions` it silently does nothing. Both now show the DSL call.
+
+  ### Guardrails
+
+  A new public-API snapshot test records every export of every `package.json` subpath in `src/__snapshots__/public-api.md`, covering types as well as values. Any change to the published surface now shows up as a reviewable diff.
+
+  `knip` is now correct and runs in CI. It previously declared only test and bench files as entry points, so it could not reason about the published surface at all — which is why the dead exports above went unnoticed.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - ## v3 public API cleanup
+
+  Consolidated breaking changes for the v3 major release. At-rule **styles-object keys stay CSS-spec-faithful** (`@keyframes`, `@property`, `@font-face`, `@counter-style`, `@function`, `@starting`); the `func` injector method stays abbreviated (`function` is a reserved word). Everything else is unified to JS conventions (plural where applicable), dead code is removed, and type-vs-runtime gaps are fixed.
+
+  ### Breaking renames
+  - `getCssText()` / `getCssTextForNode()` / `StyleInjector.getCssTextForClasses()` → `getCSSText()` / `getCSSTextForNode()` / `getCSSTextForClasses()` to match the rest of the raw-CSS family (`useRawCSS`, `injectRawCSS`, `getRawCSSText`).
+  - Config getters pluralized to match their (already-plural) config keys: `getGlobalFontFace` → `getGlobalFontFaces`, `getGlobalCounterStyle` → `getGlobalCounterStyles`, `getGlobalFunction` → `getGlobalFunctions`.
+  - `okhslFunc` / `okhstFunc` → `okhslFunction` / `okhstFunction` (align with the `useFunction` / `FunctionDefinition` family).
+  - Next.js zero-runtime wrapper moved: `@tenphi/tasty/next` → `@tenphi/tasty/zero/next` (it already lived under the `zero` namespace; this avoids colliding with `@tenphi/tasty/ssr/next`).
+
+  ### Removed from the public surface
+  - `getIsTestEnvironment()` — use `isTestEnvironment()` directly.
+  - `hydrateTastyCache()` (deprecated since 2.x) — use `hydrateTastyClasses()`.
+  - `setMiddlewareTransferCache()` / `getMiddlewareTransferCache()` — `@internal`-tagged helpers moved off the public `@tenphi/tasty/ssr/astro` export.
+  - `clearWriterCache()` — test utility removed from the `@tenphi/tasty/babel-plugin` export (still importable internally).
+  - `UseStylesOptions` type alias — `useStyles()` is now typed `Styles | undefined` directly.
+  - `PropertyOptions` (the duplicate defined in the injector barrel) — consolidated into a single `PropertyOptions` in `injector/types` (`PropertyDefinition` + `root?`). `UsePropertyOptions` is now an alias of it.
+  - `Bucket` enum — un-exported from `@tenphi/tasty/core` (parser-internal).
+  - `Props` (`Record<string, any>`) — un-exported; inline `Record<string, any>` at the wrap-overload base.
+  - Dead props removed from `BaseProps` / `TastySpecificKeys`: `css`, `block`, `inline`, `breakpoints` (typed but never consumed).
+
+  ### Behavior / type fixes
+  - `theme` prop is now implemented: it maps to the `data-theme` attribute on the rendered element (previously it fell through to `otherProps` and was spread raw). Augment `TastyThemeNames` for autocomplete.
+  - `isChecked` added to `BaseProps` / `AllBaseProps` (it already worked at runtime via the `is*` pipeline but was missing from the root prop types).
+  - `tasty(Component, options)` (wrap overload) no longer leaks factory-only options (`variants`, `elements`, `styleProps`, `modProps`, `tokenProps`) onto the wrapped component as runtime props — they are stripped, matching the element factory.
+  - `namePrefix` JSDoc regex corrected to `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$` (matches the validator).
+
+  ### Additive (still part of this major's API surface)
+  - `createServerStyleCollector()` and `createCSSWriter()` factory wrappers are now the canonical entry points for the infrastructure services (the classes remain exported for advanced use).
+  - `TastyComponentPropsWithDefaults`, the `tastyDebug` helper types (`DebugOptions`, `CssOptions`, `InspectResult`, `CacheStatus`, `ChunkBreakdown`, `Summary`, `DebugChunkInfo`), and `PropertyOptions` are now exported. The debug-local `ChunkInfo` was renamed `DebugChunkInfo` to avoid colliding with the parser `ChunkInfo`.
+
+### Minor Changes
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - Add support for the CSS `@function` at-rule (custom functions), unify function configuration under a single `functions` key, and add an opt-in `@function` polyfill.
+
+  Define reusable, parameterized CSS functions via the `'@function'` styles key, the `useFunction` hook, or `configure({ functions })`. Functions are defined with `$$name` keys and invoked with the `$$name(...)` sugar (e.g. `marginTop: '$$negative(10px)'`). Parameters and local variables use `$name`, and `result`/defaults/local-var values flow through the Tasty DSL (units, color tokens, auto-calc, fallbacks). Works across client, SSR/RSC, and zero-runtime (`tastyStatic`) modes. Functions are injected once, globally, and never cleaned up (like `@counter-style`). A component-local `@function` definition overrides a global `configure()` definition of the same name.
+
+  **Unified `functions` config (breaking for the previously-shipped `funcs`/`function` keys):** the separate `funcs` (JS parse-time functions) and `function` (declarative CSS functions) config and plugin keys are replaced by a single `functions` map, discriminated by value type — a bare key with a function value is a parse function (`name(...)`), and a `$$name` key with an object value is a CSS `@function` definition (`$$name(...)`). A key whose prefix doesn't match its value type is ignored with a dev-mode warning.
+
+  **`@function` polyfill:** enable `configure({ polyfills: { functions: true } })` to inline every `$$name(...)` call into plain CSS (`calc()`/`var()`/`color-mix()`) at parse time instead of emitting the native `@function` rule. This brings `@function` support to browsers that don't ship the at-rule yet (Firefox/Safari) and works across all rendering modes. Limitations: no native fallback, conditional results are inlined verbatim, typed params/`returns` are dropped, and recursive functions are left untouched.
+
+  Note: native `@function` is an experimental CSS feature; without the polyfill, unsupported browsers safely ignore the rule.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - Custom color functions now work as ordinary plugins with no core special-casing.
+
+  Previously `okhsl`/`okhst` were hardcoded across the style core (parser, `strToRgb`, `resolveToRgbaValues`, `#token.alpha` injection, and the fast-path color check), so a third-party color plugin could not achieve the same integration without editing Tasty itself.
+
+  The core now treats any custom `functions` entry whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) as a first-class color value by delegating back to the parser. All okhsl/okhst special-casing has been removed; they are now ordinary one-liner plugins registered by default (backward compatible — zero-config usage is unchanged).
+
+  New public exports for plugin authors: `createColorFunc` (helper for HSL-style color spaces) and `resolveFunctionColor`. A third-party color plugin is now just:
+
+  ```ts
+  const myPlugin = () => ({
+    name: 'mycolor',
+    functions: { mycolor: (groups) => 'rgb(...)' },
+  });
+  configure({ plugins: [myPlugin()] });
+  ```
+
+  `createColorFunc`'s signature changed from `(name, channelLabel, convert)` to `(name, convert, label?)` — the label is now an optional trailing argument used only to format dev warnings.
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - Add props middleware and global base style props, and make custom style handlers unambiguous.
+
+  **`configure({ propHandlers })`** registers middleware over component props — props in, props out. It is the extension point for props that are _not_ style properties: read a custom prop, strip it so it never reaches the DOM, and fold its meaning into `styles`, `mods`, `tokens`, `variant`, or `as`.
+
+  ```ts
+  configure({
+    propHandlers: {
+      glaze: (props) => {
+        const { glaze, ...rest } = props;
+        if (!glaze) return rest;
+
+        return { ...rest, styles: mergeStyles(glazeStyles(glaze), rest.styles) };
+      },
+    },
+  });
+
+  <Element glaze="purple" />
+  ```
+
+  The map key is the handler's name and, by default, the prop that triggers it — an absent prop costs one property check, not a call. Use `['*', fn]` for an unconditional handler or `[['a', 'b'], fn]` to trigger on any of several props. Handlers run in registration order (plugins first, then direct config), each receiving the previous one's output, and run before any prop is destructured, so a handler can rewrite every tasty prop. Returning nothing is treated as "unchanged" with a development-mode warning, since it is almost always a forgotten `return props`.
+
+  Handlers must be pure and must not mutate their input: style values are cached by object identity, so mutating one in place produces a stale class name and stale CSS. Memoize the styles you build per input value — this also lets the cache key reuse its serialization instead of recomputing it every render.
+
+  Not applicable to zero-runtime mode: `tastyStatic()` takes styles objects, not props, so there is nothing for middleware to run on. Components rendered through `tasty()` are unaffected and get their CSS from the runtime injector as usual. Server and client must register the same handlers, or class names diverge and hydration mismatches — the same requirement as `namePrefix`.
+
+  **`configure({ baseStyleProps })`** exposes style properties as top-level props on **every** tasty component, without each component listing them in `styleProps`:
+
+  ```ts
+  configure({ baseStyleProps: ['radius', 'shadow'] });
+
+  <Card radius="1r" shadow />
+  ```
+
+  Base style props are now resolved lazily per component and refreshed when the registry changes, so `configure()` may run _after_ your components are defined — previously the prop list was fixed when each `tasty()` factory was created, which happens at module load.
+
+  Type both with module augmentation: `TastyCustomProps` for `propHandlers` keys, and `TastyBaseStylePropNames` (each name set to `true`) for promoted style names, which are then typed exactly like the style they name. Both plugins and `configure()` can supply `propHandlers` and `baseStyleProps`.
+
+  **Plugins can now also supply `properties`, `keyframes`, `fontFaces`, and `counterStyles`.** A plugin whose handler or prop handler emits a custom property usually needs an `@property` declaration alongside it, which previously could only come from `configure()` directly. All four merge with the `configure()` values, with direct config winning on conflict.
+
+  **Custom style handlers are safer and better typed.**
+  - A handler whose dependencies mix known and unknown style names now has the unknown ones assigned to the same chunk, so it is invoked **once with all of its dependencies** instead of once per chunk with a subset. Chunks are cached independently on their own style values, so the old behaviour could emit stale CSS. A handler that bridges two _built-in_ chunks warns instead, since fixing that would mean re-chunking built-in styles.
+  - Replacing a built-in handler now warns in development and lists what it displaced. Built-in handlers are shared across style names, so `configure({ handlers: { fill } })` also took over `image` and the whole `background-*` family, and `configure({ handlers: { display } })` took down `flow`, `gap`, `hide`, `overflow`, `whiteSpace`, and `textOverflow` — and the displaced names did not go dark, they silently fell back to auto-generated CSS aliases, so `hide: true` began emitting a literal `hide: true` declaration.
+  - New `defineHandler(deps, fn)` infers each dependency's type from the dependency list, so a typo in the destructure is a type error rather than a silent `undefined`.
+  - New `StyleHandlerProps`, `ResolvedStyleValue`, and `AnyStyleHandler` types. `RawStyleHandler` and `StyleHandler` take an optional props type parameter, and the handler dependency map is now typed as the resolved scalars handlers actually receive rather than a state map — which removes the blanket `@ts-expect-error` the built-in registry needed.
+  - `CSSMap` accepts the numeric values built-in handlers already returned (`{ '-webkit-line-clamp': 3 }`), and a handler that returns a camelCase CSS property name now emits a `HANDLER_CAMEL_CASE_KEY` warning in development instead of silently producing a declaration the browser ignores. `--custom-property` names are exempt, being case-sensitive.
+
+  `docs/configuration.md` now documents the handler return shape, the `$` selector-suffix key, that values arrive as raw unparsed DSL strings, the shared-handler groups, and chunk membership.
+
+### Patch Changes
+
+- [#227](https://github.com/tenphi/tasty/pull/227) [`097bfc5`](https://github.com/tenphi/tasty/commit/097bfc5a017de876cf6fda2a5f5c200128a78a4f) Thanks [@tenphi](https://github.com/tenphi)! - Type `fade` as accepting `true`, and document it.
+
+  `fade: true` already worked — an empty value list falls back to `calc(2 * var(--gap))`, a default that follows the gap token and which no explicit value can express (`fade: '2x'` bakes in a static `16px`). But the prop type was `string` only, `docs/ai-agents.md` listed `fade` among the properties that reject `true`, and the ESLint plugin flagged it. Three of the four sources disagreed with the implementation.
+
+  Surfaced by `@cube-dev/ui-kit`, whose `FadeAllDirections` story relies on it.
+
 ## 2.11.2
 
 ### Patch Changes

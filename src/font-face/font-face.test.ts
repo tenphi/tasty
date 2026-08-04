@@ -14,7 +14,7 @@ import {
 
 describe('Font Face Utilities', () => {
   describe('hasLocalFontFace', () => {
-    it('should return false when no @fontFace defined', () => {
+    it('should return false when no @font-face defined', () => {
       const styles: Styles = {
         padding: '2x',
         fill: '#purple',
@@ -22,10 +22,10 @@ describe('Font Face Utilities', () => {
       expect(hasLocalFontFace(styles)).toBe(false);
     });
 
-    it('should return true when @fontFace is defined', () => {
+    it('should return true when @font-face is defined', () => {
       const styles: Styles = {
         padding: '2x',
-        '@fontFace': {
+        '@font-face': {
           'Brand Sans': {
             src: 'url("/fonts/brand.woff2") format("woff2")',
           },
@@ -36,12 +36,12 @@ describe('Font Face Utilities', () => {
   });
 
   describe('extractLocalFontFace', () => {
-    it('should return null when no @fontFace defined', () => {
+    it('should return null when no @font-face defined', () => {
       const styles: Styles = { padding: '2x' };
       expect(extractLocalFontFace(styles)).toBeNull();
     });
 
-    it('should extract @fontFace from styles', () => {
+    it('should extract @font-face from styles', () => {
       const fontFace: Record<string, FontFaceInput> = {
         'Brand Sans': {
           src: 'url("/fonts/brand.woff2") format("woff2")',
@@ -51,12 +51,12 @@ describe('Font Face Utilities', () => {
       };
       const styles: Styles = {
         padding: '2x',
-        '@fontFace': fontFace,
+        '@font-face': fontFace,
       };
       expect(extractLocalFontFace(styles)).toEqual(fontFace);
     });
 
-    it('should extract array form @fontFace', () => {
+    it('should extract array form @font-face', () => {
       const fontFace: Record<string, FontFaceInput> = {
         'Brand Sans': [
           {
@@ -67,7 +67,7 @@ describe('Font Face Utilities', () => {
         ],
       };
       const styles: Styles = {
-        '@fontFace': fontFace,
+        '@font-face': fontFace,
       };
       const result = extractLocalFontFace(styles);
       expect(result).toEqual(fontFace);

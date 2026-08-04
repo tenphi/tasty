@@ -31,7 +31,7 @@ The Style Parser converts an arbitrary CSS-like value string into:
 
 - Color tokens and all CSS Color 5 functions.
 - Custom units and auto-calc syntax (`2x`, `-.5r`, `(100% - 2r)` …).
-- User-defined functions supplied via `funcs`.
+- User-defined functions supplied via `functions`.
 - Custom properties with `$` syntax.
 - Classification into values, colors, and modifiers.
 - Whitespace compression.
@@ -93,7 +93,7 @@ class StyleParser {
   process(src: string): ProcessedStyle;
 
   /** Replace the entire funcs table. */
-  setFuncs(funcs: Required<ParserOptions>['funcs']): void;
+  setFunctions(functions: Required<ParserOptions>['funcs']): void;
 
   /** Replace the entire units table. */
   setUnits(units: Required<ParserOptions>['units']): void;
@@ -140,6 +140,7 @@ Each `StyleParser` instance maintains its own LRU cache.
 
 | Order | Rule                                                                                       | Bucket   |
 |-------|--------------------------------------------------------------------------------------------|----------|
+| 0     | Double prefix (literal name) – `$$ident` → `--ident`; `##ident` → `--ident-color`. Function call form: `$$ident(args)` → `--ident(<processed args>)`, `##ident(args)` → `--ident-color(<processed args>)` (custom `@function` invocation; args parsed recursively). **`@function` polyfill:** when a compiled closure is registered for `--ident` (via `configure({ polyfills: { functions: true } })`), the call is inlined into plain CSS instead of emitting `--ident(...)`; a recursion-cycle bail leaves the call untouched. | value    |
 | 1     | URL – `url(` opens `inUrl`; everything to its `)` is a single token.                       | value    |
 | 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. | value    |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |
@@ -273,6 +274,6 @@ rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray color-mix color
 3. Group builder (collect `StyleDetails`).
 4. Output builder (whitespace collapse, commas).
 5. LRU cache (simple doubly-linked list + map).
-6. Exposed mutator methods (`setFuncs`, `setUnits`, `updateOptions`).
+6. Exposed mutator methods (`setFunctions`, `setUnits`, `updateOptions`).
 7. Unit tests – provided suite plus all edge cases in §13.
 8. Benchmark with long strings to check O(n) behavior.

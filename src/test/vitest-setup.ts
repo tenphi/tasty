@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/react';
 import { expect } from 'vitest';
 
-import { getCssTextForNode } from '../injector';
+import { getCSSTextForNode } from '../injector';
 
 configure({ testIdAttribute: 'data-qa' });
 
@@ -23,7 +23,7 @@ expect.extend({
     }
 
     try {
-      const css = getCssTextForNode(received);
+      const css = getCSSTextForNode(received);
       expect(css).toMatchSnapshot();
 
       return {
@@ -51,7 +51,7 @@ const tastySerializer: Parameters<typeof expect.addSnapshotSerializer>[0] = {
   print(val: unknown, serialize: (v: unknown) => string): string {
     const node = val as ParentNode;
     const markup = serialize(node);
-    const css = getCssTextForNode(node);
+    const css = getCSSTextForNode(node);
 
     if (!css.trim()) {
       return markup;

@@ -471,6 +471,33 @@ describe('tasty() API', () => {
     // Check that explicit style prop is also applied
     expect(style).toContain('padding: 10px');
   });
+
+  it('should map theme prop to data-theme attribute', () => {
+    const Element = tasty({ as: 'div' });
+
+    const { container } = render(<Element theme="danger">Danger</Element>);
+
+    expect(container.firstChild).toHaveAttribute('data-theme', 'danger');
+  });
+
+  it('should not emit data-theme when theme prop is omitted', () => {
+    const Element = tasty({ as: 'div' });
+
+    const { container } = render(<Element>No theme</Element>);
+
+    expect(container.firstChild).not.toHaveAttribute('data-theme');
+  });
+
+  it('should map isChecked prop to checked + data-checked', () => {
+    const Checkbox = tasty({ as: 'input' });
+
+    const { container } = render(<Checkbox isChecked qa="cb" />);
+
+    const input = getByTestId(container, 'cb') as HTMLInputElement;
+
+    expect(input.checked).toBe(true);
+    expect(input.getAttribute('data-checked')).toBe('');
+  });
 });
 
 describe('style order consistency', () => {

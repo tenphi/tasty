@@ -16,11 +16,8 @@ import type {
   POSITION_STYLES,
   TEXT_STYLES,
 } from './styles/list';
-import type { Styles } from './styles/types';
-
-export interface GlobalStyledProps {
-  breakpoints?: number[];
-}
+import type { Styles, StylesInterface } from './styles/types';
+import type { StylePropValue } from './utils/styles';
 
 /**
  * Extensible interface for theme names.
@@ -41,6 +38,50 @@ export interface TastyThemeNames {}
 
 type ThemeNameKey = Extract<keyof TastyThemeNames, string>;
 type ThemeName = [ThemeNameKey] extends [never] ? string : ThemeNameKey;
+
+/**
+ * Extensible interface for custom props added via `configure({ propHandlers })`.
+ * Augment it to type those props on every tasty component.
+ *
+ * @example
+ * ```typescript
+ * declare module '@tenphi/tasty' {
+ *   interface TastyCustomProps {
+ *     glaze: 'soft' | 'strong' | { tone: string; intensity?: number };
+ *   }
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TastyCustomProps {}
+
+/**
+ * Extensible interface for style names promoted via
+ * `configure({ baseStyleProps })`. Set each name to `true`; the prop is then typed
+ * exactly like the style it names.
+ *
+ * @example
+ * ```typescript
+ * declare module '@tenphi/tasty' {
+ *   interface TastyBaseStylePropNames {
+ *     radius: true;
+ *     shadow: true;
+ *   }
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TastyBaseStylePropNames {}
+
+/**
+ * Props contributed by `configure({ baseStyleProps })`, each typed like the style
+ * it names. Intersecting with `keyof StylesInterface` makes a name that isn't a
+ * real style inert rather than `never`-typed.
+ */
+export type ExtraBaseStyleProps = {
+  [key in keyof TastyBaseStylePropNames &
+    keyof StylesInterface]?: StylePropValue<StylesInterface[key]>;
+};
 
 /** Allowed mod value types */
 export type ModValue = boolean | string | number | undefined | null;
@@ -115,20 +156,14 @@ export interface BasePropsWithoutChildren<
   element?: `${Caps}${string}`;
   /** The style map */
   styles?: Styles;
-  /** The list of responsive points in pixels */
-  breakpoints?: number[];
-  /** Whether the element has the block layout outside */
-  block?: boolean;
-  /** Whether the element has the inline layout outside */
-  inline?: boolean;
   /** The list of element modifiers **/
   mods?: Mods;
   /** Whether the element is hidden (`hidden` attribute is set) */
   isHidden?: boolean;
   /** Whether the element is disabled (`disabled` attribute is set) */
   isDisabled?: boolean;
-  /** Plain css for the element */
-  css?: string;
+  /** Whether the element is checked (`checked` attribute is set) */
+  isChecked?: boolean;
   /** The CSS style map */
   style?:
     | CSSProperties
@@ -200,9 +235,6 @@ export interface ShortGridStyles {
   areas?: Styles['gridAreas'];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Props = Record<string, any>;
-
 export type TagName = keyof HTMLElementTagNameMap;
 
 // =============================================================================
@@ -255,7 +287,7 @@ export interface TastyExtensionConfig {
    * Set to `false` to disable function validation (overrides parent).
    * @example ['clamp', 'double']
    */
-  funcs?: false | string[];
+  functions?: false | string[];
 
   /**
    * State alias names for autocomplete.

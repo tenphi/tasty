@@ -16,7 +16,7 @@ For security vulnerabilities, do **not** open a public issue — see [SECURITY.m
 ## Prerequisites
 
 - Node.js **20+**
-- pnpm **10+** (the project uses `packageManager: pnpm@10.x` in `package.json`)
+- pnpm **11+** (the project uses `packageManager: pnpm@11.x` in `package.json`)
 - Git
 
 ## Local Setup

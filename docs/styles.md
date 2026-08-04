@@ -1,6 +1,6 @@
 # Style Properties Reference
 
-All standard CSS properties are supported in Tasty and benefit from its syntax sugar: design tokens (`$name`, `#name`), custom units (`2x`, `1r`, `1bw`), color opacity (`#purple.5`), auto-calc (`(100% - 2x)`), and custom functions. Values are parsed through the Tasty engine automatically.
+All standard CSS properties are supported in Tasty and benefit from its syntax sugar: design tokens (`$name`, `#name`), custom units (`2x`, `1r`, `1bw`), color opacity (`#purple.5`), auto-calc (`(100% - 2x)`), and [custom functions](dsl.md#functions-function) (`$$negative(10px)`). Values are parsed through the Tasty engine automatically.
 
 The properties documented below have **custom handlers** with enhanced syntax. They should be **preferred** over their raw CSS equivalents because they:
 
@@ -100,11 +100,15 @@ For flex/grid layouts, outputs native `gap`. For block layouts, emulates gap usi
 
 Element padding with directional modifiers and multi-group support. Use **comma-separated groups** to set a base value and then override specific directions.
 
-**Syntax:** `[value]` | `[top right]` | `[top right bottom left]` | `[value directions...]` — comma-separated for multiple groups
+**Syntax:** `[value]` | `[block inline]` | `[top right bottom left]` | `[value direction...]` — comma-separated for multiple groups
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
 **Output modifier:** `longhand` — forces output as individual CSS longhand properties (`padding-top`, `padding-right`, `padding-bottom`, `padding-left`) instead of the `padding` shorthand. Useful when children need to selectively inherit individual directions.
+
+**One value per directional group.** A group that names direction modifiers takes **exactly one** value, applied to every direction it names. For different values per side, use comma-separated groups: `padding: '2x top, 4x right'`. Writing `padding: '2x 4x top right'` ignores `4x` and warns in development — the parser keeps values and modifiers in separate buckets, so their interleaving in the source is not recoverable and `'2x 4x top right'`, `'2x top 4x right'` and `'top 2x right 4x'` are all the same input.
+
+A group that names *no* direction keeps plain CSS shorthand order, which is unambiguous and unchanged.
 
 | Value | Effect |
 |-------|--------|
@@ -112,6 +116,7 @@ Element padding with directional modifiers and multi-group support. Use **comma-
 | `"2x 1x"` | Top/bottom `2x`, left/right `1x` |
 | `"2x top"` | Top `2x`, right/bottom/left `0` |
 | `"1x left right"` | Left and right `1x`, top/bottom `0` |
+| `"2x top, 4x right"` | Top `2x`, right `4x`, bottom/left `0` |
 | `"1x, 2x top"` | All sides `1x`, then top overridden to `2x` |
 | `"1x, 2x top bottom"` | Left/right `1x`, top/bottom `2x` |
 | `"2x longhand"` | All sides `2x`, output as 4 individual `padding-*` properties |
@@ -128,17 +133,20 @@ Individual props `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft`, `
 
 Element margin. Same syntax, modifiers, and multi-group support as `padding`.
 
-**Syntax:** `[value]` | `[top right]` | `[top right bottom left]` | `[value directions...]` — comma-separated for multiple groups
+**Syntax:** `[value]` | `[block inline]` | `[top right bottom left]` | `[value direction...]` — comma-separated for multiple groups
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
 
 **Output modifier:** `longhand` — forces output as individual CSS longhand properties (`margin-top`, etc.) instead of the `margin` shorthand.
+
+The [one-value-per-directional-group rule](#padding) from `padding` applies here too.
 
 | Value | Effect |
 |-------|--------|
 | `"2x"` | All sides `2x` |
 | `"2x 1x"` | Top/bottom `2x`, left/right `1x` |
 | `"2x top"` | Top `2x`, right/bottom/left `0` |
+| `"2x top, 4x right"` | Top `2x`, right `4x`, bottom/left `0` |
 | `"auto left right, 1x top bottom"` | Left/right `auto`, top/bottom `1x` |
 | `true` | All sides `1x` |
 | Number | Converted to `px` |
@@ -191,17 +199,22 @@ Separate `minHeight` and `maxHeight` props are supported and override values fro
 
 Positioning offsets with directional modifiers and multi-group support. Same directional syntax as `padding`.
 
-**Syntax:** `[value]` | `[top right]` | `[top right bottom left]` | `[value directions...]` — comma-separated for multiple groups
+**Syntax:** `[value]` | `[block inline]` | `[top right bottom left]` | `[value direction...]` — comma-separated for multiple groups
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
+
+The [one-value-per-directional-group rule](#padding) from `padding` applies here too, with `dock`
+as the single exception.
 
 **`dock` modifier:** pins the named edge and spans its full length, by also applying the value
 to the two perpendicular sides. `inset: 'bottom dock'` gives `inset: auto 0 0 0` — anchored to
 the bottom, full width. Without a direction, `dock` fills every side.
 
-A second value applies to the spanned sides: `inset: '2x 4x bottom dock'` pins the bottom at
-`2x` and insets the sides by `4x`. Intended for a single edge — combining `dock` with several
-directions has no well-defined meaning.
+`dock` is the one place a directional group takes **two** values: the first insets the named
+edge, the second the sides it spans. `inset: '2x 4x bottom dock'` pins the bottom at `2x` and
+insets the sides by `4x`. A third value, or a second value without `dock`, is ignored and warns
+in development. With several directions the first value applies to each named edge and the
+second to every side they span.
 
 **Output modifier:** `longhand` — forces output as individual CSS properties (`top`, `right`, `bottom`, `left`) instead of the `inset` shorthand.
 
@@ -572,15 +585,20 @@ Scrollbar styling using CSS standard properties (`scrollbar-width`, `scrollbar-c
 
 Gradient-based edge fading using CSS masks. Use **comma-separated groups** to set different widths and colors per direction.
 
-**Syntax:** `[width] [directions...] [#from-color] [#to-color]` — comma-separated for multiple groups
+**Syntax:** `[width] [direction...] [#from-color] [#to-color]` — comma-separated for multiple groups
 
 **Direction modifiers:** `top`, `right`, `bottom`, `left`
+
+A group that names edges takes a **single** width, applied to every edge it names — different
+widths per edge come from comma groups. A group that names no edge covers all four and keeps
+plain CSS shorthand order, like `padding`. See the [`padding` rule](#padding).
 
 | Value | Effect |
 |-------|--------|
 | `"top"` | Fade top edge, default width (`2x`), all other edges unfaded |
 | `"2x left right"` | Fade left and right edges with `2x` width, top/bottom unfaded |
-| `"3x 1x top bottom"` | Fade top with `3x` width, bottom with `1x` width |
+| `"3x 1x"` | All edges faded — top/bottom `3x`, left/right `1x` (CSS shorthand order) |
+| `"3x top, 1x bottom"` | Fade top with `3x` width, bottom with `1x` width |
 | `"2x #transparent #dark"` | All edges faded with `2x` width, from `#transparent` to `#dark` |
 | `"top #a #b, bottom #c #d"` | Top fades from `#a` to `#b`, bottom fades from `#c` to `#d` |
 

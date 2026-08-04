@@ -1,20 +1,20 @@
 import { StyleParser } from '../parser/parser';
 
-import { okhstFunc, okhstPlugin } from './okhst-plugin';
+import { okhstFunction, okhstPlugin } from './okhst-plugin';
 
 describe('okhstPlugin', () => {
   describe('plugin factory', () => {
     it('returns a valid TastyPlugin', () => {
       const plugin = okhstPlugin();
       expect(plugin.name).toBe('okhst');
-      expect(plugin.funcs).toBeDefined();
-      expect(plugin.funcs?.okhst).toBe(okhstFunc);
+      expect(plugin.functions).toBeDefined();
+      expect(plugin.functions?.okhst).toBe(okhstFunction);
     });
   });
 
-  describe('okhstFunc', () => {
+  describe('okhstFunction', () => {
     const parser = new StyleParser({
-      funcs: { okhst: okhstFunc },
+      functions: { okhst: okhstFunction },
     });
 
     describe('angle parsing', () => {
@@ -98,20 +98,22 @@ describe('okhstPlugin', () => {
       });
 
       it('returns fallback for missing values', () => {
-        // Silence expected warning
+        // The warning is dev-gated, so enable dev mode to observe it.
+        vi.stubEnv('NODE_ENV', 'development');
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
           /* noop */
         });
 
-        // Directly test okhstFunc with empty groups
-        const result = okhstFunc([]);
+        // Directly test okhstFunction with empty groups
+        const result = okhstFunction([]);
         expect(result).toBe('rgb(0% 0% 0%)');
         expect(warnSpy).toHaveBeenCalledWith(
-          '[okhst] Expected 3 values (H S T), got:',
+          '[Tasty] okhst(): expected 3 values (H S T), got:',
           [],
         );
 
         warnSpy.mockRestore();
+        vi.unstubAllEnvs();
       });
     });
 

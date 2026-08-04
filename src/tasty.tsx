@@ -10,15 +10,19 @@ import type {
 import { createElement, forwardRef, Fragment } from 'react';
 import type { ComputeStylesResult } from './compute-styles';
 import { computeStyles } from './compute-styles';
+import type { PropHandlerProps } from './prop-handlers';
+import { propHandlerRegistry } from './prop-handlers';
+import { baseStylePropsRegistry } from './styles/base-props';
 import { BASE_STYLES } from './styles/list';
 import type { Styles, StylesInterface } from './styles/types';
 import type {
   AllBaseProps,
   BaseProps,
   BaseStyleProps,
+  ExtraBaseStyleProps,
   ModValue,
   Mods,
-  Props,
+  TastyCustomProps,
   TokenValue,
   Tokens,
 } from './types';
@@ -244,9 +248,13 @@ function buildTokenPropsMapping(
   return Object.entries(def);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyProps = Record<string, any>;
+
 type PropsWithStyles = {
   styles?: Styles;
-} & Omit<Props, 'styles'>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} & Omit<Record<string, any>, 'styles'>;
 
 export type VariantMap = Record<string, Styles>;
 
@@ -358,7 +366,7 @@ export type TastyProps<
   K extends StyleList,
   V extends VariantMap,
   E extends ElementsDefinition = Record<string, never>,
-  DefaultProps = Props,
+  DefaultProps = AnyProps,
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
 > = TastyBaseProps<K, V, E, M, TP> & {
@@ -391,8 +399,8 @@ export type ResolveAsProps<AsType extends ElementType> =
  * element type from the `as` prop — both for intrinsic tags and for React
  * components (so the wrapped component's prop API is preserved).
  *
- * Note: Uses a separate index signature with `unknown` instead of inheriting
- * from Props (which has `any`) to ensure strict type checking for styles.
+ * Note: Uses a separate index signature with `unknown` instead of an `any`
+ * record to ensure strict type checking for styles.
  */
 export type TastyElementOptions<
   K extends StyleList,
@@ -415,6 +423,8 @@ export type AllBasePropsWithMods<
     | StyleValue<StylesInterface[key]>
     | StyleValueStateMap<StylesInterface[key]>;
 } & BaseStyleProps &
+  ExtraBaseStyleProps &
+  Partial<TastyCustomProps> &
   ResolveModProps<M> &
   ResolveTokenProps<TP>;
 
@@ -428,13 +438,10 @@ type TastySpecificKeys =
   | 'qaVal'
   | 'element'
   | 'styles'
-  | 'breakpoints'
-  | 'block'
-  | 'inline'
   | 'mods'
   | 'isHidden'
   | 'isDisabled'
-  | 'css'
+  | 'isChecked'
   | 'style'
   | 'theme'
   | 'tokens'
@@ -476,17 +483,27 @@ export type TastyElementProps<
   AllBasePropsWithMods<K, M, TP>,
   Exclude<
     keyof ResolveAsProps<AsType>,
-    TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
+    | TastySpecificKeys
+    | keyof TastyCustomProps
+    | keyof ExtraBaseStyleProps
+    | K[number]
+    | ModPropsKeys<M>
+    | TokenPropsKeys<TP>
   >
 > &
   WithVariant<V> &
   Omit<
     Omit<AllHTMLAttributes<HTMLElement>, keyof ResolveAsProps<AsType>> &
       ResolveAsProps<AsType>,
-    TastySpecificKeys | K[number] | ModPropsKeys<M> | TokenPropsKeys<TP>
+    | TastySpecificKeys
+    | keyof TastyCustomProps
+    | keyof ExtraBaseStyleProps
+    | K[number]
+    | ModPropsKeys<M>
+    | TokenPropsKeys<TP>
   >;
 
-type TastyComponentPropsWithDefaults<
+export type TastyComponentPropsWithDefaults<
   Props extends PropsWithStyles,
   DefaultProps extends Partial<Props>,
 > = keyof DefaultProps extends never
@@ -562,15 +579,28 @@ export function tasty<
 function tastyWrap<
   P extends PropsWithStyles,
   DefaultProps extends Partial<P> = Partial<P>,
+  K extends StyleList = readonly never[],
+  V extends VariantMap = VariantMap,
+  E extends ElementsDefinition = Record<string, never>,
+  M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
 >(
   Component: ComponentType<P>,
-  options?: TastyProps<never, never, P>,
+  options?: TastyProps<K, V, E, P, M, TP>,
 ): ComponentType<TastyComponentPropsWithDefaults<P, DefaultProps>> {
+  // The wrap path forwards default props + merges `styles`/`*Styles` props.
+  // Factory-only options (`styleProps`, `modProps`, `tokenProps`, `variants`,
+  // `elements`) are stripped here, not forwarded to the wrapped component.
   const {
     as: extendTag,
     element: extendElement,
+    styleProps: _styleProps,
+    modProps: _modProps,
+    tokenProps: _tokenProps,
+    variants: _variants,
+    elements: _elements,
     ...defaultProps
-  } = (options ?? {}) as TastyProps<never, never, P>;
+  } = (options ?? {}) as TastyProps<K, V, E, P, M, TP>;
 
   const propsWithStyles = ['styles'].concat(
     Object.keys(defaultProps).filter((prop) => prop.endsWith('Styles')),
@@ -689,9 +719,17 @@ function tastyElement<
     ...otherDefaultProps
   } = defaultProps ?? {};
 
-  const propsToCheck = styleProps
+  // Fixed at factory-creation time — no dependency on global config.
+  const ownPropsToCheck: readonly string[] = styleProps
     ? (styleProps as StyleList).concat(BASE_STYLES)
     : BASE_STYLES;
+
+  // Resolved lazily and refreshed on registry version change. `configure()` can
+  // run *after* this factory was created (module eval order — see `Element` at
+  // the bottom of this file), and `resetConfig()` reopens configuration, so a
+  // one-shot lazy init would go stale. Starts at -1 to force first resolution.
+  let propsToCheck: readonly string[] = ownPropsToCheck;
+  let propsToCheckVersion = -1;
 
   const modPropsKeys: string[] | undefined = modPropsDef
     ? ((Array.isArray(modPropsDef)
@@ -710,7 +748,19 @@ function tastyElement<
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
-  >((allProps, ref) => {
+  >((incomingProps, ref) => {
+    // Global props middleware (`configure({ propHandlers })`). Runs before any
+    // destructuring so a handler can rewrite every tasty prop — `styles`, `mods`,
+    // `tokens`, `variant`, `as`, `element`, `qa` — and strip its own custom props
+    // so they never reach the DOM. `ref` is out of reach: forwardRef separates it.
+    // Fast path while nothing is registered: one property load and one branch.
+    const applyPropHandlers = propHandlerRegistry.apply;
+    const allProps = applyPropHandlers
+      ? (applyPropHandlers(
+          incomingProps as unknown as PropHandlerProps,
+        ) as unknown as typeof incomingProps)
+      : incomingProps;
+
     const {
       as,
       styles: rawStyles,
@@ -722,17 +772,29 @@ function tastyElement<
       className: userClassName,
       tokens,
       style,
+      theme,
       ...otherProps
     } = allProps as Record<string, unknown> as AllBasePropsWithMods<K> &
       WithVariant<V> & {
         className?: string;
         tokens?: Tokens;
         style?: Record<string, unknown>;
+        theme?: string;
       };
 
     let styles = rawStyles;
 
     let propStyles: Styles | null = null;
+
+    if (propsToCheckVersion !== baseStylePropsRegistry.version) {
+      const promoted = baseStylePropsRegistry.list;
+
+      propsToCheck =
+        promoted.length === 0
+          ? ownPropsToCheck
+          : ownPropsToCheck.concat(promoted);
+      propsToCheckVersion = baseStylePropsRegistry.version;
+    }
 
     for (const prop of propsToCheck) {
       const key = prop as unknown as string;
@@ -864,6 +926,7 @@ function tastyElement<
       'data-element': (element as string | undefined) || defaultElement,
       'data-qa': (qa as string | undefined) || defaultQa,
       'data-qaval': (qaVal as string | undefined) || defaultQaVal,
+      'data-theme': theme,
       ...(otherDefaultProps as unknown as Record<string, unknown>),
       ...(modDataAttrs || {}),
       ...(otherProps as unknown as Record<string, unknown>),
@@ -873,6 +936,10 @@ function tastyElement<
     } as Record<string, unknown>;
 
     handleIsProperties(elementProps);
+
+    if (elementProps['data-theme'] === undefined) {
+      delete elementProps['data-theme'];
+    }
 
     const el = createElement(
       (as as string | 'div') ?? originalAs,

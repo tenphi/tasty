@@ -1,5 +1,12 @@
+import {
+  assignStyleChunk,
+  CHUNK_NAMES,
+  STYLE_TO_CHUNK,
+} from '../chunks/style-chunk-map';
+import type { ChunkName } from '../chunks/style-chunk-map';
 import { isDevEnv } from '../utils/is-dev-env';
 import type {
+  AnyStyleHandler,
   RawStyleHandler,
   StyleHandler,
   StyleHandlerDefinition,
@@ -29,6 +36,17 @@ import { widthStyle } from './width';
 
 const devMode = isDevEnv();
 
+/**
+ * Dev-mode check evaluated per call rather than at module load.
+ *
+ * `isDevEnv()` reports `false` for `NODE_ENV=test`, so a module-load capture makes
+ * a warning impossible to assert in a test. Only used on paths that already know
+ * something is wrong, so the extra call is never on the hot path.
+ */
+function inDevMode(): boolean {
+  return isDevEnv();
+}
+
 const _numberConverter = (val: string | number | boolean | undefined) => {
   if (typeof val === 'number') {
     return `${val}px`;
@@ -51,7 +69,7 @@ const rowsConverter = (val: string | number | boolean | undefined) => {
   return;
 };
 
-type StyleHandlerMap = Record<string, StyleHandler[]>;
+type StyleHandlerMap = Record<string, AnyStyleHandler[]>;
 
 const STYLE_HANDLER_MAP: StyleHandlerMap = {};
 
@@ -92,16 +110,18 @@ export function resetHandlers(): void {
 }
 
 function defineCustomStyle(
-  names: string[] | StyleHandler,
+  names: string[] | AnyStyleHandler,
   handler?: RawStyleHandler,
 ) {
-  let handlerWithLookup: StyleHandler;
+  let handlerWithLookup: AnyStyleHandler;
 
   if (typeof names === 'function') {
     handlerWithLookup = names;
     names = handlerWithLookup.__lookupStyles;
   } else if (handler) {
-    handlerWithLookup = Object.assign(handler, { __lookupStyles: names });
+    handlerWithLookup = Object.assign(handler, {
+      __lookupStyles: names,
+    }) as AnyStyleHandler;
   } else {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[Tasty] incorrect custom style definition:', names);
@@ -180,9 +200,7 @@ export function predefine() {
     scrollbarStyle,
     fadeStyle,
     insetStyle,
-  ]
-    // @ts-expect-error handler type varies across built-in style handlers
-    .forEach((handler) => defineCustomStyle(handler));
+  ].forEach((handler) => defineCustomStyle(handler));
 
   // Capture initial state after all built-in handlers are registered
   captureInitialHandlerState();
@@ -283,6 +301,128 @@ function validateHandler(
   }
 }
 
+export interface RegisterHandlerOptions {
+  /** The `handlers` key this handler was registered under, for diagnostics. */
+  key?: string;
+  /** Where it came from — a plugin name, or `'configure()'`. */
+  source?: string;
+}
+
+/** Describe a handler in a warning message. */
+function describeHandler(
+  lookupStyles: string[],
+  options?: RegisterHandlerOptions,
+): string {
+  const name = options?.key ?? lookupStyles.join(', ');
+
+  return options?.source ? `"${name}" (from ${options.source})` : `"${name}"`;
+}
+
+/**
+ * Keep a handler's dependencies inside one chunk.
+ *
+ * Chunks are rendered and cached independently and a chunk's cache key covers
+ * only its own style values, so a handler whose `__lookupStyles` straddle two
+ * chunks gets invoked once per chunk with a *subset* of its inputs — and can emit
+ * stale CSS. Custom style names are unknown to the built-in chunk lists and would
+ * otherwise fall into `misc`, splitting any handler that mixes them with built-in
+ * styles. Pull them into the built-in chunk instead.
+ *
+ * Runs in production too: this is a correctness fix, not a diagnostic. It only
+ * ever moves names the built-in lists don't know, so no existing class name can
+ * change.
+ */
+function alignHandlerChunks(
+  lookupStyles: string[],
+  options?: RegisterHandlerOptions,
+): void {
+  const known = new Set<ChunkName>();
+  const unknown: string[] = [];
+
+  for (const styleName of lookupStyles) {
+    const chunk = STYLE_TO_CHUNK.get(styleName);
+
+    if (chunk) {
+      known.add(chunk);
+    } else {
+      unknown.push(styleName);
+    }
+  }
+
+  if (known.size > 1) {
+    // The handler bridges two built-in chunks. Resolving this correctly would
+    // mean re-deriving chunk membership across the whole handler graph, which can
+    // move built-in styles between chunks and change class names — so warn only.
+    if (inDevMode()) {
+      console.warn(
+        `[Tasty] Handler ${describeHandler(lookupStyles, options)} depends on ` +
+          `styles from different chunks (${[...known].sort().join(', ')}). ` +
+          `Chunks are cached independently, so this handler will be invoked once ` +
+          `per chunk with only part of its dependencies and can emit stale CSS. ` +
+          `Split it into per-chunk handlers, or have one property expand into the ` +
+          `others before chunking.`,
+      );
+    }
+
+    return;
+  }
+
+  if (unknown.length === 0) return;
+
+  // Exactly one known chunk → custom names join it. No known chunk → pin them
+  // together in `misc`, where they would land anyway, so they stay together even
+  // if one of them later becomes known.
+  const target = known.size === 1 ? [...known][0] : CHUNK_NAMES.MISC;
+
+  for (const styleName of unknown) {
+    assignStyleChunk(styleName, target);
+  }
+}
+
+/**
+ * Warn when replacing a handler takes unrelated style properties down with it.
+ *
+ * Built-in handlers are shared across several style names (`displayStyle` also
+ * emits `hide`, `overflow`, `whiteSpace`, `textOverflow`), so registering a
+ * handler for one of them unregisters the built-in from *all* of its names. The
+ * displaced names don't go dark — the pipeline falls back to an auto-generated
+ * CSS alias and writes it back into the map — so `hide: true` starts emitting a
+ * literal `hide: true` declaration. Silent wrongness, which is worth a warning.
+ *
+ * Must run before the handlers are actually removed.
+ */
+function warnAboutOrphanedStyles(
+  lookupStyles: string[],
+  handlersToRemove: Set<StyleHandler>,
+  options?: RegisterHandlerOptions,
+): void {
+  const incoming = new Set(lookupStyles);
+  const orphaned = new Set<string>();
+
+  for (const oldHandler of handlersToRemove) {
+    for (const oldStyleName of oldHandler.__lookupStyles ?? []) {
+      if (incoming.has(oldStyleName)) continue;
+
+      const survivors = (STYLE_HANDLER_MAP[oldStyleName] ?? []).filter(
+        (h) => !handlersToRemove.has(h),
+      );
+
+      if (survivors.length === 0) orphaned.add(oldStyleName);
+    }
+  }
+
+  if (orphaned.size === 0) return;
+
+  console.warn(
+    `[Tasty] Custom handler ${describeHandler(lookupStyles, options)} displaced ` +
+      `built-in handlers that also handle: ${[...orphaned].sort().join(', ')}. ` +
+      `Those properties now fall back to auto-generated CSS aliases, which is ` +
+      `usually wrong (e.g. \`hide: true\` would emit a literal \`hide: true\` ` +
+      `declaration). Either declare them in this handler's lookup styles and ` +
+      `delegate via \`styleHandlers.*\`, or pick a narrower style name.`,
+  );
+}
+
 /**
  * Register a custom handler, replacing any existing handlers for the same lookup styles.
  * This is called by configure() to process user-defined handlers.
@@ -291,8 +431,15 @@ function validateHandler(
  * is removed from ALL its lookup styles to prevent double-processing.
  * For example, if gapStyle handles ['display', 'flow', 'gap'] and a new handler
  * is registered for just ['gap'], gapStyle is removed from display and flow too.
+ *
+ * Note: this bypasses the `configure()` lock, so calling it after styles have
+ * been generated changes the handlers for already-emitted class names. Prefer
+ * `configure({ handlers })`, which is rejected after first render.
  */
-export function registerHandler(handler: StyleHandler): void {
+export function registerHandler(
+  handler: StyleHandler,
+  options?: RegisterHandlerOptions,
+): void {
   const lookupStyles = handler.__lookupStyles;
 
   if (!lookupStyles || lookupStyles.length === 0) {
@@ -303,6 +450,8 @@ export function registerHandler(handler: StyleHandler): void {
     }
     return;
   }
+
+  alignHandlerChunks(lookupStyles, options);
 
   // Find and remove existing handlers that would conflict
   // A handler conflicts if it handles any of the same styles as the new handler
@@ -315,6 +464,10 @@ export function registerHandler(handler: StyleHandler): void {
         handlersToRemove.add(existingHandler);
       }
     }
+  }
+
+  if (handlersToRemove.size > 0 && inDevMode()) {
+    warnAboutOrphanedStyles(lookupStyles, handlersToRemove, options);
   }
 
   // Remove conflicting handlers from ALL their lookup styles

@@ -9,8 +9,9 @@ export {
   isTestEnvironment,
   hasGlobalKeyframes,
   getGlobalKeyframes,
-  getGlobalFontFace,
-  getGlobalCounterStyle,
+  getGlobalFontFaces,
+  getGlobalCounterStyles,
+  getGlobalFunctions,
   hasGlobalRecipes,
   getGlobalRecipes,
 } from '../config';
@@ -22,8 +23,22 @@ export {
 } from '../utils/name-prefix';
 
 // Plugins
-export { okhslPlugin, okhslFunc, okhstPlugin, okhstFunc } from '../plugins';
+export {
+  okhslPlugin,
+  okhslFunction,
+  okhstPlugin,
+  okhstFunction,
+  createColorFunc,
+} from '../plugins';
+export { resolveFunctionColor } from '../utils/function-color';
+// Types of the public `functions` config/plugin field.
+export type { FunctionsConfig, ParseFunction } from '../functions';
 export type { TastyPlugin, TastyPluginFactory } from '../plugins';
+export type {
+  PropHandler,
+  PropHandlerDefinition,
+  PropHandlerProps,
+} from '../prop-handlers';
 
 // Chunk utilities
 export {
@@ -52,7 +67,7 @@ export type {
 } from '../states';
 
 // Style handlers & definitions
-export { styleHandlers } from '../styles';
+export { defineHandler, styleHandlers } from '../styles';
 export * from '../styles/list';
 
 // Pipeline
@@ -69,7 +84,6 @@ export type {
   ParserOptions,
   UnitHandler,
 } from '../parser/types';
-export { Bucket } from '../parser/types';
 
 // Style computation (hook-free)
 export { computeStyles } from '../compute-styles';
@@ -84,12 +98,40 @@ export * from '../injector';
 // Utilities
 export * from '../utils/filter-base-props';
 export * from '../utils/colors';
-export * from '../utils/styles';
+export {
+  CUSTOM_UNITS,
+  DIRECTIONS,
+  filterMods,
+  getGlobalParser,
+  getGlobalPredefinedTokens,
+  getNamedColorHex,
+  getRgbValuesFromRgbaString,
+  hexToRgb,
+  normalizeColorTokenValue,
+  parseColor,
+  parseStyle,
+  stringifyStyles,
+  strToRgb,
+} from '../utils/styles';
+export type {
+  AnyStyleHandler,
+  CSSMap,
+  ParsedColor,
+  RawStyleHandler,
+  ResolvedStyleValue,
+  StyleHandler,
+  StyleHandlerDefinition,
+  StyleHandlerProps,
+  StyleHandlerResult,
+  StyleMap,
+  StylePropValue,
+  StyleValue,
+  StyleValueStateMap,
+} from '../utils/styles';
 export * from '../utils/mod-attrs';
 export * from '../utils/dotize';
 export * from '../utils/merge-styles';
 export { resolveRecipes } from '../utils/resolve-recipes';
-export * from '../utils/warnings';
 export * from '../utils/process-tokens';
 export * from '../utils/typography';
 
@@ -114,8 +156,6 @@ export type {
   FlowStyleProps,
   InnerStyleProps,
   ShortGridStyles,
-  GlobalStyledProps,
-  Props,
   TagName,
   Mods,
   ModValue,
@@ -123,6 +163,9 @@ export type {
   TokenValue,
   TastyExtensionConfig,
   TastyThemeNames,
+  TastyCustomProps,
+  TastyBaseStylePropNames,
+  ExtraBaseStyleProps,
 } from '../types';
 
 // Style types

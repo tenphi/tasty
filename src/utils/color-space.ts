@@ -1,11 +1,10 @@
 import { Lru } from '../parser/lru';
+import { resolveFunctionColor } from './function-color';
 
 import {
   getRgbValuesFromRgbaString,
   hexToRgbaValues,
   hslToRgbValues,
-  okhslToSrgb,
-  okhstToSrgb,
   oklchToRgbValues,
   rgbToHsl,
   rgbToOklch,
@@ -223,24 +222,12 @@ function resolveToRgbaValues(color: string): RgbaResult | null {
     return [r, g, b, parsed.alpha];
   }
 
-  if (trimmed.startsWith('okhsl(')) {
-    const parsed = parseColorFuncArgs(trimmed, 'okhsl');
-    if (!parsed) return null;
-    const h = parseHue(parsed.parts[0]);
-    const s = clamp01(parsePercent(parsed.parts[1]));
-    const l = clamp01(parsePercent(parsed.parts[2]));
-    const [r, g, b] = okhslToSrgb(h, s, l);
-    return [clamp01(r) * 255, clamp01(g) * 255, clamp01(b) * 255, parsed.alpha];
-  }
-
-  if (trimmed.startsWith('okhst(')) {
-    const parsed = parseColorFuncArgs(trimmed, 'okhst');
-    if (!parsed) return null;
-    const h = parseHue(parsed.parts[0]);
-    const s = clamp01(parsePercent(parsed.parts[1]));
-    const t = clamp01(parsePercent(parsed.parts[2]));
-    const [r, g, b] = okhstToSrgb(h, s, t);
-    return [clamp01(r) * 255, clamp01(g) * 255, clamp01(b) * 255, parsed.alpha];
+  // Custom color functions (e.g. okhsl/okhst via plugins) and any other
+  // registered parse function whose output is a color: delegate to the parser
+  // and recurse on the resulting rgb()/hsl()/oklch() string.
+  const resolved = resolveFunctionColor(trimmed);
+  if (resolved && resolved !== trimmed) {
+    return resolveToRgbaValues(resolved);
   }
 
   // Fallback: named colors and other formats go through string conversion

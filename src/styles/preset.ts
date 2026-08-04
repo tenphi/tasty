@@ -1,7 +1,6 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
-
-import type { Styles } from './types';
+import type { CSSMap } from '../utils/styles';
 
 const PRESET_MODIFIERS = new Set([
   'strong',
@@ -29,7 +28,7 @@ function toCSS(
 }
 
 function setCSSValue(
-  styles: Styles,
+  styles: CSSMap,
   styleName: string,
   presetName: string,
   { varOnly, cssOnly }: { varOnly?: boolean; cssOnly?: boolean } = {},
@@ -144,7 +143,9 @@ export function presetStyle({
   fontFamily,
   font,
 }: PresetStyleProps) {
-  const styles: Styles = {};
+  // A handler result, not an authoring styles object: every key written below is
+  // a kebab-case CSS property or a `--custom-property`.
+  const styles: CSSMap = {};
   const hasPreset = preset != null && preset !== false;
 
   // Handle preset if defined

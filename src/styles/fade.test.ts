@@ -86,11 +86,32 @@ describe('fadeStyle', () => {
     expect(gradientCount).toBe(4);
   });
 
-  it('applies different widths per direction', () => {
+  it('applies one width to every edge the group names', () => {
+    // A group that names edges takes a single width; the extra one is ignored
+    // (with a dev-mode warning).
     const result = fadeStyle({ fade: '3x 1x top bottom' });
-    // top should use 3x (24px), bottom should use 1x (8px)
     expect(result.mask).toContain('rgb(0 0 0 / 1) 24px');
-    expect(result.mask).toContain('rgb(0 0 0 / 1) 8px');
+    expect(result.mask).not.toContain('rgb(0 0 0 / 1) 8px');
+  });
+
+  it('uses comma groups for different widths per edge', () => {
+    // The replacement for `fade: '3x 1x top bottom'` — byte-identical output.
+    expect(fadeStyle({ fade: '3x top, 1x bottom' })!.mask).toBe(
+      'linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 24px), ' +
+        'linear-gradient(to top, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 8px)',
+    );
+  });
+
+  it('keeps CSS shorthand order when no edge is named', () => {
+    // Directionless groups are unambiguous, so they stay shorthand-shaped like
+    // `padding`: first value block edges, second value inline edges.
+    const result = fadeStyle({ fade: '3x 1x' })!;
+    expect(result.mask).toBe(
+      'linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 24px), ' +
+        'linear-gradient(to left, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 8px), ' +
+        'linear-gradient(to top, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 24px), ' +
+        'linear-gradient(to right, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 8px)',
+    );
   });
 
   // Multi-group support tests

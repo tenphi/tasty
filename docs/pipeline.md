@@ -6,7 +6,7 @@ This document describes the style rendering pipeline that transforms style objec
 
 ## Overview
 
-The pipeline takes a `Styles` object and produces an array of `CSSRule` objects ready for injection into the DOM. Entry points include `renderStylesPipeline` (full pipeline + optional class-name prefixing) and `renderStyles` (direct selector/class mode). The per-handler flow is:
+The pipeline takes a `Styles` object and produces an array of `CSSRule` objects ready for injection into the DOM. The entry point is `renderStyles`, which has two overloads: called with a selector or class (`renderStyles(styles, '.t1')`) it returns the rules directly; called without one (`renderStyles(styles)`) it returns `{ rules }` for a caller that will allocate the class name itself. The per-handler flow is:
 
 ```
 Input: Styles Object
@@ -539,7 +539,7 @@ interface CSSRule {
 }
 ```
 
-When `renderStylesPipeline` runs **without** a class name, returned rules include `needsClassName: true` (compatibility field for the injector); that flag is not part of `CSSRule` inside `materialize.ts`.
+When `renderStyles` runs **without** a selector, returned rules include `needsClassName: true` (compatibility field for the injector); that flag is not part of `CSSRule` inside `materialize.ts`.
 
 ---
 
@@ -691,7 +691,7 @@ Each snapshot yields distinct declarations; no merge.
 
 ### Stage 7: Materialize CSS
 
-Using `renderStyles(styles, '.t1')` (single class prefix; `renderStylesPipeline` doubles the class for specificity when a class name is supplied):
+Using `renderStyles(styles, '.t1')` (the class is doubled — `.t1.t1` — so Tasty owns specificity without `!important`):
 
 ```css
 .t1[data-hovered] {

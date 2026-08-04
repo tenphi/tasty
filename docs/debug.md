@@ -79,7 +79,7 @@ Retrieves CSS text for a given target. Logs the result with rule count and size.
 **Extra options:**
 
 ```typescript
-interface CssOptions extends DebugOptions {
+interface CSSOptions extends DebugOptions {
   prettify?: boolean; // Format output (default: true)
   source?: boolean;   // Read original CSS instead of live CSSOM (default: false, dev-mode only)
 }
@@ -111,14 +111,14 @@ Inspects a DOM element and returns detailed information about its tasty styles, 
 ```typescript
 interface InspectResult {
   element?: Element | null;
-  classes: string[];    // Tasty classes on the element
-  chunks: ChunkInfo[];  // Chunk assignment per class
-  css: string;          // Prettified CSS
-  size: number;         // CSS size in characters
-  rules: number;        // Number of CSS rule blocks
+  classes: string[];          // Tasty classes on the element
+  chunks: DebugChunkInfo[];   // Chunk assignment per class
+  css: string;                // Prettified CSS
+  size: number;               // CSS size in characters
+  rules: number;              // Number of CSS rule blocks
 }
 
-interface ChunkInfo {
+interface DebugChunkInfo {
   className: string;
   chunkName: string | null; // e.g., 'appearance', 'font', 'dimension'
 }

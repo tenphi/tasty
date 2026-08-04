@@ -46,7 +46,7 @@ export interface ProcessedStyle {
 export type UnitHandler = (scalar: number) => string;
 
 export interface ParserOptions {
-  funcs?: Record<string, (parsed: StyleDetails[]) => string>;
+  functions?: Record<string, (parsed: StyleDetails[]) => string>;
   units?: Record<string, string | UnitHandler>;
   cacheSize?: number;
 }

@@ -28,7 +28,7 @@ function scanAndEmitAutoProperties(
   const registered = new Set<string>();
 
   if (styles) {
-    const localProps = styles['@properties'];
+    const localProps = styles['@property'];
     if (localProps && typeof localProps === 'object') {
       for (const token of Object.keys(localProps as Record<string, unknown>)) {
         const parsed = parsePropertyToken(token);
@@ -67,7 +67,7 @@ function scanAndEmitAutoProperties(
  *
  * @param rules - Rendered style rules containing CSS declarations
  * @param collector - SSR collector to emit @property CSS into
- * @param styles - Original styles object (used to skip explicit @properties)
+ * @param styles - Original styles object (used to skip explicit @property)
  */
 export function collectAutoInferredProperties(
   rules: StyleResult[],

@@ -20,13 +20,15 @@ Tasty is a styling engine for design systems that turns component state into det
 - **React components**: [React API](react-api.md)
 - **Zero-runtime / build-time extraction**: [Zero Runtime (tastyStatic)](tasty-static.md)
 - **Runtime `tasty()` with server collection and hydration**: [Server-Side Rendering](ssr.md)
+- **Upgrading from v2**: [Migration Guide (v2 → v3)](migration-v3.md)
 
 ## By Task
 
 - **Learn the style language**: [Style DSL](dsl.md)
 - **Brief an AI agent (or yourself) on writing correct styles**: [Style Rules for AI Agents](ai-agents.md)
 - **Look up a property handler**: [Style Properties](styles.md)
-- **Define tokens, units, recipes, keyframes, or properties globally**: [Configuration](configuration.md)
+- **Define tokens, units, recipes, keyframes, properties, functions, or polyfills globally**: [Configuration](configuration.md)
+- **Extend Tasty with a plugin, custom handler, or custom prop**: [Plugins & Extension Points](plugins.md)
 - **Debug generated CSS or cache behavior**: [Debug Utilities](debug.md)
 - **Understand how selector generation works internally**: [Style rendering pipeline](pipeline.md)
 - **Understand runtime injection internals**: [Style Injector](injector.md)

@@ -6,7 +6,8 @@ import { transformSync } from '@babel/core';
 
 import { resetConfig } from '../config';
 
-import babelPlugin, { clearWriterCache } from './babel';
+import babelPlugin from './babel';
+import { clearWriterCache } from './writer-cache';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'tasty-babel-test-'));

@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { configure, resetConfig } from '../config';
-import { getCssText } from '../injector';
+import { getCSSText } from '../injector';
 
 import { useKeyframes } from './useKeyframes';
 
@@ -22,7 +22,7 @@ describe.each([
   });
 
   const keyframeRules = () =>
-    getCssText()
+    getCSSText()
       .split('\n')
       .filter((line) => line.includes('@keyframes'));
 
@@ -99,7 +99,7 @@ describe.each([
 
     // The shadow root's slot must not evict the document's rule
     expect(keyframeRules()).toHaveLength(1);
-    expect(getCssText({ root: shadowRoot })).toContain('@keyframes shared');
+    expect(getCSSText({ root: shadowRoot })).toContain('@keyframes shared');
 
     host.remove();
   });

@@ -214,7 +214,7 @@ The array form is simpler but types all values as `ModValue`:
 modProps: ['isLoading', 'isSelected'] as const,
 ```
 
-For the full API reference, see [Runtime — Mod Props](react-api.md#mod-props).
+For the full API reference, see [React API — Mod Props](react-api.md#mod-props).
 
 ---
 

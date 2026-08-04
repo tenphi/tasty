@@ -36,238 +36,37 @@
  * Before adding/moving styles, verify:
  * 1. Find all handlers that use this style (grep for the style name in __lookupStyles)
  * 2. Ensure ALL styles from each handler's __lookupStyles are in the same chunk
+ *
+ * For **custom** handlers registered through `configure({ handlers })` this is no
+ * longer only a convention: `alignHandlerChunks()` in `styles/predefined.ts` pulls
+ * any style name the lists below don't know into its handler's existing chunk, and
+ * warns when a handler bridges two chunks defined here. The lists below are still
+ * hand-maintained, so the constraint must be checked by hand when editing them.
  * ============================================================================
  */
 
 import { isSelector } from '../pipeline';
 
+import { CHUNK_NAMES, STYLE_TO_CHUNK } from './style-chunk-map';
+import type { ChunkName } from './style-chunk-map';
+
 // ============================================================================
 // Chunk Style Lists
 // ============================================================================
 
-/**
- * Appearance chunk - visual styling with independent handlers
- *
- * @public
- */
-export const APPEARANCE_CHUNK_STYLES = [
-  'fill', // fillStyle (independent)
-  'color', // colorStyle (independent)
-  'opacity', // independent
-  'border', // borderStyle (independent)
-  'radius', // radiusStyle (independent)
-  'outline', // outlineStyle: outline ↔ outlineOffset
-  'outlineOffset', // outlineStyle: outline ↔ outlineOffset
-  'shadow', // shadowStyle (independent)
-  'fade', // fadeStyle (independent)
-] as const;
-
-/**
- * Font chunk - typography styles
- *
- * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ presetStyle: preset, fontSize, lineHeight, letterSpacing, textTransform,
- *    fontWeight, fontStyle, font
- */
-/** @public */
-export const FONT_CHUNK_STYLES = [
-  // All from presetStyle handler - MUST stay together
-  'preset',
-  'font',
-  'fontWeight',
-  'fontStyle',
-  'fontSize',
-  'lineHeight',
-  'letterSpacing',
-  'textTransform',
-  // Independent text styles grouped for cohesion
-  'fontFamily', // independent alias (logical grouping with font styles)
-  'textAlign',
-  'textDecoration',
-  'wordBreak',
-  'wordWrap',
-  'boldFontWeight',
-] as const;
-
-/**
- * Dimension chunk - sizing and spacing
- *
- * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ paddingStyle: padding, paddingTop/Right/Bottom/Left, paddingBlock/Inline
- * ⚠️ marginStyle: margin, marginTop/Right/Bottom/Left, marginBlock/Inline
- * ⚠️ widthStyle: width, minWidth, maxWidth
- * ⚠️ heightStyle: height, minHeight, maxHeight
- */
-/** @public */
-export const DIMENSION_CHUNK_STYLES = [
-  // All from paddingStyle handler - MUST stay together
-  'padding',
-  'paddingTop',
-  'paddingRight',
-  'paddingBottom',
-  'paddingLeft',
-  'paddingBlock',
-  'paddingInline',
-  // All from marginStyle handler - MUST stay together
-  'margin',
-  'marginTop',
-  'marginRight',
-  'marginBottom',
-  'marginLeft',
-  'marginBlock',
-  'marginInline',
-  // widthStyle handler - MUST stay together
-  'width',
-  'minWidth',
-  'maxWidth',
-  // heightStyle handler - MUST stay together
-  'height',
-  'minHeight',
-  'maxHeight',
-  'flexBasis',
-  'flexGrow',
-  'flexShrink',
-  'flex',
-] as const;
-
-/**
- * Display chunk - display mode, layout flow, text overflow, and scrollbar
- *
- * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ displayStyle: display, hide, textOverflow, overflow, whiteSpace
- * ⚠️ flowStyle: display, flow
- * ⚠️ gapStyle: display, flow, gap
- * ⚠️ scrollbarStyle: scrollbar, overflow
- */
-/** @public */
-export const DISPLAY_CHUNK_STYLES = [
-  // displayStyle handler
-  'display',
-  'hide',
-  'textOverflow',
-  'overflow', // also used by scrollbarStyle
-  'whiteSpace',
-  // flowStyle handler (requires display)
-  'flow',
-  // gapStyle handler (requires display, flow)
-  'gap',
-  // scrollbarStyle handler (requires overflow)
-  'scrollbar',
-] as const;
-
-/**
- * Layout chunk - flex/grid alignment and grid templates
- *
- * Note: flow and gap are in DISPLAY chunk due to handler dependencies
- * (flowStyle and gapStyle both require 'display' prop).
- */
-/** @public */
-export const LAYOUT_CHUNK_STYLES = [
-  // Alignment styles (all independent handlers)
-  'placeItems',
-  'placeContent',
-  'alignItems',
-  'alignContent',
-  'justifyItems',
-  'justifyContent',
-  'align', // placementStyle
-  'justify', // placementStyle
-  'place', // placementStyle
-  'columnGap',
-  'rowGap',
-  // Grid template styles
-  'gridColumns',
-  'gridRows',
-  'gridTemplate',
-  'gridAreas',
-  'gridAutoFlow',
-  'gridAutoColumns',
-  'gridAutoRows',
-] as const;
-
-/**
- * Position chunk - element positioning
- *
- * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ insetStyle: inset, insetBlock, insetInline, top, right, bottom, left
- */
-/** @public */
-export const POSITION_CHUNK_STYLES = [
-  'position',
-  // All from insetStyle handler - MUST stay together
-  'inset',
-  'insetBlock',
-  'insetInline',
-  'top',
-  'right',
-  'bottom',
-  'left',
-  'zIndex',
-  'gridArea',
-  'gridColumn',
-  'gridRow',
-  'order',
-  'placeSelf',
-  'alignSelf',
-  'justifySelf',
-  'transform',
-  'transition',
-  'animation',
-] as const;
-
-// ============================================================================
-// Chunk Names
-// ============================================================================
-
-export const CHUNK_NAMES = {
-  /** Special chunk for styles that cannot be split */
-  COMBINED: 'combined',
-  SUBCOMPONENTS: 'subcomponents',
-  APPEARANCE: 'appearance',
-  FONT: 'font',
-  DIMENSION: 'dimension',
-  DISPLAY: 'display',
-  LAYOUT: 'layout',
-  POSITION: 'position',
-  MISC: 'misc',
-} as const;
-
-export type ChunkName = (typeof CHUNK_NAMES)[keyof typeof CHUNK_NAMES];
-
-// ============================================================================
-// Style-to-Chunk Lookup Map (O(1) categorization)
-// ============================================================================
-
-/**
- * Pre-computed map for O(1) style-to-chunk lookup.
- * Built once at module load time.
- */
-export const STYLE_TO_CHUNK = new Map<string, ChunkName>();
-
-// Populate the lookup map
-function populateStyleToChunkMap() {
-  for (const style of APPEARANCE_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.APPEARANCE);
-  }
-  for (const style of FONT_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.FONT);
-  }
-  for (const style of DIMENSION_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.DIMENSION);
-  }
-  for (const style of DISPLAY_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.DISPLAY);
-  }
-  for (const style of LAYOUT_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.LAYOUT);
-  }
-  for (const style of POSITION_CHUNK_STYLES) {
-    STYLE_TO_CHUNK.set(style, CHUNK_NAMES.POSITION);
-  }
-}
-
-// Initialize at module load
-populateStyleToChunkMap();
+// The chunk style lists and the style→chunk map live in `style-chunk-map.ts` so
+// that the map is populated by importing *that* module, independent of whether
+// this one has been loaded. Re-exported here for the original import paths.
+export {
+  APPEARANCE_CHUNK_STYLES,
+  DIMENSION_CHUNK_STYLES,
+  DISPLAY_CHUNK_STYLES,
+  FONT_CHUNK_STYLES,
+  LAYOUT_CHUNK_STYLES,
+  POSITION_CHUNK_STYLES,
+} from './style-chunk-map';
+export { CHUNK_NAMES, STYLE_TO_CHUNK } from './style-chunk-map';
+export type { ChunkName } from './style-chunk-map';
 
 // ============================================================================
 // Chunk Priority Order
@@ -328,14 +127,15 @@ export function categorizeStyleKeys(
 
   for (const key of keys) {
     // Skip the $ helper key (used for selector combinators)
-    // Skip @keyframes and @properties (processed separately in useStyles)
+    // Skip @keyframes and @property (processed separately in useStyles)
     // Skip recipe (resolved before pipeline by resolveRecipes)
     if (
       key === '$' ||
       key === '@keyframes' ||
-      key === '@properties' ||
-      key === '@fontFace' ||
-      key === '@counterStyle' ||
+      key === '@property' ||
+      key === '@font-face' ||
+      key === '@counter-style' ||
+      key === '@function' ||
       key === 'recipe'
     ) {
       continue;

@@ -12,21 +12,21 @@ import type { Styles } from '../styles/types';
 // Constants
 // ============================================================================
 
-const COUNTER_STYLE_KEY = '@counterStyle';
+const COUNTER_STYLE_KEY = '@counter-style';
 
 // ============================================================================
 // Extraction Functions
 // ============================================================================
 
 /**
- * Check if styles object has local @counterStyle definition.
+ * Check if styles object has local @counter-style definition.
  */
 export function hasLocalCounterStyle(styles: Styles): boolean {
   return COUNTER_STYLE_KEY in styles;
 }
 
 /**
- * Extract local @counterStyle from styles object.
+ * Extract local @counter-style from styles object.
  * Returns null if no local counter styles (fast path).
  */
 export function extractLocalCounterStyle(

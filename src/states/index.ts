@@ -52,16 +52,19 @@ export interface AtRuleContext {
 const BUILTIN_STATES = new Set([
   '@starting',
   '@keyframes',
-  '@properties',
-  '@fontFace',
-  '@counterStyle',
+  '@property',
+  '@font-face',
+  '@counter-style',
+  '@function',
   '@supports',
   // @inherit is a value (not a key), but reserved here to prevent
   // users from accidentally defining a state named '@inherit'.
   '@inherit',
 ]);
 
-// Reserved prefixes that are built-in
+// Reserved prefixes that are built-in.
+// Must stay in sync with BUILTIN_STATES above: that list gates exact names,
+// this one gates prefixes (see isCustomStateKey).
 const RESERVED_PREFIXES = [
   '@media',
   '@root',
@@ -70,7 +73,10 @@ const RESERVED_PREFIXES = [
   '@(',
   '@starting',
   '@keyframes',
-  '@properties',
+  '@property',
+  '@font-face',
+  '@counter-style',
+  '@function',
   '@supports',
   '@inherit',
 ];

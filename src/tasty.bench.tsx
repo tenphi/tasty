@@ -7,7 +7,13 @@ import { clearConditionCache } from './pipeline/materialize';
 import { clearParseCache } from './pipeline/parseStateKey';
 import { clearSimplifyCache } from './pipeline/simplify';
 import type { Styles } from './styles/types';
+import { registerPropHandler, resetPropHandlers } from './prop-handlers';
+import {
+  registerBaseStyleProps,
+  resetBaseStyleProps,
+} from './styles/base-props';
 import { tasty } from './tasty';
+import { mergeStyles } from './utils/merge-styles';
 import { getGlobalParser } from './utils/styles';
 
 function clearAllCaches() {
@@ -274,6 +280,124 @@ describe('tasty component render', () => {
     const { unmount } = render(
       createElement(WithModProps, { isActive: true, size: 'large' }),
     );
+    unmount();
+    cleanup();
+  });
+});
+
+// ============================================================================
+// Prop handler benchmarks — the registry is consulted on every render, so the
+// empty-registry case is the one that must stay free.
+// ============================================================================
+
+const PlainBox = tasty({ as: 'div', styles: { padding: '2x' } });
+
+const GLAZE_STYLES = new Map<string, Styles>();
+
+/**
+ * Memoized per input value, which is the guidance in docs/plugins.md: a
+ * reference-stable styles object lets the cache key's WeakMap hit instead of
+ * re-serializing on every render.
+ */
+function glazeStyles(value: string): Styles {
+  let styles = GLAZE_STYLES.get(value);
+
+  if (!styles) {
+    styles = Object.freeze({
+      '#glaze-bg': `#${value}.10`,
+      fill: '#glaze-bg',
+    }) as Styles;
+    GLAZE_STYLES.set(value, styles);
+  }
+
+  return styles;
+}
+
+describe('propHandlers', () => {
+  bench('no handlers registered (fast path)', () => {
+    resetPropHandlers();
+    const { unmount } = render(createElement(PlainBox));
+    unmount();
+    cleanup();
+  });
+
+  bench('one handler, trigger prop absent', () => {
+    resetPropHandlers();
+    registerPropHandler('glaze', (props) => props);
+    const { unmount } = render(createElement(PlainBox));
+    unmount();
+    cleanup();
+  });
+
+  bench('one handler, trigger present — memoized styles', () => {
+    resetPropHandlers();
+    registerPropHandler('glaze', (props) => {
+      const { glaze, ...rest } = props;
+      if (!glaze) return rest;
+      return {
+        ...rest,
+        styles: mergeStyles(glazeStyles(String(glaze)), rest.styles as Styles),
+      };
+    });
+    const { unmount } = render(
+      createElement(PlainBox, { glaze: 'purple' } as never),
+    );
+    unmount();
+    cleanup();
+  });
+
+  bench('one handler, trigger present — fresh styles each render', () => {
+    resetPropHandlers();
+    registerPropHandler('glaze', (props) => {
+      const { glaze, ...rest } = props;
+      if (!glaze) return rest;
+      return {
+        ...rest,
+        styles: mergeStyles(
+          { '#glaze-bg': `#${String(glaze)}.10`, fill: '#glaze-bg' },
+          rest.styles as Styles,
+        ),
+      };
+    });
+    const { unmount } = render(
+      createElement(PlainBox, { glaze: 'purple' } as never),
+    );
+    unmount();
+    cleanup();
+  });
+
+  bench('three chained handlers, all trigger', () => {
+    resetPropHandlers();
+    for (const key of ['a', 'b', 'c']) {
+      registerPropHandler(key, ['*', (props) => props]);
+    }
+    const { unmount } = render(createElement(PlainBox));
+    unmount();
+    cleanup();
+  });
+});
+
+describe('baseStyleProps', () => {
+  bench('none registered', () => {
+    resetBaseStyleProps();
+    const { unmount } = render(createElement(PlainBox));
+    unmount();
+    cleanup();
+  });
+
+  bench('eight promoted, none passed', () => {
+    resetBaseStyleProps();
+    registerBaseStyleProps([
+      'radius',
+      'shadow',
+      'border',
+      'outline',
+      'fill',
+      'color',
+      'width',
+      'height',
+    ]);
+    const { unmount } = render(createElement(PlainBox));
     unmount();
     cleanup();
   });

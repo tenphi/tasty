@@ -96,17 +96,54 @@ export function classify(
   }
 
   // 0. Double prefix for literal CSS property names ($$name -> --name, ##name -> --name-color)
-  // Used in transitions and animations to reference the property name itself, not its value
+  // Used in transitions and animations to reference the property name itself, not its value.
+  // Also supports custom @function invocation: $$name(args) -> --name(processed args).
   if (token.startsWith('$$')) {
-    const name = token.slice(2);
-    if (/^[a-z_][a-z0-9-_]*$/i.test(name)) {
-      return { bucket: Bucket.Value, processed: `--${name}` };
+    const rest = token.slice(2);
+    const openIdx = rest.indexOf('(');
+    if (openIdx > 0 && rest.endsWith(')')) {
+      const fname = rest.slice(0, openIdx);
+      if (/^[a-z_][a-z0-9-_]*$/i.test(fname)) {
+        const inner = rest.slice(openIdx + 1, -1).trim();
+        const cssName = `--${fname}`;
+        // @function polyfill: when a compiled closure is registered for this
+        // function, inline the call into plain CSS instead of emitting the
+        // (limited-support) native `--name(...)` call.
+        if (opts.functions && cssName in opts.functions) {
+          const groups = inner
+            ? new StyleParser(opts).process(inner).groups
+            : [];
+          const funcResult = opts.functions[cssName](groups);
+          // Empty result signals a recursion-cycle bail: leave the call as-is.
+          if (funcResult !== '') {
+            return classify(
+              funcResult,
+              { ...opts, functions: undefined },
+              recurse,
+            );
+          }
+        }
+        const args = inner ? recurse(inner).output : '';
+        return { bucket: Bucket.Value, processed: `--${fname}(${args})` };
+      }
+    }
+    if (/^[a-z_][a-z0-9-_]*$/i.test(rest)) {
+      return { bucket: Bucket.Value, processed: `--${rest}` };
     }
   }
   if (token.startsWith('##')) {
-    const name = token.slice(2);
-    if (/^[a-z_][a-z0-9-_]*$/i.test(name)) {
-      return { bucket: Bucket.Value, processed: `--${name}-color` };
+    const rest = token.slice(2);
+    const openIdx = rest.indexOf('(');
+    if (openIdx > 0 && rest.endsWith(')')) {
+      const fname = rest.slice(0, openIdx);
+      if (/^[a-z_][a-z0-9-_]*$/i.test(fname)) {
+        const inner = rest.slice(openIdx + 1, -1).trim();
+        const args = inner ? recurse(inner).output : '';
+        return { bucket: Bucket.Value, processed: `--${fname}-color(${args})` };
+      }
+    }
+    if (/^[a-z_][a-z0-9-_]*$/i.test(rest)) {
+      return { bucket: Bucket.Value, processed: `--${rest}-color` };
     }
   }
 
@@ -171,13 +208,38 @@ export function classify(
               );
             }
 
-            // For color functions like rgb(), rgba(), hsl(), hwb(), etc., inject alpha
-            // Includes all standard CSS color functions plus okhsl and okhst (plugins)
+            // For color functions like rgb(), rgba(), hsl(), hwb(), etc., inject alpha.
+            // This covers all standard CSS color functions plus any custom color
+            // function registered as a parse function (e.g. okhsl/okhst via plugins),
+            // so no function name is hardcoded here.
             const funcMatch = resolvedValue.match(
-              /^(rgba?|hsla?|hwb|oklab|oklch|lab|lch|color|okhsl|okhst|device-cmyk|gray|color-mix|color-contrast)\((.+)\)$/i,
+              /^([a-z][a-z0-9-]*)\((.+)\)$/i,
             );
             if (funcMatch) {
               const [, funcName, args] = funcMatch;
+              const lowerFunc = funcName.toLowerCase();
+              const isCustomFunc = !!(
+                opts.functions &&
+                lowerFunc in opts.functions &&
+                !COLOR_FUNCS.has(lowerFunc) &&
+                !COLOR_FUNCS.has(funcName.replace(/a$/i, '').toLowerCase())
+              );
+              // Native color function name with the legacy 'a' suffix dropped
+              // (rgba->rgb, hsla->hsl). Custom functions keep their original name.
+              const normalizedFunc = isCustomFunc
+                ? lowerFunc
+                : funcName.replace(/a$/i, '').toLowerCase();
+              // Only treat as a color function if it is a native CSS color
+              // function or a registered custom parse function. Otherwise the
+              // resolved value is some other function call and alpha injection
+              // does not apply.
+              const isColorFunc =
+                COLOR_FUNCS.has(normalizedFunc) ||
+                COLOR_FUNCS.has(lowerFunc) ||
+                isCustomFunc;
+              if (!isColorFunc) {
+                return classify(`${resolvedValue}.${rawAlpha}`, opts, recurse);
+              }
               // Handle $prop syntax for custom property alpha
               let alpha: string;
               if (rawAlpha.startsWith('$')) {
@@ -186,8 +248,6 @@ export function classify(
               } else {
                 alpha = rawAlpha === '0' ? '0' : `.${rawAlpha}`;
               }
-              // Normalize function name: rgba->rgb, hsla->hsl (modern syntax doesn't need 'a' suffix)
-              const normalizedFunc = funcName.replace(/a$/i, '').toLowerCase();
               // Normalize to modern syntax: replace top-level commas with spaces
               // Preserves commas inside nested functions like min(), max(), clamp()
               const normalizeArgs = (a: string) => {
@@ -265,8 +325,8 @@ export function classify(
               // so the function handler can convert them to valid CSS
               if (
                 !COLOR_FUNCS.has(normalizedFunc) &&
-                opts.funcs &&
-                normalizedFunc in opts.funcs
+                opts.functions &&
+                normalizedFunc in opts.functions
               ) {
                 return classify(constructed, opts, recurse);
               }
@@ -362,13 +422,13 @@ export function classify(
     }
 
     // user function (provided via opts)
-    if (opts.funcs && fname in opts.funcs) {
+    if (opts.functions && fname in opts.functions) {
       // split by top-level commas within inner
       const tmp = new StyleParser(opts).process(inner); // fresh parser w/ same opts but no cache share issues
-      const funcResult = opts.funcs[fname](tmp.groups);
+      const funcResult = opts.functions[fname](tmp.groups);
       // Re-classify the result to determine proper bucket (e.g., if it returns a color)
-      // Pass funcs: undefined to prevent infinite recursion if result matches a function pattern
-      return classify(funcResult, { ...opts, funcs: undefined }, recurse);
+      // Pass functions: undefined to prevent infinite recursion if result matches a function pattern
+      return classify(funcResult, { ...opts, functions: undefined }, recurse);
     }
 
     // generic: process inner and rebuild

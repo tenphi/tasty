@@ -1,29 +1,13 @@
 import { getGlobalInjector } from '../config';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatPropertyCSS } from '../ssr/format-property';
+import type { PropertyOptions } from '../injector/types';
 
-export interface UsePropertyOptions {
-  /**
-   * CSS syntax string for the property (e.g., '<color>', '<length>', '<angle>').
-   * For color tokens (#name), this is auto-set to '<color>' and cannot be overridden.
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/@property/syntax
-   */
-  syntax?: string;
-  /**
-   * Whether the property inherits from parent elements
-   * @default true
-   */
-  inherits?: boolean;
-  /**
-   * Initial value for the property.
-   * For color tokens (#name), this defaults to 'transparent' if not specified.
-   */
-  initialValue?: string | number;
-  /**
-   * Shadow root or document to inject into
-   */
-  root?: Document | ShadowRoot;
-}
+/**
+ * Options for {@link useProperty}. Extends the shared {@link PropertyOptions}
+ * (which is `PropertyDefinition` plus an optional injection `root`).
+ */
+export type UsePropertyOptions = PropertyOptions;
 
 /**
  * Register a CSS @property custom property.

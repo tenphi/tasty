@@ -101,24 +101,24 @@ const toeInv = (x: number): number => (x ** 2 + K1 * x) / (K3 * (x + K2));
 // OKHST Tone Transfers
 // ============================================================================
 
-export const OKHST_REF_EPS = 0.05;
+const OKHST_REF_EPS = 0.05;
 
-export function lToY(l: number): number {
+function lToY(l: number): number {
   const L = toeInv(l);
   return L * L * L;
 }
 
-export function yToL(y: number): number {
+function yToL(y: number): number {
   return toe(Math.cbrt(Math.max(0, y)));
 }
 
-export function toneFromY(y: number, eps: number = OKHST_REF_EPS): number {
+function toneFromY(y: number, eps: number = OKHST_REF_EPS): number {
   const num = Math.log(y + eps) - Math.log(eps);
   const den = Math.log(1 + eps) - Math.log(eps);
   return (num / den) * 100;
 }
 
-export function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
+function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
   const den = Math.log(1 + eps) - Math.log(eps);
   return Math.exp((t / 100) * den + Math.log(eps)) - eps;
 }
@@ -962,8 +962,6 @@ export function strToRgb(
   if (color.startsWith('rgb')) return color;
   if (color.startsWith('#')) return hexToRgb(color);
   if (color.startsWith('oklch(')) return oklchStringToRgb(color);
-  if (color.startsWith('okhsl(')) return okhslStringToRgb(color);
-  if (color.startsWith('okhst(')) return okhstStringToRgb(color);
   if (color.startsWith('hsl')) return hslStringToRgb(color);
 
   const namedHex = getNamedColorHex().get(color.toLowerCase());

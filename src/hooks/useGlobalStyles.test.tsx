@@ -5,7 +5,7 @@
  * @vitest-environment happy-dom
  */
 import { configure, resetConfig } from '../config';
-import { getCssText } from '../injector';
+import { getCSSText } from '../injector';
 
 import { useGlobalStyles } from './useGlobalStyles';
 
@@ -74,7 +74,7 @@ describe.each([
   });
 
   const cssFor = (selector: string, root?: Document | ShadowRoot) =>
-    getCssText(root ? { root } : undefined)
+    getCSSText(root ? { root } : undefined)
       .split('\n')
       .filter((line) => line.includes(selector))
       .join('\n');

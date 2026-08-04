@@ -12,7 +12,7 @@ import {
 
 describe('Counter Style Utilities', () => {
   describe('hasLocalCounterStyle', () => {
-    it('should return false when no @counterStyle defined', () => {
+    it('should return false when no @counter-style defined', () => {
       const styles: Styles = {
         padding: '2x',
         fill: '#purple',
@@ -20,10 +20,10 @@ describe('Counter Style Utilities', () => {
       expect(hasLocalCounterStyle(styles)).toBe(false);
     });
 
-    it('should return true when @counterStyle is defined', () => {
+    it('should return true when @counter-style is defined', () => {
       const styles: Styles = {
         padding: '2x',
-        '@counterStyle': {
+        '@counter-style': {
           thumbs: {
             system: 'cyclic',
             symbols: '"👍"',
@@ -36,12 +36,12 @@ describe('Counter Style Utilities', () => {
   });
 
   describe('extractLocalCounterStyle', () => {
-    it('should return null when no @counterStyle defined', () => {
+    it('should return null when no @counter-style defined', () => {
       const styles: Styles = { padding: '2x' };
       expect(extractLocalCounterStyle(styles)).toBeNull();
     });
 
-    it('should extract @counterStyle from styles', () => {
+    it('should extract @counter-style from styles', () => {
       const counterStyle: Record<string, CounterStyleDescriptors> = {
         thumbs: {
           system: 'cyclic',
@@ -51,7 +51,7 @@ describe('Counter Style Utilities', () => {
       };
       const styles: Styles = {
         padding: '2x',
-        '@counterStyle': counterStyle,
+        '@counter-style': counterStyle,
       };
       expect(extractLocalCounterStyle(styles)).toEqual(counterStyle);
     });
@@ -70,7 +70,7 @@ describe('Counter Style Utilities', () => {
         },
       };
       const styles: Styles = {
-        '@counterStyle': counterStyle,
+        '@counter-style': counterStyle,
       };
       const result = extractLocalCounterStyle(styles);
       expect(result).toEqual(counterStyle);

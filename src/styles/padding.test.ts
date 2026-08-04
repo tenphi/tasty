@@ -263,13 +263,27 @@ describe('paddingStyle', () => {
       });
     });
 
-    it('assigns values to directions in order they appear', () => {
-      // First value (1x) → first direction (right), second value (2x) → second direction (top)
+    it('applies the single value to every direction it names', () => {
+      // A group that names directions takes one value; extra values are ignored
+      // (with a dev-mode warning) because the parser buckets values and
+      // modifiers separately, so their interleaving is not recoverable.
       expect(paddingStyle({ padding: 'right 1x top 2x' })).toEqual({
-        padding: '16px 8px 0 0',
+        padding: '8px 8px 0 0',
       });
 
       expect(paddingStyle({ padding: 'left 2x right 1x' })).toEqual({
+        padding: '0 16px',
+      });
+    });
+
+    it('supports comma groups for per-side values', () => {
+      // The replacement for the old positional form: same output as
+      // `padding: 'right 1x top 2x'` produced before the rule changed.
+      expect(paddingStyle({ padding: '1x right, 2x top' })).toEqual({
+        padding: '16px 8px 0 0',
+      });
+
+      expect(paddingStyle({ padding: '2x left, 1x right' })).toEqual({
         padding: '0 8px 0 16px',
       });
     });

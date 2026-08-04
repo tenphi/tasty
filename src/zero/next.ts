@@ -15,7 +15,7 @@
  * @example
  * ```javascript
  * // next.config.js
- * const { withTastyZero } = require('@tenphi/tasty/next');
+ * const { withTastyZero } = require('@tenphi/tasty/zero/next');
  *
  * module.exports = withTastyZero({
  *   output: 'public/tasty.css',

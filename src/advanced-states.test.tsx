@@ -92,6 +92,7 @@ describe('Advanced State Mapping - CSS Output', () => {
         styles: {
           display: {
             '': 'block',
+            // eslint-disable-next-line tasty/prefer-hide -- tests the @media:print state key on `display` itself
             '@media:print': 'none',
           },
         },
@@ -628,6 +629,7 @@ describe('Advanced State Mapping - CSS Output', () => {
       const Element = tasty({
         styles: {
           display: {
+            // eslint-disable-next-line tasty/prefer-hide -- tests a state-only map on `display` itself
             '@media:print': 'none',
           },
         },

@@ -19,4 +19,5 @@ export { extractStylesWithChunks, extractStylesForSelector } from './extractor';
 export type { ExtractedChunk, ExtractedSelector } from './extractor';
 
 // CSS output utilities
-export { CSSWriter } from './css-writer';
+export { CSSWriter, createCSSWriter } from './css-writer';
+export type { CSSWriterOptions } from './css-writer';

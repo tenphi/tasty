@@ -13,36 +13,36 @@ import {
 
 describe('properties', () => {
   describe('hasLocalProperties', () => {
-    it('should return false when no @properties defined', () => {
+    it('should return false when no @property defined', () => {
       const styles: Styles = { fill: '#red' };
       expect(hasLocalProperties(styles)).toBe(false);
     });
 
-    it('should return true when @properties is defined', () => {
+    it('should return true when @property is defined', () => {
       const styles: Styles = {
         fill: '#red',
-        '@properties': {
+        '@property': {
           '$my-prop': { syntax: '<number>', initialValue: '0' },
         },
       };
       expect(hasLocalProperties(styles)).toBe(true);
     });
 
-    it('should return true even when @properties is empty object', () => {
+    it('should return true even when @property is empty object', () => {
       const styles: Styles = {
-        '@properties': {},
+        '@property': {},
       };
       expect(hasLocalProperties(styles)).toBe(true);
     });
   });
 
   describe('extractLocalProperties', () => {
-    it('should return null when no @properties defined', () => {
+    it('should return null when no @property defined', () => {
       const styles: Styles = { fill: '#red' };
       expect(extractLocalProperties(styles)).toBeNull();
     });
 
-    it('should extract @properties from styles', () => {
+    it('should extract @property from styles', () => {
       const properties = {
         $rotation: {
           syntax: '<angle>',
@@ -53,15 +53,15 @@ describe('properties', () => {
       };
       const styles: Styles = {
         fill: '#red',
-        '@properties': properties,
+        '@property': properties,
       };
 
       expect(extractLocalProperties(styles)).toEqual(properties);
     });
 
-    it('should return null for non-object @properties value', () => {
+    it('should return null for non-object @property value', () => {
       const styles = {
-        '@properties': 'invalid',
+        '@property': 'invalid',
       } as unknown as Styles;
 
       expect(extractLocalProperties(styles)).toBeNull();

@@ -46,7 +46,7 @@ On top of that foundation, Tasty gives teams a governed styling model: a CSS-lik
 
 - **Typed style props and mod props** — `styleProps` exposes selected CSS properties as typed React props (`<Space flow="row" gap="2x">`); `modProps` does the same for modifier keys (`<Button isLoading size="large">`). Both support state maps and full TypeScript autocomplete. See [Style Props](#style-props) and [Mod Props](#mod-props).
 - **Server-compatible by default, zero client JS in server-only contexts** — All `tasty()` components and style functions are hook-free. In server-only rendering (Next.js RSC, Astro without islands, SSG), they produce zero client JavaScript with the full feature set. Add SSR integration only when your app also has client-side hydration. Use `tastyStatic()` only when you need build-time extraction without React.
-- **Broad modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
+- **Broad modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, `@font-face`, `@counter-style`, `@function`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
 - **Performance and caching** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
 - **TypeScript-first and AI-friendly** — Style definitions are declarative, structurally consistent, and fully typed, which helps both humans and tooling understand advanced stateful styles without hidden cascade logic.
 
@@ -425,15 +425,34 @@ If you prefer explicit control, disable inference with `configure({ autoProperty
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
-### Explicit `@properties`
+### Explicit `@property`
 
-Use explicit `@properties` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
+Use explicit `@property` only when you need to override defaults such as `inherits: false` or a custom `initialValue`.
 
 See [Style DSL - Properties (`@property`)](docs/dsl.md#properties-property).
 
+### CSS Functions (`@function`)
+
+Define reusable, parameterized CSS functions and call them anywhere a value is accepted. Declare with `$$name`, invoke with `$$name(...)`; parameters and local variables use `$name`.
+
+```jsx
+const Card = tasty({
+  styles: {
+    '@function': {
+      $$negative: { args: ['$value'], result: '(-1 * $value)' },
+    },
+    marginTop: '$$negative(2x)',
+  },
+});
+```
+
+Definitions can also come from `configure({ functions })` or the `useFunction` style function, and work across client, SSR/RSC, and zero-runtime modes. `@function` is an experimental CSS feature, so for browsers that do not ship it yet enable `configure({ polyfills: { functions: true } })` to inline every call into plain CSS at parse time.
+
+See [Style DSL - Functions](docs/dsl.md#functions-function) and [Configuration - Polyfills](docs/configuration.md#polyfills).
+
 ### Style Functions
 
-When you do not need a full component wrapper, use the style functions directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, and `useCounterStyle` for animation, custom-property, font, and counter-style primitives. All style functions are hook-free and work in React Server Components.
+When you do not need a full component wrapper, use the style functions directly: `useStyles` for local class names, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction` for animation, custom-property, font, counter-style, and CSS-function primitives. All style functions are hook-free and work in React Server Components.
 
 See [React API - Style Functions](docs/react-api.md#style-functions).
 
@@ -467,10 +486,11 @@ See the [full SSR guide](docs/ssr.md).
 |--------|-------------|----------|
 | `@tenphi/tasty` | Runtime style engine (`tasty`, style functions, `configure`) | Browser |
 | `@tenphi/tasty/static` | Zero-runtime static styles (`tastyStatic`) | Browser |
+| `@tenphi/tasty/static/inject` | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode | Browser |
 | `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/next` | Next.js integration wrapper | Node |
+| `@tenphi/tasty/zero/next` | Next.js integration wrapper | Node |
 | `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
@@ -615,11 +635,16 @@ Start from the docs hub if you want the shortest path to the right guide for you
 
 ### Reference
 
-- **[Style DSL](docs/dsl.md)** — The Tasty style language: state maps, tokens, units, color syntax, extending semantics, recipes, keyframes, and @property
+- **[Style DSL](docs/dsl.md)** — The Tasty style language: state maps, tokens, units, color syntax, extending semantics, recipes, keyframes, `@property`, `@font-face`, `@counter-style`, and `@function`
 - **[React API](docs/react-api.md)** — React-specific API: `tasty()` factory, component props, variants, sub-elements, and style functions
-- **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, style handlers, and TypeScript extensions
+- **[Configuration](docs/configuration.md)** — Global configuration: tokens, recipes, custom units, functions, polyfills, style handlers, props middleware, and TypeScript extensions
+- **[Plugins & Extension Points](docs/plugins.md)** — Extending Tasty: choosing an extension point, authoring style handlers and props middleware, and packaging it as a plugin
 - **[Style Properties](docs/styles.md)** — Complete reference for all enhanced style properties: syntax, values, modifiers, and recommendations
 - **[Style Rules for AI Agents](docs/ai-agents.md)** — Condensed, rule-based brief for AI coding agents: correct value syntax, state maps, and property choices in one short page
+
+### Upgrading
+
+- **[Migration Guide (v2 → v3)](docs/migration-v3.md)** — Every breaking change in 3.0 with a search-and-replace cheat sheet: at-rule key renames, the directional-shorthand rule, config keys, renamed and removed exports, and what deliberately did not change
 
 ### Rendering modes
 

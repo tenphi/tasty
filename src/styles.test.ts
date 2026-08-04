@@ -202,12 +202,22 @@ describe('Tasty style tests', () => {
       inset: 'auto auto 16px 16px',
     });
 
-    // Multiple values with directions - values assigned in order they appear
+    // A group that names directions takes one value, applied to every direction
+    // it names. Extra values are ignored (dev warning).
     expect(insetStyle({ inset: 'right 1x top 0' })).toEqual({
-      inset: '0 8px auto auto',
+      inset: '8px 8px auto auto',
     });
 
     expect(insetStyle({ inset: 'left 2x right 1x' })).toEqual({
+      inset: 'auto 16px',
+    });
+
+    // Comma groups are the way to give each side its own value.
+    expect(insetStyle({ inset: '1x right, 0 top' })).toEqual({
+      inset: '0 8px auto auto',
+    });
+
+    expect(insetStyle({ inset: '2x left, 1x right' })).toEqual({
       inset: 'auto 8px auto 16px',
     });
 

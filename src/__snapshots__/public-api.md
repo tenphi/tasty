@@ -513,3 +513,11 @@ type       TastyMiddlewareOptions
 ## @tenphi/tasty/ssr/astro-client
 
 _(no exports — side effects only)_
+
+## @tenphi/tasty/ssr/astro-middleware
+
+value      onRequest
+
+## @tenphi/tasty/ssr/astro-middleware-static
+
+value      onRequest

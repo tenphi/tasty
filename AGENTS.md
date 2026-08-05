@@ -59,6 +59,7 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
 | `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
+| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static` | Middleware entrypoints `tastyIntegration()` hands to Astro's `addMiddleware()`. Exported only so Astro can resolve them by specifier — never reference them directly. | Node |
 
 ## Project Structure
 

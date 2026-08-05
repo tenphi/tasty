@@ -1,19 +1,16 @@
 /**
- * Astro middleware entrypoint for tastyIntegration().
+ * Astro middleware entrypoint for `tastyIntegration()`.
  *
- * Referenced by the integration via addMiddleware(). Not intended
- * as a public package export — use tastyMiddleware() directly if
- * you need manual middleware composition.
+ * Registered via `addMiddleware()` as `@tenphi/tasty/ssr/astro-middleware`.
+ * Exposed as a package subpath only so Astro can resolve it — use
+ * `tastyMiddleware()` directly if you need manual middleware composition.
  *
- * The transferCache setting is controlled by setMiddlewareTransferCache(),
- * called by tastyIntegration() before middleware is loaded.
+ * This is the islands variant: the rendered class list is transferred to the
+ * client so hydrating islands skip the style pipeline. See
+ * `./astro-middleware-static` for the variant used by
+ * `tastyIntegration({ islands: false })`.
  */
 
-import { getMiddlewareTransferCache } from './astro-transfer-cache';
 import { tastyMiddleware } from './astro';
 
-export const onRequest = tastyMiddleware({
-  get transferCache() {
-    return getMiddlewareTransferCache();
-  },
-});
+export const onRequest = tastyMiddleware({ transferCache: true });

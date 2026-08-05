@@ -354,6 +354,7 @@ const stream = await runWithCollector(collector, () =>
 | `@tenphi/tasty/ssr/next` | Next.js App Router: `TastyRegistry` component |
 | `@tenphi/tasty/ssr/astro` | Astro: `tastyIntegration`, `tastyMiddleware` |
 | `@tenphi/tasty/ssr/astro-client` | Astro: client-side cache hydration (auto-injected by integration, or import manually) |
+| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`. |
 
 ### `ServerStyleCollector`
 

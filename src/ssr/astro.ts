@@ -12,7 +12,6 @@ import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { ServerStyleCollector } from './collector';
 import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
-import { setMiddlewareTransferCache } from './astro-transfer-cache';
 
 // Wire up ALS-based collector discovery so computeStyles() can find
 // the collector set by tastyMiddleware's runWithCollector().
@@ -159,6 +158,28 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
 // Astro Integration API
 // ============================================================================
 
+/**
+ * Package subpaths of the middleware entrypoints registered by
+ * `tastyIntegration()`.
+ *
+ * These must be bare specifiers rather than
+ * `new URL('./astro-middleware.js', import.meta.url)`. The bundler is free to
+ * hoist `tastyIntegration` into a shared chunk at a different directory depth
+ * than `dist/ssr/`, which makes a relative URL resolve to a file that does not
+ * exist and breaks the build for every consumer. A package subpath is resolved
+ * by the consumer through our `exports` map, so it never depends on the
+ * chunk layout.
+ *
+ * There are two entrypoints instead of one parameterised entrypoint because
+ * `addMiddleware()` cannot pass options: the integration runs when the Astro
+ * config is loaded, while the middleware module is evaluated in the server
+ * runtime — a different process for built output — so module-level state set
+ * by the integration is not visible to the middleware.
+ */
+const MIDDLEWARE_ENTRYPOINT = '@tenphi/tasty/ssr/astro-middleware';
+const MIDDLEWARE_ENTRYPOINT_STATIC =
+  '@tenphi/tasty/ssr/astro-middleware-static';
+
 export interface TastyIntegrationOptions {
   /**
    * Enable island hydration support.
@@ -206,8 +227,6 @@ export function tastyIntegration(options?: TastyIntegrationOptions): {
 } {
   const { islands = true } = options ?? {};
 
-  setMiddlewareTransferCache(islands);
-
   return {
     name: '@tenphi/tasty',
     hooks: {
@@ -225,7 +244,9 @@ export function tastyIntegration(options?: TastyIntegrationOptions): {
         ) => void;
       }) => {
         addMiddleware({
-          entrypoint: new URL('./astro-middleware.js', import.meta.url),
+          entrypoint: islands
+            ? MIDDLEWARE_ENTRYPOINT
+            : MIDDLEWARE_ENTRYPOINT_STATIC,
           order: 'pre',
         });
 

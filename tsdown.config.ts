@@ -13,6 +13,7 @@ export default defineConfig({
     'ssr/next': 'src/ssr/next.ts',
     'ssr/astro': 'src/ssr/astro.ts',
     'ssr/astro-middleware': 'src/ssr/astro-middleware.ts',
+    'ssr/astro-middleware-static': 'src/ssr/astro-middleware-static.ts',
     'ssr/astro-client': 'src/ssr/astro-client.ts',
   },
   format: 'esm',

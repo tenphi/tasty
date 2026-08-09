@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import type { StyleResult } from '../pipeline';
 import { resetColorSpace, setColorSpace } from '../utils/color-space';
 
@@ -39,9 +36,9 @@ function cssToStyleResults(css: string, className = 'test'): StyleResult[] {
 
 /**
  * Comprehensive tests for the StyleInjector.
- * Uses forceTextInjection mode so assertions can read textContent
- * (happy-dom's CSSOM works fine, but the textContent path is what
- *  these tests were written against).
+ * Uses forceTextInjection mode so assertions can read textContent verbatim.
+ * The CSSOM path is covered by the suites further down that opt into
+ * `forceTextInjection: false`.
  */
 
 describe('StyleInjector', () => {
@@ -1210,12 +1207,38 @@ describe('StyleInjector namePrefix', () => {
 });
 
 // ---------------------------------------------------------------------------
-// @property rejection handling (jsdom / happy-dom and other engines that
-// don't support @property at all)
+// @property rejection handling (Safari < 16.4, Firefox < 128, and any other
+// engine that doesn't implement @property at all)
 // ---------------------------------------------------------------------------
 // Suppress no-op lint rule: vi.spyOn requires a function argument.
 function noop(): void {
   /* no-op */
+}
+
+/**
+ * Make the engine behave as if it had no `@property` support: every
+ * `@property` rule is rejected, the support probe in `SheetManager` included.
+ *
+ * These suites run in Chromium, which implements `@property`, so the
+ * degradation path has to be simulated. It used to come for free from
+ * happy-dom rejecting the rules natively — an incidental gap that would have
+ * silently stopped covering this branch the day happy-dom added support.
+ */
+function simulateNoAtPropertySupport() {
+  const originalInsertRule = CSSStyleSheet.prototype.insertRule;
+
+  return vi
+    .spyOn(CSSStyleSheet.prototype, 'insertRule')
+    .mockImplementation(function (
+      this: CSSStyleSheet,
+      rule: string,
+      index?: number,
+    ) {
+      if (rule.startsWith('@property ')) {
+        throw new DOMException('Failed to parse the rule.', 'SyntaxError');
+      }
+      return originalInsertRule.call(this, rule, index);
+    });
 }
 
 describe('StyleInjector @property rejection handling', () => {
@@ -1225,8 +1248,7 @@ describe('StyleInjector @property rejection handling', () => {
   });
 
   it('marks the property as injected even when the engine rejects the rule', () => {
-    // happy-dom rejects every @property rule natively, so this exercises
-    // the "engine doesn't support @property" path without any stubbing.
+    const insertRuleSpy = simulateNoAtPropertySupport();
     const injector = new StyleInjector({ forceTextInjection: false });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
 
@@ -1241,17 +1263,19 @@ describe('StyleInjector @property rejection handling', () => {
       // Calling property() again for the same token must short-circuit.
       injector.property('#accent', { initialValue: 'red' });
     } finally {
+      insertRuleSpy.mockRestore();
       injector.destroy();
       warnSpy.mockRestore();
     }
   });
 
   it('suppresses the "Browser rejected CSS rule" warning for @property when the engine has no @property support', () => {
+    const insertRuleSpy = simulateNoAtPropertySupport();
     const injector = new StyleInjector({ forceTextInjection: false });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
 
     try {
-      // Multiple distinct color tokens — all rejected by happy-dom — must
+      // Multiple distinct color tokens — all rejected by the engine — must
       // not flood the console; the per-registry probe should detect the
       // missing @property support after the first failure and silence the
       // rest.
@@ -1287,6 +1311,7 @@ describe('StyleInjector @property rejection handling', () => {
 
       expect(atPropertyWarnings).toHaveLength(0);
     } finally {
+      insertRuleSpy.mockRestore();
       injector.destroy();
       warnSpy.mockRestore();
     }
@@ -1296,9 +1321,9 @@ describe('StyleInjector @property rejection handling', () => {
     const injector = new StyleInjector({ forceTextInjection: false });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(noop);
 
-    // Simulate an engine that supports @property in general but rejects
-    // this specific (hypothetically) invalid rule. The probe rule must
-    // succeed; only `--bad-prop` should throw.
+    // An engine that supports @property in general but rejects this specific
+    // (hypothetically) invalid rule. The probe rule must succeed; only
+    // `--bad-prop` should throw.
     const originalInsertRule = CSSStyleSheet.prototype.insertRule;
     const insertRuleSpy = vi
       .spyOn(CSSStyleSheet.prototype, 'insertRule')
@@ -1307,14 +1332,8 @@ describe('StyleInjector @property rejection handling', () => {
         rule: string,
         index?: number,
       ) {
-        if (rule.startsWith('@property ')) {
-          if (rule.includes('--bad-prop')) {
-            throw new DOMException('Failed to parse the rule.', 'SyntaxError');
-          }
-          // Probe rule: pretend success. We can't actually insert an
-          // @property rule in happy-dom, so just return the index. The
-          // probe's deleteRule fallback handles missing rules silently.
-          return index ?? 0;
+        if (rule.startsWith('@property ') && rule.includes('--bad-prop')) {
+          throw new DOMException('Failed to parse the rule.', 'SyntaxError');
         }
         return originalInsertRule.call(this, rule, index);
       });

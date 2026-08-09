@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { configure, resetConfig } from './config';
 import { computeStyles } from './compute-styles';
 import { destroy, getCSSText } from './injector';
@@ -66,15 +63,29 @@ describe('computeStyles with root option', () => {
   });
 });
 
-/**
- * End-to-end @function handling is asserted through the SSR collector path:
- * jsdom/happy-dom CSSOM rejects `@function` at `insertRule`, so the client
- * injector path is not observable via getCSSText in tests.
- */
 describe('computeStyles @function handling', () => {
   afterEach(() => {
     destroy();
     resetConfig();
+  });
+
+  it('injects a component-local @function through the client CSSOM path', () => {
+    // The counterpart to the SSR-collector cases below: no collector, and
+    // `insertRule` rather than text. Chromium implements `@function`, so the
+    // rule survives insertion and reads back out of the sheet.
+    configure({ forceTextInjection: false });
+
+    computeStyles({
+      '@function': {
+        $$negative: { args: ['$value'], result: '(-1 * $value)' },
+      },
+      marginTop: '$$negative(10px)',
+    });
+
+    const css = getCSSText();
+
+    expect(css).toContain('@function --negative(--value)');
+    expect(css).toContain('--negative(10px)');
   });
 
   it('emits a component-local @function and its invocation', () => {

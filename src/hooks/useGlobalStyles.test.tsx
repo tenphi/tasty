@@ -1,9 +1,3 @@
-/**
- * happy-dom, like the injector suites: jsdom exposes `CSSStyleSheet` but not a
- * usable `ShadowRoot.adoptedStyleSheets`, so adopted mode can't be exercised there.
- *
- * @vitest-environment happy-dom
- */
 import { configure, resetConfig } from '../config';
 import { getCSSText } from '../injector';
 

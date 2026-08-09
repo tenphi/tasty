@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { configure, resetConfig } from '../config';
 import { getCSSText } from '../injector';
 
@@ -21,10 +18,34 @@ describe.each([
     resetConfig();
   });
 
-  const keyframeRules = () =>
-    getCSSText()
-      .split('\n')
-      .filter((line) => line.includes('@keyframes'));
+  /**
+   * Every `@keyframes` block in the injected CSS, whole.
+   *
+   * Matched by brace balance rather than by line: `CSSKeyframesRule.cssText`
+   * serializes across several lines, so line filtering would only ever return
+   * the `@keyframes <name> {` header and never the steps.
+   */
+  const keyframeRules = () => {
+    const css = getCSSText();
+    const blocks: string[] = [];
+    const header = /@keyframes\s+[^{]*\{/g;
+
+    for (let m = header.exec(css); m; m = header.exec(css)) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+
+      while (i < css.length && depth > 0) {
+        if (css[i] === '{') depth++;
+        else if (css[i] === '}') depth--;
+        i++;
+      }
+
+      blocks.push(css.slice(m.index, i));
+      header.lastIndex = i;
+    }
+
+    return blocks;
+  };
 
   it('should dedupe identical steps to one rule and name', () => {
     const steps = { from: { opacity: 0 }, to: { opacity: 1 } };
@@ -57,13 +78,12 @@ describe.each([
     // reclaims the plain `pulse` name instead of minting `pulse-tk0`, `pulse-tk1`
     expect(rules).toHaveLength(1);
 
-    if (forceTextInjection) {
-      // happy-dom's CSSKeyframesRule.cssText omits the steps, so the content is
-      // only readable in text mode
-      expect(rules[0]).toContain('scale(2)');
-      expect(rules[0]).not.toContain('scale(1.1)');
-      expect(rules[0]).not.toContain('scale(1.5)');
-    }
+    // The surviving rule holds the latest steps only. Asserted in both modes:
+    // Chromium's `CSSKeyframesRule.cssText` round-trips the steps, so the CSSOM
+    // path is observable too.
+    expect(rules[0]).toContain('scale(2)');
+    expect(rules[0]).not.toContain('scale(1.1)');
+    expect(rules[0]).not.toContain('scale(1.5)');
   });
 
   it('should not re-inject a named slot when deps are unchanged', () => {

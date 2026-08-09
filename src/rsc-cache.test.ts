@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { flushPendingCSS, pushRSCCSS } from './rsc-cache';
 import type { RSCStyleCache } from './rsc-cache';
 

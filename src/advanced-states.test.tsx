@@ -135,24 +135,62 @@ describe('Advanced State Mapping - CSS Output', () => {
     });
   });
 
-  // Note: @container query CSS is not supported by jsdom, so these tests
-  // verify the CSS is generated but cannot validate injection works.
-  // The CSS generation is tested via unit tests in states/states.test.ts
   describe('@container query states', () => {
-    it('should generate CSS with @container wrapper for unnamed queries (jsdom limitation)', () => {
-      // jsdom does not support @container CSS syntax
+    it('should generate CSS with @container wrapper for unnamed queries', () => {
+      const Element = tasty({
+        styles: {
+          containerType: 'inline-size',
+          padding: {
+            '': '4x',
+            '@(w < 600px)': '2x',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
 
-    it('should generate CSS with named container queries (jsdom limitation)', () => {
-      // jsdom does not support @container CSS syntax
+    it('should generate CSS with named container queries', () => {
+      const Element = tasty({
+        styles: {
+          padding: {
+            '': '4x',
+            '@(layout, w < 600px)': '2x',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
 
-    it('should handle style queries in container queries (jsdom limitation)', () => {
-      // jsdom does not support @container CSS syntax
+    it('should handle style queries in container queries', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@(layout, $compact)': '#dark-02',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
 
-    it('should handle style queries with equality (jsdom limitation)', () => {
-      // jsdom does not support @container CSS syntax
+    it('should handle style queries with equality', () => {
+      const Element = tasty({
+        styles: {
+          fill: {
+            '': '#white',
+            '@(layout, $variant=danger)': '#danger',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
   });
 
@@ -376,14 +414,37 @@ describe('Advanced State Mapping - CSS Output', () => {
     });
   });
 
-  // Note: @starting-style CSS is not supported by jsdom
   describe('@starting style states', () => {
-    it('should generate CSS with @starting-style wrapper (jsdom limitation)', () => {
-      // jsdom does not support @starting-style CSS syntax
+    it('should generate CSS with @starting-style wrapper', () => {
+      const Element = tasty({
+        styles: {
+          opacity: {
+            '': '1',
+            '@starting': '0',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
 
-    it('should handle multiple properties in starting style (jsdom limitation)', () => {
-      // jsdom does not support @starting-style CSS syntax
+    it('should handle multiple properties in starting style', () => {
+      const Element = tasty({
+        styles: {
+          opacity: {
+            '': '1',
+            '@starting': '0',
+          },
+          scale: {
+            '': '1',
+            '@starting': '.9',
+          },
+        },
+      });
+
+      const { container } = render(<Element />);
+      expect(container).toMatchTastySnapshot();
     });
   });
 
@@ -925,8 +986,7 @@ describe('Advanced State Mapping - CSS Output', () => {
       expect(container).toMatchTastySnapshot();
     });
 
-    // Container query tests - skipped due to jsdom limitations with @container CSS
-    it.skip('should handle nested container queries (jsdom limitation)', () => {
+    it('should handle nested container queries', () => {
       const Element = tasty({
         styles: {
           containerType: 'inline-size',
@@ -943,7 +1003,7 @@ describe('Advanced State Mapping - CSS Output', () => {
       expect(container).toMatchTastySnapshot();
     });
 
-    it.skip('should handle container style queries (jsdom limitation)', () => {
+    it('should handle container style queries', () => {
       const Element = tasty({
         styles: {
           containerType: 'inline-size',
@@ -966,7 +1026,8 @@ describe('Advanced State Mapping - CSS Output', () => {
 // The warning logic itself is a simple console.warn wrapper that doesn't need
 // extensive testing.
 
-// Direct renderStyles tests for features that jsdom doesn't support
+// Direct renderStyles tests: assert on the rule objects the pipeline produces,
+// before the engine gets a chance to normalize or drop anything.
 describe('Advanced State Mapping - renderStyles direct tests', () => {
   describe('@starting-style tests', () => {
     it('should generate startingStyle flag for entry animations', () => {

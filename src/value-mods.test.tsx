@@ -2,6 +2,15 @@ import { render } from '@testing-library/react';
 
 import { tasty } from './tasty';
 
+/**
+ * Computed serialization of the CSS keyword `blue`.
+ *
+ * These suites assert the *winning* branch positively rather than merely
+ * checking that the losing one is absent — a `not.toBe('red')` would pass even
+ * if no rule applied at all.
+ */
+const BLUE = 'rgb(0, 0, 255)';
+
 describe('Value Mods', () => {
   describe('modAttrs generation', () => {
     const TestElement = tasty({
@@ -176,7 +185,7 @@ describe('Value Mods', () => {
       // Check computed color - should use boolean selector (higher priority)
       // The value selector should be filtered out before CSS generation
       const style = window.getComputedStyle(element);
-      expect(style.color).not.toBe('red'); // Value selector should not apply
+      expect(style.color).toBe(BLUE); // the boolean branch is the live one
     });
 
     it('should allow both selectors when value has higher priority', () => {
@@ -303,7 +312,7 @@ describe('Value Mods', () => {
 
       // Check computed color - should use boolean selector (higher priority)
       const style = window.getComputedStyle(element);
-      expect(style.color).not.toBe('red'); // Value selector should not apply
+      expect(style.color).toBe(BLUE); // the boolean branch is the live one
     });
 
     it('should work with full attribute selector syntax when value has priority', () => {
@@ -344,7 +353,7 @@ describe('Value Mods', () => {
 
       // Check computed color - should use boolean selector (higher priority)
       const style = window.getComputedStyle(element);
-      expect(style.color).not.toBe('red'); // Value selector should not apply
+      expect(style.color).toBe(BLUE); // the boolean branch is the live one
     });
 
     it('should work with data-* prefix in full selector syntax', () => {
@@ -365,7 +374,7 @@ describe('Value Mods', () => {
 
       // Check computed fontSize - should use boolean selector (higher priority)
       const style = window.getComputedStyle(element);
-      expect(style.fontSize).not.toBe('20px'); // Value selector should not apply
+      expect(style.fontSize).toBe('16px'); // the boolean branch is the live one
     });
   });
 

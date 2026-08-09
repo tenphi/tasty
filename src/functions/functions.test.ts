@@ -1,6 +1,3 @@
-/**
- * @vitest-environment jsdom
- */
 import type { FunctionDefinition } from '../injector/types';
 import type { Styles } from '../styles/types';
 

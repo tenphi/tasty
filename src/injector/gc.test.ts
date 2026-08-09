@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { StyleInjector } from './injector';
 import type { StyleRule } from './types';
 

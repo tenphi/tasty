@@ -1,6 +1,3 @@
-/**
- * @vitest-environment jsdom
- */
 import { ServerStyleCollector } from '../ssr/collector';
 import {
   registerSSRCollectorGetter,
@@ -9,10 +6,9 @@ import {
 import { useFunction } from './useFunction';
 
 /**
- * The client injector path can't be asserted in jsdom/happy-dom because their
- * CSSOM rejects `@function` at `insertRule`. We exercise the hook through the
- * SSR collector (text-based) instead, which is the same code path used for
- * server rendering.
+ * Exercised through the SSR collector, which is the same code path used for
+ * server rendering. The client CSSOM path for `@function` is covered
+ * separately in `compute-styles.test.ts`.
  */
 describe('useFunction', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;

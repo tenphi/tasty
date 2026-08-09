@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { SheetManager } from './sheet-manager';
 import type { StyleInjectorConfig, StyleRule } from './types';
 

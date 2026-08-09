@@ -54,19 +54,41 @@ const _numberConverter = (val: string | number | boolean | undefined) => {
 
   return val;
 };
-const columnsConverter = (val: string | number | boolean | undefined) => {
-  if (typeof val === 'number') {
-    return 'minmax(1px, 1fr) '.repeat(val).trim();
-  }
+/**
+ * Read a grid track count, or `undefined` when the value isn't one.
+ *
+ * Plain digit strings count: every value inside a state map arrives as a
+ * string, so `gridColumns: { '': '2', '@media(w < 600px)': '1' }` would
+ * otherwise emit `grid-template-columns: 2` — invalid CSS that browsers drop
+ * silently.
+ *
+ * Zero and negatives yield `undefined`. Zero already produced an empty value,
+ * and a negative number used to throw inside `String.repeat`.
+ */
+function trackCount(
+  val: string | number | boolean | undefined,
+): number | undefined {
+  const count =
+    typeof val === 'number'
+      ? val
+      : typeof val === 'string' && /^\d+$/.test(val.trim())
+        ? Number(val.trim())
+        : NaN;
 
-  return;
+  return Number.isFinite(count) && count >= 1 ? Math.floor(count) : undefined;
+}
+
+const columnsConverter = (val: string | number | boolean | undefined) => {
+  const count = trackCount(val);
+
+  return count === undefined
+    ? undefined
+    : 'minmax(1px, 1fr) '.repeat(count).trim();
 };
 const rowsConverter = (val: string | number | boolean | undefined) => {
-  if (typeof val === 'number') {
-    return 'auto '.repeat(val).trim();
-  }
+  const count = trackCount(val);
 
-  return;
+  return count === undefined ? undefined : 'auto '.repeat(count).trim();
 };
 
 type StyleHandlerMap = Record<string, AnyStyleHandler[]>;
@@ -170,9 +192,11 @@ export function predefine() {
     (val: string | boolean | number | undefined) => {
       if (typeof val !== 'string') return;
 
+      // Each side converts independently, and a side that isn't a track count
+      // (`auto`, `1fr`, an areas string) is kept verbatim.
       return val
         .split('/')
-        .map((s, i) => (i ? columnsConverter : rowsConverter)(s))
+        .map((s, i) => (i ? columnsConverter : rowsConverter)(s) ?? s)
         .join('/');
     },
   );

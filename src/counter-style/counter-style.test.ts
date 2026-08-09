@@ -1,6 +1,3 @@
-/**
- * @vitest-environment jsdom
- */
 import type { CounterStyleDescriptors } from '../injector/types';
 import type { Styles } from '../styles/types';
 

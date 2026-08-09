@@ -1,6 +1,3 @@
-/**
- * @vitest-environment jsdom
- */
 import { configure, resetConfig } from '../config';
 import { parseStyle } from '../utils/styles';
 

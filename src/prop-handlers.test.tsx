@@ -11,6 +11,7 @@ import { configure, resetConfig } from './config';
 import { getCSSText } from './injector';
 import { propHandlerRegistry, resetPropHandlers } from './prop-handlers';
 import { tasty } from './tasty';
+import { disableDevWarnings, enableDevWarnings } from './test/dev-env';
 import { mergeStyles } from './utils/merge-styles';
 
 describe('propHandlers', () => {
@@ -26,7 +27,7 @@ describe('propHandlers', () => {
   afterEach(() => {
     warnSpy.mockRestore();
     resetConfig();
-    vi.unstubAllEnvs();
+    disableDevWarnings();
   });
 
   describe('fast path', () => {
@@ -327,7 +328,7 @@ describe('propHandlers', () => {
 
   describe('invalid returns', () => {
     beforeEach(() => {
-      vi.stubEnv('NODE_ENV', 'development');
+      enableDevWarnings();
     });
 
     it.each([
@@ -377,8 +378,9 @@ describe('propHandlers', () => {
       configure({ propHandlers: { glaze: (props) => props } });
 
       // configure() bails wholesale once styles exist, so nothing is registered.
-      // The accompanying warning uses config.ts's module-load dev gate, which is
-      // off under NODE_ENV=test, so only the effect is asserted here.
+      // The accompanying warning is gated on `const devMode = isDevEnv()` read
+      // once at config.ts module load, so flipping the flag mid-test cannot turn
+      // it on — only the effect is asserted here.
       expect(propHandlerRegistry.apply).toBeNull();
       expect(propHandlerRegistry.list).toHaveLength(0);
     });

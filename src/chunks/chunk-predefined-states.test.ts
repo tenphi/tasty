@@ -1,6 +1,3 @@
-/**
- * @vitest-environment jsdom
- */
 import { clearPipelineCache } from '../pipeline';
 import type { Styles } from '../styles/types';
 

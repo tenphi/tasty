@@ -27,6 +27,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The `browser` Vitest project runs against headless Chromium. The binary
+      # is ~100 MB, so it is cached and keyed on the lockfile — a Playwright
+      # version bump invalidates the cache and pulls a matching browser.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      # System libraries live outside the cached directory, so they are
+      # reinstalled even when the browser itself was restored.
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
       - name: Build
         run: pnpm build
 

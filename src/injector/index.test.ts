@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { configure, resetConfig } from '../config';
 import type { StyleResult } from '../pipeline';
 import {

@@ -100,8 +100,9 @@ describe('docs/plugins.md glaze example', () => {
     );
 
     expect(container.firstElementChild!.className).not.toBe('');
-    // .30 opacity, not the .10 default.
-    expect(getCSSText()).toContain('var(--success-color-oklch)/.30');
+    // .30 opacity, not the .10 default. Matched loosely because the engine
+    // normalizes whitespace around the alpha slash when it reserializes.
+    expect(getCSSText()).toMatch(/var\(--success-color-oklch\)\s*\/\s*\.30/);
   });
 
   it('registers the plugin-supplied @property', () => {

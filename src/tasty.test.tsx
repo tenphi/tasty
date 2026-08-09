@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { configure, resetConfig } from './config';
 import { useGlobalStyles } from './hooks';
+import { getCSSText } from './injector';
 import { CONTAINER_STYLES } from './styles/list';
 import { tasty } from './tasty';
 
@@ -1312,9 +1313,10 @@ describe('useGlobalStyles() hook', () => {
 
     render(<Component />);
 
-    // Get the injected styles
-    const styleElement = document.querySelector('style');
-    const styleContent = styleElement?.textContent || '';
+    // Read back through the injector rather than `document.querySelector`:
+    // rules go in via `insertRule`, so the `<style>` element carries no text,
+    // and the runner's own page styles would match first anyway.
+    const styleContent = getCSSText();
 
     // Should transform to: > [data-element="Body"] > [data-element="Row"] > [data-element="Cell"]
     expect(styleContent).toMatch(

@@ -11,13 +11,17 @@ Repository: <https://github.com/tenphi/tasty>
 | Command | Purpose |
 |---|---|
 | `pnpm build` | Build via tsdown (ESM, browser + node targets) |
-| `pnpm test` | Run tests (vitest) |
+| `pnpm test` | Run tests (vitest — both projects) |
+| `pnpm test:node` | Run only the `node` project (pure logic, no DOM) |
+| `pnpm test:browser` | Run only the `browser` project (headless Chromium) |
+| `pnpm test:setup` | Download the Chromium binary the browser project needs |
 | `pnpm typecheck` | Type-check without emitting |
 | `pnpm lint` | Lint source files |
 | `pnpm lint:fix` | Lint and auto-fix |
 | `pnpm format` | Format with Prettier |
 | `pnpm format:check` | Check formatting |
-| `pnpm bench` | Run benchmarks (vitest bench) |
+| `pnpm bench` | Run pipeline benchmarks (Node project — the numbers quoted in the README) |
+| `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
 | `pnpm size` | Check bundle sizes (size-limit) |
 | `pnpm hygiene` | Run lint + format check + typecheck together |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
@@ -38,7 +42,7 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)
 - **Build**: tsdown — ESM, unbundled, dts + sourcemaps, browser + node targets
-- **Test**: Vitest 4, globals enabled, jsdom (default) + happy-dom (injector tests)
+- **Test**: Vitest 4, globals enabled, split into two projects (see [Test environments](#test-environments))
 - **Lint**: ESLint 10 + typescript-eslint + prettier + `@tenphi/eslint-plugin-tasty` (dogfooded on the repo's own style objects; see `eslint.config.js` for the rules disabled because this repo tests the parser)
 - **Format**: Prettier — single quotes, semicolons, trailing commas, 80 cols
 - **Versioning**: Changesets
@@ -151,9 +155,29 @@ src/
 - Functional API pattern: factory functions + hooks, no class components. The *styling* API (`tasty`, `useStyles`, `configure`, etc.) is entirely functional. Stateful infrastructure services (`ServerStyleCollector`, `CSSWriter`, `StyleInjector`) are classes but each exposes a `create*()` factory wrapper (`createServerStyleCollector`, `createCSSWriter`) as the canonical public entry point; the class is also exported for advanced/internal use.
 - All style values go through the Tasty parser — supports design tokens (`#color`, `$token`), custom units (`2x`, `1r`), auto-calc, and color opacity (`#purple.5`)
 
+## Test environments
+
+Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
+
+| Project | Environment | Covers |
+|---|---|---|
+| `node` | plain Node, no DOM | Parser, style handlers, pipeline, SSR string output, Babel extractor, config merging — pure logic |
+| `browser` | headless Chromium via Playwright | Everything that touches `document`, renders React, or asserts on CSS the engine actually parsed |
+
+**Where a new test goes.** Add it to the `BROWSER_TESTS` list in `vitest.config.ts` if it touches `document`, renders React, or asserts on injected CSS; otherwise it lands in `node` automatically. All `*.test.tsx` files are already matched by the list. A DOM test left in the `node` project fails loudly with `document is not defined`, so the mistake is cheap.
+
+**Why a real browser.** Tasty compiles to CSS, and only a CSS engine can tell you whether that CSS is valid. jsdom and happy-dom reject `@container`, `@starting-style`, `@property`, `@function`, and CSS nesting outright — under jsdom, 53 of the 54 snapshots in `advanced-states.test.tsx` were empty strings asserting nothing, and `@container`/`@starting-style` coverage did not exist at all. Chromium accepts these rules, so the snapshots now pin real CSS and an invalid declaration shows up as a dropped property.
+
+**Consequences to keep in mind:**
+
+- The engine reserializes what it accepts. `oklch(var(--x)/.1)` comes back as `oklch(var(--x) / .1)`, and `CSSKeyframesRule.cssText` spans multiple lines. Assert with tolerant matchers, or use `forceTextInjection: true` when the point is to pin Tasty's own output byte-for-byte (see `injector/at-rule-docs.test.ts`).
+- Degradation paths must be simulated, not inherited. Chromium supports `@property`, so the "engine has no `@property` support" branch is exercised by stubbing `CSSStyleSheet.prototype.insertRule` — see `simulateNoAtPropertySupport()` in `injector/injector.test.ts`.
+- There is no `process` global in the browser, so `vi.stubEnv('NODE_ENV', …)` cannot reach `isDevEnv()`. Use `enableDevWarnings()` from `src/test/dev-env.ts`, which flips the `TASTY_DEBUG` localStorage flag — the switch that works in a real browser.
+- First checkout needs `pnpm test:setup` once to download the Chromium binary.
+
 ## CI/CD
 
-- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), tests, size limit on push to `main` and PRs
+- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
 - **Release**: Changesets — on push to `main`, either creates a version PR or publishes to npm
 - **Snapshots**: comment `/snapshot` on a PR for `0.0.0-snapshot.<sha>` release
 - **npm trusted publishing**: OIDC provenance via the `release` GitHub environment

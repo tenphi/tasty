@@ -1,6 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
 import { ChunkSheetRegistry } from './chunk-sheet-registry';
 
 describe('ChunkSheetRegistry', () => {

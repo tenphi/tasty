@@ -11,6 +11,7 @@ import { render } from '@testing-library/react';
 
 import { configure, resetConfig } from '../config';
 import { Element, tasty } from '../tasty';
+import { disableDevWarnings, enableDevWarnings } from '../test/dev-env';
 
 import { baseStylePropsRegistry, getBaseStyleProps } from './base-props';
 
@@ -30,7 +31,7 @@ describe('baseStyleProps', () => {
   afterEach(() => {
     warnSpy.mockRestore();
     resetConfig();
-    vi.unstubAllEnvs();
+    disableDevWarnings();
   });
 
   it('promotes a style to a prop on a factory created afterwards', () => {
@@ -126,7 +127,7 @@ describe('baseStyleProps', () => {
     });
 
     it('rejects invalid names in dev', () => {
-      vi.stubEnv('NODE_ENV', 'development');
+      enableDevWarnings();
 
       configure({ baseStyleProps: ['Radius', '@media', '$token'] });
 
@@ -137,7 +138,7 @@ describe('baseStyleProps', () => {
     });
 
     it('rejects names tasty() consumes itself', () => {
-      vi.stubEnv('NODE_ENV', 'development');
+      enableDevWarnings();
 
       configure({ baseStyleProps: ['styles', 'variant'] });
 

@@ -25,9 +25,14 @@ For security vulnerabilities, do **not** open a public issue — see [SECURITY.m
 git clone https://github.com/tenphi/tasty.git
 cd tasty
 pnpm install
+pnpm test:setup
 pnpm build
 pnpm test
 ```
+
+`pnpm test:setup` downloads the headless Chromium binary that part of the test
+suite runs against. It is a one-time step per checkout — see
+[Testing](#testing).
 
 ## Project Layout
 
@@ -49,7 +54,10 @@ For a deeper map of the codebase, see [`AGENTS.md`](AGENTS.md).
 | Script | Purpose |
 |--------|---------|
 | `pnpm build` | Build all entry points with `tsdown` |
-| `pnpm test` | Run the test suite once |
+| `pnpm test` | Run the test suite once (both projects) |
+| `pnpm test:node` | Run only the Node project (pure logic, no DOM) |
+| `pnpm test:browser` | Run only the browser project (headless Chromium) |
+| `pnpm test:setup` | Download the Chromium binary the browser project needs |
 | `pnpm test:watch` | Watch mode for tests |
 | `pnpm test:coverage` | Run tests with coverage |
 | `pnpm typecheck` | Run `tsc --noEmit` |
@@ -58,9 +66,37 @@ For a deeper map of the codebase, see [`AGENTS.md`](AGENTS.md).
 | `pnpm hygiene` | Lint + format check + typecheck (CI mirror) |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
 | `pnpm size` | Run size-limit checks against the built bundles |
-| `pnpm bench` | Run pipeline benchmarks |
+| `pnpm bench` | Run pipeline benchmarks (Node project) |
+| `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
 
 Run `pnpm hygiene` before pushing — CI runs the same checks.
+
+## Testing
+
+The suite is split into two Vitest projects, configured in
+[`vitest.config.ts`](vitest.config.ts):
+
+| Project | Environment | Covers |
+|---------|-------------|--------|
+| `node` | plain Node, no DOM | Parser, style handlers, pipeline, SSR string output, Babel extractor — pure logic |
+| `browser` | headless Chromium (Playwright) | Anything that touches `document`, renders React, or asserts on CSS the engine actually parsed |
+
+Tasty compiles to CSS, and only a real CSS engine can tell you whether that CSS
+is valid. jsdom and happy-dom reject `@container`, `@starting-style`,
+`@property`, `@function`, and CSS nesting, which silently hollowed out the
+assertions that depended on them. Running those suites in Chromium means an
+invalid declaration shows up as a property the browser dropped.
+
+**Adding a test.** Put it next to the source it exercises. If it touches
+`document`, renders React, or asserts on injected CSS, add it to the
+`BROWSER_TESTS` list in `vitest.config.ts` — every `*.test.tsx` file is already
+matched. Everything else runs in the `node` project automatically, and a DOM
+test that ends up there fails immediately with `document is not defined`.
+
+**Writing browser assertions.** The engine reserializes the CSS it accepts, so
+prefer tolerant matchers over exact strings — `oklch(var(--x)/.1)` reads back as
+`oklch(var(--x) / .1)`. When the point is to pin Tasty's own output verbatim,
+configure `forceTextInjection: true` and read it back with `getCSSText()`.
 
 ## Development Workflow
 
@@ -69,7 +105,7 @@ Run `pnpm hygiene` before pushing — CI runs the same checks.
    git checkout -b fix/short-description
    ```
 2. **Make your change.** Keep PRs focused — one logical change per PR is much easier to review and ship.
-3. **Add or update tests.** Bug fixes should include a regression test; features should include coverage for the new behavior. Tests use [Vitest](https://vitest.dev/) and live next to the source they exercise.
+3. **Add or update tests.** Bug fixes should include a regression test; features should include coverage for the new behavior. Tests use [Vitest](https://vitest.dev/) and live next to the source they exercise — see [Testing](#testing) for which of the two projects yours belongs in.
 4. **Update the docs.** Public-API changes need a corresponding update under `docs/` (and usually the README's relevant section).
 5. **Add a changeset** (see below) describing the user-facing change.
 6. **Run hygiene + tests:**

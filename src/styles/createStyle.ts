@@ -89,10 +89,17 @@ export function createStyle(
         styleValue = normalized;
       }
 
-      if (converter && typeof styleValue !== 'string') {
-        styleValue = converter(styleValue as string | number | true);
+      if (converter) {
+        const converted = converter(styleValue as string | number | true);
 
-        if (!styleValue) return null;
+        if (converted) {
+          styleValue = converted;
+        } else if (typeof styleValue !== 'string') {
+          // A converter declining a non-string value leaves nothing to emit —
+          // `true` and numbers have no meaningful CSS serialization on their
+          // own. Strings are already valid CSS, so they pass through untouched.
+          return null;
+        }
       }
 
       if (

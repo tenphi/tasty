@@ -1,8 +1,9 @@
 /**
  * Pins the at-rule injection examples in docs/injector.md.
  *
- * Uses text injection because jsdom's CSSOM rejects several of these at-rules at
- * `insertRule`, which is also why `getCSSText()` is the observation point.
+ * Uses text injection so the assertions read back exactly the CSS Tasty emitted,
+ * without the engine's reserialization in between — these cases pin the
+ * documented output, not the browser's normalization of it.
  */
 import { configure, resetConfig } from '../config';
 

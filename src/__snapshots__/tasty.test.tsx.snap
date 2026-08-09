@@ -34,7 +34,7 @@ exports[`tasty() API > should apply extend-mode base styles on top of variant 2`
 .t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
-exports[`tasty() API > should be able to override styles 1`] = `".tdiafv5.tdiafv5 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch)/.1); --current-color-oklch: var(--black-color-oklch); }"`;
+exports[`tasty() API > should be able to override styles 1`] = `".tdiafv5.tdiafv5 { color: oklch(var(--black-color-oklch) / .1); --current-color: oklch(var(--black-color-oklch) / .1); --current-color-oklch: var(--black-color-oklch); }"`;
 
 exports[`tasty() API > should create element styles 1`] = `
 ".tt6i54n.tt6i54n:where(:not([data-modified])) [data-element="Element"] { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
@@ -45,7 +45,7 @@ exports[`tasty() API > should define style props 1`] = `".tms9l71.tms9l71 { bord
 
 exports[`tasty() API > should fallback to default variant 1`] = `".t1qyzno6.t1qyzno6 { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }"`;
 
-exports[`tasty() API > should handle color fallback syntax 1`] = `".t1x40q7f.t1x40q7f { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color,var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch,var(--dark-04-color-oklch)); }"`;
+exports[`tasty() API > should handle color fallback syntax 1`] = `".t1x40q7f.t1x40q7f { color: var(--placeholder-color, var(--dark-04-color)); --current-color: var(--placeholder-color, var(--dark-04-color)); --current-color-oklch: var(--placeholder-color-oklch, var(--dark-04-color-oklch)); }"`;
 
 exports[`tasty() API > should handle fill fallback syntax 1`] = `".th5j7l3.th5j7l3 { background-color: var(--surface-color, var(--white-color)); }"`;
 
@@ -85,7 +85,7 @@ exports[`tasty() API > should optimize attribute selectors 3`] = `
 .t1c00a7t.t1c00a7t:where([data-selected][data-size="large"]) { padding: 24px 0px 0px; }"
 `;
 
-exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch)/.1); --current-color-oklch: var(--clear-color-oklch); }"`;
+exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: oklch(var(--clear-color-oklch) / .1); --current-color: oklch(var(--clear-color-oklch) / .1); --current-color-oklch: var(--clear-color-oklch); }"`;
 
 exports[`tasty() API > should support camelCase modifiers 1`] = `
 ".t10vr46x.t10vr46x:where(:not([data-somehow-modified])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }

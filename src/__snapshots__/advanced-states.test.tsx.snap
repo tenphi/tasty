@@ -1,110 +1,576 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should expand dimension shorthands in media queries 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @container query states > should generate CSS with @container wrapper for unnamed queries 1`] = `
+"@container (not (width < 600px)) {
+  .t5fc7ek.t5fc7ek { padding: 32px; }
+}
+@container (width < 600px) {
+  .t5fc7ek.t5fc7ek { padding: 16px; }
+}
+.t6pr2z.t6pr2z { container-type: inline-size; }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should expand tasty units in media queries 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @container query states > should generate CSS with named container queries 1`] = `
+"@container layout (not (width < 600px)) {
+  .te30siu.te30siu { padding: 32px; }
+}
+@container layout (width < 600px) {
+  .te30siu.te30siu { padding: 16px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should generate CSS with @media wrapper for dimension queries 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @container query states > should handle style queries in container queries 1`] = `
+"@container layout (not style(--compact)) {
+  .t1gypgf0.t1gypgf0 { background-color: var(--white-color); }
+}
+@container layout style(--compact) {
+  .t1gypgf0.t1gypgf0 { background-color: var(--dark-02-color); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should generate exclusive CSS for multiple overlapping breakpoints 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @container query states > should handle style queries with equality 1`] = `
+"@container layout (not style(--variant: danger)) {
+  .tffkjdk.tffkjdk { background-color: var(--white-color); }
+}
+@container layout style(--variant: danger) {
+  .tffkjdk.tffkjdk { background-color: var(--danger-color); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should handle @media:type syntax 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should expand dimension shorthands in media queries 1`] = `
+"@media (not (height > 800px)) and (not (width < 600px)) {
+  .tngbv2n.tngbv2n { padding: 32px; }
+}
+@media (not (height > 800px)) and (width < 600px) {
+  .tngbv2n.tngbv2n { padding: 16px; }
+}
+@media (height > 800px) {
+  .tngbv2n.tngbv2n { padding: 48px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should handle cascading media queries with overlapping ranges 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should expand tasty units in media queries 1`] = `
+"@media (not (width <= calc(var(--gap) * 40))) {
+  .t1193m0n.t1193m0n { padding: 32px; }
+}
+@media (width <= calc(var(--gap) * 40)) {
+  .t1193m0n.t1193m0n { padding: 16px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @media query states > should handle media queries with range syntax 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should generate CSS with @media wrapper for dimension queries 1`] = `
+"@media (not (width <= 920px)) {
+  .t1e9ro93.t1e9ro93 { padding: 32px; }
+}
+@media (width <= 920px) {
+  .t1e9ro93.t1e9ro93 { padding: 16px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should generate CSS with :is() for parent states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should generate exclusive CSS for multiple overlapping breakpoints 1`] = `
+"@media (not (width < 480px)) and (not (width < 768px)) {
+  .t1s0nwne.t1s0nwne { padding: 32px; }
+}
+@media (not (width < 480px)) and (width < 768px) {
+  .t1s0nwne.t1s0nwne { padding: 16px; }
+}
+@media (width < 480px) {
+  .t1s0nwne.t1s0nwne { padding: 8px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should handle @media:type syntax 1`] = `
+"@media not print {
+  .t5wwo45.t5wwo45 { display: block; }
+}
+@media print {
+  .t5wwo45.t5wwo45 { display: none; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should handle cascading media queries with overlapping ranges 1`] = `
+"@media (not (width <= 1400px)) and (not (width <= 920px)) {
+  .t19jjzuq.t19jjzuq { grid-template-columns: 1fr 1fr 1fr; }
+}
+@media (not (width <= 920px)) and (width <= 1400px) {
+  .t19jjzuq.t19jjzuq { grid-template-columns: 1fr 1fr; }
+}
+@media (width <= 920px) {
+  .t19jjzuq.t19jjzuq { grid-template-columns: 1fr; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle class-based parent state 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @media query states > should handle media queries with range syntax 1`] = `
+"@media (not (600px <= width < 900px)) and (not (width >= 900px)) {
+  .t1wxuy8g.t1wxuy8g { grid-template-columns: minmax(1px, 1fr); }
+}
+@media (600px <= width < 900px) {
+  .t1wxuy8g.t1wxuy8g { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr); }
+}
+@media (width >= 900px) {
+  .t1wxuy8g.t1wxuy8g { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle direct parent syntax 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should generate CSS with :is() for parent states 1`] = `
+".t1usod76.t1usod76:where(:not([data-hovered] *)) { background-color: var(--white-color); }
+.t1usod76.t1usod76:where([data-hovered] *) { background-color: var(--gray-05-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (AND) 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle OR inside single @parent() 1`] = `
+".t1jf60ey.t1jf60ey:where(:not([data-focused] *, [data-hovered] *)) { background-color: var(--white-color); }
+.t1jf60ey.t1jf60ey:where([data-focused] *, [data-hovered] *) { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (OR) 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle attribute-based parent state 1`] = `
+".t50bgj0.t50bgj0:where(:not([aria-expanded="true"] *)) { background-color: var(--white-color); }
+.t50bgj0.t50bgj0:where([aria-expanded="true"] *) { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle class-based parent state 1`] = `
+".t4rb55e.t4rb55e:where(:not(.active *)) { background-color: var(--white-color); }
+.t4rb55e.t4rb55e:where(.active *) { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with root 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle direct parent syntax 1`] = `
+".t1jbyq1o.t1jbyq1o:where(:not([data-hovered] > *)) { background-color: var(--white-color); }
+.t1jbyq1o.t1jbyq1o:where([data-hovered] > *) { background-color: var(--gray-05-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent on sub-element 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (AND) 1`] = `
+".t1mp3d4v.t1mp3d4v:where(:not([data-focused] *)), .t1mp3d4v.t1mp3d4v:where(:not([data-hovered] *)):where([data-focused] *) { background-color: var(--white-color); }
+.t1mp3d4v.t1mp3d4v:where([data-focused] *):where([data-hovered] *) { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @parent states > should handle value modifier parent state 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle multiple parent conditions (OR) 1`] = `
+".t1dxi5ed.t1dxi5ed:where(:not([data-focused] *)):where(:not([data-hovered] *)) { background-color: var(--white-color); }
+.t1dxi5ed.t1dxi5ed:where([data-hovered] *), .t1dxi5ed.t1dxi5ed:where(:not([data-hovered] *)):where([data-focused] *) { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @root states > should generate CSS with :root prefix for root states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `
+".t1dofem5.t1dofem5:where(:not([data-disabled])):where(:not([data-hovered] *)) { background-color: var(--white-color); }
+.t1dofem5.t1dofem5:where([data-disabled]):where(:not([data-hovered] *)) { background-color: var(--gray-03-color); }
+.t1dofem5.t1dofem5:where(:not([data-disabled])):where([data-hovered] *) { background-color: var(--blue-color); }
+.t1dofem5.t1dofem5:where([data-disabled]):where([data-hovered] *) { background-color: var(--gray-05-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @root states > should handle OR inside single @root() 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with root 1`] = `
+":where(:root:not([data-theme="dark"])) .t168yhp7.t168yhp7:where(:not([data-hovered] *)) { background-color: var(--white-color); }
+:where(:root[data-theme="dark"]) .t168yhp7.t168yhp7:where(:not([data-hovered] *)) { background-color: var(--dark-02-color); }
+.t168yhp7.t168yhp7:where([data-hovered] *) { background-color: var(--gray-05-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @root states > should handle attribute-based root states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent on sub-element 1`] = `
+".t9gsj9a.t9gsj9a { background-color: var(--white-color); }
+.t1sj3qi4.t1sj3qi4:where(:not([data-hovered] *)) [data-element="Label"] { background-color: var(--gray-02-color); }
+.t1sj3qi4.t1sj3qi4:where([data-hovered] *) [data-element="Label"] { background-color: var(--blue-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > @root states > should handle class-based root states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @parent states > should handle value modifier parent state 1`] = `
+".t1ph663n.t1ph663n:where(:not([data-theme="dark"] *)) { background-color: var(--white-color); }
+.t1ph663n.t1ph663n:where([data-theme="dark"] *) { background-color: var(--dark-02-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should combine media queries with regular modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @root states > should generate CSS with :root prefix for root states 1`] = `
+":where(:root:not([data-theme="dark"])) .t1tdiym5.t1tdiym5 { background-color: var(--white-color); }
+:where(:root[data-theme="dark"]) .t1tdiym5.t1tdiym5 { background-color: var(--dark-02-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should handle root states with regular modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @root states > should handle OR inside single @root() 1`] = `
+":where(:root:not([data-mode="compact"], [data-theme="dark"])) .t1e24t42.t1e24t42 { background-color: var(--white-color); }
+:where(:root:is([data-mode="compact"], [data-theme="dark"])) .t1e24t42.t1e24t42 { background-color: var(--dark-02-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with linked styles with a different set of states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @root states > should handle attribute-based root states 1`] = `
+":where(:root:not([data-high-contrast])) .t1efuyz5.t1efuyz5 { background-color: var(--white-color); }
+:where(:root[data-high-contrast]) .t1efuyz5.t1efuyz5 { background-color: var(--black-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with linked styles with the same set of states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @root states > should handle class-based root states 1`] = `
+":where(:root:not(.compact-mode)) .tjb3xfq.tjb3xfq { background-color: var(--white-color); }
+:where(:root.compact-mode) .tjb3xfq.tjb3xfq { background-color: var(--gray-05-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @starting style states > should generate CSS with @starting-style wrapper 1`] = `
+".t1wo5ltp.t1wo5ltp { opacity: 1; }
+.t1wo5ltp.t1wo5ltp {
+  @starting-style {
+  opacity: 0;
+}
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups in real world use case 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > @starting style states > should handle multiple properties in starting style 1`] = `
+".t1wo5ltp.t1wo5ltp { opacity: 1; }
+.t1wo5ltp.t1wo5ltp {
+  @starting-style {
+  opacity: 0;
+}
+}
+.t9f4qan.t9f4qan { scale: 1; }
+.t9f4qan.t9f4qan {
+  @starting-style {
+  scale: 0.9;
+}
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of mixed media and root OR groups 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should combine media queries with regular modifiers 1`] = `
+"@media (not (width < 600px)) {
+  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 32px; }
+}
+@media (not (width < 600px)) {
+  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 40px; }
+}
+@media (width < 600px) {
+  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 16px; }
+}
+@media (width < 600px) {
+  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 24px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle advanced states with multiple modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should handle root states with regular modifiers 1`] = `
+":where(:root:not([data-theme="dark"])) .t1m7ai2a.t1m7ai2a:where(:not([data-disabled])) { background-color: var(--white-color); }
+:where(:root:not([data-theme="dark"])) .t1m7ai2a.t1m7ai2a:where([data-disabled]) { background-color: var(--gray-03-color); }
+:where(:root[data-theme="dark"]) .t1m7ai2a.t1m7ai2a:where(:not([data-disabled])) { background-color: var(--dark-02-color); }
+:where(:root[data-theme="dark"]) .t1m7ai2a.t1m7ai2a:where([data-disabled]) { background-color: var(--dark-04-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle cascading root states with specificity 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with linked styles with a different set of states 1`] = `
+"@media (not (width < 1200px)) and (not (width < 600px)) {
+  .txmvqhk.txmvqhk { display: flex; }
+}
+@media (width < 600px) {
+  .txmvqhk.txmvqhk { display: none; }
+}
+@media (not (width < 600px)) and (width < 1200px) {
+  .txmvqhk.txmvqhk { display: grid; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle combined media and root states on same property 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with linked styles with the same set of states 1`] = `
+"@media (not (width < 600px)) {
+  .t1gi51rf.t1gi51rf { display: flex; }
+}
+@media (width < 600px) {
+  .t1gi51rf.t1gi51rf { display: none; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle media queries on different dimensions 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups 1`] = `
+"@media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
+  :where(:root:not([data-prefers-schema="light"])) .tqlrckn.tqlrckn { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
+  :where(:root:not([data-schema="system"])[data-prefers-schema="light"]) .tqlrckn.tqlrckn { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (prefers-color-scheme: light) {
+  .tqlrckn.tqlrckn { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: light)) and (prefers-color-scheme: no-preference) {
+  .tqlrckn.tqlrckn { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: light)) and (not (prefers-color-scheme: no-preference)) {
+  :where(:root[data-prefers-schema="light"][data-schema="system"]) .tqlrckn.tqlrckn { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle multiple root states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of different types in OR groups in real world use case 1`] = `
+"@media (not (prefers-color-scheme: dark)) {
+  :where(:root:not([data-schema="dark"])) .tx0cfao.tx0cfao { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-schema="dark"])[data-schema]) .tx0cfao.tx0cfao { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+:where(:root[data-schema="dark"]) .tx0cfao.tx0cfao { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-schema])) .tx0cfao.tx0cfao { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle predefined states with modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with styles of mixed media and root OR groups 1`] = `
+"@media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
+  .t1eu6fd.t1eu6fd { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: dark)) and (prefers-color-scheme: no-preference) {
+  :where(:root:not([data-prefers-schema="dark"])) .t1eu6fd.t1eu6fd { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: no-preference)) and (prefers-color-scheme: dark) {
+  :where(:root:not([data-prefers-schema="system"])) .t1eu6fd.t1eu6fd { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (prefers-color-scheme: dark) and (prefers-color-scheme: no-preference) {
+  :where(:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"])) .t1eu6fd.t1eu6fd { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-prefers-schema="system"]) .t1eu6fd.t1eu6fd { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (not (prefers-color-scheme: dark)) and (prefers-color-scheme: no-preference) {
+  :where(:root[data-prefers-schema="dark"]) .t1eu6fd.t1eu6fd { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (prefers-color-scheme: dark) and (prefers-color-scheme: no-preference) {
+  :where(:root[data-prefers-schema="dark"]) .t1eu6fd.t1eu6fd { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle root states with pseudo-class modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle advanced states with multiple modifiers 1`] = `
+"@media (not (width < 600px)) {
+  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 32px; }
+}
+@media (not (width < 600px)) {
+  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 40px; }
+}
+@media (width < 600px) {
+  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 16px; }
+}
+@media (width < 600px) {
+  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 24px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle sub-elements with multiple advanced states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle cascading root states with specificity 1`] = `
+":where(:root:not([data-mode="compact"]):not([data-theme="dark"]):not([data-theme="light"])) .t1ve3s2q.t1ve3s2q { background-color: var(--white-color); }
+:where(:root:not([data-mode="compact"])[data-theme="dark"]) .t1ve3s2q.t1ve3s2q { background-color: var(--dark-02-color); }
+:where(:root:not([data-mode="compact"])[data-theme="light"]) .t1ve3s2q.t1ve3s2q { background-color: var(--light-01-color); }
+:where(:root[data-mode="compact"]) .t1ve3s2q.t1ve3s2q { background-color: var(--gray-02-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should handle three-way media query cascade 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle combined media and root states on same property 1`] = `
+"@media (not (width < 600px)) and (not (width >= 1200px)) {
+  :where(:root:not([data-theme="dark"])) .tueks5i.tueks5i { padding: 32px; }
+}
+@media (width < 600px) {
+  :where(:root:not([data-theme="dark"])) .tueks5i.tueks5i { padding: 16px; }
+}
+@media (not (width >= 1200px)) {
+  :where(:root[data-theme="dark"]) .tueks5i.tueks5i { padding: 24px; }
+}
+@media (width >= 1200px) {
+  .tueks5i.tueks5i { padding: 48px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > complex combinations > should support complex predefined states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle container style queries 1`] = `
+"@container (not style(--theme: dark)) {
+  .t1gg09g2.t1gg09g2 { background-color: var(--white-color); }
+}
+@container style(--theme: dark) {
+  .t1gg09g2.t1gg09g2 { background-color: var(--dark-02-color); }
+}
+.t6pr2z.t6pr2z { container-type: inline-size; }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with complex style values 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle media queries on different dimensions 1`] = `
+"@media (not (height < 400px)) and (not (width < 600px)) {
+  .t18l7iv8.t18l7iv8 { padding: 32px; }
+}
+@media (not (height < 400px)) and (width < 600px) {
+  .t18l7iv8.t18l7iv8 { padding: 16px; }
+}
+@media (height < 400px) {
+  .t18l7iv8.t18l7iv8 { padding: 8px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with fallback color syntax 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle multiple root states 1`] = `
+":where(:root:not([data-high-contrast]):not([data-theme="dark"])) .ti2u7ou.ti2u7ou { background-color: var(--white-color); }
+:where(:root:not([data-high-contrast])[data-theme="dark"]) .ti2u7ou.ti2u7ou { background-color: var(--dark-02-color); }
+:where(:root[data-high-contrast]) .ti2u7ou.ti2u7ou { background-color: var(--black-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > edge cases > should handle empty default with only advanced state 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle nested container queries 1`] = `
+"@container card (width < 400px) {
+  .trv5e5a.trv5e5a { padding: 16px; }
+}
+@container card (width >= 400px) {
+  .trv5e5a.trv5e5a { padding: 24px; }
+}
+.t1bap1yv.t1bap1yv { container: card / inline-size; }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > predefined states (global) > should handle multiple global predefined states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle predefined states with modifiers 1`] = `
+".t1xdgn0c.t1xdgn0c:where(:not([data-compact]):not([data-hovered])) { padding: 32px; }
+.t1xdgn0c.t1xdgn0c:where([data-compact]:not([data-hovered])) { padding: 16px; }
+.t1xdgn0c.t1xdgn0c:where([data-hovered]) { padding: 40px; }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > predefined states (global) > should prioritize local over global predefined states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle root states with pseudo-class modifiers 1`] = `
+":where(:root:not([data-theme="dark"])) .t1sf8gyh.t1sf8gyh:where(:not([data-hovered])) { background-color: var(--white-color); }
+:where(:root[data-theme="dark"]) .t1sf8gyh.t1sf8gyh:where(:not([data-hovered])) { background-color: var(--dark-02-color); }
+.t1sf8gyh.t1sf8gyh:where([data-hovered]) { background-color: var(--gray-01-color); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > predefined states (global) > should resolve global predefined states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle sub-elements with multiple advanced states 1`] = `
+".t12gf898.t12gf898 { padding: 32px; }
+@media (not (width < 600px)) {
+  :where(:root:not([data-theme="dark"])) .t1jpbrvm.t1jpbrvm [data-element="Header"] { padding: 16px; }
+}
+@media (width < 600px) {
+  :where(:root:not([data-theme="dark"])) .t1jpbrvm.t1jpbrvm [data-element="Header"] { padding: 8px; }
+}
+:where(:root[data-theme="dark"]) .t1jpbrvm.t1jpbrvm [data-element="Header"] { padding: 24px; }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > predefined states (local) > should handle multiple local predefined states 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should handle three-way media query cascade 1`] = `
+"@media (not (width <= 1200px)) and (not (width <= 400px)) and (not (width <= 800px)) {
+  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
+}
+@media (not (width <= 400px)) and (not (width <= 800px)) and (width <= 1200px) {
+  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
+}
+@media (not (width <= 400px)) and (width <= 800px) {
+  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr); }
+}
+@media (width <= 400px) {
+  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > predefined states (local) > should resolve local predefined states to their definitions 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > complex combinations > should support complex predefined states 1`] = `
+"@media (not (prefers-color-scheme: dark)) and (not (prefers-color-scheme: no-preference)) {
+  .ttrtoca.ttrtoca { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: dark)) and (prefers-color-scheme: no-preference) {
+  :where(:root:not([data-prefers-schema="dark"])) .ttrtoca.ttrtoca { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (not (prefers-color-scheme: no-preference)) and (prefers-color-scheme: dark) {
+  :where(:root:not([data-prefers-schema="system"])) .ttrtoca.ttrtoca { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (prefers-color-scheme: dark) and (prefers-color-scheme: no-preference) {
+  :where(:root:not([data-prefers-schema="system"]):not([data-prefers-schema="dark"])) .ttrtoca.ttrtoca { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-prefers-schema="system"]) .ttrtoca.ttrtoca { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (not (prefers-color-scheme: dark)) and (prefers-color-scheme: no-preference) {
+  :where(:root[data-prefers-schema="dark"]) .ttrtoca.ttrtoca { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}
+@media (prefers-color-scheme: dark) and (prefers-color-scheme: no-preference) {
+  :where(:root[data-prefers-schema="dark"]) .ttrtoca.ttrtoca { color: var(--white-color); --current-color: var(--white-color); --current-color-oklch: var(--white-color-oklch); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply @own state to sub-element 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with complex style values 1`] = `
+"@media (not (width < 600px)) {
+  :where(:root:not([data-theme="dark"])) .t1ik0iam.t1ik0iam { border: 1px solid var(--border-color); }
+}
+@media (not (width < 600px)) {
+  :where(:root[data-theme="dark"]) .t1ik0iam.t1ik0iam { border: 1px solid var(--dark-05-color); }
+}
+@media (width < 600px) {
+  .t1ik0iam.t1ik0iam { border: var(--border-width) none var(--border-color, currentColor); }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply media queries to sub-element styles 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with fallback color syntax 1`] = `
+":where(:root:not([data-theme="dark"])) .t1iw64ce.t1iw64ce { background-color: var(--surface-color, var(--white-color)); }
+:where(:root[data-theme="dark"]) .t1iw64ce.t1iw64ce { background-color: var(--dark-surface-color, var(--dark-02-color)); }"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply root states to sub-element styles 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > edge cases > should handle empty default with only advanced state 1`] = `
+"@media print {
+  .tzcnxfg.tzcnxfg { display: none; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with media query 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > predefined states (global) > should handle multiple global predefined states 1`] = `
+"@media (width < 768px) {
+  .t3k5liw.t3k5liw { padding: 8px; }
+}
+@media (768px <= width < 1024px) {
+  .t3k5liw.t3k5liw { padding: 24px; }
+}
+@media (width >= 1024px) {
+  .t3k5liw.t3k5liw { padding: 32px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with parent modifiers 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > predefined states (global) > should prioritize local over global predefined states 1`] = `
+"@media (not (width < 480px)) {
+  .t62dqt.t62dqt { padding: 32px; }
+}
+@media (width < 480px) {
+  .t62dqt.t62dqt { padding: 16px; }
+}"
+`;
 
-exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should handle negated @own state 1`] = `""`;
+exports[`Advanced State Mapping - CSS Output > predefined states (global) > should resolve global predefined states 1`] = `
+"@media (not (width < 768px)) {
+  .tknrgk2.tknrgk2 { padding: 32px; }
+}
+@media (width < 768px) {
+  .tknrgk2.tknrgk2 { padding: 16px; }
+}"
+`;
+
+exports[`Advanced State Mapping - CSS Output > predefined states (local) > should handle multiple local predefined states 1`] = `
+"@media (width < 400px) {
+  .t3hf1l1.t3hf1l1 { padding: 8px; }
+}
+@media (400px <= width < 800px) {
+  .t3hf1l1.t3hf1l1 { padding: 24px; }
+}
+@media (width >= 800px) {
+  .t3hf1l1.t3hf1l1 { padding: 32px; }
+}"
+`;
+
+exports[`Advanced State Mapping - CSS Output > predefined states (local) > should resolve local predefined states to their definitions 1`] = `
+"@media (not (width < 600px)) {
+  .t1e25bnz.t1e25bnz { padding: 32px; }
+}
+@media (width < 600px) {
+  .t1e25bnz.t1e25bnz { padding: 16px; }
+}"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply @own state to sub-element 1`] = `
+".t9gsj9a.t9gsj9a { background-color: var(--white-color); }
+.t1fjqqzi.t1fjqqzi [data-element="Label"]:where(:not([data-hovered])) { color: var(--dark-color); --current-color: var(--dark-color); --current-color-oklch: var(--dark-color-oklch); }
+.t1fjqqzi.t1fjqqzi [data-element="Label"]:where([data-hovered]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply media queries to sub-element styles 1`] = `
+".t12gf898.t12gf898 { padding: 32px; }
+@media (not (width < 600px)) {
+  .t3ra2jm.t3ra2jm [data-element="Header"] { padding: 16px; }
+}
+@media (width < 600px) {
+  .t3ra2jm.t3ra2jm [data-element="Header"] { padding: 8px; }
+}"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should apply root states to sub-element styles 1`] = `
+".t9gsj9a.t9gsj9a { background-color: var(--white-color); }
+:where(:root:not([data-theme="dark"])) .t3ryopq.t3ryopq [data-element="Header"] { background-color: var(--gray-02-color); }
+:where(:root[data-theme="dark"]) .t3ryopq.t3ryopq [data-element="Header"] { background-color: var(--dark-03-color); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with media query 1`] = `
+"@media (not (width < 600px)) {
+  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where(:not([data-hovered])) { font-size: 16px; }
+}
+@media (width < 600px) {
+  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where([data-hovered]) { font-size: 16px; }
+}
+@media (not (width < 600px)) {
+  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where([data-hovered]) { font-size: 18px; }
+}
+@media (width < 600px) {
+  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where(:not([data-hovered])) { font-size: 14px; }
+}"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with parent modifiers 1`] = `
+".t157koo.t157koo:where(:not([data-disabled])) [data-element="Icon"]:where(:not([data-hovered])) { color: var(--gray-color); --current-color: var(--gray-color); --current-color-oklch: var(--gray-color-oklch); }
+.t157koo.t157koo:where([data-disabled]) [data-element="Icon"] { color: var(--light-gray-color); --current-color: var(--light-gray-color); --current-color-oklch: var(--light-gray-color-oklch); }
+.t157koo.t157koo:where(:not([data-disabled])) [data-element="Icon"]:where([data-hovered]) { color: var(--purple-color); --current-color: var(--purple-color); --current-color-oklch: var(--purple-color-oklch); }"
+`;
+
+exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should handle negated @own state 1`] = `
+".t1ot3w0r.t1ot3w0r [data-element="Label"]:where([data-focused]) { opacity: 1; }
+.t1ot3w0r.t1ot3w0r [data-element="Label"]:where(:not([data-focused])) { opacity: 0.7; }"
+`;
 
 exports[`Advanced State Mapping - renderStyles direct tests > XOR (^) operator > should render a tasty() component with XOR state 1`] = `
 ".to43j36.to43j36:where(:is(:not([data-focused]):not([data-hovered]), [data-focused][data-hovered])) { color: black; }

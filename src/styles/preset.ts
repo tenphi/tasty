@@ -1,5 +1,6 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
+import { isTokenNameReference } from './shared';
 import type { CSSMap } from '../utils/styles';
 
 const PRESET_MODIFIERS = new Set([
@@ -172,7 +173,12 @@ export function presetStyle({
       nameTokens.length > 0 && nameTokens.every((t) => PRESET_MODIFIERS.has(t));
 
     const nameToken = namePart?.mods[0] ?? namePart?.values[0] ?? '';
-    const name = isModOnly ? 'inherit' : nameToken || 'inherit';
+    // A reference cannot name a preset; fall back to `inherit`, the same name an
+    // absent preset resolves to, rather than emitting `var(--var(--x)-font-size)`.
+    const name =
+      isModOnly || isTokenNameReference('preset', nameToken)
+        ? 'inherit'
+        : nameToken || 'inherit';
 
     const modTokens = isModOnly ? nameTokens : (modPart?.all ?? []);
     const activeMods = new Set<string>();

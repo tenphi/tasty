@@ -1,3 +1,5 @@
+import { foldDslCase } from '../utils/string';
+
 import { classify } from './classify';
 import { Lru } from './lru';
 import { scan } from './tokenizer';
@@ -27,10 +29,10 @@ export class StyleParser {
     const hit = this.cache.get(key);
     if (hit) return hit;
 
-    // strip comments & lower-case once
-    const stripped = src
-      .replace(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//g, '')
-      .toLowerCase();
+    // strip comments, then case-fold everything except custom-property names
+    const stripped = foldDslCase(
+      src.replace(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//g, ''),
+    );
 
     const groups: StyleDetails[] = [];
     let currentGroup = makeEmptyDetails();
@@ -71,6 +73,11 @@ export class StyleParser {
           break;
         case Bucket.Mod:
           currentPart.mods.push(processed);
+          break;
+        case Bucket.ColorValue:
+          // Untyped reference: readable from either bucket, listed once in `all`.
+          currentPart.colors.push(processed);
+          currentPart.values.push(processed);
           break;
       }
       currentPart.all.push(processed);

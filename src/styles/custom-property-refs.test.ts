@@ -19,6 +19,7 @@ import { flowStyle } from './flow';
 import { outlineStyle } from './outline';
 import { placementStyle } from './placement';
 import { presetStyle } from './preset';
+import { transitionStyle } from './transition';
 import { STYLE_HANDLER_MAP } from './index';
 
 describe('custom property references in handler output', () => {
@@ -141,6 +142,87 @@ describe('custom property references in handler output', () => {
     });
     expect(outlineStyle({ outlineOffset: '$my-offset-color' })).toEqual({
       'outline-offset': 'var(--my-offset-color)',
+    });
+  });
+
+  /**
+   * A `-color` suffix is the only hint the parser has about a reference, so it
+   * used to decide the *bucket* outright: the reference went to `colors` alone and
+   * a handler reading `values` came up empty and emitted its own default instead —
+   * `padding: '$brand-color'` silently became `padding: var(--gap)`.
+   *
+   * The suffix may still *add* reach (a color slot can read it, which is what the
+   * form is for), but it must never cost the reference a slot it would otherwise
+   * have filled.
+   */
+  it('never drops a `-color`-suffixed reference', () => {
+    const dropped: string[] = [];
+
+    for (const styleName of Object.keys(STYLE_HANDLER_MAP)) {
+      const plainCss = renderStyles({ [styleName]: '$my-prop' })
+        .rules.map((rule) => rule.declarations)
+        .join(' ');
+      const suffixedCss = renderStyles({ [styleName]: '$my-prop-color' })
+        .rules.map((rule) => rule.declarations)
+        .join(' ');
+
+      if (
+        plainCss.includes('var(--my-prop)') &&
+        !suffixedCss.includes('var(--my-prop-color)')
+      ) {
+        dropped.push(`${styleName}: "${plainCss}" vs "${suffixedCss}"`);
+      }
+    }
+
+    expect(dropped).toEqual([]);
+  });
+
+  it('keeps a `-color`-suffixed reference readable as a length', () => {
+    expect(
+      renderStyles({ padding: '$my-prop-color' }).rules[0].declarations,
+    ).toBe('padding: var(--my-prop-color);');
+    expect(
+      renderStyles({ radius: '$my-prop-color' }).rules[0].declarations,
+    ).toBe('border-radius: var(--my-prop-color);');
+  });
+
+  it('places a dual-bucket reference in one slot only', () => {
+    // Filed under both buckets, so the shorthand must not use it twice.
+    expect(outlineStyle({ outline: '2px $my-outline-color' })).toEqual({
+      outline: '2px solid var(--my-outline-color)',
+    });
+  });
+
+  /**
+   * `preset` and `transition` interpolate their input into a custom-property
+   * *name*, which cannot be indirected through a reference: the name is needed at
+   * build time and a reference only resolves in the browser. They used to emit
+   * `var(--var(--x)-font-size)` — syntactically fine, unusable as a name, dropped
+   * by the browser.
+   */
+  describe('references where a token name is expected', () => {
+    it('falls back to inherit for a preset name', () => {
+      expect(presetStyle({ preset: '$my-preset' })).toEqual(
+        presetStyle({ preset: 'inherit' }),
+      );
+    });
+
+    it('skips a transition entry named by a reference', () => {
+      expect(transitionStyle({ transition: '$my-transition' })).toBeNull();
+    });
+
+    it('keeps the usable entries of a transition list', () => {
+      const result = transitionStyle({ transition: 'fill, $my-transition' });
+
+      expect(result?.transition).toContain('background-color');
+      expect(result?.transition).not.toContain('var(--var(');
+    });
+
+    it('still accepts a reference in a transition value slot', () => {
+      // Only the name slot rejects references; the timing is an ordinary value.
+      expect(
+        transitionStyle({ transition: 'fill $my-duration' })?.transition,
+      ).toContain('background-color var(--my-duration)');
     });
   });
 

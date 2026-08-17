@@ -1,5 +1,6 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
+import { isTokenNameReference } from './shared';
 
 const SECOND_FILL_COLOR_PROPERTY = '--tasty-second-fill-color';
 
@@ -143,6 +144,10 @@ export function transitionStyle({ transition }: { transition?: string }) {
   transitions.forEach((transition) => {
     const name = transition[0];
 
+    // The name doubles as the property to transition and as the timing token, so
+    // a reference cannot stand in for it.
+    if (isTokenNameReference('transition', name)) return;
+
     let timing: string | undefined;
     let easing: string | undefined;
     let delay: string | undefined;
@@ -162,6 +167,9 @@ export function transitionStyle({ transition }: { transition?: string }) {
       map[style] = [name, easing, timing, delay];
     });
   });
+
+  // Every entry may have been rejected as a reference-named transition.
+  if (Object.keys(map).length === 0) return null;
 
   const result = Object.entries(map)
     .map(([style, [name, easing, timing, delay]]) => {

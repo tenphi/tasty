@@ -3,7 +3,7 @@ import {
   getColorSpaceSuffix,
   strToColorSpace,
 } from '../utils/color-space';
-import { toSnakeCase } from '../utils/string';
+import { normalizeDslName, toSnakeCase } from '../utils/string';
 import {
   normalizeColorTokenValue,
   parseColor,
@@ -76,11 +76,14 @@ export function createStyle(
         !cssStyle && typeof styleName === 'string' && styleName.startsWith('#');
 
       if (isColorToken) {
-        const raw = styleName.slice(1);
-        const name = toSnakeCase(raw).replace(/^-+/, '');
-        finalCssStyle = `--${name}-color`;
+        finalCssStyle = `--${normalizeDslName(styleName.slice(1))}-color`;
+      } else if (!cssStyle && styleName[0] === '$') {
+        // A `$name` key names a custom property, so it keeps its case rather than
+        // being kebab-cased — `$myVar` has to reach the same `--myVar` that
+        // `$myVar` in a value references.
+        finalCssStyle = `--${normalizeDslName(styleName.slice(1))}`;
       } else {
-        finalCssStyle = cssStyle || toSnakeCase(styleName).replace(/^\$/, '--');
+        finalCssStyle = cssStyle || toSnakeCase(styleName);
       }
 
       if (isColorToken) {

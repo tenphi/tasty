@@ -3,6 +3,7 @@ import type { Tokens, TokenValue } from '../types';
 import type { CSSProperties } from './css-types';
 
 import { getColorSpaceComponents, getColorSpaceSuffix } from './color-space';
+import { normalizeDslName } from './string';
 import { normalizeColorTokenValue, parseStyle } from './styles';
 
 export { hslToRgbValues } from './color-math';
@@ -115,7 +116,7 @@ export function processTokens(
 
     if (key.startsWith('$')) {
       // Custom property token: $name -> --name
-      const propName = `--${key.slice(1)}`;
+      const propName = `--${normalizeDslName(key.slice(1))}`;
       // Boolean true for custom properties converts to empty string (valid CSS value)
       const effectiveValue = value === true ? '' : value;
       const processedValue = processTokenValue(effectiveValue);
@@ -123,7 +124,7 @@ export function processTokens(
       if (!result) result = {};
       result[propName] = processedValue;
     } else if (key.startsWith('#')) {
-      const colorName = key.slice(1);
+      const colorName = normalizeDslName(key.slice(1));
       const suffix = getColorSpaceSuffix();
 
       // Normalize color token value (true → 'transparent', false is already filtered by isValidTokenValue)

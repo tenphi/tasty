@@ -186,4 +186,41 @@ describe('outlineStyle', () => {
       });
     });
   });
+
+  describe('custom property references', () => {
+    it('fills the style slot with a reference past the width', () => {
+      // Colors are authored as `#name`, so a plain reference is a line style.
+      expect(outlineStyle({ outline: '2px $my-style' })).toEqual({
+        outline: '2px var(--my-style) var(--outline-color)',
+      });
+    });
+
+    it('fills the style slot alongside a slash offset', () => {
+      expect(outlineStyle({ outline: '2px $my-style / 4px' })).toEqual({
+        outline: '2px var(--my-style) var(--outline-color)',
+        'outline-offset': '4px',
+      });
+    });
+
+    it('keeps a `-color` reference in the color slot', () => {
+      expect(outlineStyle({ outline: '2px $my-outline-color' })).toEqual({
+        outline: '2px solid var(--my-outline-color)',
+      });
+    });
+
+    it('overflows into the color slot once width and style are taken', () => {
+      expect(outlineStyle({ outline: '2px dashed $my-color' })).toEqual({
+        outline: '2px dashed var(--my-color)',
+      });
+    });
+
+    it('fills style then color from two references', () => {
+      expect(
+        outlineStyle({ outline: '2px $my-style $my-color / 4px' }),
+      ).toEqual({
+        outline: '2px var(--my-style) var(--my-color)',
+        'outline-offset': '4px',
+      });
+    });
+  });
 });

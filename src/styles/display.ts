@@ -1,4 +1,4 @@
-import { parseStyle } from '../utils/styles';
+import { parseStyle, resolveCustomProperties } from '../utils/styles';
 
 interface DisplayStyleProps {
   display?: string;
@@ -85,23 +85,30 @@ export function displayStyle({
 }: DisplayStyleProps) {
   const result: Record<string, string | number> = {};
 
+  // Resolved once up front: `processTextOverflow` emits `whiteSpace` as the
+  // clamp's `white-space` too, so substituting only at the branch below would
+  // still leak the raw reference through the truncation path.
+  const whiteSpaceValue = whiteSpace
+    ? resolveCustomProperties(whiteSpace)
+    : whiteSpace;
+
   if (textOverflow != null && textOverflow !== false) {
-    const textResult = processTextOverflow(textOverflow, whiteSpace);
+    const textResult = processTextOverflow(textOverflow, whiteSpaceValue);
 
     if (textResult) Object.assign(result, textResult);
   }
 
   if (overflow && !result['overflow']) {
-    result['overflow'] = overflow;
+    result['overflow'] = resolveCustomProperties(overflow);
   }
-  if (whiteSpace && !result['white-space']) {
-    result['white-space'] = whiteSpace;
+  if (whiteSpaceValue && !result['white-space']) {
+    result['white-space'] = whiteSpaceValue;
   }
 
   if (hide) {
     result['display'] = 'none';
   } else if (!result['display'] && display) {
-    result['display'] = display;
+    result['display'] = resolveCustomProperties(display);
   }
 
   if (Object.keys(result).length === 0) {

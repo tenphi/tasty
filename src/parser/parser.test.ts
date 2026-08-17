@@ -322,10 +322,13 @@ describe('StyleProcessor', () => {
     const result = parser.process(
       '($custom-margin, 1x) ($theme-color, #purple)',
     );
+    // $theme-color ends with -color, so it is filed as a color *and* as a value:
+    // the suffix is a hint, not a type, and a handler reading `values` must not
+    // come up empty (see Bucket.ColorValue).
     expect(result.groups[0].values).toEqual([
       'var(--custom-margin, 8px)', // raw unit fallback
+      'var(--theme-color, var(--purple-color))',
     ]);
-    // $theme-color is now classified as a color since it ends with -color
     expect(result.groups[0].colors).toEqual([
       'var(--theme-color, var(--purple-color))',
     ]);
@@ -568,12 +571,19 @@ describe('StyleProcessor', () => {
     ]);
     expect(result2.groups[0].colors).toEqual([]);
 
-    // Custom property with -color suffix should be classified as color
+    // A -color suffix files the reference under both buckets, so a color slot and
+    // a value slot can each read it.
     const result3 = parser.process('($primary-color, $fallback-color)');
     expect(result3.groups[0].colors).toEqual([
       'var(--primary-color, var(--fallback-color))',
     ]);
-    expect(result3.groups[0].values).toEqual([]);
+    expect(result3.groups[0].values).toEqual([
+      'var(--primary-color, var(--fallback-color))',
+    ]);
+    // Listed once in `all`, not twice.
+    expect(result3.groups[0].all).toEqual([
+      'var(--primary-color, var(--fallback-color))',
+    ]);
   });
 
   test('skips invalid functions while parsing (for example missing closing parenthesis)', () => {

@@ -1,4 +1,4 @@
-import { parseStyle } from '../utils/styles';
+import { parseStyle, resolveCustomProperties } from '../utils/styles';
 
 export function fillStyle({
   fill,
@@ -40,7 +40,11 @@ export function fillStyle({
     const firstColor = parsed.groups[0]?.colors[0];
     const secondColor = parsed.groups[0]?.colors[1];
 
-    result['background-color'] = firstColor || colorValue;
+    // No color found: the value may still be a custom-property reference the
+    // parser classified as a plain value (`$name` is a color only when the name
+    // ends with `-color`), so substitute before falling back to the raw input.
+    result['background-color'] =
+      firstColor || resolveCustomProperties(colorValue);
 
     if (secondColor) {
       result['--tasty-second-fill-color'] = secondColor;
@@ -74,16 +78,17 @@ export function fillStyle({
       parseStyle(backgroundSize).output || backgroundSize;
   }
   if (backgroundRepeat) {
-    result['background-repeat'] = backgroundRepeat;
+    result['background-repeat'] = resolveCustomProperties(backgroundRepeat);
   }
   if (backgroundAttachment) {
-    result['background-attachment'] = backgroundAttachment;
+    result['background-attachment'] =
+      resolveCustomProperties(backgroundAttachment);
   }
   if (backgroundOrigin) {
-    result['background-origin'] = backgroundOrigin;
+    result['background-origin'] = resolveCustomProperties(backgroundOrigin);
   }
   if (backgroundClip) {
-    result['background-clip'] = backgroundClip;
+    result['background-clip'] = resolveCustomProperties(backgroundClip);
   }
 
   if (Object.keys(result).length === 0) return null;
@@ -108,7 +113,7 @@ export function svgFillStyle({ svgFill }: { svgFill?: string }) {
   if (!svgFill) return null;
 
   const processed = parseStyle(svgFill);
-  svgFill = processed.groups[0]?.colors[0] || svgFill;
+  svgFill = processed.groups[0]?.colors[0] || resolveCustomProperties(svgFill);
 
   return { fill: svgFill };
 }

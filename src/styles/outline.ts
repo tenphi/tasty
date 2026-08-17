@@ -1,6 +1,11 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { filterMods, parseStyle } from '../utils/styles';
+import {
+  filterMods,
+  parseStyle,
+  resolveCustomProperties,
+} from '../utils/styles';
 import { BORDER_STYLES } from './const';
+import { assignLineSlots } from './shared';
 
 interface OutlineStyleProps {
   outline?: string | boolean | number;
@@ -46,9 +51,15 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
           BORDER_STYLES as unknown as string[],
         );
 
+        const slots = assignLineSlots(
+          outlinePart.values,
+          typeMods[0],
+          outlinePart.colors[0],
+        );
+
         const value = outlinePart.values[0] || 'var(--outline-width)';
-        const type = typeMods[0] || 'solid';
-        const outlineColor = outlinePart.colors[0] || 'var(--outline-color)';
+        const type = slots.style || 'solid';
+        const outlineColor = slots.color || 'var(--outline-color)';
 
         result['outline'] = [value, type, outlineColor].join(' ');
 
@@ -64,7 +75,8 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
     const offsetValue =
       typeof outlineOffset === 'number' ? `${outlineOffset}px` : outlineOffset;
     const processed = parseStyle(offsetValue);
-    result['outline-offset'] = processed.groups[0]?.values[0] || offsetValue;
+    result['outline-offset'] =
+      processed.groups[0]?.values[0] || resolveCustomProperties(offsetValue);
   }
 
   if (Object.keys(result).length === 0) {

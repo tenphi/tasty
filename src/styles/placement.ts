@@ -1,3 +1,5 @@
+import { resolveCustomProperties } from '../utils/styles';
+
 interface PlacementStyleProps {
   place?: string | boolean;
   placeItems?: string | boolean;
@@ -14,7 +16,7 @@ function str(val: string | boolean | undefined): string | null {
   if (val == null || val === false || val === '') return null;
   if (val === true) return 'center';
 
-  return String(val);
+  return resolveCustomProperties(String(val));
 }
 
 /**

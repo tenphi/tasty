@@ -112,6 +112,71 @@ describe('borderStyle', () => {
     });
   });
 
+  describe('custom property references', () => {
+    it('fills the style slot with a reference past the width', () => {
+      // Colors are authored as `#name`, so a plain reference is a line style.
+      expect(borderStyle({ border: '1bw $my-style' })).toEqual({
+        border: '1px var(--my-style) var(--border-color, currentColor)',
+      });
+    });
+
+    it('fills width and style from two references', () => {
+      expect(borderStyle({ border: '$my-width $my-style' })).toEqual({
+        border:
+          'var(--my-width) var(--my-style) var(--border-color, currentColor)',
+      });
+    });
+
+    it('takes a lone reference as the width', () => {
+      expect(borderStyle({ border: '$my-width' })).toEqual({
+        border: 'var(--my-width) solid var(--border-color, currentColor)',
+      });
+    });
+
+    it('overflows into the color slot once width and style are taken', () => {
+      // Nothing else is free, so the reference is the color rather than dropped.
+      expect(borderStyle({ border: '1bw dashed $my-color' })).toEqual({
+        border: '1px dashed var(--my-color)',
+      });
+    });
+
+    it('fills style then color from two references', () => {
+      expect(borderStyle({ border: '1bw $my-style $my-color' })).toEqual({
+        border: '1px var(--my-style) var(--my-color)',
+      });
+    });
+
+    it('keeps a color token ahead of a reference', () => {
+      expect(borderStyle({ border: '1bw $my-style #purple' })).toEqual({
+        border: '1px var(--my-style) var(--purple-color)',
+      });
+    });
+
+    it('keeps a `-color` reference in the color slot', () => {
+      expect(borderStyle({ border: '1bw $my-border-color' })).toEqual({
+        border: '1px solid var(--my-border-color)',
+      });
+    });
+
+    it('ignores a second length rather than emitting it as the style', () => {
+      // Two lengths are not valid in the shorthand; promoting one would emit an
+      // invalid declaration instead of dropping the extra value.
+      expect(borderStyle({ border: '1bw 2px' })).toEqual({
+        border: '1px solid var(--border-color, currentColor)',
+      });
+    });
+
+    it('applies per group in multi-group syntax', () => {
+      const result = borderStyle({ border: '1bw $a, 2bw $b top' });
+      expect(result['border-top']).toBe(
+        '2px var(--b) var(--border-color, currentColor)',
+      );
+      expect(result['border-left']).toBe(
+        '1px var(--a) var(--border-color, currentColor)',
+      );
+    });
+  });
+
   // Multi-group support tests
   describe('multi-group support', () => {
     it('handles multiple groups with base and direction override', () => {

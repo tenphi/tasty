@@ -2,6 +2,14 @@ export enum Bucket {
   Color,
   Value,
   Mod,
+  /**
+   * A custom-property reference whose name ends with `-color`, e.g.
+   * `$brand-color`. The suffix is the only hint the parser has, so the reference
+   * is filed as a color *and* as a value: a color slot finds it, and so does a
+   * handler reading `values` — otherwise `padding: '$brand-color'` would find no
+   * value and silently emit its default instead.
+   */
+  ColorValue,
 }
 
 /**

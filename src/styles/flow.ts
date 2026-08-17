@@ -1,3 +1,5 @@
+import { resolveCustomProperties } from '../utils/styles';
+
 export function flowStyle({
   display = 'block',
   flow,
@@ -13,7 +15,7 @@ export function flowStyle({
     style = 'flex-flow';
   }
 
-  return style ? { [style]: flow } : null;
+  return style && flow ? { [style]: resolveCustomProperties(flow) } : null;
 }
 
 flowStyle.__lookupStyles = ['display', 'flow'];

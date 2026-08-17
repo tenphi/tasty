@@ -1,5 +1,6 @@
 import { getColorSpaceFunc, getColorSpaceSuffix } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
+import { foldDslCase } from '../utils/string';
 
 import {
   COLOR_FUNCS,
@@ -182,11 +183,13 @@ export function classify(
   if (token[0] === '$' || token[0] === '#') {
     const predefinedTokens = getGlobalPredefinedTokens();
     if (predefinedTokens) {
-      // Exact match
-      if (token in predefinedTokens) {
-        const tokenValue = predefinedTokens[token];
-        // Lowercase the token value to match parser behavior (parser lowercases input)
-        return classify(tokenValue.toLowerCase(), opts, recurse);
+      // Exact match. Keys are stored lowercase, and token names are matched
+      // case-insensitively even though the name they *emit* keeps its case.
+      const lookupKey = token.toLowerCase();
+      if (lookupKey in predefinedTokens) {
+        const tokenValue = predefinedTokens[lookupKey];
+        // Fold the token value the same way the parser folds its input.
+        return classify(foldDslCase(tokenValue), opts, recurse);
       }
       // Check for color token with alpha suffix: #token.alpha or #token.$prop
       if (token[0] === '#') {
@@ -195,14 +198,15 @@ export function classify(
         );
         if (alphaMatch) {
           const [, baseToken, rawAlpha] = alphaMatch;
-          if (baseToken in predefinedTokens) {
-            const resolvedValue = predefinedTokens[baseToken];
+          const baseKey = baseToken.toLowerCase();
+          if (baseKey in predefinedTokens) {
+            const resolvedValue = predefinedTokens[baseKey];
 
             // If resolved value starts with # (color token), use standard alpha syntax
             if (resolvedValue.startsWith('#')) {
-              // Lowercase to match parser behavior
+              // Fold to match parser behavior
               return classify(
-                `${resolvedValue.toLowerCase()}.${rawAlpha}`,
+                `${foldDslCase(resolvedValue)}.${rawAlpha}`,
                 opts,
                 recurse,
               );
@@ -343,7 +347,7 @@ export function classify(
   }
 
   // 0. Direct var(--*-color) token
-  const varColorMatch = token.match(/^var\(--([a-z0-9-]+)-color\)$/);
+  const varColorMatch = token.match(/^var\(--([a-zA-Z0-9-]+)-color\)$/);
   if (varColorMatch) {
     return { bucket: Bucket.Color, processed: token };
   }
@@ -355,11 +359,13 @@ export function classify(
 
   // 2. Custom property
   if (token[0] === '$') {
-    const identMatch = token.match(/^\$([a-z_][a-z0-9-_]*)$/);
+    const identMatch = token.match(/^\$([a-z_][a-zA-Z0-9-_]*)$/);
     if (identMatch) {
       const name = identMatch[1];
       const processed = `var(--${name})`;
-      const bucketType = name.endsWith('-color') ? Bucket.Color : Bucket.Value;
+      const bucketType = name.endsWith('-color')
+        ? Bucket.ColorValue
+        : Bucket.Value;
       return {
         bucket: bucketType,
         processed,
@@ -456,11 +462,13 @@ export function classify(
   // 7. Custom property with fallback syntax: ($prop, fallback)
   if (token.startsWith('(') && token.endsWith(')')) {
     const inner = token.slice(1, -1);
-    const match = inner.match(/^\$([a-z_][a-z0-9-_]*)\s*,\s*(.*)$/);
+    const match = inner.match(/^\$([a-z_][a-zA-Z0-9-_]*)\s*,\s*(.*)$/);
     if (match) {
       const [, name, fallback] = match;
       const processedFallback = recurse(fallback).output;
-      const bucketType = name.endsWith('-color') ? Bucket.Color : Bucket.Value;
+      const bucketType = name.endsWith('-color')
+        ? Bucket.ColorValue
+        : Bucket.Value;
       return {
         bucket: bucketType,
         processed: `var(--${name}, ${processedFallback})`,

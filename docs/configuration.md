@@ -164,6 +164,7 @@ configure({
 
 - `$name` keys become `--name` CSS custom properties
 - `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties (suffix depends on `colorSpace`, default `oklch`)
+- Names keep their case, since CSS custom properties are case-sensitive: `$myVar` is `--myVar` and is referenced as `$myVar`. A leading capital is not supported and folds — `$Foo` and `#Purple` become `--foo` and `--purple-color` — so start names lowercase. Kebab-case (`$my-var`) remains the convention.
 
 Tokens are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin).
 

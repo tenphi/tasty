@@ -142,18 +142,27 @@ Each `StyleParser` instance maintains its own LRU cache.
 |-------|--------------------------------------------------------------------------------------------|----------|
 | 0     | Double prefix (literal name) – `$$ident` → `--ident`; `##ident` → `--ident-color`. Function call form: `$$ident(args)` → `--ident(<processed args>)`, `##ident(args)` → `--ident-color(<processed args>)` (custom `@function` invocation; args parsed recursively). **`@function` polyfill:** when a compiled closure is registered for `--ident` (via `configure({ polyfills: { functions: true } })`), the call is inlined into plain CSS instead of emitting `--ident(...)`; a recursion-cycle bail leaves the call untouched. | value    |
 | 1     | URL – `url(` opens `inUrl`; everything to its `)` is a single token.                       | value    |
-| 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. | value    |
+| 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. An ident ending in `-color` is filed under both buckets (see note below). | value / color+value |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |
 | 4     | Color function – name in list §12.2 followed by `(` (balanced).                            | color    |
 | 5     | User / other function – `ident(` not in color list; parse args recursively, hand off to `funcs[name]` if provided; else rebuild with processed args. | value    |
 | 6     | Color fallback – `(#name, fallback)` → `var(--name-color, <processed fallback>)`. Supports unlimited nesting. Fallback can be another color token, nested color fallback, hex literal, or CSS color function. | color    |
-| 7     | Custom property fallback – `($ident, fallback)` → `var(--ident, <processed fallback>)`. Classified as color if ident ends with `-color`, otherwise value. | color/value |
+| 7     | Custom property fallback – `($ident, fallback)` → `var(--ident, <processed fallback>)`. If the ident ends with `-color` it is filed under **both** buckets (see §5 note), otherwise value. | color+value/value |
 | 8     | Auto-calc group – parentheses not preceded by identifier. See §6.                          | value    |
 | 9     | Numeric + custom unit – regex `^[+-]?(\d*.\d+ \d+)([a-z][a-z0-9]*)$` and unit key exists.  |          |
 | 10    | Literal value keyword – exactly `auto`, `max-content`, `min-content`, `fit-content`, `stretch`. | value    |
 | 11    | Fallback                                                                                   | modifier |
 
 Each processed string is inserted into its bucket and into `all` in source order.
+
+A custom-property reference is untyped — the parser cannot know whether
+`var(--brand)` holds a length or a color, and a `-color` suffix is a naming
+convention, not a type. A reference whose name ends with `-color` is therefore
+filed under **both** `colors` and `values` (`Bucket.ColorValue`), appearing once in
+`all`. A color slot can read it, and so can a handler reading `values` — which
+previously found nothing and emitted its own default, so `padding: '$brand-color'`
+silently became `padding: var(--gap)`. Handlers that fill several slots from one
+group (`border`, `outline`) must place such a reference once, not in both slots.
 
 ---
 
@@ -164,7 +173,7 @@ Each processed string is inserted into its bucket and into `all` in source order
 | Custom unit (`2x`, `.75r`, `-3cr`) | `units[unit]`: • string → `calc(n * replacement)` • function → `calc(handler(numeric))`<br> `0u` stays `calc(0 * …)` (unit info preserved). |
 | Auto-calc parentheses    | Applies anywhere, nesting allowed.<br>Trigger = `(` whose previous non-space char is not `[a-z0-9_-]` and not `l` in `url(`.<br>Algorithm:<br>1. Strip outer parens.<br>2. Recursively parse inner text (so `2r`, `#fff`, nested auto-calc, etc., all expand).<br>3. Wrap in `calc( … )`. |
 | Color fallback           | `(#name, fallback)` → `var(--name-color, <processed fallback>)`<br>Fallback is recursively processed, supporting unlimited nesting: `(#a, (#b, #c))` → `var(--a-color, var(--b-color, var(--c-color)))`. |
-| Custom property          | `$ident` → `var(--ident)` \| `($ident,fallback)` → `var(--ident, <processed fallback>)`<br>If ident ends with `-color`, classified as color bucket. |
+| Custom property          | `$ident` → `var(--ident)` \| `($ident,fallback)` → `var(--ident, <processed fallback>)`<br>If ident ends with `-color`, filed under both the color and value buckets. |
 | Hash colors              | As in §5-3.                                                                                 |
 | Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.                     |
 | User functions           | If `funcs[name]` exists → call with parsed arg-`StyleDetails[]`, use return string.<br>Else rebuild `ident(<processed args>)`. |
@@ -198,7 +207,16 @@ Each processed string is inserted into its bucket and into `all` in source order
 
 ## 10. Normalization Rules
 
-- Entire input lower-cased before parsing.
+- Input is case-folded before parsing, **except** the body of a DSL identifier
+  (`$name`, `$$name`, `#name`, `##name`), which names a case-sensitive CSS custom
+  property and keeps its inner case: `$myVar` → `var(--myVar)`. The identifier's
+  first character always folds — a leading capital is not a supported name, so
+  `$Foo` → `var(--foo)` — and hex literals fold whole (`#FF0000` is a color, not a
+  name). Every place that derives a CSS name from an identifier applies the same
+  rule (`normalizeDslName`), so a token definition and a reference to it agree.
+- Predefined-token *lookup* stays case-insensitive: `configure({ replaceTokens: {
+  $CardPadding: '4x' } })` is matched by `$cardpadding`. Only the name a reference
+  *emits* preserves case.
 - Outside parentheses/url, contiguous whitespace collapses to a single space.
 - Leading & trailing spaces of the whole input are trimmed.
 

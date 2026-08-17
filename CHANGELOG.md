@@ -1,5 +1,129 @@
 # @tenphi/tasty
 
+## 3.0.2
+
+### Patch Changes
+
+- [#264](https://github.com/tenphi/tasty/pull/264) [`40fa041`](https://github.com/tenphi/tasty/commit/40fa0415fdd52cc0049c87b9c77a47bc848f71dc) Thanks [@tenphi](https://github.com/tenphi)! - Fix `$name` references leaking unsubstituted into CSS from pass-through style values.
+
+  A `$name` reference is classified as a color only when the name ends with
+  `-color`; otherwise it lands in the value bucket. Handlers that read one bucket
+  and fall back to their raw input therefore emitted the authored DSL verbatim,
+  which browsers drop as an invalid declaration:
+
+  ```jsx
+  // Previously emitted `background-color: $current-fill-hover` and applied nothing.
+  tasty({
+    styles: {
+      '$current-fill-hover': '#current.04',
+      fill: { '': '#current.0', hovered: '$current-fill-hover' },
+    },
+  });
+  ```
+
+  The same happened in the other direction (`fontSize: '$my-size-color'` →
+  `font-size: $my-size-color`) and in every handler that passes keyword values
+  straight through: `display`, `overflow`, `whiteSpace`, `flow`, `place` /
+  `align` / `justify` and their longhands, `textTransform`, `font` /
+  `fontFamily`, `color`, `fill` / `backgroundColor`, `svgFill`, `background-clip`
+  / `-origin` / `-repeat` / `-attachment`, and `outlineOffset`.
+
+  All of them now substitute references before emitting. Values without a `$`
+  still skip the parser entirely, so pass-through output — including case-sensitive
+  font family names and `var()` references — is unchanged.
+
+  `border` and `outline` now place a `$name` reference instead of dropping it. A
+  reference fills the first free slot in shorthand order — width, then style, then
+  color. The style would otherwise arrive as a keyword (`solid`, `dashed`, …) that
+  a reference has no way to match, and colors are authored as `#name`: the
+  `$name-color` form the parser buckets as a color is there to reference a raw CSS
+  custom property, not as the way colors are written, so a reference does not reach
+  for the color slot until the style slot is taken.
+
+  ```jsx
+  // Previously `1px solid var(--border-color, currentColor)` — reference dropped.
+  tasty({ styles: { border: '1bw $my-style' } });
+  // Now `1px var(--my-style) var(--border-color, currentColor)`.
+
+  // Previously `1px dashed var(--border-color, currentColor)` — reference dropped.
+  tasty({ styles: { border: '1bw dashed $my-color' } });
+  // Now `1px dashed var(--my-color)`.
+  ```
+
+  An explicit `#name` token still wins the color slot, `$name-color` references
+  still land there directly, and a second _length_ is still ignored rather than
+  promoted (two lengths are not valid in these shorthands).
+
+- [#264](https://github.com/tenphi/tasty/pull/264) [`40fa041`](https://github.com/tenphi/tasty/commit/40fa0415fdd52cc0049c87b9c77a47bc848f71dc) Thanks [@tenphi](https://github.com/tenphi)! - Fix three ways a `$name` reference could silently do nothing.
+
+  **A `-color`-suffixed reference is no longer confined to color slots.** The suffix
+  is the only hint the parser has about an untyped reference, and it used to decide
+  the bucket outright: the reference went to `colors` alone, so a handler reading
+  `values` found nothing and emitted its own default instead. Across 35 style props
+  the authored value simply vanished:
+
+  ```jsx
+  // Previously `padding: var(--gap)` — the reference was replaced by the default.
+  tasty({ styles: { padding: '$brand-color' } });
+  // Now `padding: var(--brand-color)`.
+  ```
+
+  Such a reference is now filed under both buckets (`Bucket.ColorValue`), so a color
+  slot and a value slot can each read it, and it still appears once in `all`.
+  `border` / `outline` place it once rather than in both the style and color slots.
+
+  **Custom-property names keep their case.** The parser lowercased its whole input
+  before classifying, which folded custom-property names too — and those are
+  case-sensitive in CSS. A camelCase name could never resolve, because the token
+  definition emitted `--myVar` while the reference asked for `var(--myvar)`:
+
+  ```jsx
+  // Previously `--myVar: 16px; padding: var(--myvar);` — two different properties.
+  tasty({ styles: { $myVar: '2x', padding: '$myVar' } });
+  // Now both sides agree on --myVar.
+  ```
+
+  Identifier bodies (`$name`, `$$name`, `#name`, `##name`) now keep their case, and
+  every place that derives a CSS name from one applies the same rule, so definitions
+  and references always agree. A leading capital is not a supported name and folds
+  rather than being kebab-cased — `$Foo` → `--foo`, `#Purple` → `--purple-color` —
+  so names should start lowercase. Everything else still folds exactly as before:
+  keywords, units, function names, and hex literals (`#FF0000` is a color, not a
+  name). Predefined-token _lookup_ stays case-insensitive; only the emitted name
+  preserves case.
+
+  **A reference where a token name is expected now warns instead of emitting dead
+  CSS.** `preset` and `transition` interpolate their input into a custom-property
+  name, which cannot be indirected through a reference — the name is needed at build
+  time, and a reference only resolves in the browser. `preset: '$my-preset'` built
+  `font-size: var(--var(--my-preset)-font-size, …)`: syntactically valid, unusable as
+  a name, dropped by the browser without a word. `preset` now falls back to
+  `inherit` (what an absent preset resolves to) and `transition` skips the entry,
+  both warning once in development. Value slots are unaffected —
+  `transition: 'fill $my-duration'` still works.
+
+  Size budgets are raised by 0.25–0.5 kB per entry to fit the added logic (~250 B
+  brotlied); every entry keeps headroom.
+
+- [#256](https://github.com/tenphi/tasty/pull/256) [`b39e27f`](https://github.com/tenphi/tasty/commit/b39e27f81616c3ec6fe9fc8fd0ccd4854473223a) Thanks [@tenphi](https://github.com/tenphi)! - Fix `gridColumns` / `gridRows` emitting invalid CSS for numeric strings.
+
+  The track-count shorthand only expanded real numbers, so `gridColumns={3}`
+  produced `grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr)`
+  while `gridColumns="3"` produced `grid-template-columns: 3` — invalid CSS that
+  browsers drop silently. Every value inside a state map arrives as a string, so
+  responsive grids were the common way to hit this:
+
+  ```jsx
+  // Previously emitted `grid-template-columns: 3` / `: 1` and applied neither.
+  tasty({ styles: { gridColumns: { '': '3', '@media(w <= 600px)': '1' } } });
+  ```
+
+  Digit strings now expand exactly like numbers. Real track lists (`'1fr 2fr'`,
+  `'repeat(auto-fit, minmax(200px, 1fr))'`, `'0'`) still pass through untouched,
+  and `gridTemplate` converts each side independently instead of discarding the
+  side that isn't a count. A negative count no longer throws inside
+  `String.repeat`.
+
 ## 3.0.1
 
 ### Patch Changes

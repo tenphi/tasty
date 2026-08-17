@@ -1,5 +1,9 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { filterMods, parseStyle } from '../utils/styles';
+import {
+  filterMods,
+  parseStyle,
+  resolveCustomProperties,
+} from '../utils/styles';
 import { BORDER_STYLES } from './const';
 
 interface OutlineStyleProps {
@@ -64,7 +68,8 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
     const offsetValue =
       typeof outlineOffset === 'number' ? `${outlineOffset}px` : outlineOffset;
     const processed = parseStyle(offsetValue);
-    result['outline-offset'] = processed.groups[0]?.values[0] || offsetValue;
+    result['outline-offset'] =
+      processed.groups[0]?.values[0] || resolveCustomProperties(offsetValue);
   }
 
   if (Object.keys(result).length === 0) {

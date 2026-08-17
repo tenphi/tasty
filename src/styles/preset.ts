@@ -1,5 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { parseStyle } from '../utils/styles';
+import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import type { CSSMap } from '../utils/styles';
 
 const PRESET_MODIFIERS = new Set([
@@ -24,7 +24,12 @@ function toCSS(
   }
   // Parse through style parser to handle custom units like 1x, 2r, etc.
   const processed = parseStyle(String(value));
-  return processed.groups[0]?.values[0] || String(value);
+  // A `$name-color` reference lands in the color bucket, not `values`, so the
+  // fallback still has to substitute custom properties rather than emit the
+  // raw DSL.
+  return (
+    processed.groups[0]?.values[0] || resolveCustomProperties(String(value))
+  );
 }
 
 function setCSSValue(
@@ -91,7 +96,7 @@ function resolveFontFamily(
 ): string | null {
   // fontFamily takes precedence as a direct value
   if (fontFamily) {
-    return fontFamily;
+    return resolveCustomProperties(fontFamily);
   }
 
   if (font == null || font === false) {
@@ -106,7 +111,7 @@ function resolveFontFamily(
     return 'var(--font-sans, var(--font-sans-fallback))';
   }
 
-  return `${font}, var(--font-sans, var(--font-sans-fallback))`;
+  return `${resolveCustomProperties(font)}, var(--font-sans, var(--font-sans-fallback))`;
 }
 
 /**
@@ -263,7 +268,7 @@ export function presetStyle({
   }
 
   if (textTransform) {
-    styles['text-transform'] = textTransform;
+    styles['text-transform'] = resolveCustomProperties(textTransform);
   }
 
   // Handle font/fontFamily (font has special handling, fontFamily is direct)

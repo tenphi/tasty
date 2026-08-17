@@ -1,4 +1,4 @@
-import { parseStyle } from '../utils/styles';
+import { parseStyle, resolveCustomProperties } from '../utils/styles';
 
 interface DisplayStyleProps {
   display?: string;
@@ -92,16 +92,16 @@ export function displayStyle({
   }
 
   if (overflow && !result['overflow']) {
-    result['overflow'] = overflow;
+    result['overflow'] = resolveCustomProperties(overflow);
   }
   if (whiteSpace && !result['white-space']) {
-    result['white-space'] = whiteSpace;
+    result['white-space'] = resolveCustomProperties(whiteSpace);
   }
 
   if (hide) {
     result['display'] = 'none';
   } else if (!result['display'] && display) {
-    result['display'] = display;
+    result['display'] = resolveCustomProperties(display);
   }
 
   if (Object.keys(result).length === 0) {

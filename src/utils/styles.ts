@@ -347,6 +347,31 @@ export function parseStyle(value: StyleValue): ProcessedStyle {
   return getOrCreateParser().process(str);
 }
 
+/** A `$`-prefixed custom-property reference — the only DSL syntax that starts with `$`. */
+const RE_CUSTOM_PROPERTY_REF = /\$[a-zA-Z_$]/;
+
+/**
+ * Substitute custom-property references (`$ident` → `var(--ident)`) inside a
+ * value a handler would otherwise emit to CSS verbatim.
+ *
+ * Handlers for keyword-valued properties (`display`, `align`, `text-transform`,
+ * `overflow`, …) pass their input straight through, since there are no units or
+ * color tokens to resolve. That leaked the raw DSL into the stylesheet:
+ * `display: '$my-display'` emitted `display: $my-display`, which the browser
+ * drops as invalid. The same applies to color props whose value the parser could
+ * not classify as a color — `$ident` is a color only when the name ends with
+ * `-color`, so `fill: '$my-fill'` fell back to the unparsed input.
+ *
+ * Values without a `$` skip the parser entirely, so pass-through behaviour (and
+ * the parser's case folding) is unchanged for every value that was already
+ * valid CSS.
+ */
+export function resolveCustomProperties(value: string): string {
+  if (!RE_CUSTOM_PROPERTY_REF.test(value)) return value;
+
+  return parseStyle(value).output || value;
+}
+
 /**
  * Parse color. Find it value, name and opacity.
  * Optimized to avoid heavy parseStyle calls for simple color patterns.

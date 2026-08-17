@@ -14,6 +14,25 @@ export function extractCSSWideKeyword(group: StyleDetails): string | null {
   return CSS_WIDE_KEYWORDS.has(group.values[0]) ? group.values[0] : null;
 }
 
+/** A resolved custom-property reference, i.e. `var(--name)` or `var(--name, …)`. */
+const RE_VAR_REFERENCE = /^var\(/;
+
+/**
+ * Pick the line-style slot out of a `<line-width> <line-style> <line-color>`
+ * shorthand (`border`, `outline`) when no style keyword was given.
+ *
+ * The style normally arrives as a modifier (`solid`, `dashed`, …). A custom
+ * property has no keyword to match, so it lands in the value bucket instead, and
+ * a reference past the width slot is the style: colors are authored as `#name`,
+ * and the `$name-color` form the parser buckets as a color exists to reference a
+ * raw CSS custom property, not as the way colors are written. Lengths are left
+ * alone — a second length in these shorthands is not valid CSS, and promoting
+ * one to the style slot would emit an invalid declaration instead of ignoring it.
+ */
+export function extractLineStyle(values: string[]): string | undefined {
+  return values.slice(1).find((value) => RE_VAR_REFERENCE.test(value));
+}
+
 /** Warning keys already emitted, so each distinct offending value warns once. */
 const emittedWarnings = new Set<string>();
 

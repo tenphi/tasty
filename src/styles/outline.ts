@@ -5,6 +5,7 @@ import {
   resolveCustomProperties,
 } from '../utils/styles';
 import { BORDER_STYLES } from './const';
+import { extractLineStyle } from './shared';
 
 interface OutlineStyleProps {
   outline?: string | boolean | number;
@@ -51,7 +52,8 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
         );
 
         const value = outlinePart.values[0] || 'var(--outline-width)';
-        const type = typeMods[0] || 'solid';
+        const type =
+          typeMods[0] || extractLineStyle(outlinePart.values) || 'solid';
         const outlineColor = outlinePart.colors[0] || 'var(--outline-color)';
 
         result['outline'] = [value, type, outlineColor].join(' ');

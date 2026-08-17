@@ -1,7 +1,7 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
 import { BORDER_STYLES } from './const';
-import { extractCSSWideKeyword } from './shared';
+import { extractCSSWideKeyword, extractLineStyle } from './shared';
 
 type Direction = (typeof DIRECTIONS)[number];
 
@@ -31,7 +31,7 @@ function processGroup(group: GroupData): {
   const typeMods = filterMods(mods, BORDER_STYLES as unknown as string[]);
 
   const width = values[0] || 'var(--border-width)';
-  const style = typeMods[0] || 'solid';
+  const style = typeMods[0] || extractLineStyle(values) || 'solid';
   const color = colors?.[0] || 'var(--border-color, currentColor)';
 
   return {

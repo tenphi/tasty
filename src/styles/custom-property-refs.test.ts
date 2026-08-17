@@ -26,17 +26,39 @@ describe('custom property references in handler output', () => {
     resetConfig();
   });
 
+  // Both classifications of `$name` (value bucket and color bucket) plus the
+  // fallback form, since handlers read the buckets selectively.
+  const VALUES = ['$my-prop', '$my-prop-color', '($my-prop, 1x)'];
+
+  /**
+   * Some handlers only reach their interesting branch when a companion prop is
+   * set — `flow` needs a `display`, and `whiteSpace` is emitted a second time by
+   * the `textOverflow` clamp. Sweeping props one at a time lets those branches
+   * return early and pass without ever being exercised.
+   */
+  const CONTEXTS: Record<string, string>[] = [
+    {},
+    { display: 'flex' },
+    { display: 'grid' },
+    { textOverflow: 'ellipsis' },
+    { textOverflow: 'ellipsis / 3' },
+  ];
+
   it('never leaves a `$` reference in any registered style prop', () => {
     const leaks: string[] = [];
 
     for (const styleName of Object.keys(STYLE_HANDLER_MAP)) {
-      // Both classifications of `$name` (value bucket and color bucket) plus the
-      // fallback form, since handlers read the buckets selectively.
-      for (const value of ['$my-prop', '$my-prop-color', '($my-prop, 1x)']) {
-        const { rules } = renderStyles({ [styleName]: value });
-        const css = rules.map((rule) => rule.declarations).join(' ');
+      for (const value of VALUES) {
+        for (const context of CONTEXTS) {
+          const { rules } = renderStyles({ ...context, [styleName]: value });
+          const css = rules.map((rule) => rule.declarations).join(' ');
 
-        if (css.includes('$')) leaks.push(`${styleName}: ${value} → ${css}`);
+          if (css.includes('$')) {
+            leaks.push(
+              `${JSON.stringify({ ...context, [styleName]: value })} → ${css}`,
+            );
+          }
+        }
       }
     }
 
@@ -73,6 +95,16 @@ describe('custom property references in handler output', () => {
     ).toEqual({
       display: 'var(--my-display)',
       overflow: 'var(--my-overflow)',
+      'white-space': 'var(--my-white-space)',
+    });
+
+    // `textOverflow` emits `white-space` itself, a second path to the same
+    // declaration.
+    expect(
+      displayStyle({ textOverflow: 'ellipsis', whiteSpace: '$my-white-space' }),
+    ).toEqual({
+      overflow: 'hidden',
+      'text-overflow': 'ellipsis',
       'white-space': 'var(--my-white-space)',
     });
 

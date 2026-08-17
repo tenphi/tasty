@@ -133,20 +133,28 @@ describe('borderStyle', () => {
       });
     });
 
-    it('keeps a style keyword ahead of a reference', () => {
-      const result = borderStyle({ border: '1bw dashed $my-width' });
-      expect(result.border).toContain('dashed');
+    it('overflows into the color slot once width and style are taken', () => {
+      // Nothing else is free, so the reference is the color rather than dropped.
+      expect(borderStyle({ border: '1bw dashed $my-color' })).toEqual({
+        border: '1px dashed var(--my-color)',
+      });
+    });
+
+    it('fills style then color from two references', () => {
+      expect(borderStyle({ border: '1bw $my-style $my-color' })).toEqual({
+        border: '1px var(--my-style) var(--my-color)',
+      });
+    });
+
+    it('keeps a color token ahead of a reference', () => {
+      expect(borderStyle({ border: '1bw $my-style #purple' })).toEqual({
+        border: '1px var(--my-style) var(--purple-color)',
+      });
     });
 
     it('keeps a `-color` reference in the color slot', () => {
       expect(borderStyle({ border: '1bw $my-border-color' })).toEqual({
         border: '1px solid var(--my-border-color)',
-      });
-    });
-
-    it('combines a reference style with a color token', () => {
-      expect(borderStyle({ border: '1bw $my-style #purple' })).toEqual({
-        border: '1px var(--my-style) var(--purple-color)',
       });
     });
 

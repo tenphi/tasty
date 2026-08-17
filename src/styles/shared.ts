@@ -18,19 +18,37 @@ export function extractCSSWideKeyword(group: StyleDetails): string | null {
 const RE_VAR_REFERENCE = /^var\(/;
 
 /**
- * Pick the line-style slot out of a `<line-width> <line-style> <line-color>`
- * shorthand (`border`, `outline`) when no style keyword was given.
+ * Assign custom-property references to the style and color slots of a
+ * `<line-width> <line-style> <line-color>` shorthand (`border`, `outline`).
  *
- * The style normally arrives as a modifier (`solid`, `dashed`, …). A custom
- * property has no keyword to match, so it lands in the value bucket instead, and
- * a reference past the width slot is the style: colors are authored as `#name`,
- * and the `$name-color` form the parser buckets as a color exists to reference a
- * raw CSS custom property, not as the way colors are written. Lengths are left
- * alone — a second length in these shorthands is not valid CSS, and promoting
- * one to the style slot would emit an invalid declaration instead of ignoring it.
+ * The parser cannot type a reference, so it buckets `$name` as a plain value and
+ * the handler has to place it. A reference fills the first slot still free, in
+ * shorthand order: the width takes `values[0]`, then the style, then the color.
+ * The style would otherwise arrive as a keyword (`solid`, `dashed`, …) that a
+ * reference has no way to match, and the color as `#name` — the `$name-color`
+ * form the parser buckets as a color exists to reference a raw CSS custom
+ * property, not as the way colors are written, so a reference should not reach
+ * for the color slot until the style slot is taken.
+ *
+ * Lengths are left alone: a second length is not valid in these shorthands, and
+ * promoting one would emit an invalid declaration instead of ignoring an extra
+ * value. Callers supply their own slot defaults.
  */
-export function extractLineStyle(values: string[]): string | undefined {
-  return values.slice(1).find((value) => RE_VAR_REFERENCE.test(value));
+export function assignLineSlots(
+  values: string[],
+  styleKeyword: string | undefined,
+  colorToken: string | undefined,
+): { style: string | undefined; color: string | undefined } {
+  if (styleKeyword && colorToken) {
+    return { style: styleKeyword, color: colorToken };
+  }
+
+  const spare = values.slice(1).filter((value) => RE_VAR_REFERENCE.test(value));
+
+  return {
+    style: styleKeyword || spare.shift(),
+    color: colorToken || spare.shift(),
+  };
 }
 
 /** Warning keys already emitted, so each distinct offending value warns once. */

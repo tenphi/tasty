@@ -207,5 +207,20 @@ describe('outlineStyle', () => {
         outline: '2px solid var(--my-outline-color)',
       });
     });
+
+    it('overflows into the color slot once width and style are taken', () => {
+      expect(outlineStyle({ outline: '2px dashed $my-color' })).toEqual({
+        outline: '2px dashed var(--my-color)',
+      });
+    });
+
+    it('fills style then color from two references', () => {
+      expect(
+        outlineStyle({ outline: '2px $my-style $my-color / 4px' }),
+      ).toEqual({
+        outline: '2px var(--my-style) var(--my-color)',
+        'outline-offset': '4px',
+      });
+    });
   });
 });

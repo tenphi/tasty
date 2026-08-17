@@ -296,9 +296,9 @@ export interface StylesInterface extends Omit<
    * - `border="1bw, dashed top bottom, #purple left right"` // base 1bw, dashed on top/bottom, purple on left/right
    * - `border="1bw $my-style"` // custom property in the style slot
    *
-   * A `$name` reference fills the first free slot — width, then style. Colors are
-   * authored as `#name`; to point the color slot at a raw custom property, name
-   * it `$name-color`.
+   * A `$name` reference fills the first free slot — width, then style, then
+   * color. Colors are authored as `#name`; to point the color slot at a raw
+   * custom property directly, name it `$name-color`.
    */
   border?: CSSProperties['border'] | string | boolean;
   /**
@@ -426,9 +426,9 @@ export interface StylesInterface extends Omit<
    * - `outline={true}` // default outline (1ow solid)
    * - `outline="2ow $my-style"` // custom property in the style slot
    *
-   * A `$name` reference fills the first free slot — width, then style. Colors are
-   * authored as `#name`; to point the color slot at a raw custom property, name
-   * it `$name-color`.
+   * A `$name` reference fills the first free slot — width, then style, then
+   * color. Colors are authored as `#name`; to point the color slot at a raw
+   * custom property directly, name it `$name-color`.
    */
   outline?: string | boolean;
   /**

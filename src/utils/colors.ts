@@ -1,8 +1,10 @@
-import { getColorSpaceFunc, getColorSpaceSuffix } from './color-space';
+import { overrideColorAlpha } from './color-space';
 
 export function color(name: string, opacity = 1) {
   if (opacity !== 1) {
-    return `${getColorSpaceFunc()}(var(--${name}-color-${getColorSpaceSuffix()}) / ${opacity})`;
+    // The alpha slot takes a `<number>`, so the value goes in as authored —
+    // no percentage conversion to introduce a float artifact.
+    return overrideColorAlpha(`var(--${name}-color)`, String(opacity));
   }
 
   return `var(--${name}-color)`;

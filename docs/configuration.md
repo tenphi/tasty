@@ -78,7 +78,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 
 ## Color Space
 
-Controls the CSS color space used for decomposed color token companion variables. When you define `#name` color tokens, tasty generates both `--name-color` (full color) and `--name-color-{suffix}` (decomposed components for alpha composition).
+Controls the CSS color space used for decomposed color token companion variables. When you define `#name` color tokens, tasty generates both `--name-color` (the color) and `--name-color-{suffix}` (its channels, decomposed).
 
 ```jsx
 configure({
@@ -86,15 +86,17 @@ configure({
 });
 ```
 
-| Color Space | Suffix | Components Format | Alpha Syntax |
+| Color Space | Suffix | Components Format | Channel Reference |
 |---|---|---|---|
-| `rgb` | `-rgb` | `255 128 0` | `rgb(var(--name-color-rgb) / .5)` |
-| `hsl` | `-hsl` | `300 100% 25%` | `hsl(var(--name-color-hsl) / .5)` |
-| `oklch` | `-oklch` | `0.42 0.16 328` | `oklch(var(--name-color-oklch) / .5)` |
+| `rgb` | `-rgb` | `255 128 0` | `rgb(var(--name-color-rgb))` |
+| `hsl` | `-hsl` | `300 100% 25%` | `hsl(var(--name-color-hsl))` |
+| `oklch` | `-oklch` | `0.42 0.16 328` | `oklch(var(--name-color-oklch))` |
 
-The `oklch` color space is the default because it provides perceptually uniform color manipulation — alpha fading and color mixing produce more natural-looking results.
+The `oklch` color space is the default because it provides perceptually uniform color manipulation — reaching for a channel to shift lightness or hue produces more natural-looking results.
 
-A color the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a `color()` in a space it has no conversion for — has no channels to decompose, so its components companion is expressed *by reference* using CSS relative color syntax (`--name-color-oklch: from color-mix(…) l c h`). The opacity suffix keeps working; the browser resolves the channels.
+The companion is there so you can *address the channels*: shift a lightness, animate a hue, build a derived color. It is not how the [opacity suffix](dsl.md#color-tokens--opacity) works — that sets the alpha on `--name-color` itself with relative color syntax, so it needs nothing from the companion and works on any color.
+
+A color the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a `color()` in a space it has no conversion for — has no channels to decompose, so its companion is expressed *by reference* using CSS relative color syntax (`--name-color-oklch: from color-mix(…) l c h`). Reading a channel off it still works; the browser resolves them.
 
 ---
 

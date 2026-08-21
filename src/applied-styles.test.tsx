@@ -62,10 +62,124 @@ describe('generated CSS applies in the browser', () => {
         'Box',
       );
 
-      // `#black.5` resolves through the default oklch colour space:
-      // `oklch(var(--black-color-oklch) / .5)`, with `--black-color-oklch`
-      // supplied by the token's `@property` initial value.
+      // `#black.5` becomes `oklch(from var(--black-color) l c h / .5)` — the
+      // channels copied over and the alpha slot written — so this is black at
+      // half alpha, reported in the same shape the channel-components form was.
       expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
+    });
+
+    it('fades a colour variable Tasty never registered', () => {
+      // The token lives only in hand-authored CSS: no `@property`, and no
+      // `--ink-color-oklch` companion for opacity to compose onto. Applying the
+      // alpha to the colour itself is what makes this resolve at all.
+      const sheet = document.createElement('style');
+      sheet.textContent = ':root { --ink-color: rgb(0 0 255); }';
+      document.head.append(sheet);
+
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(<Box styles={{ fill: '#ink.5' }} />).getByTestId('Box');
+
+      // Compared against the same fade written by hand rather than a literal, so
+      // the assertion is about the colour and not the engine's channel precision.
+      const control = document.createElement('div');
+      control.style.backgroundColor = 'oklch(from rgb(0 0 255) l c h / .5)';
+      document.body.append(control);
+
+      expect(computed(el, 'background-color')).toBe(
+        computed(control, 'background-color'),
+      );
+      expect(computed(el, 'background-color')).toMatch(/\/ 0\.5\)$/);
+
+      control.remove();
+      sheet.remove();
+    });
+
+    it('replaces an alpha the colour already carries', () => {
+      // The regression this guards: composing with `color-mix()` against
+      // `transparent` would *multiply* the two alphas, so a token holding
+      // `rgb(255 0 0 / .8)` faded to `.5` would come out at `.4`. Writing the
+      // alpha slot replaces it, which is what the channel-components form did
+      // and what a statically-known colour still does.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ '#half': 'rgb(255 0 0 / .8)', fill: '#half.5' }} />,
+      ).getByTestId('Box');
+
+      expect(computed(el, 'background-color')).toMatch(/\/ 0\.5\)$/);
+    });
+
+    it('takes an opacity variable in either number or percentage form', () => {
+      // The alpha slot accepts both, and `--*-opacity` properties are registered
+      // as `<number> | <percentage>`. Scaling the reference into a percentage
+      // would make one of the two forms invalid and drop the declaration.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+
+      for (const fade of ['0.5', '50%']) {
+        const { getByTestId, unmount } = render(
+          <Box
+            styles={{ '$fade-opacity': fade, fill: '#black.$fade-opacity' }}
+          />,
+        );
+
+        expect(computed(getByTestId('Box'), 'background-color')).toBe(
+          'oklch(0 0 0 / 0.5)',
+        );
+
+        unmount();
+      }
+    });
+
+    it('composes a nested `#current` fade instead of replacing it', () => {
+      // A ramp built on `#current` depends on this: a label faded to `.4` and a
+      // fill authored at `.18` under it land at `.072`, which is what the fill's
+      // alpha was chosen against. Replacing would make it 2.5x more opaque.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const Inner = tasty({ qa: 'Inner', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ color: '#current.4' }}>
+          <Inner styles={{ fill: '#current.18' }} />
+        </Box>,
+      ).getByTestId('Inner');
+
+      expect(computed(el, 'background-color')).toContain('/ 0.072)');
+    });
+
+    it('composes a nested `#current` fade instead of replacing it', () => {
+      // A ramp built on `#current` depends on this: a label faded to `.4` with a
+      // fill authored at `.18` under it lands at `.072`, which is the value that
+      // alpha was chosen against. Replacing would make it 2.5x more opaque.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const Inner = tasty({ qa: 'Inner', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ color: '#current.4' }}>
+          <Inner styles={{ fill: '#current.18' }} />
+        </Box>,
+      ).getByTestId('Inner');
+
+      expect(computed(el, 'background-color')).toContain('/ 0.072)');
+    });
+
+    it('fades without clamping a colour to sRGB', () => {
+      // The channels are copied, not converted into a gamut-limited space, so a
+      // display-p3 red keeps a chroma sRGB cannot hold. `rgb(from …)` — or a mix
+      // `in srgb` — would clamp it.
+      const p3 = document.createElement('div');
+      p3.style.backgroundColor =
+        'oklch(from color(display-p3 1 0.2 0) l c h / .5)';
+      const srgb = document.createElement('div');
+      srgb.style.backgroundColor = 'oklch(from rgb(255 0 0) l c h / .5)';
+      document.body.append(p3, srgb);
+
+      const chroma = (el: Element) =>
+        parseFloat(
+          computed(el, 'background-color').match(/^oklch\([^ ]+ ([^ ]+)/)![1],
+        );
+
+      expect(chroma(p3)).toBeGreaterThan(chroma(srgb));
+      expect(computed(p3, 'background-color')).toContain('/ 0.5)');
+
+      p3.remove();
+      srgb.remove();
     });
 
     it('applies a color-mix() as the background colour', () => {
@@ -90,10 +204,10 @@ describe('generated CSS applies in the browser', () => {
         />,
       ).getByTestId('Box');
 
-      // `#brand` cannot be decomposed into channels here, so its components
-      // companion is relative — `from color-mix(…) l c h` — and the browser
-      // resolves the channels before the `/ .5` alpha is applied.
-      expect(computed(el, '--brand-color-oklch')).toContain('from color-mix(');
+      // Opacity applies to the token's colour directly, so a colour the engine
+      // cannot decompose into channels at build time needs nothing extra to
+      // fade — the browser copies its channels.
+      expect(computed(el, '--brand-color')).toBe('color(srgb 0.5 0.5 0.5)');
 
       // Mid-grey at half alpha. Channel precision is up to the engine, so only
       // the lightness band and the alpha are asserted.

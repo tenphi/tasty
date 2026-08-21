@@ -47,11 +47,13 @@ When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallb
 
 This applies to all color fallback syntaxes, including nested fallbacks and literal values.
 
+The companion exists so the channels can be *addressed* — shifting a lightness,
+animating a hue. It is not what the opacity suffix uses; see §6.
+
 A color the engine cannot evaluate at build time — a `color-mix()`, a
 `light-dark()`, a `color()` in a space it has no conversion for — has no channels
 to decompose, so the companion is expressed *by reference* with CSS relative
-color syntax: `--brand-color-oklch: from color-mix(…) l c h`. `#brand.5` then
-still resolves, with the browser working out the channels.
+color syntax: `--brand-color-oklch: from color-mix(…) l c h`.
 
 ---
 
@@ -181,7 +183,10 @@ group (`border`, `outline`) must place such a reference once, not in both slots.
 | Color fallback           | `(#name, fallback)` → `var(--name-color, <processed fallback>)`<br>Fallback is recursively processed, supporting unlimited nesting: `(#a, (#b, #c))` → `var(--a-color, var(--b-color, var(--c-color)))`. |
 | Custom property          | `$ident` → `var(--ident)` \| `($ident,fallback)` → `var(--ident, <processed fallback>)`<br>If ident ends with `-color`, filed under both the color and value buckets. |
 | Hash colors              | As in §5-3.                                                                                 |
-| Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.<br>An opacity suffix on a token resolving to a *derived* color function wraps the call: `#brand.5` → `color-mix(in oklab, <color> 50%, transparent)`. |
+| Opacity suffix           | `#name.5` → `oklch(from var(--name-color) l c h / .5)`; the authored digits are kept verbatim (`.05` → `.05`, `.0` → `0`) and `.$prop` → `/ var(--prop)`.<br>Alpha applies to the color, never to its channel components: a token may hold any `<color>`, including one with no components to write into and one Tasty never defined.<br>Writing the alpha slot **replaces** any alpha the color carries, and the slot takes a `<number>` or a `<percentage>`, so an opacity property works in either form.<br>The space is always `oklch` — it is unbounded, so a gamut-limited space would clamp a wide-gamut color. |
+| Opacity on `#current`    | `#current.5` → `color-mix(in oklab, currentcolor 50%, transparent)`, which **composes** with any alpha an ancestor already applied — `currentcolor` is inherited, so `.4` means "40% of what reaches me" and a nested `.18` under it lands at `.072`.<br>The percentage is derived by shifting the decimal point (`.07` → `7%`), not by multiplying. A `$prop` alpha is scaled (`calc(var(--prop) * 100%)`), so it must hold a unitless number — a mix percentage cannot be a `<number>`. |
+| Opacity on a static color | A *predefined token* resolving to a literal color function is faded in place, since its channels are right there: a channel function takes the alpha after a slash (`#brand: 'hsl(220 90% 50%)'` → `#brand.5` → `hsl(220 90% 50% / .5)`), a derived one goes through relative syntax (`#brand: 'light-dark(#a, #b)'` → `oklch(from light-dark(…) l c h / .5)`). See §12.2. |
+| Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.                     |
 | User functions           | If `funcs[name]` exists → call with parsed arg-`StyleDetails[]`, use return string.<br>Else rebuild `ident(<processed args>)`. |
 
 ---
@@ -247,14 +252,14 @@ none auto max-content min-content fit-content
 ### 12.2 Recognized color functions
 
 Channel functions — the arguments *are* the color, so an opacity suffix on a
-token resolving to one of them is appended after a slash:
+*predefined token* holding one of these literally is appended after a slash:
 
 ```
 rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray
 ```
 
 Derived functions — they build a color out of other colors and take no alpha
-channel, so an opacity suffix wraps the whole call in `color-mix()`:
+channel, so such a token goes through relative color syntax instead:
 
 ```
 color-mix color-contrast contrast-color light-dark
@@ -294,6 +299,8 @@ it is filed as a color only when its arguments hold one — `light-dark(#dark,
 | `light-dark(#dark, #light)`   | Color (arguments hold colors).                                                 |
 | `light-dark(1x, 2x)`          | Value (arguments hold lengths).                                                |
 | `oklch(from #a l c h / 50%)`  | Color; relative color syntax with the origin token expanded.                    |
+| `#a.5`                        | `oklch(from var(--a-color) l c h / .5)`.                                       |
+| `#a.$fade`                    | `oklch(from var(--a-color) l c h / var(--fade))`.                              |
 | `($123invalid, fallback)`     | `calc($123invalid, fallback)` (invalid name → auto-calc).                      |
 | Excess spaces/newlines         | Collapsed in output.                                                            |
 | `+2r, 1e3x`                    | Invalid → modifiers.                                                            |

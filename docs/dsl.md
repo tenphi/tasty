@@ -111,7 +111,7 @@ const List = tasty({
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:
 
 ```jsx
-fill: '#purple.5'  // → var(--purple-color) with 50% opacity
+fill: '#purple.5'  // → oklch(from var(--purple-color) l c h / .5)
 ```
 
 ### Modifier
@@ -133,10 +133,58 @@ Modifiers can also be exposed as top-level component props via `modProps` — se
 color: '#purple',           // Full opacity
 color: '#purple.5',         // 50% opacity
 color: '#purple.05',        // 5% opacity
+color: '#purple.$fade',     // Opacity from a custom property
 fill: '#current',           // → currentcolor
-fill: '#current.5',         // → color-mix(in oklab, currentcolor 50%, transparent)
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
+
+The suffix sets the alpha on the token's color with CSS relative color syntax:
+
+```jsx
+fill: '#purple.5';
+// → oklch(from var(--purple-color) l c h / .5)
+```
+
+The channels are copied over and the alpha slot is written, which asks nothing of
+the color beyond *being* a color. That means the suffix works on every one of
+these:
+
+- a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
+  Tasty cannot convert — none of which have channels to decompose
+- `#current`, which resolves to `currentcolor`
+- a `--name-color` variable declared in your own CSS, with no Tasty token
+  definition and no companion variable behind it
+
+Two properties follow from writing the alpha slot rather than compositing:
+
+- **Alpha is replaced, not multiplied.** A token holding `rgb(255 0 0 / .8)`
+  faded to `.5` is alpha `.5`, not `.4`.
+- **The alpha may be a number or a percentage.** `#purple.$fade` emits
+  `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
+  which is what `--*-opacity` properties are registered to accept.
+
+### `#current` composes instead
+
+`#current` is the one exception, and the difference is deliberate. A token *names*
+a color, so fading it sets its alpha. `currentcolor` is the color an element
+**inherits**, which an ancestor may already have faded — `#current.4` means "40%
+of what reaches me":
+
+```jsx
+fill: '#current.4';
+// → color-mix(in oklab, currentcolor 40%, transparent)
+```
+
+So a `#current` fade nested inside another one composes: a label at `#current.4`
+with a fill of `#current.18` under it lands at `.072`. Color ramps built on
+`#current` depend on that — replacing would double the opacity of every nested
+step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
+custom property used as `#current.$fade` must hold a unitless number; a token
+accepts either form.
+
+The space is always `oklch`, whatever [`colorSpace`](configuration.md#color-space)
+is set to: it is unbounded, so a wide-gamut color survives a round trip that a
+gamut-limited space would clamp.
 
 ---
 
@@ -158,7 +206,8 @@ shadow: '0 0 1x color-mix(in oklab, #dark 20%, transparent)',
 values of any type, so it is treated as a color only when its arguments are
 colors. `padding: 'light-dark(1x, 2x)'` still reaches the padding slot.
 
-A color token defined as one of these functions supports the opacity suffix too:
+A color token defined as one of these functions takes the
+[opacity suffix](#color-tokens--opacity) like any other:
 
 ```jsx
 const Card = tasty({
@@ -169,16 +218,21 @@ const Card = tasty({
 });
 ```
 
-For a [replace token](configuration.md#replace-tokens-parse-time-substitution),
-whose value is known while parsing, the suffix wraps the call — a derived
-function (`color-mix()`, `light-dark()`, `color-contrast()`,
-`contrast-color()`) has no alpha channel to write into:
+A [replace token](configuration.md#replace-tokens-parse-time-substitution) is
+substituted while parsing, so its color is right there to fade in place. A
+channel function takes the alpha after a slash; a derived function has no alpha
+channel, so it gets wrapped:
 
 ```jsx
-configure({ replaceTokens: { '#brand': 'light-dark(#dark, #light)' } });
+configure({
+  replaceTokens: {
+    '#solid': 'hsl(220 90% 50%)',
+    '#adaptive': 'light-dark(#dark, #light)',
+  },
+});
 
-fill: '#brand.5';
-// → color-mix(in oklab, light-dark(var(--dark-color), var(--light-color)) 50%, transparent)
+fill: '#solid.5';     // → hsl(220 90% 50% / .5)
+fill: '#adaptive.5';  // → oklch(from light-dark(…) l c h / .5)
 ```
 
 ---

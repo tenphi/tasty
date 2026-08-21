@@ -606,6 +606,26 @@ describe('Tasty style tests', () => {
       });
     });
 
+    it('keeps the components companion pointing at the faded token', () => {
+      // Components carry no alpha, so the opacity wrapper is peeled off and the
+      // companion still names the token's own channels — which is what keeps
+      // `$current-color-{space}` usable downstream.
+      expect(colorStyle({ color: '#purple.5' })).toEqual({
+        color: 'oklch(from var(--purple-color) l c h / .5)',
+        '--current-color': 'oklch(from var(--purple-color) l c h / .5)',
+        '--current-color-rgb': 'var(--purple-color-rgb)',
+      });
+    });
+
+    it('defines a token from a faded token without losing its channels', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': '#purple.5' })).toEqual({
+        '--brand-color': 'oklch(from var(--purple-color) l c h / .5)',
+        '--brand-color-rgb': 'var(--purple-color-rgb)',
+      });
+    });
+
     it('keeps a light-dark() of lengths out of the color slot', () => {
       expect(paddingStyle({ padding: 'light-dark(1x, 2x)' })).toEqual({
         padding: 'light-dark(8px,16px)',

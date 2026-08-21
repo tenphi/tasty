@@ -4,6 +4,7 @@ import { registerDefaultFunctions } from '../plugins/defaults';
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
 import { getNamedColorHex } from './color-math';
+import { parseAlphaOverride } from './color-space';
 
 export {
   getNamedColorHex,
@@ -417,20 +418,30 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     firstColor = extractedColor;
   }
 
+  // `#name.alpha` fades the color with relative color syntax, so the name and the
+  // opacity are read off the parts rather than the whole.
+  const faded = parseAlphaOverride(firstColor);
+  const baseColor = faded ? faded.color : firstColor;
+
   // Extract color name (if present) from variable pattern using precompiled regex
-  let nameMatch = firstColor.match(COLOR_VAR_PATTERN);
+  let nameMatch = baseColor.match(COLOR_VAR_PATTERN);
   if (!nameMatch) {
-    nameMatch = firstColor.match(COLOR_VAR_COMPONENTS_PATTERN);
+    nameMatch = baseColor.match(COLOR_VAR_COMPONENTS_PATTERN);
   }
 
   let opacity: number | undefined;
-  if (
-    firstColor.startsWith('rgb') ||
-    firstColor.startsWith('hsl') ||
-    firstColor.startsWith('lch') ||
-    firstColor.startsWith('oklch')
+  if (faded) {
+    // A `var()` alpha has no number to report.
+    const { alpha } = faded;
+    const v = parseFloat(alpha);
+    if (!isNaN(v)) opacity = alpha.endsWith('%') ? v : v * 100;
+  } else if (
+    baseColor.startsWith('rgb') ||
+    baseColor.startsWith('hsl') ||
+    baseColor.startsWith('lch') ||
+    baseColor.startsWith('oklch')
   ) {
-    const alphaMatch = firstColor.match(RGB_ALPHA_PATTERN);
+    const alphaMatch = baseColor.match(RGB_ALPHA_PATTERN);
     if (alphaMatch) {
       const v = parseFloat(alphaMatch[1]);
       if (!isNaN(v)) opacity = v * 100;

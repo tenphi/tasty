@@ -1,4 +1,5 @@
-import { getRgbValuesFromRgbaString, strToRgb } from './styles';
+import { color } from './colors';
+import { getRgbValuesFromRgbaString, parseColor, strToRgb } from './styles';
 import { resetColorSpace, setColorSpace, strToColorSpace } from './color-space';
 
 describe('getRgbValuesFromRgbaString', () => {
@@ -131,5 +132,67 @@ describe('strToRgb', () => {
     expect(strToRgb('')).toBeUndefined();
     expect(strToRgb(null)).toBeUndefined();
     expect(strToRgb(undefined)).toBeUndefined();
+  });
+});
+
+describe('parseColor with a faded color', () => {
+  it('reads the name and the opacity through the fade', () => {
+    // `#purple.5` parses to `oklch(from var(--purple-color) l c h / .5)`. The
+    // whole thing is the color, but the name and the opacity are its parts.
+    const parsed = parseColor('#purple.5');
+
+    expect(parsed.color).toBe('oklch(from var(--purple-color) l c h / .5)');
+    expect(parsed.name).toBe('purple');
+    expect(parsed.opacity).toBe(50);
+  });
+
+  it('reports no opacity for a dynamic alpha', () => {
+    const parsed = parseColor('#purple.$fade');
+
+    expect(parsed.name).toBe('purple');
+    expect(parsed.opacity).toBeUndefined();
+  });
+
+  it('reads a percentage alpha as itself', () => {
+    expect(
+      parseColor('oklch(from var(--purple-color) l c h / 40%)').opacity,
+    ).toBe(40);
+  });
+
+  it('still reads a slash alpha off a static color function', () => {
+    expect(parseColor('rgb(255 0 0 / .25)').opacity).toBe(25);
+  });
+
+  it('does not name a color after an operand of a color function', () => {
+    const parsed = parseColor('color-mix(in oklab, #purple 50%, #red)');
+
+    expect(parsed.name).toBeUndefined();
+    expect(parsed.opacity).toBeUndefined();
+  });
+});
+
+describe('color() helper', () => {
+  it('returns the bare variable at full opacity', () => {
+    expect(color('purple')).toBe('var(--purple-color)');
+  });
+
+  it('fades the colour variable with relative color syntax', () => {
+    expect(color('purple', 0.5)).toBe(
+      'oklch(from var(--purple-color) l c h / 0.5)',
+    );
+  });
+
+  it('passes the opacity through without arithmetic', () => {
+    // The alpha slot takes a `<number>`, so there is no percentage conversion to
+    // introduce a float artifact — `0.07 * 100` is `7.000000000000001`.
+    expect(color('purple', 0.07)).toBe(
+      'oklch(from var(--purple-color) l c h / 0.07)',
+    );
+    expect(color('purple', 0.29)).toBe(
+      'oklch(from var(--purple-color) l c h / 0.29)',
+    );
+    expect(color('purple', 0.025)).toBe(
+      'oklch(from var(--purple-color) l c h / 0.025)',
+    );
   });
 });

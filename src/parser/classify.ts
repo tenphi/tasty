@@ -1,5 +1,5 @@
 import { getNamedColorHex } from '../utils/color-math';
-import { getColorSpaceFunc, getColorSpaceSuffix } from '../utils/color-space';
+import { mixColorAlpha, overrideColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 
@@ -20,23 +20,52 @@ import type { ParserOptions, ProcessedStyle } from './types';
 import { Bucket } from './types';
 
 /**
- * Convert an opacity suffix (`.5`, `.05`, `.$disabled`) to the percentage
- * `color-mix()` needs. Used for colors that take no alpha channel of their own —
- * `currentcolor` and every function in `DERIVED_COLOR_FUNCS`.
+ * Convert an opacity suffix to the alpha value it denotes.
+ *
+ * The authored digits are kept verbatim — `.07` stays `.07` rather than being
+ * multiplied into `7.000000000000001%` — and a `$prop` suffix passes the
+ * reference straight through, so it works whether the property holds a
+ * `<number>` or a `<percentage>`. Both are what the alpha slot accepts.
+ */
+function alphaSuffixToAlpha(rawAlpha: string): string {
+  // Custom property: $disabled -> var(--disabled)
+  if (rawAlpha.startsWith('$')) return `var(--${rawAlpha.slice(1)})`;
+  if (rawAlpha === '0') return '0';
+
+  return `.${rawAlpha}`;
+}
+
+/** Apply an opacity suffix to a color, replacing any alpha it already carries. */
+function fadeColor(color: string, rawAlpha: string): string {
+  return overrideColorAlpha(color, alphaSuffixToAlpha(rawAlpha));
+}
+
+/**
+ * Convert an opacity suffix to the percentage `color-mix()` needs, by shifting
+ * the decimal point rather than multiplying: `.07` is `7%`, not the
+ * `7.000000000000001%` that `parseFloat('.07') * 100` produces.
  */
 function alphaSuffixToPercentage(rawAlpha: string): string {
   if (rawAlpha.startsWith('$')) {
-    // Custom property: $disabled -> calc(var(--disabled) * 100%)
+    // A mix percentage cannot be a `<number>`, so the reference has to be scaled.
     return `calc(var(--${rawAlpha.slice(1)}) * 100%)`;
   }
   if (rawAlpha === '0') return '0%';
-  // Convert .5 -> 50%, .05 -> 5%
-  return `${parseFloat('.' + rawAlpha) * 100}%`;
+
+  const digits = rawAlpha.length === 1 ? `${rawAlpha}0` : rawAlpha;
+  const whole = String(Number(digits.slice(0, 2)));
+  const fraction = digits.slice(2);
+
+  return `${fraction ? `${whole}.${fraction}` : whole}%`;
 }
 
-/** Apply an opacity suffix to a color that has no alpha channel to write into. */
-function mixAlpha(color: string, rawAlpha: string): string {
-  return `color-mix(in oklab, ${color} ${alphaSuffixToPercentage(rawAlpha)}, transparent)`;
+/**
+ * Apply an opacity suffix to `currentcolor`, composing with any alpha an
+ * ancestor already applied. See {@link mixColorAlpha} for why this differs from
+ * how a token is faded.
+ */
+function fadeCurrentColor(rawAlpha: string): string {
+  return mixColorAlpha('currentcolor', alphaSuffixToPercentage(rawAlpha));
 }
 
 /**
@@ -200,7 +229,7 @@ export function classify(
   if (currentAlphaMatch) {
     return {
       bucket: Bucket.Color,
-      processed: mixAlpha('currentcolor', currentAlphaMatch[1]),
+      processed: fadeCurrentColor(currentAlphaMatch[1]),
     };
   }
 
@@ -248,8 +277,8 @@ export function classify(
               const lowerFunc = funcName.toLowerCase();
 
               // A derived color function (color-mix, light-dark, …) has no alpha
-              // channel to write into, so opacity wraps the whole call the same
-              // way `#current.5` does.
+              // channel to write into, so opacity is applied to the whole call
+              // the same way `#current.5` is.
               if (DERIVED_COLOR_FUNCS.has(lowerFunc)) {
                 const resolved = classify(
                   foldDslCase(resolvedValue),
@@ -259,7 +288,7 @@ export function classify(
 
                 return {
                   bucket: Bucket.Color,
-                  processed: mixAlpha(resolved.processed, rawAlpha),
+                  processed: fadeColor(resolved.processed, rawAlpha),
                 };
               }
               const isCustomFunc = !!(
@@ -422,19 +451,15 @@ export function classify(
     );
     if (alphaMatch) {
       const [, base, rawAlpha] = alphaMatch;
-      let alpha: string;
-      if (rawAlpha.startsWith('$')) {
-        // Custom property: $disabled -> var(--disabled)
-        const propName = rawAlpha.slice(1);
-        alpha = `var(--${propName})`;
-      } else if (rawAlpha === '0') {
-        alpha = '0';
-      } else {
-        alpha = `.${rawAlpha}`;
-      }
+
+      // Opacity applies to the color variable itself, not to its channel
+      // components. The token may hold anything a `<color>` can be — including a
+      // `color-mix()` or a `light-dark()` with no channels to decompose, or a
+      // value written straight into `--name-color` by hand-authored CSS with no
+      // companion at all — and relative color syntax fades all of them.
       return {
         bucket: Bucket.Color,
-        processed: `${getColorSpaceFunc()}(var(--${base}-color-${getColorSpaceSuffix()}) / ${alpha})`,
+        processed: fadeColor(`var(--${base}-color)`, rawAlpha),
       };
     }
 

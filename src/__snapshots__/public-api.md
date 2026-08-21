@@ -74,6 +74,7 @@ value      filterBaseProps
 value      filterMods
 value      FLOW_STYLES
 type       FlowStyleProps
+value      flushStyles
 value      FONT_CHUNK_STYLES
 value      fontFace
 type       FontFaceDescriptors
@@ -104,6 +105,7 @@ value      getRawCSSText
 value      getRgbValuesFromRgbaString
 value      hasGlobalKeyframes
 value      hasGlobalRecipes
+value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
 value      hslToRgbValues
@@ -160,12 +162,14 @@ type       PropertyOptions
 type       PropHandler
 type       PropHandlerDefinition
 type       PropHandlerProps
+type       QueuedWrite
 type       RawCSSResult
 type       RawStyleHandler
 type       RecipeStyles
 type       RenderResult
 value      renderStyles
 value      resetConfig
+value      resetStyleBatch
 type       ResolveAsProps
 type       ResolvedStyleValue
 value      resolveFunctionColor
@@ -211,6 +215,8 @@ type       Summary
 type       TagName
 value      tasty
 type       TastyBaseStylePropNames
+value      TastyBatchProvider
+type       TastyBatchProviderProps
 type       TastyComponentPropsWithDefaults
 type       TastyConfig
 type       TastyCustomProps
@@ -345,6 +351,7 @@ value      filterBaseProps
 value      filterMods
 value      FLOW_STYLES
 type       FlowStyleProps
+value      flushStyles
 value      FONT_CHUNK_STYLES
 value      fontFace
 type       FontFaceDescriptors
@@ -374,6 +381,7 @@ value      getRawCSSText
 value      getRgbValuesFromRgbaString
 value      hasGlobalKeyframes
 value      hasGlobalRecipes
+value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
 value      hslToRgbValues
@@ -428,12 +436,14 @@ type       PropertyOptions
 type       PropHandler
 type       PropHandlerDefinition
 type       PropHandlerProps
+type       QueuedWrite
 type       RawCSSResult
 type       RawStyleHandler
 type       RecipeStyles
 type       RenderResult
 value      renderStyles
 value      resetConfig
+value      resetStyleBatch
 type       ResolvedStyleValue
 value      resolveFunctionColor
 value      resolveRecipes

@@ -556,6 +556,7 @@ Run `pnpm bench` to reproduce. `pnpm bench:browser` runs the component-render be
 - Style normalization guarantees equivalent style input resolves to the same chunks, improving deduplication hit rates.
 - A style garbage collector removes unused styles/chunks over time.
 - A dedicated style injector minimizes DOM/style-tag overhead.
+- Optional [batched injection](docs/configuration.md#batched-injection) collapses many `insertRule()` calls into one style invalidation per commit, which matters when components measure layout during render.
 - This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
 
 ## Ecosystem

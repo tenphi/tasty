@@ -1,6 +1,8 @@
 import type { StyleResult } from '../pipeline';
 import type { PropertyTypeResolver } from '../properties/property-type-resolver';
 
+import type { QueuedWrite } from './batch';
+
 declare global {
   interface Window {
     __TASTY__?: string[];
@@ -45,6 +47,13 @@ export interface StyleInjectorConfig {
    * @default 't'
    */
   namePrefix?: string;
+  /**
+   * Defer stylesheet writes and apply them in one batch instead of one
+   * `insertRule()` per component. Mirrors `batchInjection` on the public
+   * `TastyConfig`.
+   * @default false
+   */
+  batchInjection?: boolean | 'always';
 }
 
 /**
@@ -90,6 +99,13 @@ export interface GCOptions {
 export const HYDRATED_RULE_INDEX = -2;
 /** Sentinel for pre-allocated class names whose CSS hasn't been injected yet. */
 export const PLACEHOLDER_RULE_INDEX = -1;
+/**
+ * Sentinel for class names whose rules are queued for a batched sheet write.
+ * Distinct from `PLACEHOLDER_RULE_INDEX`: a placeholder still needs its rules
+ * built and inserted, whereas a pending entry already owns a queued write and
+ * must not be injected twice.
+ */
+export const PENDING_RULE_INDEX = -3;
 
 export interface RuleInfo {
   className: string;
@@ -186,6 +202,14 @@ export interface RootRegistry {
   usageMap: Map<string, StyleUsage>;
   /** Touch counter for scheduling GC (per-root) */
   touchCount: number;
+  /**
+   * Millisecond that `touchedTick` refers to. `touch()` only ever stamps
+   * `lastTouchedAt` with the current millisecond, so a repeat touch of the same
+   * class name inside one millisecond is a no-op worth skipping.
+   */
+  touchTick: number;
+  /** Class-name strings already touched during `touchTick`. */
+  touchedTick: Set<string>;
   /** How many entries from `window.__TASTY__` have been synced into this registry */
   serverClassSyncIndex: number;
   /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */
@@ -226,6 +250,12 @@ export interface KeyframesCacheEntry {
   name: string;
   refCount: number;
   info: KeyframesInfo;
+  /**
+   * Queued sheet write, when `batchInjection` deferred the insertion. Present
+   * only between `keyframes()` and the flush; disposing in that window cancels
+   * the write instead of deleting a rule that was never inserted.
+   */
+  pending?: QueuedWrite;
 }
 
 /**

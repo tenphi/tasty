@@ -318,6 +318,8 @@ export type {
   GCOptions,
 } from './types';
 
+export { flushStyles, hasPendingStyleWrites, resetStyleBatch } from './batch';
+export type { QueuedWrite } from './batch';
 export { StyleInjector } from './injector';
 export { SheetManager } from './sheet-manager';
 export { ChunkSheetRegistry, chunkSheetRegistry } from './chunk-sheet-registry';

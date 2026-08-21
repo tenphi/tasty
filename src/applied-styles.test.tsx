@@ -62,10 +62,66 @@ describe('generated CSS applies in the browser', () => {
         'Box',
       );
 
-      // `#black.5` resolves through the default oklch colour space:
-      // `oklch(var(--black-color-oklch) / .5)`, with `--black-color-oklch`
-      // supplied by the token's `@property` initial value.
-      expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
+      // `#black.5` becomes `color-mix(in oklab, var(--black-color) 50%,
+      // transparent)`, and mixing premultiplied against `transparent` leaves the
+      // channels alone — so this is black at half alpha, serialized in the
+      // mixing space.
+      expect(computed(el, 'background-color')).toBe('oklab(0 0 0 / 0.5)');
+    });
+
+    it('fades a colour variable Tasty never registered', () => {
+      // The token lives only in hand-authored CSS: no `@property`, and no
+      // `--ink-color-oklch` companion for opacity to compose onto. Applying the
+      // alpha to the colour itself is what makes this resolve at all.
+      const sheet = document.createElement('style');
+      sheet.textContent = ':root { --ink-color: rgb(0 0 255); }';
+      document.head.append(sheet);
+
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(<Box styles={{ fill: '#ink.5' }} />).getByTestId('Box');
+
+      // Compared against the same fade written by hand rather than a literal, so
+      // the assertion is about the colour and not the engine's channel precision.
+      const control = document.createElement('div');
+      control.style.backgroundColor =
+        'color-mix(in oklab, rgb(0 0 255) 50%, transparent)';
+      document.body.append(control);
+
+      expect(computed(el, 'background-color')).toBe(
+        computed(control, 'background-color'),
+      );
+      expect(computed(el, 'background-color')).toMatch(/\/ 0\.5\)$/);
+
+      control.remove();
+      sheet.remove();
+    });
+
+    it('fades to the same colour the channel-slash form produced', () => {
+      // The form changed from `oklch(var(--x-color-oklch) / .5)` to a
+      // `color-mix()`; the colour must not. Mixing premultiplied against a fully
+      // transparent colour leaves the channels untouched, so both forms are the
+      // same colour at the same alpha — including out of sRGB, which is why the
+      // mixing space is oklab and not srgb.
+      const forms = [
+        ['rgb(255 128 64)', '50%', '.5'],
+        ['oklch(0.7 0.2 300)', '25%', '.25'],
+        ['color(display-p3 1 0.2 0)', '5%', '.05'],
+      ];
+
+      for (const [color, percentage, alpha] of forms) {
+        const viaMix = document.createElement('div');
+        viaMix.style.backgroundColor = `color-mix(in oklab, ${color} ${percentage}, transparent)`;
+        const viaSlash = document.createElement('div');
+        viaSlash.style.backgroundColor = `oklab(from ${color} l a b / ${alpha})`;
+        document.body.append(viaMix, viaSlash);
+
+        expect(computed(viaMix, 'background-color')).toBe(
+          computed(viaSlash, 'background-color'),
+        );
+
+        viaMix.remove();
+        viaSlash.remove();
+      }
     });
 
     it('applies a color-mix() as the background colour', () => {
@@ -90,15 +146,14 @@ describe('generated CSS applies in the browser', () => {
         />,
       ).getByTestId('Box');
 
-      // `#brand` cannot be decomposed into channels here, so its components
-      // companion is relative — `from color-mix(…) l c h` — and the browser
-      // resolves the channels before the `/ .5` alpha is applied.
-      expect(computed(el, '--brand-color-oklch')).toContain('from color-mix(');
+      // Opacity applies to the token's colour directly, so a colour the engine
+      // cannot decompose into channels needs nothing extra to fade.
+      expect(computed(el, '--brand-color')).toBe('color(srgb 0.5 0.5 0.5)');
 
       // Mid-grey at half alpha. Channel precision is up to the engine, so only
       // the lightness band and the alpha are asserted.
       const background = computed(el, 'background-color');
-      expect(background).toMatch(/^oklch\(0\.59\d+ /);
+      expect(background).toMatch(/^oklab\(0\.59\d+ /);
       expect(background).toMatch(/\/ 0\.5\)$/);
     });
 

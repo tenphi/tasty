@@ -1348,10 +1348,10 @@ describe('attribute mutual-exclusivity optimization', () => {
       clearPipelineCache();
       const result = renderStyles(buildFillMap(), '.x');
 
-      // The default uses the bare token; the waiting entry uses an oklch()
-      // opacity variant, so match `var(--purple-04-color)` exactly.
+      // The default uses the bare token; the waiting entry wraps the same
+      // token in `color-mix()`, so the declaration has to match exactly.
       const matches = result.filter((r) =>
-        r.declarations.includes('var(--purple-04-color)'),
+        r.declarations.includes('background-color: var(--purple-04-color);'),
       );
       // One variant (no exploded selector list): a single rule.
       expect(matches.length).toBe(1);

@@ -111,7 +111,7 @@ const List = tasty({
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:
 
 ```jsx
-fill: '#purple.5'  // → var(--purple-color) with 50% opacity
+fill: '#purple.5'  // → color-mix(in oklab, var(--purple-color) 50%, transparent)
 ```
 
 ### Modifier
@@ -133,10 +133,32 @@ Modifiers can also be exposed as top-level component props via `modProps` — se
 color: '#purple',           // Full opacity
 color: '#purple.5',         // 50% opacity
 color: '#purple.05',        // 5% opacity
+color: '#purple.$fade',     // Opacity from a custom property
 fill: '#current',           // → currentcolor
-fill: '#current.5',         // → color-mix(in oklab, currentcolor 50%, transparent)
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
+
+The suffix applies alpha to the token's color with `color-mix()`:
+
+```jsx
+fill: '#purple.5';
+// → color-mix(in oklab, var(--purple-color) 50%, transparent)
+```
+
+Mixing premultiplied against a fully transparent color leaves the channels
+untouched and sets the alpha, so the result is the same color a channel-level
+`/ <alpha>` would give — but it asks nothing of the color beyond *being* a color.
+That means the suffix works on every one of these:
+
+- a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
+  Tasty cannot convert — none of which have channels to decompose
+- `#current`, which resolves to `currentcolor`
+- a `--name-color` variable declared in your own CSS, with no Tasty token
+  definition and no companion variable behind it
+
+The mixing space is always `oklab`, whatever [`colorSpace`](configuration.md#color-space)
+is set to: alpha application is space-independent, and oklab is unbounded, so a
+wide-gamut color survives a round trip that `in srgb` would clamp.
 
 ---
 
@@ -158,7 +180,8 @@ shadow: '0 0 1x color-mix(in oklab, #dark 20%, transparent)',
 values of any type, so it is treated as a color only when its arguments are
 colors. `padding: 'light-dark(1x, 2x)'` still reaches the padding slot.
 
-A color token defined as one of these functions supports the opacity suffix too:
+A color token defined as one of these functions takes the
+[opacity suffix](#color-tokens--opacity) like any other:
 
 ```jsx
 const Card = tasty({
@@ -169,16 +192,21 @@ const Card = tasty({
 });
 ```
 
-For a [replace token](configuration.md#replace-tokens-parse-time-substitution),
-whose value is known while parsing, the suffix wraps the call — a derived
-function (`color-mix()`, `light-dark()`, `color-contrast()`,
-`contrast-color()`) has no alpha channel to write into:
+A [replace token](configuration.md#replace-tokens-parse-time-substitution) is
+substituted while parsing, so its color is right there to fade in place. A
+channel function takes the alpha after a slash; a derived function has no alpha
+channel, so it gets wrapped:
 
 ```jsx
-configure({ replaceTokens: { '#brand': 'light-dark(#dark, #light)' } });
+configure({
+  replaceTokens: {
+    '#solid': 'hsl(220 90% 50%)',
+    '#adaptive': 'light-dark(#dark, #light)',
+  },
+});
 
-fill: '#brand.5';
-// → color-mix(in oklab, light-dark(var(--dark-color), var(--light-color)) 50%, transparent)
+fill: '#solid.5';     // → hsl(220 90% 50% / .5)
+fill: '#adaptive.5';  // → color-mix(in oklab, light-dark(…) 50%, transparent)
 ```
 
 ---

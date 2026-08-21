@@ -42,10 +42,6 @@ export function getColorSpaceSuffix(): string {
   return currentColorSpace;
 }
 
-export function getColorSpaceFunc(): string {
-  return currentColorSpace;
-}
-
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
@@ -457,6 +453,34 @@ export function strToColorSpace(color: string): string | null | undefined {
   return result;
 }
 
+/**
+ * Apply an alpha value to a whole color.
+ *
+ * `color-mix()` against `transparent` is how opacity is applied to every color
+ * Tasty emits. Mixing premultiplied against a fully transparent color leaves the
+ * channels untouched and sets the alpha to the given percentage, so the result
+ * is the same color the equivalent `<func>(… / <alpha>)` would produce — but it
+ * needs nothing from the color except that it *is* a color. A `color-mix()`, a
+ * `light-dark()`, a `currentcolor`, a `--name-color` written by hand-authored
+ * CSS with no companion variable: all of them work, where writing into a channel
+ * slot requires components the engine may have no way to compute.
+ *
+ * The mixing space is always `oklab`, regardless of the configured
+ * {@link ColorSpace}: alpha application is space-independent, and oklab is
+ * unbounded, so a wide-gamut color survives the round trip that `in srgb` would
+ * clamp.
+ */
+export function mixColorAlpha(color: string, percentage: string): string {
+  return `color-mix(in oklab, ${color} ${percentage}, transparent)`;
+}
+
+/**
+ * Matches what {@link mixColorAlpha} builds, capturing the color and the alpha
+ * percentage so the two can be recovered separately.
+ */
+export const RE_ALPHA_MIX =
+  /^color-mix\(in oklab, (.+) ([^\s,]+), transparent\)$/;
+
 /** Channel names of each color space, in `<func>()` argument order. */
 const COLOR_SPACE_CHANNELS: Record<ColorSpace, string> = {
   rgb: 'r g b',
@@ -530,10 +554,18 @@ export function getColorSpaceComponents(color: string): string {
 export function convertColorChainToComponentChain(colorValue: string): string {
   const suffix = getColorSpaceSuffix();
 
-  // Handle func(var(--name-color-{suffix}) / alpha) pattern.
-  // When #name.opacity is parsed, the classifier produces e.g.
-  // oklch(var(--name-color-oklch) / .opacity).
-  // The component chain should be just the inner var() reference.
+  // Components carry no alpha, so an opacity wrapper is peeled off and the color
+  // underneath is converted instead. `#name.5` parses to
+  // `color-mix(in oklab, var(--name-color) 50%, transparent)`, whose components
+  // are simply `--name-color`'s.
+  const alphaMix = colorValue.match(RE_ALPHA_MIX);
+  if (alphaMix) {
+    return convertColorChainToComponentChain(alphaMix[1].trim());
+  }
+
+  // Handle the legacy `func(var(--name-color-{suffix}) / alpha)` form, which
+  // hand-written CSS and older cached values can still hold: the component chain
+  // is just the inner var() reference.
   const componentVarMatch = colorValue.match(
     /^(?:rgb|hsl|oklch)a?\(\s*(var\(--[a-z0-9-]+-color-(?:rgb|hsl|oklch)\))\s*\//,
   );

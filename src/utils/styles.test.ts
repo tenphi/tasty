@@ -1,4 +1,5 @@
-import { getRgbValuesFromRgbaString, strToRgb } from './styles';
+import { color } from './colors';
+import { getRgbValuesFromRgbaString, parseColor, strToRgb } from './styles';
 import { resetColorSpace, setColorSpace, strToColorSpace } from './color-space';
 
 describe('getRgbValuesFromRgbaString', () => {
@@ -131,5 +132,66 @@ describe('strToRgb', () => {
     expect(strToRgb('')).toBeUndefined();
     expect(strToRgb(null)).toBeUndefined();
     expect(strToRgb(undefined)).toBeUndefined();
+  });
+});
+
+describe('parseColor with the opacity wrapper', () => {
+  it('reads the name and the opacity through the color-mix() wrapper', () => {
+    // `#purple.5` parses to `color-mix(in oklab, var(--purple-color) 50%,
+    // transparent)`. The wrapper is the colour, but the name and the opacity
+    // belong to what it wraps.
+    const parsed = parseColor('#purple.5');
+
+    expect(parsed.color).toBe(
+      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+    );
+    expect(parsed.name).toBe('purple');
+    expect(parsed.opacity).toBe(50);
+  });
+
+  it('reports no opacity for a dynamic alpha', () => {
+    const parsed = parseColor('#purple.$fade');
+
+    expect(parsed.name).toBe('purple');
+    expect(parsed.opacity).toBeUndefined();
+  });
+
+  it('still reads a slash alpha off a static color function', () => {
+    expect(parseColor('rgb(255 0 0 / .25)').opacity).toBe(25);
+  });
+
+  it('does not name a color after an operand of a color function', () => {
+    const parsed = parseColor('color-mix(in oklab, #purple 50%, #red)');
+
+    expect(parsed.name).toBeUndefined();
+    expect(parsed.opacity).toBeUndefined();
+  });
+});
+
+describe('color() helper', () => {
+  it('returns the bare variable at full opacity', () => {
+    expect(color('purple')).toBe('var(--purple-color)');
+  });
+
+  it('fades the colour variable with color-mix()', () => {
+    expect(color('purple', 0.5)).toBe(
+      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+    );
+  });
+
+  it('does not leak float artifacts into the percentage', () => {
+    // 0.07 * 100 is 7.000000000000001 in IEEE 754.
+    expect(color('purple', 0.07)).toBe(
+      'color-mix(in oklab, var(--purple-color) 7%, transparent)',
+    );
+    expect(color('purple', 0.29)).toBe(
+      'color-mix(in oklab, var(--purple-color) 29%, transparent)',
+    );
+  });
+
+  it('keeps a genuinely fractional percentage', () => {
+    expect(color('purple', 0.025)).toBe(
+      'color-mix(in oklab, var(--purple-color) 2.5%, transparent)',
+    );
   });
 });

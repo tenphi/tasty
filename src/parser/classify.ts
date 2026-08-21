@@ -1,5 +1,5 @@
 import { getNamedColorHex } from '../utils/color-math';
-import { getColorSpaceFunc, getColorSpaceSuffix } from '../utils/color-space';
+import { mixColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 
@@ -21,8 +21,7 @@ import { Bucket } from './types';
 
 /**
  * Convert an opacity suffix (`.5`, `.05`, `.$disabled`) to the percentage
- * `color-mix()` needs. Used for colors that take no alpha channel of their own —
- * `currentcolor` and every function in `DERIVED_COLOR_FUNCS`.
+ * `color-mix()` needs.
  */
 function alphaSuffixToPercentage(rawAlpha: string): string {
   if (rawAlpha.startsWith('$')) {
@@ -34,9 +33,9 @@ function alphaSuffixToPercentage(rawAlpha: string): string {
   return `${parseFloat('.' + rawAlpha) * 100}%`;
 }
 
-/** Apply an opacity suffix to a color that has no alpha channel to write into. */
+/** Apply an opacity suffix to a color. */
 function mixAlpha(color: string, rawAlpha: string): string {
-  return `color-mix(in oklab, ${color} ${alphaSuffixToPercentage(rawAlpha)}, transparent)`;
+  return mixColorAlpha(color, alphaSuffixToPercentage(rawAlpha));
 }
 
 /**
@@ -422,19 +421,15 @@ export function classify(
     );
     if (alphaMatch) {
       const [, base, rawAlpha] = alphaMatch;
-      let alpha: string;
-      if (rawAlpha.startsWith('$')) {
-        // Custom property: $disabled -> var(--disabled)
-        const propName = rawAlpha.slice(1);
-        alpha = `var(--${propName})`;
-      } else if (rawAlpha === '0') {
-        alpha = '0';
-      } else {
-        alpha = `.${rawAlpha}`;
-      }
+
+      // Opacity composes onto the color variable itself, not onto its channel
+      // components. The token may hold anything a `<color>` can be — including a
+      // `color-mix()` or a `light-dark()` with no channels to decompose, or a
+      // value written straight into `--name-color` by hand-authored CSS with no
+      // companion at all — and `color-mix()` applies alpha to all of them.
       return {
         bucket: Bucket.Color,
-        processed: `${getColorSpaceFunc()}(var(--${base}-color-${getColorSpaceSuffix()}) / ${alpha})`,
+        processed: mixAlpha(`var(--${base}-color)`, rawAlpha),
       };
     }
 

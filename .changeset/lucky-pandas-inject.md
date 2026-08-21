@@ -34,6 +34,13 @@ layout effect or event handler, SSR, RSC — is written straight through as befo
 It covers more commits and accepts the measurement hazard above. Paint is
 unaffected in both modes: microtasks always drain before the browser paints.
 
+Safe to enable in shared code: SSR and RSC collect CSS as text, so the runtime
+injector never runs there and the provider is inert without a `document`.
+Zero-runtime `tastyStatic` styles are extracted at build time and never reach the
+injector, so they are unaffected too. Astro islands are separate React roots — in
+`true` mode a provider covers only its own island. See
+`docs/configuration.md#batched-injection`.
+
 New exports: `TastyBatchProvider`, `flushStyles()`, `hasPendingStyleWrites()`,
 `resetStyleBatch()`. Default is `false` — nothing changes unless you opt in.
 

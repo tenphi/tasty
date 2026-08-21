@@ -148,6 +148,38 @@ All writes share one FIFO queue — component rules, global rules, raw CSS,
 Draining it in insertion order keeps the sheet byte-identical to unbatched
 output, which matters because equal-specificity rules resolve by document order.
 
+### SSR, RSC and zero-runtime
+
+**Server render — nothing to batch, safe to leave enabled.** SSR and RSC collect
+CSS as text through `ServerStyleCollector`; the runtime injector never runs
+there, so `batchInjection` changes nothing either way. `<TastyBatchProvider>`
+renders its children and does nothing else: the window it opens is a no-op
+without a `document`, and the `useInsertionEffect` that would close it never
+fires on the server. Configure the flag once in shared code — no environment
+branching needed.
+
+**Hydration — the better your SSR coverage, the less there is to batch.**
+`hydrateTastyClasses()` (wired up for you by `@tenphi/tasty/ssr/next` and the
+Astro integration) pre-populates the injector from `window.__TASTY__`, so
+hydrating a server-rendered class is a cache hit that produces no sheet write at
+all. Batching pays off on what SSR could not cover: client-only routes, styles
+that first appear after hydration (a `styles` prop that changes on interaction, a
+modal or popover mounting), and dynamic tokens.
+
+**Astro islands — one provider per island, or `'always'`.** Every island is its
+own React root, so a provider inside one island does not open a window for
+another. With `batchInjection: true`, wrap each island root that renders enough
+tasty components to be worth it. `'always'` needs no provider and covers every
+island, at the cost of the measurement hazard above. Either way, an island that
+only re-hydrates server-rendered classes has nothing to batch.
+
+**Zero-runtime (`tastyStatic`) — unaffected.** Build-time extraction never
+touches the injector: the babel plugin emits either a CSS file import or an
+`injectCSS()` call from `@tenphi/tasty/static/inject`, which appends text to a
+single `<style data-tasty-static>` element. `batchInjection` only defers CSSOM
+writes made by the runtime injector, so extracted styles are unchanged. In an app
+that mixes both, it still applies to the runtime half.
+
 ### `flushStyles()`
 
 Applies every pending write immediately. Every injector read API

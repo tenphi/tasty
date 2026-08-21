@@ -121,8 +121,15 @@ export function hasPendingStyleWrites(): boolean {
  * Called during render on purpose: the window must be open before children
  * render. It is idempotent and carries no other side effect, and a render that
  * is thrown away is recovered by the microtask backstop.
+ *
+ * A no-op without a `document`. On the server there is no sheet to batch
+ * against, and `useInsertionEffect` never runs, so nothing would ever close a
+ * window this opened — the counter would climb for the life of the process and
+ * be shared by every concurrent request. Skipping it keeps the provider inert
+ * during SSR and RSC instead of merely harmless.
  */
 export function openBatchWindow(): void {
+  if (typeof document === 'undefined') return;
   openWindows++;
   everOpened = true;
 }

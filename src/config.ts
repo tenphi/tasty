@@ -161,7 +161,10 @@ export interface TastyConfig {
    *   microtasks run after the layout phase. Paint is unaffected: microtasks
    *   always drain before the browser paints.
    *
-   * No effect during SSR or in RSC, where there is no live sheet.
+   * No effect during SSR or RSC: styles are collected as text there, the
+   * runtime injector never runs, and the provider is inert without a
+   * `document`. No effect on zero-runtime `tastyStatic` styles either — those
+   * are extracted at build time and never reach the injector.
    *
    * @default false
    * @example

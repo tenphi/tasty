@@ -1,3 +1,4 @@
+import { colorFuncName } from '../parser/const';
 import { Lru } from '../parser/lru';
 import { resolveFunctionColor } from './function-color';
 
@@ -456,6 +457,34 @@ export function strToColorSpace(color: string): string | null | undefined {
   return result;
 }
 
+/** Channel names of the configured color space, in `<func>()` argument order. */
+function getColorSpaceChannels(): string {
+  switch (currentColorSpace) {
+    case 'rgb':
+      return 'r g b';
+    case 'hsl':
+      return 'h s l';
+    case 'oklch':
+      return 'l c h';
+  }
+}
+
+/**
+ * Express a color as components of the configured color space *by reference*,
+ * using CSS relative color syntax: `from <color> l c h`.
+ *
+ * Static colors are decomposed into numbers (see `getColorSpaceComponents`), but
+ * a color the engine cannot evaluate at build time — a `color-mix()`, a
+ * `light-dark()`, a `color()` in a space with no conversion, anything reached
+ * through `var()` — has no numbers to decompose. Handing back the relative form
+ * keeps the `--name-color-{space}` companion usable anyway: the browser resolves
+ * the channels, so `oklch(var(--name-color-oklch) / .5)` still applies opacity to
+ * whatever the color turns out to be.
+ */
+export function toRelativeColorSpaceComponents(color: string): string {
+  return `from ${color} ${getColorSpaceChannels()}`;
+}
+
 /**
  * Extract the decomposed components of a color in the configured color space.
  * Returns a space-separated string of components without the wrapping function.
@@ -486,6 +515,68 @@ export function getColorSpaceComponents(color: string): string {
   );
   componentsCache.set(color, result);
   return result;
+}
+
+/**
+ * Rewrite a color into the `--name-color-{space}` components that `#name.alpha`
+ * composes opacity onto.
+ *
+ * A `var()` chain is rewritten reference by reference so the fallback order
+ * survives; a color the engine can evaluate is decomposed into numbers; anything
+ * left — a derived color function, a `color()` in a space with no conversion —
+ * falls back to relative color syntax and lets the browser do it.
+ *
+ * Returns the input unchanged when there is nothing to rewrite, so callers can
+ * tell whether the conversion found anything.
+ *
+ * Example: `var(--primary-color, var(--secondary-color))`
+ *   → `var(--primary-color-oklch, var(--secondary-color-oklch))`
+ */
+export function convertColorChainToComponentChain(colorValue: string): string {
+  const suffix = getColorSpaceSuffix();
+
+  // Handle func(var(--name-color-{suffix}) / alpha) pattern.
+  // When #name.opacity is parsed, the classifier produces e.g.
+  // oklch(var(--name-color-oklch) / .opacity).
+  // The component chain should be just the inner var() reference.
+  const componentVarMatch = colorValue.match(
+    /^(?:rgb|hsl|oklch)a?\(\s*(var\(--[a-z0-9-]+-color-(?:rgb|hsl|oklch)\))\s*\//,
+  );
+  if (componentVarMatch) {
+    return componentVarMatch[1];
+  }
+
+  // A color function call is decomposed as a whole. Its arguments may hold
+  // var() references of their own, and those belong to the arguments — matching
+  // one below would substitute a single argument for the whole color, so a
+  // `color-mix()` would silently collapse to one of its operands.
+  if (colorFuncName(colorValue)) {
+    const components = getColorSpaceComponents(colorValue);
+
+    return components !== colorValue
+      ? components
+      : toRelativeColorSpaceComponents(colorValue);
+  }
+
+  // Match var(--name-color, ...) pattern
+  const varPattern = /var\(--([a-z0-9-]+)-color\s*(?:,\s*(.+))?\)/;
+  const match = colorValue.match(varPattern);
+
+  if (!match) {
+    // Not a color variable — try to convert to components
+    const components = getColorSpaceComponents(colorValue);
+    if (components !== colorValue) return components;
+    return colorValue;
+  }
+
+  const [, name, fallback] = match;
+
+  if (!fallback) {
+    return `var(--${name}-color-${suffix})`;
+  }
+
+  const processedFallback = convertColorChainToComponentChain(fallback.trim());
+  return `var(--${name}-color-${suffix}, ${processedFallback})`;
 }
 
 /**
@@ -523,7 +614,7 @@ export function colorInitialValueToComponents(
   return getDefaultComponents();
 }
 
-function getDefaultComponents(): string {
+export function getDefaultComponents(): string {
   switch (currentColorSpace) {
     case 'rgb':
       return '0 0 0';

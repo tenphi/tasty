@@ -1,9 +1,12 @@
+import { getNamedColorHex } from '../utils/color-math';
 import { getColorSpaceFunc, getColorSpaceSuffix } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 
 import {
   COLOR_FUNCS,
+  DERIVED_COLOR_FUNCS,
+  POLYMORPHIC_COLOR_FUNCS,
   RE_HEX,
   RE_NUMBER,
   RE_RAW_UNIT,
@@ -14,6 +17,40 @@ import {
 import { StyleParser } from './parser';
 import type { ParserOptions, ProcessedStyle } from './types';
 import { Bucket } from './types';
+
+/**
+ * Convert an opacity suffix (`.5`, `.05`, `.$disabled`) to the percentage
+ * `color-mix()` needs. Used for colors that take no alpha channel of their own —
+ * `currentcolor` and every function in `DERIVED_COLOR_FUNCS`.
+ */
+function alphaSuffixToPercentage(rawAlpha: string): string {
+  if (rawAlpha.startsWith('$')) {
+    // Custom property: $disabled -> calc(var(--disabled) * 100%)
+    return `calc(var(--${rawAlpha.slice(1)}) * 100%)`;
+  }
+  if (rawAlpha === '0') return '0%';
+  // Convert .5 -> 50%, .05 -> 5%
+  return `${parseFloat('.' + rawAlpha) * 100}%`;
+}
+
+/** Apply an opacity suffix to a color that has no alpha channel to write into. */
+function mixAlpha(color: string, rawAlpha: string): string {
+  return `color-mix(in oklab, ${color} ${alphaSuffixToPercentage(rawAlpha)}, transparent)`;
+}
+
+/**
+ * Whether parsed function arguments hold a color. Colors reach either the color
+ * bucket (`#token`, a nested color function, `transparent`) or — for the CSS
+ * named colors, which the parser has no token syntax for — the modifier bucket.
+ */
+function hasColorArgs(parsed: ProcessedStyle): boolean {
+  const namedColors = getNamedColorHex();
+
+  return parsed.groups.some(
+    (group) =>
+      group.colors.length > 0 || group.mods.some((mod) => namedColors.has(mod)),
+  );
+}
 
 /**
  * Re-parses a value through the parser until it stabilizes (no changes)
@@ -160,21 +197,9 @@ export function classify(
     /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
   );
   if (currentAlphaMatch) {
-    const rawAlpha = currentAlphaMatch[1];
-    let percentage: string;
-    if (rawAlpha.startsWith('$')) {
-      // Custom property: $disabled -> calc(var(--disabled) * 100%)
-      const propName = rawAlpha.slice(1);
-      percentage = `calc(var(--${propName}) * 100%)`;
-    } else if (rawAlpha === '0') {
-      percentage = '0%';
-    } else {
-      // Convert .5 -> 50%, .05 -> 5%
-      percentage = `${parseFloat('.' + rawAlpha) * 100}%`;
-    }
     return {
       bucket: Bucket.Color,
-      processed: `color-mix(in oklab, currentcolor ${percentage}, transparent)`,
+      processed: mixAlpha('currentcolor', currentAlphaMatch[1]),
     };
   }
 
@@ -222,6 +247,22 @@ export function classify(
             if (funcMatch) {
               const [, funcName, args] = funcMatch;
               const lowerFunc = funcName.toLowerCase();
+
+              // A derived color function (color-mix, light-dark, …) has no alpha
+              // channel to write into, so opacity wraps the whole call the same
+              // way `#current.5` does.
+              if (DERIVED_COLOR_FUNCS.has(lowerFunc)) {
+                const resolved = classify(
+                  foldDslCase(resolvedValue),
+                  opts,
+                  recurse,
+                );
+
+                return {
+                  bucket: Bucket.Color,
+                  processed: mixAlpha(resolved.processed, rawAlpha),
+                };
+              }
               const isCustomFunc = !!(
                 opts.functions &&
                 lowerFunc in opts.functions &&
@@ -420,11 +461,19 @@ export function classify(
 
     if (COLOR_FUNCS.has(fname)) {
       // Process inner to expand nested colors or units.
-      const argProcessed = recurse(inner).output.replace(/,\s+/g, ','); // color funcs expect no spaces after commas
-      return {
-        bucket: Bucket.Color,
-        processed: `${canonicalFuncName(fname)}(${argProcessed})`,
-      };
+      const parsedInner = recurse(inner);
+      const argProcessed = parsedInner.output.replace(/,\s+/g, ','); // color funcs expect no spaces after commas
+      const processed = `${canonicalFuncName(fname)}(${argProcessed})`;
+      // `light-dark()` is not color-only — CSS lets it pick between values of
+      // any type — so bucket it by what it actually holds. Otherwise
+      // `padding: 'light-dark(1x, 2x)'` would land in the color slot and the
+      // padding handler would emit its default instead.
+      const bucket =
+        POLYMORPHIC_COLOR_FUNCS.has(fname) && !hasColorArgs(parsedInner)
+          ? Bucket.Value
+          : Bucket.Color;
+
+      return { bucket, processed };
     }
 
     // user function (provided via opts)

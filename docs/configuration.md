@@ -94,6 +94,8 @@ configure({
 
 The `oklch` color space is the default because it provides perceptually uniform color manipulation — alpha fading and color mixing produce more natural-looking results.
 
+A color the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a `color()` in a space it has no conversion for — has no channels to decompose, so its components companion is expressed *by reference* using CSS relative color syntax (`--name-color-oklch: from color-mix(…) l c h`). The opacity suffix keeps working; the browser resolves the channels.
+
 ---
 
 ## Name Prefix

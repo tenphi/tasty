@@ -1352,3 +1352,142 @@ describe('#current color token', () => {
     warnSpy.mockRestore();
   });
 });
+
+describe('Modern color functions', () => {
+  // Import inline to avoid circular dependency issues at module load time
+  let setGlobalPredefinedTokens: (tokens: Record<string, string>) => void;
+  let resetGlobalPredefinedTokens: () => void;
+
+  beforeAll(async () => {
+    const styles = await vi.importActual<any>('../utils/styles');
+    setGlobalPredefinedTokens = styles.setGlobalPredefinedTokens;
+    resetGlobalPredefinedTokens = styles.resetGlobalPredefinedTokens;
+  });
+
+  beforeEach(() => {
+    resetGlobalPredefinedTokens();
+  });
+
+  afterEach(() => {
+    resetGlobalPredefinedTokens();
+  });
+
+  test('color-mix() is a color and expands the tokens inside it', () => {
+    const result = parser.process('color-mix(in oklab, #purple 50%, #red)');
+
+    expect(result.groups[0].colors).toEqual([
+      'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
+    ]);
+  });
+
+  test('light-dark() holding colors is a color', () => {
+    const result = parser.process('light-dark(#light, #dark)');
+
+    expect(result.groups[0].colors).toEqual([
+      'light-dark(var(--light-color),var(--dark-color))',
+    ]);
+  });
+
+  test('light-dark() holding CSS named colors is a color', () => {
+    const result = parser.process('light-dark(white, rebeccapurple)');
+
+    expect(result.groups[0].colors).toEqual([
+      'light-dark(white,rebeccapurple)',
+    ]);
+  });
+
+  test('light-dark() holding lengths stays a value', () => {
+    // CSS lets light-dark() pick between values of any type, so bucketing it as
+    // a color unconditionally would hide `padding: 'light-dark(1x, 2x)'` from
+    // the padding handler.
+    const result = parser.process('light-dark(1x, 2x)');
+
+    expect(result.groups[0].values).toEqual(['light-dark(8px,16px)']);
+    expect(result.groups[0].colors).toEqual([]);
+  });
+
+  test('contrast-color() is a color', () => {
+    const result = parser.process('contrast-color(#purple)');
+
+    expect(result.groups[0].colors).toEqual([
+      'contrast-color(var(--purple-color))',
+    ]);
+  });
+
+  test('color-contrast() is a color', () => {
+    const result = parser.process('color-contrast(#purple vs #light, #dark)');
+
+    expect(result.groups[0].colors).toEqual([
+      'color-contrast(var(--purple-color) vs var(--light-color),var(--dark-color))',
+    ]);
+  });
+
+  test('color() is a color', () => {
+    const result = parser.process('color(display-p3 1 .5 0)');
+
+    expect(result.groups[0].colors).toEqual(['color(display-p3 1 .5 0)']);
+  });
+
+  test('relative color syntax is a color and expands its origin token', () => {
+    const result = parser.process('oklch(from #purple l c h / 50%)');
+
+    expect(result.groups[0].colors).toEqual([
+      'oklch(from var(--purple-color) l c h / 50%)',
+    ]);
+  });
+
+  test('a color function nested in another one is expanded', () => {
+    const result = parser.process(
+      'color-mix(in oklab, light-dark(#light, #dark) 30%, #current)',
+    );
+
+    expect(result.groups[0].colors).toEqual([
+      'color-mix(in oklab,light-dark(var(--light-color),var(--dark-color)) 30%,currentcolor)',
+    ]);
+  });
+
+  test('opacity suffix on a color-mix() token wraps it in color-mix()', () => {
+    // A derived color function has no alpha channel to write into, so the
+    // `oklch(… / .5)` treatment used for channel functions cannot apply.
+    setGlobalPredefinedTokens({
+      '#mixed-brand': 'color-mix(in oklab, #purple 50%, #red)',
+    });
+
+    const result = parser.process('#mixed-brand.5');
+
+    expect(result.output).toBe(
+      'color-mix(in oklab, color-mix(in oklab,var(--purple-color) 50%,var(--red-color)) 50%, transparent)',
+    );
+    expect(result.groups[0].colors).toEqual([result.output]);
+  });
+
+  test('opacity suffix on a light-dark() token wraps it in color-mix()', () => {
+    setGlobalPredefinedTokens({
+      '#dual-theme': 'light-dark(#light, #dark)',
+    });
+
+    expect(parser.process('#dual-theme.05').output).toBe(
+      'color-mix(in oklab, light-dark(var(--light-color),var(--dark-color)) 5%, transparent)',
+    );
+  });
+
+  test('$prop opacity suffix on a derived color token', () => {
+    setGlobalPredefinedTokens({
+      '#dual-theme': 'light-dark(#light, #dark)',
+    });
+
+    expect(parser.process('#dual-theme.$disabled').output).toBe(
+      'color-mix(in oklab, light-dark(var(--light-color),var(--dark-color)) calc(var(--disabled) * 100%), transparent)',
+    );
+  });
+
+  test('opacity suffix on a color() token uses its alpha channel', () => {
+    setGlobalPredefinedTokens({
+      '#wide-gamut': 'color(display-p3 1 .5 0)',
+    });
+
+    expect(parser.process('#wide-gamut.5').output).toBe(
+      'color(display-p3 1 .5 0 / .5)',
+    );
+  });
+});

@@ -1,23 +1,19 @@
-import { getColorSpaceSuffix } from '../utils/color-space';
+import {
+  convertColorChainToComponentChain,
+  getColorSpaceSuffix,
+} from '../utils/color-space';
 import { parseColor, resolveCustomProperties } from '../utils/styles';
-
-import { convertColorChainToComponentChain } from './createStyle';
 
 export function colorStyle({ color }: { color?: string | boolean }) {
   if (!color) return null;
 
   if (color === true) color = 'currentColor';
 
-  if (
-    typeof color === 'string' &&
-    (color.startsWith('#') || color.startsWith('(#'))
-  ) {
-    color = parseColor(color).color || color;
-  } else if (typeof color === 'string') {
-    // Non-token values are emitted verbatim, so `$name` references still need
-    // substituting — otherwise the raw DSL leaks into the declaration.
-    color = resolveCustomProperties(color);
-  }
+  // Resolve whatever the parser recognizes as a color — a `#token`, a fallback
+  // chain, a color function with tokens inside it. Anything else (a keyword, a
+  // bare `$name`) is emitted verbatim, so references still need substituting or
+  // the raw DSL leaks into the declaration.
+  color = parseColor(color, true).color || resolveCustomProperties(color);
 
   const match = color.match(/var\(--(.+?)-color/);
   let name = '';

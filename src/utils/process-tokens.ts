@@ -2,7 +2,11 @@ import type { Tokens, TokenValue } from '../types';
 
 import type { CSSProperties } from './css-types';
 
-import { getColorSpaceComponents, getColorSpaceSuffix } from './color-space';
+import {
+  convertColorChainToComponentChain,
+  getColorSpaceComponents,
+  getColorSpaceSuffix,
+} from './color-space';
 import { normalizeDslName } from './string';
 import { normalizeColorTokenValue, parseStyle } from './styles';
 
@@ -19,14 +23,6 @@ function extractColorSpaceValue(
   colorValue: string,
   parsedOutput: string,
 ): string {
-  const suffix = getColorSpaceSuffix();
-
-  // If the parsed output references a color variable, use the companion variant
-  const varMatch = parsedOutput.match(/var\(--([a-z0-9-]+)-color\)/);
-  if (varMatch) {
-    return `var(--${varMatch[1]}-color-${suffix})`;
-  }
-
   // Try the parsed (replace-token-substituted) output first, then the raw
   // original. Using the parsed output ensures replaceTokens like `$hue` ->
   // `var(--hue)` are substituted before component extraction; the original is
@@ -36,6 +32,13 @@ function extractColorSpaceValue(
 
   const components = getColorSpaceComponents(colorValue);
   if (components !== colorValue) return components;
+
+  // Nothing decomposes as a whole, so rewrite it reference by reference: a
+  // `var()` chain keeps its fallback order, and a color the engine cannot
+  // evaluate — a `color-mix()`, a `light-dark()` — defers to the browser
+  // through relative color syntax.
+  const chain = convertColorChainToComponentChain(parsedOutput);
+  if (chain !== parsedOutput) return chain;
 
   // Fallback: return the parsed output
   return parsedOutput;

@@ -47,6 +47,12 @@ When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallb
 
 This applies to all color fallback syntaxes, including nested fallbacks and literal values.
 
+A color the engine cannot evaluate at build time — a `color-mix()`, a
+`light-dark()`, a `color()` in a space it has no conversion for — has no channels
+to decompose, so the companion is expressed *by reference* with CSS relative
+color syntax: `--brand-color-oklch: from color-mix(…) l c h`. `#brand.5` then
+still resolves, with the browser working out the channels.
+
 ---
 
 ## 2. Public API
@@ -144,7 +150,7 @@ Each `StyleParser` instance maintains its own LRU cache.
 | 1     | URL – `url(` opens `inUrl`; everything to its `)` is a single token.                       | value    |
 | 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. An ident ending in `-color` is filed under both buckets (see note below). | value / color+value |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |
-| 4     | Color function – name in list §12.2 followed by `(` (balanced).                            | color    |
+| 4     | Color function – name in list §12.2 followed by `(` (balanced). `light-dark()` is a color only when its arguments hold one, otherwise a value. | color / value |
 | 5     | User / other function – `ident(` not in color list; parse args recursively, hand off to `funcs[name]` if provided; else rebuild with processed args. | value    |
 | 6     | Color fallback – `(#name, fallback)` → `var(--name-color, <processed fallback>)`. Supports unlimited nesting. Fallback can be another color token, nested color fallback, hex literal, or CSS color function. | color    |
 | 7     | Custom property fallback – `($ident, fallback)` → `var(--ident, <processed fallback>)`. If the ident ends with `-color` it is filed under **both** buckets (see §5 note), otherwise value. | color+value/value |
@@ -175,7 +181,7 @@ group (`border`, `outline`) must place such a reference once, not in both slots.
 | Color fallback           | `(#name, fallback)` → `var(--name-color, <processed fallback>)`<br>Fallback is recursively processed, supporting unlimited nesting: `(#a, (#b, #c))` → `var(--a-color, var(--b-color, var(--c-color)))`. |
 | Custom property          | `$ident` → `var(--ident)` \| `($ident,fallback)` → `var(--ident, <processed fallback>)`<br>If ident ends with `-color`, filed under both the color and value buckets. |
 | Hash colors              | As in §5-3.                                                                                 |
-| Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.                     |
+| Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.<br>An opacity suffix on a token resolving to a *derived* color function wraps the call: `#brand.5` → `color-mix(in oklab, <color> 50%, transparent)`. |
 | User functions           | If `funcs[name]` exists → call with parsed arg-`StyleDetails[]`, use return string.<br>Else rebuild `ident(<processed args>)`. |
 
 ---
@@ -240,10 +246,25 @@ none auto max-content min-content fit-content
 
 ### 12.2 Recognized color functions
 
+Channel functions — the arguments *are* the color, so an opacity suffix on a
+token resolving to one of them is appended after a slash:
+
 ```
-rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray color-mix color-contrast
+rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray
 ```
+
+Derived functions — they build a color out of other colors and take no alpha
+channel, so an opacity suffix wraps the whole call in `color-mix()`:
+
+```
+color-mix color-contrast contrast-color light-dark
+```
+
 (case-insensitive)
+
+`light-dark()` is *polymorphic*: CSS lets it pick between values of any type, so
+it is filed as a color only when its arguments hold one — `light-dark(#dark,
+#light)` is a color, `light-dark(1x, 2x)` is a value.
 
 ### 12.3 CSS number (without exponent)
 
@@ -269,6 +290,10 @@ rgb rgba hsl hsla hwb lab lch oklab oklch color device-cmyk gray color-mix color
 | `(#primary, (#secondary, #tertiary))` | `var(--primary-color, var(--secondary-color, var(--tertiary-color)))` (nested fallbacks). |
 | `(#theme, #fff)`              | `var(--theme-color, var(--fff-color, #fff))` (fallback with hex literal).      |
 | `(#bg, rgb(255 0 0))`         | `var(--bg-color, rgb(255 0 0))` (fallback with CSS function).                  |
+| `color-mix(in oklab, #a 50%, #b)` | Color; tokens inside are expanded.                                        |
+| `light-dark(#dark, #light)`   | Color (arguments hold colors).                                                 |
+| `light-dark(1x, 2x)`          | Value (arguments hold lengths).                                                |
+| `oklch(from #a l c h / 50%)`  | Color; relative color syntax with the origin token expanded.                    |
 | `($123invalid, fallback)`     | `calc($123invalid, fallback)` (invalid name → auto-calc).                      |
 | Excess spaces/newlines         | Collapsed in output.                                                            |
 | `+2r, 1e3x`                    | Invalid → modifiers.                                                            |

@@ -15,6 +15,16 @@ import {
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
+export interface FormatPropertyOptions {
+  /**
+   * Whether a CSS property name is already registered. The components companion
+   * of a color property is skipped when it is — the caller registered it from
+   * its own declaration, and a second rule with the default `<number>+` syntax
+   * would come later in the sheet and override it.
+   */
+  isPropertyDefined?: (cssName: string) => boolean;
+}
+
 /**
  * Format a single @property rule as a CSS string.
  *
@@ -25,6 +35,7 @@ import { parseStyle } from '../utils/styles';
 export function formatPropertyCSS(
   token: string,
   definition: PropertyDefinition,
+  options?: FormatPropertyOptions,
 ): string {
   const result = getEffectiveDefinition(token, definition);
   if (!result.isValid) return '';
@@ -36,16 +47,19 @@ export function formatPropertyCSS(
   if (result.isColor) {
     const suffix = getColorSpaceSuffix();
     const componentCssName = `${result.cssName}-${suffix}`;
-    const componentInitial = colorInitialValueToComponents(
-      result.definition.initialValue,
-    );
-    rules.push(
-      buildPropertyRule(componentCssName, {
-        syntax: getComponentPropertySyntax(),
-        inherits: result.definition.inherits,
-        initialValue: componentInitial,
-      }),
-    );
+
+    if (!options?.isPropertyDefined?.(componentCssName)) {
+      const componentInitial = colorInitialValueToComponents(
+        result.definition.initialValue,
+      );
+      rules.push(
+        buildPropertyRule(componentCssName, {
+          syntax: getComponentPropertySyntax(),
+          inherits: result.definition.inherits,
+          initialValue: componentInitial,
+        }),
+      );
+    }
   }
 
   return rules.join('\n');

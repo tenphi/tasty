@@ -338,6 +338,76 @@ describe('processTokens', () => {
     });
   });
 
+  describe('derived color functions', () => {
+    // A color the engine cannot evaluate at build time has no channels to
+    // decompose, so the `--name-color-{space}` companion is expressed by
+    // reference with CSS relative color syntax. `#name.alpha` then composes
+    // opacity onto whatever the browser resolves the color to.
+    it('expresses a color-mix() token companion by reference', () => {
+      const result = processTokens({
+        '#brand': 'color-mix(in oklab, #purple 50%, #red)',
+      });
+
+      expect(result!['--brand-color']).toBe(
+        'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
+      );
+      expect(result!['--brand-color-rgb']).toBe(
+        'from color-mix(in oklab,var(--purple-color) 50%,var(--red-color)) r g b',
+      );
+    });
+
+    it('expresses a light-dark() token companion by reference', () => {
+      const result = processTokens({
+        '#surface': 'light-dark(#light, #dark)',
+      });
+
+      expect(result!['--surface-color']).toBe(
+        'light-dark(var(--light-color),var(--dark-color))',
+      );
+      expect(result!['--surface-color-rgb']).toBe(
+        'from light-dark(var(--light-color),var(--dark-color)) r g b',
+      );
+    });
+
+    it('expresses a color() token companion by reference', () => {
+      // display-p3 has no conversion here, so there are no numbers to emit.
+      const result = processTokens({
+        '#wide': 'color(display-p3 1 0.5 0)',
+      });
+
+      expect(result!['--wide-color-rgb']).toBe(
+        'from color(display-p3 1 0.5 0) r g b',
+      );
+    });
+
+    it('does not mistake an argument of a color function for the token color', () => {
+      configure({ colorSpace: 'oklch' });
+
+      const result = processTokens({
+        '#brand': 'color-mix(in oklab, #purple 50%, #red)',
+      });
+
+      // The `var(--purple-color)` inside the mix is an operand, not the token's
+      // own color — reading it as one would collapse the mix to purple.
+      expect(result!['--brand-color-oklch']).not.toBe(
+        'var(--purple-color-oklch)',
+      );
+    });
+
+    it('keeps the whole fallback chain in the companion', () => {
+      const result = processTokens({
+        '#brand': '(#primary, #fallback)',
+      });
+
+      expect(result!['--brand-color']).toBe(
+        'var(--primary-color, var(--fallback-color))',
+      );
+      expect(result!['--brand-color-rgb']).toBe(
+        'var(--primary-color-rgb, var(--fallback-color-rgb))',
+      );
+    });
+  });
+
   describe('boolean color token values', () => {
     it('converts boolean true to transparent for color tokens', () => {
       const result = processTokens({

@@ -226,6 +226,52 @@ describe('PropertyTypeResolver', () => {
     });
   });
 
+  describe('color components companion', () => {
+    it('registers a components companion expressed by reference as `*`', () => {
+      // `--brand-color` alone would type the companion `<number>+`, and the
+      // engine would then drop a relative-color value for the initial one.
+      resolver.scanDeclarations(
+        '--brand-color: color-mix(in oklab, red 50%, blue); ' +
+          '--brand-color-oklch: from color-mix(in oklab, red 50%, blue) l c h',
+        isPropertyDefined,
+        registerProperty,
+      );
+
+      expect(registered.get('--brand-color-oklch')).toEqual({
+        syntax: '*',
+        initialValue: '0 0 0',
+      });
+      expect(registered.get('--brand-color')?.syntax).toBe('<color>');
+    });
+
+    it('leaves the companion of an explicitly declared color alone', () => {
+      registered.set('--brand-color', {
+        syntax: '<color>',
+        initialValue: 'transparent',
+      });
+
+      resolver.scanDeclarations(
+        '--brand-color: color-mix(in oklab, red 50%, blue); ' +
+          '--brand-color-oklch: from color-mix(in oklab, red 50%, blue) l c h',
+        isPropertyDefined,
+        registerProperty,
+      );
+
+      expect(registered.has('--brand-color-oklch')).toBe(false);
+    });
+
+    it('leaves a numeric components companion to the color sibling', () => {
+      resolver.scanDeclarations(
+        '--brand-color: rgb(255 0 0); --brand-color-rgb: 255 0 0',
+        isPropertyDefined,
+        registerProperty,
+      );
+
+      // Registered by `injector.property()` for `--brand-color`, not here.
+      expect(registered.has('--brand-color-rgb')).toBe(false);
+    });
+  });
+
   describe('line-height name-based inference', () => {
     it('should register --line-height with var() as <number> | <length-percentage>', () => {
       resolver.scanDeclarations(

@@ -140,6 +140,49 @@ color: '(#primary, #secondary)',  // Fallback syntax
 
 ---
 
+## CSS Color Functions
+
+Every CSS color function is recognized as a color, so it lands in the color slot
+of whichever style property you use it in — and tokens inside it are expanded:
+
+```jsx
+fill: 'color-mix(in oklab, #primary 50%, #surface)',
+color: 'light-dark(#dark, #light)',
+color: 'contrast-color(#primary)',
+fill: 'color(display-p3 1 .5 0)',
+border: '1bw solid oklch(from #primary l c h / 50%)',  // relative color syntax
+shadow: '0 0 1x color-mix(in oklab, #dark 20%, transparent)',
+```
+
+`light-dark()` is the one exception to "always a color": CSS lets it pick between
+values of any type, so it is treated as a color only when its arguments are
+colors. `padding: 'light-dark(1x, 2x)'` still reaches the padding slot.
+
+A color token defined as one of these functions supports the opacity suffix too:
+
+```jsx
+const Card = tasty({
+  styles: {
+    '#brand': 'color-mix(in oklab, #primary 50%, #surface)',
+    fill: '#brand.5',
+  },
+});
+```
+
+For a [replace token](configuration.md#replace-tokens-parse-time-substitution),
+whose value is known while parsing, the suffix wraps the call — a derived
+function (`color-mix()`, `light-dark()`, `color-contrast()`,
+`contrast-color()`) has no alpha channel to write into:
+
+```jsx
+configure({ replaceTokens: { '#brand': 'light-dark(#dark, #light)' } });
+
+fill: '#brand.5';
+// → color-mix(in oklab, light-dark(var(--dark-color), var(--light-color)) 50%, transparent)
+```
+
+---
+
 ## Built-in Units
 
 | Unit | Description | Example | CSS Output |

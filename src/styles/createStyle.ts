@@ -1,4 +1,6 @@
+import { colorFuncName } from '../parser/const';
 import {
+  convertColorChainToComponentChain,
   getColorSpaceComponents,
   getColorSpaceSuffix,
   strToColorSpace,
@@ -17,46 +19,6 @@ import type {
 } from '../utils/styles';
 
 const CACHE: Record<string, StyleHandler> = {};
-
-/**
- * Convert color fallback chain to component fallback chain.
- * Example: var(--primary-color, var(--secondary-color))
- *   → var(--primary-color-oklch, var(--secondary-color-oklch))
- */
-export function convertColorChainToComponentChain(colorValue: string): string {
-  const suffix = getColorSpaceSuffix();
-
-  // Handle func(var(--name-color-{suffix}) / alpha) pattern.
-  // When #name.opacity is parsed, the classifier produces e.g.
-  // oklch(var(--name-color-oklch) / .opacity).
-  // The component chain should be just the inner var() reference.
-  const componentVarMatch = colorValue.match(
-    /^(?:rgb|hsl|oklch)a?\(\s*(var\(--[a-z0-9-]+-color-(?:rgb|hsl|oklch)\))\s*\//,
-  );
-  if (componentVarMatch) {
-    return componentVarMatch[1];
-  }
-
-  // Match var(--name-color, ...) pattern
-  const varPattern = /var\(--([a-z0-9-]+)-color\s*(?:,\s*(.+))?\)/;
-  const match = colorValue.match(varPattern);
-
-  if (!match) {
-    // Not a color variable — try to convert to components
-    const components = getColorSpaceComponents(colorValue);
-    if (components !== colorValue) return components;
-    return colorValue;
-  }
-
-  const [, name, fallback] = match;
-
-  if (!fallback) {
-    return `var(--${name}-color-${suffix})`;
-  }
-
-  const processedFallback = convertColorChainToComponentChain(fallback.trim());
-  return `var(--${name}-color-${suffix}, ${processedFallback})`;
-}
 
 export function createStyle(
   styleName: string,
@@ -142,6 +104,18 @@ export function createStyle(
             [finalCssStyle]: colorSpaceStr,
             [`${finalCssStyle}-${suffix}`]:
               getColorSpaceComponents(colorSpaceStr),
+          };
+        }
+
+        // A color with no token name of its own — a `color-mix()`, a
+        // `light-dark()`, any derived color function — still needs its
+        // components companion, or `#name.alpha` on the token would compose
+        // opacity onto nothing.
+        if (color && colorFuncName(color)) {
+          return {
+            [finalCssStyle]: color,
+            [`${finalCssStyle}-${suffix}`]:
+              convertColorChainToComponentChain(color),
           };
         }
 

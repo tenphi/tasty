@@ -68,6 +68,40 @@ describe('generated CSS applies in the browser', () => {
       expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
     });
 
+    it('applies a color-mix() as the background colour', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ fill: 'color-mix(in srgb, #black 50%, #white)' }} />,
+      ).getByTestId('Box');
+
+      // Half black, half white. Only reaches the engine intact if the parser
+      // filed the whole call in the colour slot — commas and all.
+      expect(computed(el, 'background-color')).toBe('color(srgb 0.5 0.5 0.5)');
+    });
+
+    it('applies opacity to a derived-colour token', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            '#brand': 'color-mix(in srgb, #black 50%, #white)',
+            fill: '#brand.5',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      // `#brand` cannot be decomposed into channels here, so its components
+      // companion is relative — `from color-mix(…) l c h` — and the browser
+      // resolves the channels before the `/ .5` alpha is applied.
+      expect(computed(el, '--brand-color-oklch')).toContain('from color-mix(');
+
+      // Mid-grey at half alpha. Channel precision is up to the engine, so only
+      // the lightness band and the alpha are asserted.
+      const background = computed(el, 'background-color');
+      expect(background).toMatch(/^oklch\(0\.59\d+ /);
+      expect(background).toMatch(/\/ 0\.5\)$/);
+    });
+
     it('registers design tokens as inherited custom properties', () => {
       render(<div />);
 

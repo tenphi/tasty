@@ -828,6 +828,29 @@ describe('collectAutoInferredProperties', () => {
     expect(css).not.toContain('@property --angle');
   });
 
+  it('types a components companion expressed by reference as `*` once', () => {
+    const collector = new ServerStyleCollector();
+
+    collectAutoInferredProperties(
+      [
+        {
+          selector: '',
+          declarations:
+            '--brand-color: color-mix(in oklab, red 50%, blue); ' +
+            '--brand-color-oklch: from color-mix(in oklab, red 50%, blue) l c h',
+        },
+      ],
+      collector,
+    );
+
+    const css = collector.getCSS();
+    // A second companion rule with the default `<number>+` syntax would come
+    // later in the sheet and make the engine drop the relative value.
+    expect(css).toContain('@property --brand-color-oklch');
+    expect(css).not.toContain('"<number>+"');
+    expect(css).toContain('"*"');
+  });
+
   it('handles multiple properties in a single declaration block', () => {
     const collector = new ServerStyleCollector();
 

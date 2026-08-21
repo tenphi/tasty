@@ -11,6 +11,7 @@ import { outlineStyle } from './styles/outline';
 import { paddingStyle } from './styles/padding';
 import { presetStyle } from './styles/preset';
 import { radiusStyle } from './styles/radius';
+import { shadowStyle } from './styles/shadow';
 
 describe('Tasty style tests', () => {
   beforeEach(() => {
@@ -532,6 +533,82 @@ describe('Tasty style tests', () => {
           'var(--placeholder-color, var(--dark-04-color))',
         '--local-placeholder-color-rgb':
           'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
+      });
+    });
+  });
+
+  describe('Modern color functions', () => {
+    const MIX = 'color-mix(in oklab, #purple 50%, #red)';
+    const MIX_CSS =
+      'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))';
+    const THEME = 'light-dark(#light, #dark)';
+    const THEME_CSS = 'light-dark(var(--light-color),var(--dark-color))';
+
+    it('fills with color-mix()', () => {
+      expect(fillStyle({ fill: MIX })).toEqual({
+        'background-color': MIX_CSS,
+      });
+    });
+
+    it('fills with light-dark()', () => {
+      expect(fillStyle({ fill: THEME })).toEqual({
+        'background-color': THEME_CSS,
+      });
+    });
+
+    it('fills with contrast-color()', () => {
+      expect(fillStyle({ fill: 'contrast-color(#purple)' })).toEqual({
+        'background-color': 'contrast-color(var(--purple-color))',
+      });
+    });
+
+    it('takes a color function as the border color', () => {
+      expect(borderStyle({ border: `2bw solid ${THEME}` })).toEqual({
+        border: `2px solid ${THEME_CSS}`,
+      });
+    });
+
+    it('takes a color function as the outline color', () => {
+      expect(outlineStyle({ outline: `1ow dashed ${MIX}` })).toEqual({
+        outline: `3px dashed ${MIX_CSS}`,
+      });
+    });
+
+    it('keeps a color function whole in a shadow layer', () => {
+      // The commas belong to the color function, not to the shadow layer list.
+      expect(shadowStyle({ shadow: `0 0 4px ${MIX}` })).toEqual({
+        'box-shadow': ` 0 0 4px ${MIX_CSS}`,
+      });
+    });
+
+    it('still splits shadow layers around a color function', () => {
+      expect(
+        shadowStyle({ shadow: `0 0 4px ${MIX}, inset 0 1px 2px #dark` }),
+      ).toEqual({
+        'box-shadow': ` 0 0 4px ${MIX_CSS},inset 0 1px 2px var(--dark-color)`,
+      });
+    });
+
+    it('resolves the tokens inside a color function for `color`', () => {
+      expect(colorStyle({ color: THEME })).toEqual({
+        color: THEME_CSS,
+        '--current-color': THEME_CSS,
+        '--current-color-rgb': `from ${THEME_CSS} r g b`,
+      });
+    });
+
+    it('emits a components companion for a derived color token', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': MIX })).toEqual({
+        '--brand-color': MIX_CSS,
+        '--brand-color-rgb': `from ${MIX_CSS} r g b`,
+      });
+    });
+
+    it('keeps a light-dark() of lengths out of the color slot', () => {
+      expect(paddingStyle({ padding: 'light-dark(1x, 2x)' })).toEqual({
+        padding: 'light-dark(8px,16px)',
       });
     });
   });

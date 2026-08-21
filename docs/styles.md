@@ -254,6 +254,7 @@ Background color with design token support. Preferred over `backgroundColor` and
 | `"#purple.10"` | Token color at 10% opacity |
 | `"#surface #primary.10"` | Background `#surface` with `#primary.10` overlay (two colors enable smooth transitions between both) |
 | `"rgb(255 128 0)"` | CSS color value |
+| `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 | `true` | Default fill color |
 
 When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. The overlay is only applied when no explicit `image` or `backgroundImage` is set.
@@ -286,6 +287,7 @@ Text color with design token support.
 | `"#current"` | Current inherited color |
 | `"#current.5"` | Current inherited color at 50% opacity |
 | `"(#primary, #secondary)"` | Fallback: use `#primary`, fall back to `#secondary` |
+| `"light-dark(#dark, #light)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 | `true` | `currentColor` |
 
 When set to a named color token, also sets `$current-color` and `$current-color-{colorSpace}` custom properties for downstream use (suffix depends on the configured `colorSpace`, default `oklch`).

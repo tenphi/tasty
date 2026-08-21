@@ -127,10 +127,13 @@ export type StyleMap = Record<string, StyleValue | StyleValueStateMap>;
 const devMode = process.env.NODE_ENV !== 'production';
 
 // Precompiled regex patterns for parseColor optimization
-// Match var(--name-color...) and extract the name, regardless of fallbacks
-const COLOR_VAR_PATTERN = /var\(--([a-z0-9-]+)-color/;
+// Match var(--name-color...) and extract the name, regardless of fallbacks.
+// Anchored: a reference inside a color function is an *argument* of that color,
+// not the color's own name — `color-mix(in oklab, var(--purple-color) 50%, …)`
+// is not named `purple`.
+const COLOR_VAR_PATTERN = /^var\(--([a-z0-9-]+)-color[,)]/;
 const COLOR_VAR_COMPONENTS_PATTERN =
-  /var\(--([a-z0-9-]+)-color-(?:rgb|hsl|oklch)/;
+  /^(?:[a-z-]+\(\s*)?var\(--([a-z0-9-]+)-color-(?:rgb|hsl|oklch)[,)]/;
 const RGB_ALPHA_PATTERN = /\/\s*([0-9.]+)\)/;
 const RE_HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const RE_VAR_COLOR = /^var\(--[a-z0-9-]+-color/;

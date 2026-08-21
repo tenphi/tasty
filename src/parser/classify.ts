@@ -6,7 +6,8 @@ import { foldDslCase } from '../utils/string';
 import {
   COLOR_FUNCS,
   DERIVED_COLOR_FUNCS,
-  POLYMORPHIC_COLOR_FUNCS,
+  POLYMORPHIC_COLOR_FUNC,
+  RE_FUNC_CALL,
   RE_HEX,
   RE_NUMBER,
   RE_RAW_UNIT,
@@ -241,9 +242,7 @@ export function classify(
             // This covers all standard CSS color functions plus any custom color
             // function registered as a parse function (e.g. okhsl/okhst via plugins),
             // so no function name is hardcoded here.
-            const funcMatch = resolvedValue.match(
-              /^([a-z][a-z0-9-]*)\((.+)\)$/i,
-            );
+            const funcMatch = resolvedValue.match(RE_FUNC_CALL);
             if (funcMatch) {
               const [, funcName, args] = funcMatch;
               const lowerFunc = funcName.toLowerCase();
@@ -469,7 +468,7 @@ export function classify(
       // `padding: 'light-dark(1x, 2x)'` would land in the color slot and the
       // padding handler would emit its default instead.
       const bucket =
-        POLYMORPHIC_COLOR_FUNCS.has(fname) && !hasColorArgs(parsedInner)
+        fname === POLYMORPHIC_COLOR_FUNC && !hasColorArgs(parsedInner)
           ? Bucket.Value
           : Bucket.Color;
 

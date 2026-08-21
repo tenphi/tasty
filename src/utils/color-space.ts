@@ -457,17 +457,12 @@ export function strToColorSpace(color: string): string | null | undefined {
   return result;
 }
 
-/** Channel names of the configured color space, in `<func>()` argument order. */
-function getColorSpaceChannels(): string {
-  switch (currentColorSpace) {
-    case 'rgb':
-      return 'r g b';
-    case 'hsl':
-      return 'h s l';
-    case 'oklch':
-      return 'l c h';
-  }
-}
+/** Channel names of each color space, in `<func>()` argument order. */
+const COLOR_SPACE_CHANNELS: Record<ColorSpace, string> = {
+  rgb: 'r g b',
+  hsl: 'h s l',
+  oklch: 'l c h',
+};
 
 /**
  * Express a color as components of the configured color space *by reference*,
@@ -481,8 +476,8 @@ function getColorSpaceChannels(): string {
  * the channels, so `oklch(var(--name-color-oklch) / .5)` still applies opacity to
  * whatever the color turns out to be.
  */
-export function toRelativeColorSpaceComponents(color: string): string {
-  return `from ${color} ${getColorSpaceChannels()}`;
+function toRelativeColorSpaceComponents(color: string): string {
+  return `from ${color} ${COLOR_SPACE_CHANNELS[currentColorSpace]}`;
 }
 
 /**

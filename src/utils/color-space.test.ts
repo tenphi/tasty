@@ -4,7 +4,7 @@ import {
   convertColorChainToComponentChain,
   getColorSpace,
   getColorSpaceComponents,
-  parseAlphaMix,
+  parseAlphaOverride,
   resetColorSpace,
   setColorSpace,
   strToColorSpace,
@@ -257,70 +257,67 @@ describe('configure() colorSpace merge semantics', () => {
   });
 });
 
-describe('parseAlphaMix', () => {
-  it('splits a faded color into the color and the percentage', () => {
+describe('parseAlphaOverride', () => {
+  it('splits a faded color into the color and the alpha', () => {
     expect(
-      parseAlphaMix(
-        'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-      ),
-    ).toEqual({ color: 'var(--purple-color)', percentage: '50%' });
+      parseAlphaOverride('oklch(from var(--purple-color) l c h / .5)'),
+    ).toEqual({ color: 'var(--purple-color)', alpha: '.5' });
   });
 
-  it('accepts the form with the comma spaces dropped', () => {
-    // The parser drops them when it re-serializes a color function, and so does
-    // the CSSOM, so the same value can come back either way.
+  it('keeps a var() alpha whole', () => {
     expect(
-      parseAlphaMix('color-mix(in oklab,var(--purple-color) 50%,transparent)'),
-    ).toEqual({ color: 'var(--purple-color)', percentage: '50%' });
+      parseAlphaOverride('oklch(from var(--a-color) l c h / var(--fade))'),
+    ).toEqual({ color: 'var(--a-color)', alpha: 'var(--fade)' });
   });
 
-  it('keeps a calc() percentage whole', () => {
-    // The split is the last *top-level* space: a dynamic percentage has spaces
-    // of its own inside the parentheses.
+  it('splits a doubly faded color on its outer layer', () => {
     expect(
-      parseAlphaMix(
-        'color-mix(in oklab, var(--a-color) calc(var(--fade) * 100%), transparent)',
+      parseAlphaOverride(
+        'oklch(from oklch(from var(--a-color) l c h / .5) l c h / .25)',
       ),
     ).toEqual({
-      color: 'var(--a-color)',
-      percentage: 'calc(var(--fade) * 100%)',
+      color: 'oklch(from var(--a-color) l c h / .5)',
+      alpha: '.25',
     });
   });
 
-  it('peels one layer off a doubly faded color', () => {
+  it('handles a derived color as the origin', () => {
     expect(
-      parseAlphaMix(
-        'color-mix(in oklab, color-mix(in oklab, var(--a-color) 50%, transparent) 25%, transparent)',
+      parseAlphaOverride(
+        'oklch(from light-dark(var(--a-color),var(--b-color)) l c h / .5)',
       ),
     ).toEqual({
-      color: 'color-mix(in oklab, var(--a-color) 50%, transparent)',
-      percentage: '25%',
+      color: 'light-dark(var(--a-color),var(--b-color))',
+      alpha: '.5',
     });
   });
 
-  it('returns null for a mix that is not an alpha wrapper', () => {
+  it('returns null for anything else', () => {
+    expect(parseAlphaOverride('oklab(0.5 0.1 0.1)')).toBeNull();
+    expect(parseAlphaOverride('var(--a-color)')).toBeNull();
     expect(
-      parseAlphaMix('color-mix(in srgb, var(--a-color) 50%, var(--b-color))'),
+      parseAlphaOverride(
+        'color-mix(in oklab, var(--a-color) 50%, transparent)',
+      ),
     ).toBeNull();
-    expect(parseAlphaMix('var(--a-color)')).toBeNull();
   });
 });
 
 describe('convertColorChainToComponentChain through a fade', () => {
-  it('reports the faded token’s own channels', () => {
+  it('reports the faded token\u2019s own channels', () => {
     setColorSpace('oklch');
 
-    // Components carry no alpha, so the wrapper is peeled before converting.
+    // Components carry no alpha, so the fade is peeled before converting.
     expect(
       convertColorChainToComponentChain(
-        'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+        'oklch(from var(--purple-color) l c h / .5)',
       ),
     ).toBe('var(--purple-color-oklch)');
 
-    // Including when the comma spaces are gone.
+    // Including through more than one layer.
     expect(
       convertColorChainToComponentChain(
-        'color-mix(in oklab,var(--purple-color) 50%,transparent)',
+        'oklch(from oklch(from var(--purple-color) l c h / .5) l c h / .25)',
       ),
     ).toBe('var(--purple-color-oklch)');
 

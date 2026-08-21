@@ -111,7 +111,7 @@ const List = tasty({
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:
 
 ```jsx
-fill: '#purple.5'  // → color-mix(in oklab, var(--purple-color) 50%, transparent)
+fill: '#purple.5'  // → oklch(from var(--purple-color) l c h / .5)
 ```
 
 ### Modifier
@@ -138,17 +138,16 @@ fill: '#current',           // → currentcolor
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
-The suffix applies alpha to the token's color with `color-mix()`:
+The suffix sets the alpha on the token's color with CSS relative color syntax:
 
 ```jsx
 fill: '#purple.5';
-// → color-mix(in oklab, var(--purple-color) 50%, transparent)
+// → oklch(from var(--purple-color) l c h / .5)
 ```
 
-Mixing premultiplied against a fully transparent color leaves the channels
-untouched and sets the alpha, so the result is the same color a channel-level
-`/ <alpha>` would give — but it asks nothing of the color beyond *being* a color.
-That means the suffix works on every one of these:
+The channels are copied over and the alpha slot is written, which asks nothing of
+the color beyond *being* a color. That means the suffix works on every one of
+these:
 
 - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
   Tasty cannot convert — none of which have channels to decompose
@@ -156,9 +155,17 @@ That means the suffix works on every one of these:
 - a `--name-color` variable declared in your own CSS, with no Tasty token
   definition and no companion variable behind it
 
-The mixing space is always `oklab`, whatever [`colorSpace`](configuration.md#color-space)
-is set to: alpha application is space-independent, and oklab is unbounded, so a
-wide-gamut color survives a round trip that `in srgb` would clamp.
+Two properties follow from writing the alpha slot rather than compositing:
+
+- **Alpha is replaced, not multiplied.** A token holding `rgb(255 0 0 / .8)`
+  faded to `.5` is alpha `.5`, not `.4`.
+- **The alpha may be a number or a percentage.** `#purple.$fade` emits
+  `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
+  which is what `--*-opacity` properties are registered to accept.
+
+The space is always `oklch`, whatever [`colorSpace`](configuration.md#color-space)
+is set to: it is unbounded, so a wide-gamut color survives a round trip that a
+gamut-limited space would clamp.
 
 ---
 
@@ -206,7 +213,7 @@ configure({
 });
 
 fill: '#solid.5';     // → hsl(220 90% 50% / .5)
-fill: '#adaptive.5';  // → color-mix(in oklab, light-dark(…) 50%, transparent)
+fill: '#adaptive.5';  // → oklch(from light-dark(…) l c h / .5)
 ```
 
 ---

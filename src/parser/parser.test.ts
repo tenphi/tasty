@@ -46,9 +46,9 @@ describe('StyleProcessor', () => {
     );
     expect(result.groups[0].colors).toEqual([
       'var(--dark-color)',
-      'color-mix(in oklab, var(--purple-color) 0%, transparent)',
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-      'color-mix(in oklab, var(--purple-color) 5%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0)',
+      'oklch(from var(--purple-color) l c h / .5)',
+      'oklch(from var(--purple-color) l c h / .05)',
       'rgb(10,20,30)',
       'hsl(10,20%,30%)',
     ]);
@@ -246,7 +246,7 @@ describe('StyleProcessor', () => {
     const dropShadow = 'drop-shadow(1x 2x 3x #dark.5)';
     const result = parser.process(dropShadow);
     expect(result.groups[0].values[0]).toEqual(
-      'drop-shadow(8px 16px 24px color-mix(in oklab, var(--dark-color) 50%, transparent))', // raw units calculated
+      'drop-shadow(8px 16px 24px oklch(from var(--dark-color) l c h / .5))', // raw units calculated
     );
   });
 
@@ -872,9 +872,7 @@ describe('Predefined tokens', () => {
 
     const result = parser.process('#primary');
     // #primary = '#purple.5' -> oklch(var(--purple-color-oklch) / .5)
-    expect(result.output).toBe(
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from var(--purple-color) l c h / .5)');
   });
 
   test('opacity suffix works with predefined color tokens', () => {
@@ -884,9 +882,7 @@ describe('Predefined tokens', () => {
 
     // #accent.5 should resolve #accent to #purple, then apply .5 opacity
     const result = parser.process('#accent.5');
-    expect(result.output).toBe(
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from var(--purple-color) l c h / .5)');
   });
 
   test('custom property opacity works with predefined color tokens', () => {
@@ -897,7 +893,7 @@ describe('Predefined tokens', () => {
     // #accent.$disabled should resolve #accent to #purple, then apply var(--disabled)
     const result = parser.process('#accent.$disabled');
     expect(result.output).toBe(
-      'color-mix(in oklab, var(--purple-color) calc(var(--disabled) * 100%), transparent)',
+      'oklch(from var(--purple-color) l c h / var(--disabled))',
     );
   });
 
@@ -1183,8 +1179,7 @@ describe('Predefined tokens', () => {
     const directResult = parser.process('#purple.5');
 
     // Both should produce lowercase CSS custom property names
-    const expected =
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)';
+    const expected = 'oklch(from var(--purple-color) l c h / .5)';
     expect(tokenResult.output).toBe(expected);
     expect(directResult.output).toBe(expected);
     expect(tokenResult.output).toBe(directResult.output);
@@ -1195,21 +1190,21 @@ describe('Custom property opacity syntax', () => {
   test('#color.$prop uses var() for alpha', () => {
     const result = parser.process('#purple.$disabled');
     expect(result.output).toBe(
-      'color-mix(in oklab, var(--purple-color) calc(var(--disabled) * 100%), transparent)',
+      'oklch(from var(--purple-color) l c h / var(--disabled))',
     );
   });
 
   test('#color.$prop works with hyphenated names', () => {
     const result = parser.process('#dark-05.$my-opacity');
     expect(result.output).toBe(
-      'color-mix(in oklab, var(--dark-05-color) calc(var(--my-opacity) * 100%), transparent)',
+      'oklch(from var(--dark-05-color) l c h / var(--my-opacity))',
     );
   });
 
   test('#color.$prop works with underscore names', () => {
     const result = parser.process('#blue.$_private');
     expect(result.output).toBe(
-      'color-mix(in oklab, var(--blue-color) calc(var(--_private) * 100%), transparent)',
+      'oklch(from var(--blue-color) l c h / var(--_private))',
     );
   });
 });
@@ -1244,36 +1239,30 @@ describe('#current color token', () => {
 
   test('#current.5 uses color-mix with 50%', () => {
     const result = parser.process('#current.5');
-    expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor 50%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from currentcolor l c h / .5)');
   });
 
   test('#current.05 uses color-mix with 5%', () => {
     const result = parser.process('#current.05');
-    expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor 5%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from currentcolor l c h / .05)');
   });
 
   test('#current.0 uses color-mix with 0%', () => {
     const result = parser.process('#current.0');
-    expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor 0%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from currentcolor l c h / 0)');
   });
 
   test('#current.$opacity uses color-mix with calc()', () => {
     const result = parser.process('#current.$opacity');
     expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor calc(var(--opacity) * 100%), transparent)',
+      'oklch(from currentcolor l c h / var(--opacity))',
     );
   });
 
   test('#current.$disabled uses color-mix with calc()', () => {
     const result = parser.process('#current.$disabled');
     expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor calc(var(--disabled) * 100%), transparent)',
+      'oklch(from currentcolor l c h / var(--disabled))',
     );
   });
 
@@ -1331,9 +1320,7 @@ describe('#current color token', () => {
 
     // Using the token should produce color-mix
     const result = parser.process('#my-color');
-    expect(result.output).toBe(
-      'color-mix(in oklab, currentcolor 50%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from currentcolor l c h / .5)');
 
     warnSpy.mockRestore();
   });
@@ -1367,41 +1354,54 @@ describe('Token opacity suffix', () => {
     // Tasty never saw — so the alpha goes onto the colour itself.
     const result = parser.process('#purple.5');
 
-    expect(result.output).toBe(
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-    );
+    expect(result.output).toBe('oklch(from var(--purple-color) l c h / .5)');
     expect(result.groups[0].colors).toEqual([result.output]);
   });
 
   test('a two-digit suffix is a fraction of a percent point', () => {
     expect(parser.process('#purple.05').output).toBe(
-      'color-mix(in oklab, var(--purple-color) 5%, transparent)',
+      'oklch(from var(--purple-color) l c h / .05)',
     );
   });
 
   test('a zero suffix is fully transparent', () => {
     expect(parser.process('#purple.0').output).toBe(
-      'color-mix(in oklab, var(--purple-color) 0%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0)',
     );
   });
 
-  test('a custom property suffix scales to a percentage', () => {
+  test('a custom property suffix passes the reference straight through', () => {
+    // The alpha slot takes a `<number>` or a `<percentage>`, so the property
+    // works whichever the author declared it as — nothing to convert and get
+    // wrong.
     expect(parser.process('#purple.$fade').output).toBe(
-      'color-mix(in oklab, var(--purple-color) calc(var(--fade) * 100%), transparent)',
+      'oklch(from var(--purple-color) l c h / var(--fade))',
     );
   });
 
-  test('a hex token keeps its literal fallback under the wrapper', () => {
+  test('the authored digits survive verbatim', () => {
+    // `.07` must not arrive as `7.000000000000001%`.
+    expect(parser.process('#purple.07').output).toBe(
+      'oklch(from var(--purple-color) l c h / .07)',
+    );
+    expect(parser.process('#purple.29').output).toBe(
+      'oklch(from var(--purple-color) l c h / .29)',
+    );
+  });
+
+  test('a hex token keeps its literal fallback under the fade', () => {
     expect(parser.process('#ff8040.5').output).toBe(
-      'color-mix(in oklab, var(--ff8040-color) 50%, transparent)',
+      'oklch(from var(--ff8040-color) l c h / .5)',
     );
   });
 
-  test('the mixing space is oklab whatever the configured color space', () => {
-    // Alpha application is space-independent, and oklab is unbounded — mixing
-    // `in srgb` would clamp a wide-gamut token.
+  test('the space is oklab whatever the configured color space', () => {
+    // oklab is unbounded, so a wide-gamut token survives a round trip that a
+    // gamut-limited space would clamp.
     setColorSpace('rgb');
-    expect(parser.process('#wide-token.5').output).toContain('in oklab');
+    expect(parser.process('#wide-token.5').output).toBe(
+      'oklch(from var(--wide-token-color) l c h / .5)',
+    );
     resetColorSpace();
   });
 });
@@ -1509,7 +1509,7 @@ describe('Modern color functions', () => {
     const result = parser.process('#mixed-brand.5');
 
     expect(result.output).toBe(
-      'color-mix(in oklab, color-mix(in oklab,var(--purple-color) 50%,var(--red-color)) 50%, transparent)',
+      'oklch(from color-mix(in oklab,var(--purple-color) 50%,var(--red-color)) l c h / .5)',
     );
     expect(result.groups[0].colors).toEqual([result.output]);
   });
@@ -1520,7 +1520,7 @@ describe('Modern color functions', () => {
     });
 
     expect(parser.process('#dual-theme.05').output).toBe(
-      'color-mix(in oklab, light-dark(var(--light-color),var(--dark-color)) 5%, transparent)',
+      'oklch(from light-dark(var(--light-color),var(--dark-color)) l c h / .05)',
     );
   });
 
@@ -1530,7 +1530,7 @@ describe('Modern color functions', () => {
     });
 
     expect(parser.process('#dual-theme.$disabled').output).toBe(
-      'color-mix(in oklab, light-dark(var(--light-color),var(--dark-color)) calc(var(--disabled) * 100%), transparent)',
+      'oklch(from light-dark(var(--light-color),var(--dark-color)) l c h / var(--disabled))',
     );
   });
 

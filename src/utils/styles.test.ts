@@ -135,16 +135,13 @@ describe('strToRgb', () => {
   });
 });
 
-describe('parseColor with the opacity wrapper', () => {
-  it('reads the name and the opacity through the color-mix() wrapper', () => {
-    // `#purple.5` parses to `color-mix(in oklab, var(--purple-color) 50%,
-    // transparent)`. The wrapper is the colour, but the name and the opacity
-    // belong to what it wraps.
+describe('parseColor with a faded color', () => {
+  it('reads the name and the opacity through the fade', () => {
+    // `#purple.5` parses to `oklch(from var(--purple-color) l c h / .5)`. The
+    // whole thing is the color, but the name and the opacity are its parts.
     const parsed = parseColor('#purple.5');
 
-    expect(parsed.color).toBe(
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-    );
+    expect(parsed.color).toBe('oklch(from var(--purple-color) l c h / .5)');
     expect(parsed.name).toBe('purple');
     expect(parsed.opacity).toBe(50);
   });
@@ -154,6 +151,12 @@ describe('parseColor with the opacity wrapper', () => {
 
     expect(parsed.name).toBe('purple');
     expect(parsed.opacity).toBeUndefined();
+  });
+
+  it('reads a percentage alpha as itself', () => {
+    expect(
+      parseColor('oklch(from var(--purple-color) l c h / 40%)').opacity,
+    ).toBe(40);
   });
 
   it('still reads a slash alpha off a static color function', () => {
@@ -173,25 +176,23 @@ describe('color() helper', () => {
     expect(color('purple')).toBe('var(--purple-color)');
   });
 
-  it('fades the colour variable with color-mix()', () => {
+  it('fades the colour variable with relative color syntax', () => {
     expect(color('purple', 0.5)).toBe(
-      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0.5)',
     );
   });
 
-  it('does not leak float artifacts into the percentage', () => {
-    // 0.07 * 100 is 7.000000000000001 in IEEE 754.
+  it('passes the opacity through without arithmetic', () => {
+    // The alpha slot takes a `<number>`, so there is no percentage conversion to
+    // introduce a float artifact — `0.07 * 100` is `7.000000000000001`.
     expect(color('purple', 0.07)).toBe(
-      'color-mix(in oklab, var(--purple-color) 7%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0.07)',
     );
     expect(color('purple', 0.29)).toBe(
-      'color-mix(in oklab, var(--purple-color) 29%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0.29)',
     );
-  });
-
-  it('keeps a genuinely fractional percentage', () => {
     expect(color('purple', 0.025)).toBe(
-      'color-mix(in oklab, var(--purple-color) 2.5%, transparent)',
+      'oklch(from var(--purple-color) l c h / 0.025)',
     );
   });
 });

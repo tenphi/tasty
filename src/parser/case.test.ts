@@ -44,7 +44,7 @@ describe('DSL name case', () => {
         'calc(var(--myVar) * 2)',
       );
       expect(parseStyle('#purple.$myAlpha').output).toBe(
-        'color-mix(in oklab, var(--purple-color) calc(var(--myAlpha) * 100%), transparent)',
+        'oklch(from var(--purple-color) l c h / var(--myAlpha))',
       );
     });
 

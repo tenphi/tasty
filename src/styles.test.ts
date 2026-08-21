@@ -611,9 +611,8 @@ describe('Tasty style tests', () => {
       // companion still names the token's own channels — which is what keeps
       // `$current-color-{space}` usable downstream.
       expect(colorStyle({ color: '#purple.5' })).toEqual({
-        color: 'color-mix(in oklab, var(--purple-color) 50%, transparent)',
-        '--current-color':
-          'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+        color: 'oklch(from var(--purple-color) l c h / .5)',
+        '--current-color': 'oklch(from var(--purple-color) l c h / .5)',
         '--current-color-rgb': 'var(--purple-color-rgb)',
       });
     });
@@ -622,8 +621,7 @@ describe('Tasty style tests', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': '#purple.5' })).toEqual({
-        '--brand-color':
-          'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+        '--brand-color': 'oklch(from var(--purple-color) l c h / .5)',
         '--brand-color-rgb': 'var(--purple-color-rgb)',
       });
     });

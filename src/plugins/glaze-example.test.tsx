@@ -102,7 +102,7 @@ describe('docs/plugins.md glaze example', () => {
     expect(container.firstElementChild!.className).not.toBe('');
     // 30% opacity, not the 10% default.
     expect(getCSSText()).toContain(
-      'color-mix(in oklab, var(--success-color) 30%, transparent)',
+      'oklch(from var(--success-color) l c h / .30)',
     );
   });
 

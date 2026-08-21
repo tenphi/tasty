@@ -4,7 +4,7 @@ import { registerDefaultFunctions } from '../plugins/defaults';
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
 import { getNamedColorHex } from './color-math';
-import { parseAlphaMix } from './color-space';
+import { parseAlphaOverride } from './color-space';
 
 export {
   getNamedColorHex,
@@ -418,10 +418,10 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     firstColor = extractedColor;
   }
 
-  // `#name.alpha` wraps the color in `color-mix()`, so the name and the opacity
-  // are read off the wrapper's parts rather than the wrapper itself.
-  const alphaMix = parseAlphaMix(firstColor);
-  const baseColor = alphaMix ? alphaMix.color : firstColor;
+  // `#name.alpha` fades the color with relative color syntax, so the name and the
+  // opacity are read off the parts rather than the whole.
+  const faded = parseAlphaOverride(firstColor);
+  const baseColor = faded ? faded.color : firstColor;
 
   // Extract color name (if present) from variable pattern using precompiled regex
   let nameMatch = baseColor.match(COLOR_VAR_PATTERN);
@@ -430,11 +430,11 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   }
 
   let opacity: number | undefined;
-  if (alphaMix) {
-    // A dynamic percentage (`calc(var(--fade) * 100%)`) has no number to report.
-    const { percentage } = alphaMix;
-    const v = parseFloat(percentage);
-    if (percentage.endsWith('%') && !isNaN(v)) opacity = v;
+  if (faded) {
+    // A `var()` alpha has no number to report.
+    const { alpha } = faded;
+    const v = parseFloat(alpha);
+    if (!isNaN(v)) opacity = alpha.endsWith('%') ? v : v * 100;
   } else if (
     baseColor.startsWith('rgb') ||
     baseColor.startsWith('hsl') ||

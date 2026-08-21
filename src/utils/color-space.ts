@@ -454,65 +454,51 @@ export function strToColorSpace(color: string): string | null | undefined {
 }
 
 /**
- * Apply an alpha value to a whole color.
+ * Set the alpha of a whole color, replacing any it already carries.
  *
- * `color-mix()` against `transparent` is how opacity is applied to every color
- * Tasty emits. Mixing premultiplied against a fully transparent color leaves the
- * channels untouched and sets the alpha to the given percentage, so the result
- * is the same color the equivalent `<func>(… / <alpha>)` would produce — but it
- * needs nothing from the color except that it *is* a color. A `color-mix()`, a
- * `light-dark()`, a `currentcolor`, a `--name-color` written by hand-authored
- * CSS with no companion variable: all of them work, where writing into a channel
- * slot requires components the engine may have no way to compute.
+ * CSS relative color syntax is how opacity is applied to every color Tasty
+ * emits. `oklch(from <color> l c h / <alpha>)` copies the channels over and
+ * writes the alpha slot, which needs nothing from the color except that it *is*
+ * a color: a `color-mix()`, a `light-dark()`, a `currentcolor`, a
+ * `--name-color` written by hand-authored CSS with no companion variable — all
+ * of them work, where writing into a channel slot directly requires components
+ * the engine may have no way to compute.
  *
- * The mixing space is always `oklab`, regardless of the configured
- * {@link ColorSpace}: alpha application is space-independent, and oklab is
- * unbounded, so a wide-gamut color survives the round trip that `in srgb` would
- * clamp.
+ * Alpha is *replaced*, not composed. A token holding `rgb(255 0 0 / .8)` faded
+ * to `.5` is alpha `.5`, matching what the channel-components form did and what
+ * a statically-known color still does. `color-mix()` against `transparent`
+ * cannot do this — it would multiply the two to `.4`.
+ *
+ * The alpha slot takes a `<number>` or a `<percentage>`, so an opacity custom
+ * property passes straight through in whichever form the author declared it.
+ *
+ * The space is always `oklch`, regardless of the configured {@link ColorSpace}:
+ * it is unbounded, so a wide-gamut color survives the round trip that a
+ * gamut-limited space would clamp, and it is the space the computed value used
+ * to be reported in. Channels are copied rather than interpolated, so the polar
+ * form costs nothing even for an achromatic color, whose hue is carried through
+ * untouched.
  */
-export function mixColorAlpha(color: string, percentage: string): string {
-  return `color-mix(in oklab, ${color} ${percentage}, transparent)`;
+export function overrideColorAlpha(color: string, alpha: string): string {
+  return `oklch(from ${color} l c h / ${alpha})`;
 }
 
 /**
- * Matches what {@link mixColorAlpha} builds, capturing everything between the
- * mixing space and `transparent`.
- *
- * Whitespace after the commas is optional: the parser drops it when it
- * re-serializes a color function, and so does the CSSOM, so the same value can
- * come back either spaced or not.
+ * Matches what {@link overrideColorAlpha} builds. The first group is greedy so a
+ * nested override splits on its outermost layer.
  */
-const RE_ALPHA_MIX = /^color-mix\(in oklab,\s*(.+),\s*transparent\)$/;
+const RE_ALPHA_OVERRIDE = /^oklch\(from (.+) l c h \/ (.+)\)$/;
 
 /**
- * Split what {@link mixColorAlpha} builds back into the color it faded and the
- * alpha percentage, or `null` when the value is not one of those.
+ * Split what {@link overrideColorAlpha} builds back into the color it faded and
+ * the alpha, or `null` when the value is not one of those.
  */
-export function parseAlphaMix(
+export function parseAlphaOverride(
   value: string,
-): { color: string; percentage: string } | null {
-  const match = value.match(RE_ALPHA_MIX);
-  if (!match) return null;
+): { color: string; alpha: string } | null {
+  const match = value.match(RE_ALPHA_OVERRIDE);
 
-  const body = match[1];
-
-  // The percentage is the last top-level token. A dynamic one is a `calc()` with
-  // spaces of its own, so the split has to ignore anything inside parentheses.
-  let depth = 0;
-  for (let i = body.length - 1; i >= 0; i--) {
-    const char = body[i];
-
-    if (char === ')') depth++;
-    else if (char === '(') depth--;
-    else if (char === ' ' && depth === 0) {
-      return {
-        color: body.slice(0, i).trim(),
-        percentage: body.slice(i + 1),
-      };
-    }
-  }
-
-  return null;
+  return match ? { color: match[1], alpha: match[2] } : null;
 }
 
 /** Channel names of each color space, in `<func>()` argument order. */
@@ -588,13 +574,13 @@ export function getColorSpaceComponents(color: string): string {
 export function convertColorChainToComponentChain(colorValue: string): string {
   const suffix = getColorSpaceSuffix();
 
-  // Components carry no alpha, so an opacity wrapper is peeled off and the color
+  // Components carry no alpha, so an opacity override is peeled off and the color
   // underneath is converted instead. `#name.5` parses to
-  // `color-mix(in oklab, var(--name-color) 50%, transparent)`, whose components
-  // are simply `--name-color`'s.
-  const alphaMix = parseAlphaMix(colorValue);
-  if (alphaMix) {
-    return convertColorChainToComponentChain(alphaMix.color);
+  // `oklab(from var(--name-color) l a b / .5)`, whose components are simply
+  // `--name-color`'s.
+  const faded = parseAlphaOverride(colorValue);
+  if (faded) {
+    return convertColorChainToComponentChain(faded.color);
   }
 
   // Handle the legacy `func(var(--name-color-{suffix}) / alpha)` form, which

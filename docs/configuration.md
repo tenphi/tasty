@@ -94,7 +94,7 @@ configure({
 
 The `oklch` color space is the default because it provides perceptually uniform color manipulation — reaching for a channel to shift lightness or hue produces more natural-looking results.
 
-The companion is there so you can *address the channels*: shift a lightness, animate a hue, build a derived color. It is not how the [opacity suffix](dsl.md#color-tokens--opacity) works — that applies alpha to `--name-color` itself with `color-mix()`, so it needs nothing from the companion and works on any color.
+The companion is there so you can *address the channels*: shift a lightness, animate a hue, build a derived color. It is not how the [opacity suffix](dsl.md#color-tokens--opacity) works — that sets the alpha on `--name-color` itself with relative color syntax, so it needs nothing from the companion and works on any color.
 
 A color the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a `color()` in a space it has no conversion for — has no channels to decompose, so its companion is expressed *by reference* using CSS relative color syntax (`--name-color-oklch: from color-mix(…) l c h`). Reading a channel off it still works; the browser resolves them.
 

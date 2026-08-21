@@ -74,11 +74,21 @@ let microtaskScheduled = false;
 let flushing = false;
 
 /**
- * Depth of open batch windows. Non-zero means a `<TastyBatchProvider>` has
- * rendered in the current commit and will flush in its insertion effect, so
- * queuing a write is safe. Nested providers are counted, not deduplicated.
+ * Whether a `<TastyBatchProvider>` has rendered in the current commit and will
+ * therefore flush in its insertion effect, making it safe to queue a write.
+ *
+ * A flag rather than a depth count, because renders and insertion effects do
+ * not pair up one-to-one. StrictMode double-invokes render but runs the
+ * insertion effect once, so a counter ends the commit stuck above zero — and a
+ * window that stays open past its commit turns the next provider-less commit
+ * into `'always'` mode behind the user's back, which is exactly the measurement
+ * hazard `true` exists to avoid.
+ *
+ * Clearing on the first close is safe with nested or sibling providers: React
+ * finishes every render in a commit before running any insertion effect, so once
+ * one closes, no further render-phase injection can arrive in that commit.
  */
-let openWindows = 0;
+let windowOpen = false;
 /** Whether any window has ever been opened, i.e. a provider is in the tree. */
 let everOpened = false;
 /** Dev-only: warn at most once that batching is on with no provider mounted. */
@@ -119,18 +129,18 @@ export function hasPendingStyleWrites(): boolean {
  * effect.
  *
  * Called during render on purpose: the window must be open before children
- * render. It is idempotent and carries no other side effect, and a render that
- * is thrown away is recovered by the microtask backstop.
+ * render. It is idempotent — so StrictMode's double render costs nothing — and
+ * carries no other side effect. A render that is thrown away is recovered by the
+ * microtask backstop.
  *
  * A no-op without a `document`. On the server there is no sheet to batch
  * against, and `useInsertionEffect` never runs, so nothing would ever close a
- * window this opened — the counter would climb for the life of the process and
- * be shared by every concurrent request. Skipping it keeps the provider inert
- * during SSR and RSC instead of merely harmless.
+ * window this opened. Skipping it keeps the provider inert during SSR and RSC
+ * instead of merely harmless.
  */
 export function openBatchWindow(): void {
   if (typeof document === 'undefined') return;
-  openWindows++;
+  windowOpen = true;
   everOpened = true;
 }
 
@@ -140,13 +150,13 @@ export function openBatchWindow(): void {
  * layout effect.
  */
 export function closeBatchWindow(): void {
-  if (openWindows > 0) openWindows--;
+  windowOpen = false;
   flushStyles();
 }
 
 /** Whether a batch window is currently open. */
 export function isBatchWindowOpen(): boolean {
-  return openWindows > 0;
+  return windowOpen;
 }
 
 function scheduleMicrotaskFlush(): void {
@@ -157,7 +167,7 @@ function scheduleMicrotaskFlush(): void {
     // Normally a no-op: the provider's insertion effect has already drained the
     // queue. This only does work when a render was aborted or suspended before
     // reaching that effect, or when running in `'always'` mode.
-    openWindows = 0;
+    windowOpen = false;
     flushStyles();
   });
 }
@@ -215,7 +225,7 @@ export function resetStyleBatch(): void {
   head = 0;
   microtaskScheduled = false;
   flushing = false;
-  openWindows = 0;
+  windowOpen = false;
   everOpened = false;
   warnedNoProvider = false;
 }

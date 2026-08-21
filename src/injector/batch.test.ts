@@ -1,6 +1,7 @@
 import {
   flushStyles,
   hasPendingStyleWrites,
+  isBatchWindowOpen,
   openBatchWindow,
   closeBatchWindow,
   resetStyleBatch,
@@ -109,6 +110,40 @@ describe('batched injection', () => {
       // The stale window is gone, so later injections are synchronous again.
       injector.inject([rule('.b.b', 'color: blue')]);
       expect(hasPendingStyleWrites()).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Window lifetime
+  // -------------------------------------------------------------------------
+
+  // A window that outlives its commit turns the next provider-less commit into
+  // `'always'` mode behind the user's back: writes queued, then flushed by the
+  // microtask after layout effects have already measured. Renders and insertion
+  // effects do not pair up one-to-one — StrictMode double-invokes render and
+  // runs the insertion effect once — so opening has to be idempotent and closing
+  // has to close rather than decrement.
+  describe('window lifetime', () => {
+    it('closes on a single close after repeated opens', () => {
+      openBatchWindow();
+      openBatchWindow();
+      openBatchWindow();
+      closeBatchWindow();
+
+      expect(isBatchWindowOpen()).toBe(false);
+    });
+
+    it('stops batching once the window has closed', () => {
+      injector = makeInjector(true);
+
+      openBatchWindow();
+      openBatchWindow();
+      closeBatchWindow();
+
+      injector.inject([rule('.after.after', 'color: red')], { cacheKey: 'a' });
+
+      expect(hasPendingStyleWrites()).toBe(false);
+      expect(injector.getCSSText()).toContain('color: red');
     });
   });
 
@@ -238,9 +273,9 @@ describe('batched injection', () => {
       ).toBeLessThan(injector.getCSSText().indexOf('color: tail'));
     });
 
-    // Nested providers: the inner one closes its window and flushes while the
-    // outer one is still open, so the drain runs with batching still on.
-    it('keeps order when the flush runs inside a still-open window', () => {
+    // Nested or repeated opens — nested providers, StrictMode's double render —
+    // must still leave the sheet in unbatched order.
+    it('keeps order across repeated opens', () => {
       const sync = makeInjector(undefined);
       buildWithProperty(sync);
       const expected = sync.getCSSText();
@@ -254,8 +289,6 @@ describe('batched injection', () => {
 
       expect(hasPendingStyleWrites()).toBe(false);
       expect(injector.getCSSText()).toBe(expected);
-
-      closeBatchWindow();
     });
   });
 
@@ -361,6 +394,30 @@ describe('batched injection', () => {
         initialValue: '0px',
       });
       expect(injector.isPropertyDefined('--batched-prop')).toBe(true);
+    });
+
+    // The whole read surface, so a new read API that forgets to flush — and
+    // would therefore hand back a sheet missing rules that are already queued —
+    // shows up here rather than in a consumer.
+    const READS: [string, (i: StyleInjector) => unknown][] = [
+      ['getCSSText', (i) => i.getCSSText()],
+      ['getCSSTextForClasses', (i) => i.getCSSTextForClasses(['t0'])],
+      ['getRawCSSText', (i) => i.getRawCSSText()],
+      ['isPropertyDefined', (i) => i.isPropertyDefined('--x')],
+      ['getMetrics', (i) => i.getMetrics()],
+      ['cleanup', (i) => i.cleanup()],
+      ['gc', (i) => i.gc()],
+      ['destroy', (i) => i.destroy()],
+    ];
+
+    it.each(READS)('%s drains the queue', (_name, read) => {
+      injector = makeInjector('always');
+      injector.inject([rule('.a.a', 'color: red')], { cacheKey: 'k' });
+      expect(hasPendingStyleWrites()).toBe(true);
+
+      read(injector);
+
+      expect(hasPendingStyleWrites()).toBe(false);
     });
   });
 

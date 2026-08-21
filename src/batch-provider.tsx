@@ -55,9 +55,10 @@ export interface TastyBatchProviderProps {
 export function TastyBatchProvider({ children }: TastyBatchProviderProps) {
   // Opened during render on purpose: the window has to be open before children
   // render, and this is the only phase that precedes them. It is idempotent and
-  // has no other side effect. A render that is thrown away (aborted or
-  // suspended) leaves the counter raised, which the microtask backstop resets —
-  // and such a render mounts nothing, so nothing can measure what it queued.
+  // has no other side effect, so StrictMode's double render costs nothing. A
+  // render that is thrown away (aborted or suspended) leaves the window open,
+  // which the microtask backstop closes — and such a render mounts nothing, so
+  // nothing can measure what it queued.
   openBatchWindow();
 
   // Fires in the mutation phase, before any layout effect. No dependency array:

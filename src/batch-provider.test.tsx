@@ -8,7 +8,7 @@
  * that ever regresses; asserting on CSS text would not catch it.
  */
 import { render } from '@testing-library/react';
-import { useLayoutEffect, useRef } from 'react';
+import { StrictMode, useLayoutEffect, useRef } from 'react';
 
 import { TastyBatchProvider } from './batch-provider';
 import { configure, resetConfig } from './config';
@@ -180,6 +180,51 @@ describe('TastyBatchProvider', () => {
     );
 
     expect(measured).toBe(WIDTH);
+  });
+
+  // StrictMode double-invokes render but runs the insertion effect once. When
+  // the window was a depth counter, that left it open past the commit, and the
+  // next provider-less commit silently got `'always'` semantics — its layout
+  // effect measured the unstyled box. Dev is where StrictMode runs, so this was
+  // the common case, not an exotic one.
+  it('leaves no window open after a StrictMode commit', () => {
+    configure({ batchInjection: true });
+
+    let measured = -1;
+    const Measured = makeMeasured((w) => {
+      measured = w;
+    });
+
+    render(
+      <StrictMode>
+        <TastyBatchProvider>
+          <Measured />
+        </TastyBatchProvider>
+      </StrictMode>,
+    );
+
+    expect(measured).toBe(WIDTH);
+    expect(hasPendingStyleWrites()).toBe(false);
+
+    // The commit that proves it: no provider, no StrictMode. In `true` mode this
+    // has to write straight through, so the layout effect measures real styles.
+    const LATER_WIDTH = 211;
+    const Later = tasty({
+      styles: { width: `${LATER_WIDTH}px`, height: '10px' },
+    });
+    let laterMeasured = -1;
+
+    function LaterMeasured() {
+      const ref = useRef<HTMLDivElement>(null);
+      useLayoutEffect(() => {
+        laterMeasured = ref.current!.getBoundingClientRect().width;
+      }, []);
+      return <Later ref={ref} />;
+    }
+
+    render(<LaterMeasured />);
+
+    expect(laterMeasured).toBe(LATER_WIDTH);
   });
 
   it('renders children unchanged when batching is off', () => {

@@ -818,6 +818,10 @@ export class StyleInjector {
    * Get cache performance metrics
    */
   getMetrics(options?: { root?: Document | ShadowRoot }): CacheMetrics | null {
+    // Batched insertions only count themselves once they reach a sheet, so a read
+    // taken mid-window would report a torn picture: `hits` already advanced,
+    // `totalInsertions` not yet.
+    flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     return this.sheetManager.getMetrics(registry);

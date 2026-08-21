@@ -182,9 +182,10 @@ that mixes both, it still applies to the runtime half.
 
 ### `flushStyles()`
 
-Applies every pending write immediately. Every injector read API
-(`getCSSText`, `getCSSTextForNode`, `cleanup`, `gc`, `destroy`,
-`isPropertyDefined`) calls it for you, so reads never observe a partial sheet.
+Applies every pending write immediately. Every injector read API calls it for
+you — `getCSSText`, `getCSSTextForClasses`, `getCSSTextForNode`,
+`getRawCSSText`, `isPropertyDefined`, `getMetrics`, `cleanup`, `gc` and
+`destroy` — so a read never observes a partial sheet.
 Call it directly before measuring in code that runs outside a batch window under
 `'always'`:
 

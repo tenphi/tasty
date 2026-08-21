@@ -71,8 +71,135 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
 | `plugins` | `TastyPlugin[]` | - | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
 | `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
+| `batchInjection` | `boolean \| 'always'` | `false` | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection) |
 | `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
 | `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
+
+---
+
+## Batched Injection
+
+Every `insertRule()` on a live stylesheet invalidates style for that sheet's
+scope. Components inject during React's render phase, and if anything else reads
+layout in the same pass, the two interleave:
+
+```
+inject -> read (forced style recalc) -> inject -> read (forced recalc) -> ...
+```
+
+A UI kit that measures during render — popovers, autosizing inputs, virtualized
+lists — can turn one mount into a dozen full-tree recalculations. `batchInjection`
+queues the writes instead and applies them together, so the tree is invalidated
+once per flush.
+
+```tsx
+import { configure, TastyBatchProvider } from '@tenphi/tasty';
+
+configure({ batchInjection: true });
+
+createRoot(el).render(
+  <TastyBatchProvider>
+    <App />
+  </TastyBatchProvider>,
+);
+```
+
+### Why the provider is required
+
+Deferring a write past React's layout phase would let a `useLayoutEffect`
+measure an element whose rules are not in the sheet yet and read its *unstyled*
+box — a wrong number, not a stale one, so it never self-corrects.
+
+`TastyBatchProvider` closes that hole. It opens a *batch window* during its
+render and closes it — flushing — in `useInsertionEffect`, which React runs in
+the mutation phase, before any layout effect:
+
+```
+provider renders          -> window OPEN
+  children render         -> injections queued
+provider insertionEffect  -> FLUSH, window CLOSED
+layout effects run        -> rules are in the sheet
+```
+
+With `batchInjection: true` a write is only ever queued inside such a window, so
+turning the flag on can make injection cheaper but can never make a measurement
+wrong. Injections outside a window are written straight through, exactly as with
+batching off:
+
+- a deep update that did not re-render the provider
+- an injection from a layout effect, an event handler or an async callback
+- SSR and RSC, where there is no live sheet at all
+
+Mount the provider as high in the tree as you can: batching applies to the
+commits it takes part in.
+
+### Modes
+
+| Value | Behaviour |
+|-------|-----------|
+| `false` (default) | One `insertRule()` per component, synchronously. |
+| `true` | Batch inside a provider window only. Cannot affect measurement. Without the provider nothing is batched, and dev mode says so once. |
+| `'always'` | Batch every injection, flushing on a microtask when no window is open. Covers more commits; a `useLayoutEffect` measuring a freshly mounted element can read its unstyled box. Paint is unaffected — microtasks always drain before the browser paints. |
+
+### Ordering
+
+All writes share one FIFO queue — component rules, global rules, raw CSS,
+`@property`, `@keyframes`, `@font-face`, `@counter-style` and `@function`.
+Draining it in insertion order keeps the sheet byte-identical to unbatched
+output, which matters because equal-specificity rules resolve by document order.
+
+### SSR, RSC and zero-runtime
+
+**Server render — nothing to batch, safe to leave enabled.** SSR and RSC collect
+CSS as text through `ServerStyleCollector`; the runtime injector never runs
+there, so `batchInjection` changes nothing either way. `<TastyBatchProvider>`
+renders its children and does nothing else: the window it opens is a no-op
+without a `document`, and the `useInsertionEffect` that would close it never
+fires on the server. Configure the flag once in shared code — no environment
+branching needed.
+
+**Hydration — the better your SSR coverage, the less there is to batch.**
+`hydrateTastyClasses()` (wired up for you by `@tenphi/tasty/ssr/next` and the
+Astro integration) pre-populates the injector from `window.__TASTY__`, so
+hydrating a server-rendered class is a cache hit that produces no sheet write at
+all. Batching pays off on what SSR could not cover: client-only routes, styles
+that first appear after hydration (a `styles` prop that changes on interaction, a
+modal or popover mounting), and dynamic tokens.
+
+**Astro islands — one provider per island, or `'always'`.** Every island is its
+own React root, so a provider inside one island does not open a window for
+another. With `batchInjection: true`, wrap each island root that renders enough
+tasty components to be worth it. `'always'` needs no provider and covers every
+island, at the cost of the measurement hazard above. Either way, an island that
+only re-hydrates server-rendered classes has nothing to batch.
+
+**Zero-runtime (`tastyStatic`) — unaffected.** Build-time extraction never
+touches the injector: the babel plugin emits either a CSS file import or an
+`injectCSS()` call from `@tenphi/tasty/static/inject`, which appends text to a
+single `<style data-tasty-static>` element. `batchInjection` only defers CSSOM
+writes made by the runtime injector, so extracted styles are unchanged. In an app
+that mixes both, it still applies to the runtime half.
+
+### `flushStyles()`
+
+Applies every pending write immediately. Every injector read API calls it for
+you — `getCSSText`, `getCSSTextForClasses`, `getCSSTextForNode`,
+`getRawCSSText`, `isPropertyDefined`, `getMetrics`, `cleanup`, `gc` and
+`destroy` — so a read never observes a partial sheet.
+Call it directly before measuring in code that runs outside a batch window under
+`'always'`:
+
+```tsx
+import { flushStyles } from '@tenphi/tasty';
+
+useLayoutEffect(() => {
+  flushStyles();
+  const { width } = ref.current.getBoundingClientRect();
+}, []);
+```
+
+`hasPendingStyleWrites()` reports whether anything is queued, and
+`resetStyleBatch()` drops the queue without applying it (tests only).
 
 ---
 

@@ -137,6 +137,47 @@ export interface TastyConfig {
    */
   autoPropertyTypes?: boolean;
   /**
+   * Defer stylesheet writes and apply them in one batch instead of performing
+   * one `insertRule()` per component during render.
+   *
+   * Each `insertRule()` on a live sheet invalidates style for that sheet's
+   * scope. When components inject during React's render phase while other
+   * components read layout in the same pass, the two interleave and the browser
+   * is forced to recalculate style between every injection. Batching collapses
+   * that into one invalidation per flush.
+   *
+   * - `false` (default) — inject synchronously, one write per component.
+   * - `true` — batch, but only inside a *batch window*: a commit in which
+   *   `<TastyBatchProvider>` rendered and will therefore flush in its
+   *   `useInsertionEffect`, before any `useLayoutEffect` runs. Any injection
+   *   outside a window — a deep update the provider did not re-render for, an
+   *   injection from a layout effect, an event handler, an async callback — is
+   *   written straight through. Enabling this can never make a layout effect
+   *   measure an unstyled element. Requires `<TastyBatchProvider>`; without it
+   *   nothing is batched (and dev mode says so once).
+   * - `'always'` — batch every injection, flushing on a microtask when no
+   *   window is open. Wins on more commits, but a `useLayoutEffect` that
+   *   measures a freshly mounted element can read its unstyled box, because
+   *   microtasks run after the layout phase. Paint is unaffected: microtasks
+   *   always drain before the browser paints.
+   *
+   * No effect during SSR or RSC: styles are collected as text there, the
+   * runtime injector never runs, and the provider is inert without a
+   * `document`. No effect on zero-runtime `tastyStatic` styles either — those
+   * are extracted at build time and never reach the injector.
+   *
+   * @default false
+   * @example
+   * ```tsx
+   * configure({ batchInjection: true });
+   *
+   * <TastyBatchProvider>
+   *   <App />
+   * </TastyBatchProvider>
+   * ```
+   */
+  batchInjection?: boolean | 'always';
+  /**
    * Garbage collection configuration for unused styles.
    * GC is triggered by touch count: every `touchInterval` touches, the
    * oldest unused styles are evicted when their count exceeds `capacity`.

@@ -300,6 +300,17 @@ const styleRule: StyleResult = {
 };
 ```
 
+### Batched Injection
+
+`configure({ batchInjection: true })` queues every sheet write — component
+rules, global rules, raw CSS and at-rules — into one FIFO and applies them
+together, so the document is style-invalidated once per flush instead of once per
+component. `<TastyBatchProvider>` flushes in `useInsertionEffect`, before any
+layout effect, so a queued write can never be observed by a measurement. See
+[Batched injection](configuration.md#batched-injection) for the modes and the
+ordering guarantee. `flushStyles()` applies pending writes on demand; every read
+API here calls it for you.
+
 ### Deduplication & Performance
 
 ```typescript

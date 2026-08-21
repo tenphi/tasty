@@ -203,13 +203,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "58 kB"
+      "limit": "59 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "55 kB"
+      "limit": "55.75 kB"
     },
     {
       "name": "static",
@@ -237,7 +237,7 @@
         "path",
         "crypto"
       ],
-      "limit": "51.25 kB"
+      "limit": "52 kB"
     }
   ]
 }

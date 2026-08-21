@@ -26,6 +26,9 @@ export type {
   UseFunctionOptions,
 } from './hooks';
 
+export { TastyBatchProvider } from './batch-provider';
+export type { TastyBatchProviderProps } from './batch-provider';
+
 // React-specific utilities
 export * from './utils/get-display-name';
 

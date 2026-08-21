@@ -157,6 +157,8 @@ export class SheetManager {
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),
         touchCount: 0,
+        touchTick: -1,
+        touchedTick: new Set<string>(),
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
         injectionMode: this.detectInjectionMode(root),

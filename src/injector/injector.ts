@@ -26,6 +26,13 @@ import {
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
 
+import {
+  enqueueStyleWrite,
+  flushStyles,
+  isBatchWindowOpen,
+  warnBatchProviderMissing,
+} from './batch';
+import type { QueuedWrite } from './batch';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
 import { formatCounterStyleDeclarations } from '../counter-style';
@@ -34,7 +41,11 @@ import {
   formatFunctionPrelude,
   parseFunctionName,
 } from '../functions';
-import { HYDRATED_RULE_INDEX, PLACEHOLDER_RULE_INDEX } from './types';
+import {
+  HYDRATED_RULE_INDEX,
+  PENDING_RULE_INDEX,
+  PLACEHOLDER_RULE_INDEX,
+} from './types';
 import type {
   CacheMetrics,
   CounterStyleDescriptors,
@@ -43,14 +54,28 @@ import type {
   GCOptions,
   GlobalInjectResult,
   InjectResult,
+  KeyframesCacheEntry,
+  KeyframesInfo,
   KeyframesResult,
   KeyframesSteps,
   PropertyDefinition,
   RawCSSResult,
   RootRegistry,
+  RuleInfo,
   StyleInjectorConfig,
   StyleRule,
 } from './types';
+
+/**
+ * Placeholder `KeyframesInfo` for a cache entry reserved by a batched write and
+ * not yet backed by a real rule. Only ever read through `entry.pending`, which
+ * is checked before the info is used.
+ */
+const EMPTY_KEYFRAMES_INFO = {
+  name: '',
+  ruleIndex: PENDING_RULE_INDEX,
+  sheetIndex: PENDING_RULE_INDEX,
+} as unknown as KeyframesInfo;
 
 /**
  * Extract class names from `<style data-tasty-rsc>` tags.
@@ -133,6 +158,66 @@ export class StyleInjector {
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
     return this.sheetManager;
+  }
+
+  /**
+   * Whether sheet writes should be queued instead of applied immediately.
+   *
+   * Only ever true on the client: SSR collects CSS as text and the RSC path
+   * returns it as strings, so neither has a live sheet to batch writes against.
+   *
+   * In the default `true` mode a write is only queued inside an open batch
+   * window — a commit in which `<TastyBatchProvider>` rendered and will
+   * therefore flush in its insertion effect, before any layout effect can
+   * measure. Everything else falls through to a synchronous write, so enabling
+   * the flag cannot make a `useLayoutEffect` read an unstyled element.
+   * `'always'` drops the gate and accepts that trade for wider coverage.
+   */
+  private get batching(): boolean {
+    const mode = this.config.batchInjection;
+    if (!mode || typeof document === 'undefined') return false;
+    if (mode === 'always') return true;
+    if (isBatchWindowOpen()) return true;
+    warnBatchProviderMissing();
+    return false;
+  }
+
+  /**
+   * Apply a sheet write now, or queue it when batching is on.
+   * Returns the queue handle when deferred, so the caller can cancel it if it
+   * disposes before the flush.
+   */
+  private writeSheet(task: () => void): QueuedWrite | null {
+    if (this.batching) return enqueueStyleWrite(task);
+    task();
+    return null;
+  }
+
+  /**
+   * Insert a global (non-class) rule, honouring batching.
+   *
+   * `onApplied` records the caller's dedupe bookkeeping. When the write is
+   * queued it runs eagerly, so a repeat call before the flush bails out instead
+   * of queueing the same rule twice — the same reasoning as
+   * `insertPropertyRule`'s eager marking. When written synchronously it runs
+   * only on success, preserving the existing retry-on-failure behaviour.
+   */
+  private writeGlobalRule(
+    registry: RootRegistry,
+    rules: StyleRule[],
+    key: string,
+    root: Document | ShadowRoot,
+    onApplied?: () => void,
+  ): void {
+    if (this.batching) {
+      onApplied?.();
+      enqueueStyleWrite(() => {
+        this.sheetManager.insertGlobalRule(registry, rules, key, root);
+      });
+      return;
+    }
+    const info = this.sheetManager.insertGlobalRule(registry, rules, key, root);
+    if (info) onApplied?.();
   }
 
   constructor(config: StyleInjectorConfig = {}) {
@@ -259,15 +344,34 @@ export class StyleInjector {
     // Check if we can reuse based on cache key
     const cacheKey = options?.cacheKey;
     let className: string;
-    let isPreAllocated = false;
 
     if (cacheKey && registry.cacheKeyToClassName.has(cacheKey)) {
       // Reuse existing class for this cache key
       className = registry.cacheKeyToClassName.get(cacheKey)!;
       const existingRuleInfo = registry.rules.get(className)!;
 
-      // Check if this is a placeholder (pre-allocated but not yet injected)
-      isPreAllocated =
+      // Rules are already queued for a batched write. Bump the refCount and let
+      // the queued write land — injecting again would duplicate every rule.
+      if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
+        registry.refCounts.set(
+          className,
+          (registry.refCounts.get(className) || 0) + 1,
+        );
+
+        if (registry.metrics) {
+          registry.metrics.hits++;
+        }
+
+        return {
+          className,
+          dispose: () => this.dispose(className, registry),
+        };
+      }
+
+      // A placeholder means the class name was pre-allocated but its CSS was
+      // never injected, so fall through and inject it now. Anything else is
+      // already in a sheet.
+      const isPreAllocated =
         existingRuleInfo.ruleIndex === PLACEHOLDER_RULE_INDEX &&
         existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
@@ -344,42 +448,113 @@ export class StyleInjector {
       };
     });
 
-    // Auto-register @property for custom properties with inferable types.
-    // Colors are detected by --*-color name pattern, numeric types by value.
-    if (this.config.autoPropertyTypes !== false) {
-      const resolver = registry.propertyTypeResolver;
-      const defined = registry.injectedProperties;
-      for (const rule of rulesToInsert) {
-        if (!rule.declarations) continue;
-        resolver.scanDeclarations(
-          rule.declarations,
-          (name) => defined.has(name),
-          (name, syntax, initialValue) => {
-            this.property(name, {
-              syntax,
-              inherits: true,
-              initialValue,
-              root,
-            });
-          },
-        );
+    // The sheet write, plus the `@property` auto-registration that the rules'
+    // declarations may trigger. Kept together in one closure so batching moves
+    // them as a unit and the sheet ends up in the same order either way.
+    const applySheetWrite = (): RuleInfo | null => {
+      // Auto-register @property for custom properties with inferable types.
+      // Colors are detected by --*-color name pattern, numeric types by value.
+      if (this.config.autoPropertyTypes !== false) {
+        const resolver = registry.propertyTypeResolver;
+        const defined = registry.injectedProperties;
+        for (const rule of rulesToInsert) {
+          if (!rule.declarations) continue;
+          resolver.scanDeclarations(
+            rule.declarations,
+            (name) => defined.has(name),
+            (name, syntax, initialValue) => {
+              this.property(name, {
+                syntax,
+                inherits: true,
+                initialValue,
+                root,
+              });
+            },
+          );
+        }
       }
-    }
 
-    // Insert rules using existing sheet manager
-    const ruleInfo = this.sheetManager.insertRule(
-      registry,
-      rulesToInsert,
-      className,
-      root,
-    );
+      // Insert rules using existing sheet manager
+      const ruleInfo = this.sheetManager.insertRule(
+        registry,
+        rulesToInsert,
+        className,
+        root,
+      );
 
-    if (!ruleInfo) {
+      if (!ruleInfo) {
+        // Update metrics
+        if (registry.metrics) {
+          registry.metrics.misses++;
+        }
+        return null;
+      }
+
+      // Store in registry. Setting the cacheKey mapping is idempotent when the
+      // class was pre-allocated, so both paths can share one branch.
+      registry.rules.set(className, ruleInfo);
+      if (cacheKey) {
+        registry.cacheKeyToClassName.set(cacheKey, className);
+      }
+
       // Update metrics
       if (registry.metrics) {
+        registry.metrics.totalInsertions++;
         registry.metrics.misses++;
       }
 
+      return ruleInfo;
+    };
+
+    if (this.batching) {
+      // Reserve the class name before returning so a repeat inject() with the
+      // same cacheKey — very common, one per sibling component — takes the
+      // PENDING short-circuit above instead of queueing the same rules again.
+      registry.rules.set(className, {
+        className,
+        ruleIndex: PENDING_RULE_INDEX,
+        sheetIndex: PENDING_RULE_INDEX,
+      });
+      if (cacheKey) {
+        registry.cacheKeyToClassName.set(cacheKey, className);
+      }
+      registry.refCounts.set(className, 1);
+
+      const queued = enqueueStyleWrite(() => {
+        if (applySheetWrite()) return;
+        // Insertion failed. Fall back to the "allocated but not injected"
+        // state so a later render retries, matching the unbatched path.
+        registry.rules.set(className, {
+          className,
+          ruleIndex: PLACEHOLDER_RULE_INDEX,
+          sheetIndex: PLACEHOLDER_RULE_INDEX,
+        });
+      });
+
+      return {
+        className,
+        dispose: () => {
+          // Still queued and this was the only owner: drop the write and the
+          // reservation rather than leaving an orphan rule for GC to find.
+          if (
+            !queued.done &&
+            registry.refCounts.get(className) === 1 &&
+            registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
+          ) {
+            queued.cancelled = true;
+            registry.rules.delete(className);
+            if (cacheKey) {
+              registry.cacheKeyToClassName.delete(cacheKey);
+            }
+            registry.refCounts.set(className, 0);
+            return;
+          }
+          this.dispose(className, registry);
+        },
+      };
+    }
+
+    if (!applySheetWrite()) {
       return {
         className,
         dispose: () => {
@@ -388,26 +563,7 @@ export class StyleInjector {
       };
     }
 
-    // Store in registry
     registry.refCounts.set(className, 1);
-
-    if (isPreAllocated) {
-      // Update the existing placeholder entry with real rule info
-      registry.rules.set(className, ruleInfo);
-      // cacheKey mapping already exists from allocation
-    } else {
-      // Store new entries
-      registry.rules.set(className, ruleInfo);
-      if (cacheKey) {
-        registry.cacheKeyToClassName.set(cacheKey, className);
-      }
-    }
-
-    // Update metrics
-    if (registry.metrics) {
-      registry.metrics.totalInsertions++;
-      registry.metrics.misses++;
-    }
 
     return {
       className,
@@ -435,40 +591,69 @@ export class StyleInjector {
       };
     }
 
-    // Auto-register @property for custom properties in global rules
-    if (this.config.autoPropertyTypes !== false) {
-      const resolver = registry.propertyTypeResolver;
-      const defined = registry.injectedProperties;
-      for (const rule of rules) {
-        if (!rule.declarations) continue;
-        resolver.scanDeclarations(
-          rule.declarations,
-          (name) => defined.has(name),
-          (name, syntax, initialValue) => {
-            this.property(name, {
-              syntax,
-              inherits: true,
-              initialValue,
-              root,
-            });
-          },
-        );
-      }
-    }
-
     // Use a non-tasty identifier to avoid any collisions with .t{number} classes
     const key = `global:${this.globalRuleCounter++}`;
 
-    const info = this.sheetManager.insertGlobalRule(
-      registry,
-      rules as unknown as StyleRule[],
-      key,
-      root,
-    );
+    // The `@property` auto-registration inserts rules of its own, so it stays in
+    // the same queue slot as the rules that triggered it. Global rules are style
+    // rules and do take part in the cascade, so they share the one FIFO with
+    // component rules — that is what keeps sheet order identical to unbatched
+    // output, and equal-specificity rules resolve by document order.
+    const applyWrite = (): RuleInfo | null => {
+      // Auto-register @property for custom properties in global rules
+      if (this.config.autoPropertyTypes !== false) {
+        const resolver = registry.propertyTypeResolver;
+        const defined = registry.injectedProperties;
+        for (const rule of rules) {
+          if (!rule.declarations) continue;
+          resolver.scanDeclarations(
+            rule.declarations,
+            (name) => defined.has(name),
+            (name, syntax, initialValue) => {
+              this.property(name, {
+                syntax,
+                inherits: true,
+                initialValue,
+                root,
+              });
+            },
+          );
+        }
+      }
 
-    if (registry.metrics) {
-      registry.metrics.totalInsertions++;
+      const inserted = this.sheetManager.insertGlobalRule(
+        registry,
+        rules as unknown as StyleRule[],
+        key,
+        root,
+      );
+
+      if (registry.metrics) {
+        registry.metrics.totalInsertions++;
+      }
+
+      return inserted;
+    };
+
+    if (this.batching) {
+      let info: RuleInfo | null = null;
+      const queued = enqueueStyleWrite(() => {
+        info = applyWrite();
+      });
+
+      return {
+        dispose: () => {
+          // Cancel instead of deleting a rule that never made it into a sheet.
+          if (!queued.done) {
+            queued.cancelled = true;
+            return;
+          }
+          if (info) this.sheetManager.deleteGlobalRule(registry, key);
+        },
+      };
     }
+
+    const info = applyWrite();
 
     return {
       dispose: () => {
@@ -487,13 +672,34 @@ export class StyleInjector {
     options?: { root?: Document | ShadowRoot },
   ): RawCSSResult {
     const root = options?.root || document;
-    return this.sheetManager.injectRawCSS(css, root);
+
+    if (!this.batching) {
+      return this.sheetManager.injectRawCSS(css, root);
+    }
+
+    // Raw CSS is arbitrary and does take part in the cascade, so it goes through
+    // the same FIFO as component and global rules.
+    let result: RawCSSResult | null = null;
+    const queued = enqueueStyleWrite(() => {
+      result = this.sheetManager.injectRawCSS(css, root);
+    });
+
+    return {
+      dispose: () => {
+        if (!queued.done) {
+          queued.cancelled = true;
+          return;
+        }
+        result?.dispose();
+      },
+    };
   }
 
   /**
    * Get raw CSS text for SSR
    */
   getRawCSSText(options?: { root?: Document | ShadowRoot }): string {
+    flushStyles();
     const root = options?.root || document;
     return this.sheetManager.getRawCSSText(root);
   }
@@ -548,6 +754,7 @@ export class StyleInjector {
    * Force bulk cleanup of unused styles
    */
   cleanup(root?: Document | ShadowRoot): void {
+    flushStyles();
     const registry = this.sheetManager.getRegistry(root || document);
     // Clean up ALL unused rules regardless of batch ratio
     this.sheetManager.forceCleanup(registry);
@@ -557,6 +764,7 @@ export class StyleInjector {
    * Get CSS text from all sheets (for SSR)
    */
   getCSSText(options?: { root?: Document | ShadowRoot }): string {
+    flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     return this.sheetManager.getCSSText(registry);
@@ -569,6 +777,7 @@ export class StyleInjector {
     classNames: Iterable<string>,
     options?: { root?: Document | ShadowRoot },
   ): string {
+    flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
 
@@ -609,6 +818,10 @@ export class StyleInjector {
    * Get cache performance metrics
    */
   getMetrics(options?: { root?: Document | ShadowRoot }): CacheMetrics | null {
+    // Batched insertions only count themselves once they reach a sheet, so a read
+    // taken mid-window would report a torn picture: `hits` already advanced,
+    // `totalInsertions` not yet.
+    flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     return this.sheetManager.getMetrics(registry);
@@ -751,12 +964,7 @@ export class StyleInjector {
       normalizePropertyDefinition(definition),
     );
 
-    this.sheetManager.insertGlobalRule(
-      registry,
-      [rule],
-      `property:${cacheKey}`,
-      root,
-    );
+    this.writeGlobalRule(registry, [rule], `property:${cacheKey}`, root);
   }
 
   /**
@@ -771,6 +979,7 @@ export class StyleInjector {
     name: string,
     options?: { root?: Document | ShadowRoot },
   ): boolean {
+    flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
 
@@ -808,16 +1017,9 @@ export class StyleInjector {
       declarations: formatFontFaceDeclarations(family, descriptors),
     } as StyleRule;
 
-    const info = this.sheetManager.insertGlobalRule(
-      registry,
-      [rule],
-      `fontface:${hash}`,
-      root,
-    );
-
-    if (info) {
+    this.writeGlobalRule(registry, [rule], `fontface:${hash}`, root, () => {
       registry.injectedFontFaces.add(hash);
-    }
+    });
   }
 
   /**
@@ -845,7 +1047,9 @@ export class StyleInjector {
       if (isWeak || existingIsStrong === true) {
         return;
       }
-      this.sheetManager.deleteGlobalRule(registry, `counterstyle:${name}`);
+      this.writeSheet(() => {
+        this.sheetManager.deleteGlobalRule(registry, `counterstyle:${name}`);
+      });
     }
 
     const rule: StyleRule = {
@@ -853,16 +1057,9 @@ export class StyleInjector {
       declarations: formatCounterStyleDeclarations(descriptors),
     } as StyleRule;
 
-    const info = this.sheetManager.insertGlobalRule(
-      registry,
-      [rule],
-      `counterstyle:${name}`,
-      root,
-    );
-
-    if (info) {
+    this.writeGlobalRule(registry, [rule], `counterstyle:${name}`, root, () => {
       registry.injectedCounterStyles.set(name, !isWeak);
-    }
+    });
   }
 
   /**
@@ -892,7 +1089,9 @@ export class StyleInjector {
       if (isWeak || existingIsStrong === true) {
         return;
       }
-      this.sheetManager.deleteGlobalRule(registry, `function:${cssName}`);
+      this.writeSheet(() => {
+        this.sheetManager.deleteGlobalRule(registry, `function:${cssName}`);
+      });
     }
 
     const rule: StyleRule = {
@@ -904,16 +1103,9 @@ export class StyleInjector {
       declarations: formatFunctionDeclarations(definition),
     } as StyleRule;
 
-    const info = this.sheetManager.insertGlobalRule(
-      registry,
-      [rule],
-      `function:${cssName}`,
-      root,
-    );
-
-    if (info) {
+    this.writeGlobalRule(registry, [rule], `function:${cssName}`, root, () => {
       registry.injectedFunctions.set(cssName, !isWeak);
-    }
+    });
   }
 
   /**
@@ -986,52 +1178,93 @@ export class StyleInjector {
       );
     }
 
-    // Insert keyframes
-    const result = this.sheetManager.insertKeyframes(
-      registry,
-      steps,
-      actualName,
-      root,
-    );
-    if (!result) {
+    // The insertion plus the `@property` scan over the resulting declarations.
+    // Returns false when the sheet rejected the rule, so the caller can leave
+    // the cache untouched and let a later call retry.
+    const applyWrite = (): boolean => {
+      const result = this.sheetManager.insertKeyframes(
+        registry,
+        steps,
+        actualName,
+        root,
+      );
+      if (!result) return false;
+
+      const { info, declarations } = result;
+
+      // Auto-register @property for custom properties found in keyframe declarations
+      if (this.config.autoPropertyTypes !== false && declarations) {
+        const resolver = registry.propertyTypeResolver;
+        resolver.scanDeclarations(
+          declarations,
+          (name) => registry.injectedProperties.has(name),
+          (name, syntax, initialValue) => {
+            this.property(name, {
+              syntax,
+              inherits: true,
+              initialValue,
+              root,
+            });
+          },
+        );
+      }
+
+      const entry = registry.keyframesCache.get(contentHash);
+      if (entry) {
+        // Batched path: the entry was reserved up front, fill in the real info.
+        entry.info = info;
+        entry.pending = undefined;
+      } else {
+        registry.keyframesCache.set(contentHash, {
+          name: actualName,
+          refCount: 1,
+          info,
+        });
+      }
+
+      // Update metrics
+      if (registry.metrics) {
+        registry.metrics.totalInsertions++;
+        registry.metrics.misses++;
+      }
+
+      return true;
+    };
+
+    if (this.batching) {
+      // Reserve the cache entry now so a second keyframes() call with the same
+      // content before the flush reuses the name instead of queueing again.
+      // `info` is a placeholder until the write lands; `pending` marks that, and
+      // disposeKeyframes() cancels rather than deleting a non-existent rule.
+      const entry: KeyframesCacheEntry = {
+        name: actualName,
+        refCount: 1,
+        info: EMPTY_KEYFRAMES_INFO,
+      };
+      registry.keyframesCache.set(contentHash, entry);
+
+      entry.pending = enqueueStyleWrite(() => {
+        if (applyWrite()) return;
+        // Rejected: drop the reservation so a later call can retry, mirroring
+        // the unbatched path which never caches a failed insertion.
+        if (registry.keyframesCache.get(contentHash) === entry) {
+          registry.keyframesCache.delete(contentHash);
+        }
+      });
+
+      return {
+        toString: () => actualName,
+        dispose: () => this.disposeKeyframes(contentHash, registry),
+      };
+    }
+
+    if (!applyWrite()) {
       return {
         toString: () => '',
         dispose: () => {
           /* noop */
         },
       };
-    }
-
-    const { info, declarations } = result;
-
-    // Auto-register @property for custom properties found in keyframe declarations
-    if (this.config.autoPropertyTypes !== false && declarations) {
-      const resolver = registry.propertyTypeResolver;
-      resolver.scanDeclarations(
-        declarations,
-        (name) => registry.injectedProperties.has(name),
-        (name, syntax, initialValue) => {
-          this.property(name, {
-            syntax,
-            inherits: true,
-            initialValue,
-            root,
-          });
-        },
-      );
-    }
-
-    // Cache the result by content hash
-    registry.keyframesCache.set(contentHash, {
-      name: actualName,
-      refCount: 1,
-      info,
-    });
-
-    // Update metrics
-    if (registry.metrics) {
-      registry.metrics.totalInsertions++;
-      registry.metrics.misses++;
     }
 
     return {
@@ -1049,8 +1282,14 @@ export class StyleInjector {
 
     entry.refCount--;
     if (entry.refCount <= 0) {
-      // Dispose immediately - keyframes are global and safe to clean up right away
-      this.sheetManager.deleteKeyframes(registry, entry.info);
+      // Queued but not yet written: cancel the write instead of deleting a rule
+      // that was never inserted.
+      if (entry.pending && !entry.pending.done) {
+        entry.pending.cancelled = true;
+      } else {
+        // Dispose immediately - keyframes are global and safe to clean up right away
+        this.sheetManager.deleteKeyframes(registry, entry.info);
+      }
       registry.keyframesCache.delete(contentHash);
 
       // Clean up name-to-content mapping if this name was tracked
@@ -1088,6 +1327,21 @@ export class StyleInjector {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     const now = Date.now();
+
+    // `touch()` runs on every render of every tasty component — on a fully
+    // cached render it is the only work left — and a page typically renders
+    // hundreds of components sharing a handful of class names. Everything below
+    // stamps `lastTouchedAt` with the millisecond we are already in, so
+    // re-touching the same class-name string inside that millisecond writes the
+    // value it already holds. Skip it: one Set lookup instead of a split, a
+    // regex test and two Map operations per chunk.
+    if (registry.touchTick !== now) {
+      registry.touchTick = now;
+      registry.touchedTick.clear();
+    } else if (registry.touchedTick.has(className)) {
+      return;
+    }
+    registry.touchedTick.add(className);
 
     const parts =
       className.indexOf(' ') === -1 ? [className] : className.split(' ');
@@ -1145,6 +1399,9 @@ export class StyleInjector {
    * @returns Number of styles evicted.
    */
   gc(options?: GCOptions): number {
+    // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
+    // those would corrupt sheet indices, so land every write first.
+    flushStyles();
     if (typeof document === 'undefined') return 0;
 
     // Cancel any pending idle-scheduled GC to prevent double runs
@@ -1221,6 +1478,7 @@ export class StyleInjector {
    * Destroy all resources for a root
    */
   destroy(root?: Document | ShadowRoot): void {
+    flushStyles();
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
 

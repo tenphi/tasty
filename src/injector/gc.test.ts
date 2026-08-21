@@ -83,6 +83,64 @@ describe('GC: touch / gc', () => {
       expect(registry.usageMap.size).toBe(0);
     });
 
+    it('should skip a repeat touch of the same className within one millisecond', () => {
+      const { className } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      // Freeze the clock so every touch lands in the same millisecond.
+      vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+      injector.touch(className);
+      const afterFirst = registry.touchCount;
+
+      for (let i = 0; i < 20; i++) injector.touch(className);
+
+      // Every one of those would have written the timestamp it already holds.
+      expect(registry.touchCount).toBe(afterFirst);
+      expect(registry.usageMap.get(className)!.lastTouchedAt).toBe(1_000);
+
+      vi.restoreAllMocks();
+    });
+
+    it('should still count a different className in the same millisecond', () => {
+      const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
+      const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+      injector.touch(r1.className);
+      const afterFirst = registry.touchCount;
+      injector.touch(r2.className);
+
+      expect(registry.touchCount).toBeGreaterThan(afterFirst);
+      expect(registry.usageMap.has(r2.className)).toBe(true);
+
+      vi.restoreAllMocks();
+    });
+
+    it('should re-touch once the millisecond advances', () => {
+      const { className } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+      injector.touch(className);
+      injector.touch(className);
+      const afterSameMs = registry.touchCount;
+
+      nowSpy.mockReturnValue(1_001);
+      injector.touch(className);
+
+      expect(registry.touchCount).toBeGreaterThan(afterSameMs);
+      expect(registry.usageMap.get(className)!.lastTouchedAt).toBe(1_001);
+
+      vi.restoreAllMocks();
+    });
+
     it('should increment touchCount and schedule GC at touchInterval', () => {
       const gcSpy = vi.spyOn(injector, 'gc');
 

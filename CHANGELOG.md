@@ -1,5 +1,44 @@
 # @tenphi/tasty
 
+## 3.1.0
+
+### Minor Changes
+
+- [#266](https://github.com/tenphi/tasty/pull/266) [`b90760c`](https://github.com/tenphi/tasty/commit/b90760c937be1064438f13145eeb34043397ee37) Thanks [@tenphi](https://github.com/tenphi)! - Treat modern CSS color functions as colors so they reach the color slot of every style property.
+
+  `light-dark()` and `contrast-color()` are now recognized alongside `color-mix()`, `color-contrast()`, `color()` and the channel functions, and the tokens inside them are expanded. `fill`, `color`, `border`, `outline`, `shadow` and `svgFill` place the whole call in their color slot instead of dropping it or emitting the unresolved DSL.
+  - `light-dark()` is filed by content: `light-dark(#dark, #light)` is a color, `light-dark(1x, 2x)` stays a value, so `padding: 'light-dark(1x, 2x)'` still works.
+  - `shadow` splits layers through the parser instead of `split(',')`, so a color function's own commas no longer tear a layer apart.
+  - An opacity suffix on a replace token that resolves to a derived color function wraps the call — `color-mix(in oklab, <color> 50%, transparent)` — instead of appending a slash alpha the function has no channel for.
+  - A color token whose value cannot be decomposed at build time gets its `--name-color-{space}` companion expressed by reference with relative color syntax, so `#token.alpha` keeps working. Such a companion is registered as `@property … syntax: "*"`; numeric companions keep `<number>+`. The SSR collector no longer emits a second, conflicting companion rule for it.
+  - `parseColor()` no longer reports the name of a `var()` reference found _inside_ a color function as the color's own name — `color-mix(in oklab, #purple 50%, #red)` is not named `purple`.
+  - The `tokens` prop keeps the whole fallback chain in the components companion: `(#primary, #fallback)` now yields `var(--primary-color-{space}, var(--fallback-color-{space}))` instead of only the last fallback.
+
+- [#268](https://github.com/tenphi/tasty/pull/268) [`9c4b929`](https://github.com/tenphi/tasty/commit/9c4b92966fb5fdce19698072d09421d4900a3992) Thanks [@tenphi](https://github.com/tenphi)! - Apply the color-token opacity suffix with CSS relative color syntax instead of the channel components.
+
+  `#purple.5` now emits `oklch(from var(--purple-color) l c h / .5)` where it previously emitted `oklch(var(--purple-color-oklch) / .5)`. The channels are copied over and the alpha slot is written, which asks nothing of the color beyond _being_ a color — so the suffix no longer needs the token decomposed into channels first.
+
+  That makes it work where it used to break:
+  - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space Tasty cannot convert — none of which have channels to decompose
+  - a `--name-color` variable declared in your own CSS, with no Tasty token definition and no companion variable behind it, which previously fell back to the `@property` initial value and silently rendered black
+
+  Writing the alpha slot keeps two properties that compositing with `color-mix()` against `transparent` would have broken: alpha is **replaced** rather than multiplied (a token holding `rgb(255 0 0 / .8)` faded to `.5` is `.5`, not `.4`), and the alpha may be a `<number>` **or** a `<percentage>`, so `#purple.$fade` works whether `$fade` holds `.5` or `50%` — which is what `--*-opacity` properties are registered to accept. The authored digits also survive verbatim, so `#purple.07` stays `.07`.
+
+  `#current.N` is unchanged and still **composes**: `currentcolor` is the color an element inherits, which an ancestor may already have faded, so `#current.4` means "40% of what reaches me" and a nested `#current.18` under it lands at `.072`. Color ramps built on `#current` depend on that. Its percentage is now derived by shifting the decimal point rather than multiplying, so `#current.07` emits `7%` instead of `7.000000000000001%`.
+
+  The space is always `oklch`, whatever `colorSpace` is set to: it is unbounded, so a wide-gamut color survives a round trip that a gamut-limited space would clamp.
+
+  **What changes for consumers:**
+  - Generated CSS changes for every `#token.alpha` value. The colour and its computed serialization are unchanged — `oklch(…)`, as before — so snapshots over computed styles are largely unaffected; snapshots over _emitted_ CSS text need updating. `#current.alpha` is untouched.
+  - Relative color syntax is required on the common path, moving the effective floor to Chrome 119 / Safari 16.4 / Firefox 128.
+  - `parseColor().color` returns the faded form; `.name` and `.opacity` are unchanged, both read through it.
+
+  `--name-color-{space}` companions are untouched: they are still generated, still registered as `@property`, and still what you reach for to address a token's channels. An opacity suffix does not move them — `color="#purple.5"` still reports `#purple`'s own channels in `--current-color-{space}`.
+
+  A _replace token_ is substituted while parsing, so its colour is faded in place: `#brand: 'hsl(220 90% 50%)'` with `#brand.5` still gives `hsl(220 90% 50% / .5)`.
+
+  Also fixes `color(name, 0.07)` emitting `7.000000000000001%`.
+
 ## 3.0.2
 
 ### Patch Changes

@@ -1,8 +1,10 @@
 import { configure, resetConfig } from '../config';
 
 import {
+  convertColorChainToComponentChain,
   getColorSpace,
   getColorSpaceComponents,
+  parseAlphaMix,
   resetColorSpace,
   setColorSpace,
   strToColorSpace,
@@ -252,5 +254,76 @@ describe('configure() colorSpace merge semantics', () => {
   it('defaults to oklch when no configure() call sets colorSpace', () => {
     configure({});
     expect(getColorSpace()).toBe('oklch');
+  });
+});
+
+describe('parseAlphaMix', () => {
+  it('splits a faded color into the color and the percentage', () => {
+    expect(
+      parseAlphaMix(
+        'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+      ),
+    ).toEqual({ color: 'var(--purple-color)', percentage: '50%' });
+  });
+
+  it('accepts the form with the comma spaces dropped', () => {
+    // The parser drops them when it re-serializes a color function, and so does
+    // the CSSOM, so the same value can come back either way.
+    expect(
+      parseAlphaMix('color-mix(in oklab,var(--purple-color) 50%,transparent)'),
+    ).toEqual({ color: 'var(--purple-color)', percentage: '50%' });
+  });
+
+  it('keeps a calc() percentage whole', () => {
+    // The split is the last *top-level* space: a dynamic percentage has spaces
+    // of its own inside the parentheses.
+    expect(
+      parseAlphaMix(
+        'color-mix(in oklab, var(--a-color) calc(var(--fade) * 100%), transparent)',
+      ),
+    ).toEqual({
+      color: 'var(--a-color)',
+      percentage: 'calc(var(--fade) * 100%)',
+    });
+  });
+
+  it('peels one layer off a doubly faded color', () => {
+    expect(
+      parseAlphaMix(
+        'color-mix(in oklab, color-mix(in oklab, var(--a-color) 50%, transparent) 25%, transparent)',
+      ),
+    ).toEqual({
+      color: 'color-mix(in oklab, var(--a-color) 50%, transparent)',
+      percentage: '25%',
+    });
+  });
+
+  it('returns null for a mix that is not an alpha wrapper', () => {
+    expect(
+      parseAlphaMix('color-mix(in srgb, var(--a-color) 50%, var(--b-color))'),
+    ).toBeNull();
+    expect(parseAlphaMix('var(--a-color)')).toBeNull();
+  });
+});
+
+describe('convertColorChainToComponentChain through a fade', () => {
+  it('reports the faded token’s own channels', () => {
+    setColorSpace('oklch');
+
+    // Components carry no alpha, so the wrapper is peeled before converting.
+    expect(
+      convertColorChainToComponentChain(
+        'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+      ),
+    ).toBe('var(--purple-color-oklch)');
+
+    // Including when the comma spaces are gone.
+    expect(
+      convertColorChainToComponentChain(
+        'color-mix(in oklab,var(--purple-color) 50%,transparent)',
+      ),
+    ).toBe('var(--purple-color-oklch)');
+
+    resetColorSpace();
   });
 });

@@ -475,11 +475,45 @@ export function mixColorAlpha(color: string, percentage: string): string {
 }
 
 /**
- * Matches what {@link mixColorAlpha} builds, capturing the color and the alpha
- * percentage so the two can be recovered separately.
+ * Matches what {@link mixColorAlpha} builds, capturing everything between the
+ * mixing space and `transparent`.
+ *
+ * Whitespace after the commas is optional: the parser drops it when it
+ * re-serializes a color function, and so does the CSSOM, so the same value can
+ * come back either spaced or not.
  */
-export const RE_ALPHA_MIX =
-  /^color-mix\(in oklab, (.+) ([^\s,]+), transparent\)$/;
+const RE_ALPHA_MIX = /^color-mix\(in oklab,\s*(.+),\s*transparent\)$/;
+
+/**
+ * Split what {@link mixColorAlpha} builds back into the color it faded and the
+ * alpha percentage, or `null` when the value is not one of those.
+ */
+export function parseAlphaMix(
+  value: string,
+): { color: string; percentage: string } | null {
+  const match = value.match(RE_ALPHA_MIX);
+  if (!match) return null;
+
+  const body = match[1];
+
+  // The percentage is the last top-level token. A dynamic one is a `calc()` with
+  // spaces of its own, so the split has to ignore anything inside parentheses.
+  let depth = 0;
+  for (let i = body.length - 1; i >= 0; i--) {
+    const char = body[i];
+
+    if (char === ')') depth++;
+    else if (char === '(') depth--;
+    else if (char === ' ' && depth === 0) {
+      return {
+        color: body.slice(0, i).trim(),
+        percentage: body.slice(i + 1),
+      };
+    }
+  }
+
+  return null;
+}
 
 /** Channel names of each color space, in `<func>()` argument order. */
 const COLOR_SPACE_CHANNELS: Record<ColorSpace, string> = {
@@ -558,9 +592,9 @@ export function convertColorChainToComponentChain(colorValue: string): string {
   // underneath is converted instead. `#name.5` parses to
   // `color-mix(in oklab, var(--name-color) 50%, transparent)`, whose components
   // are simply `--name-color`'s.
-  const alphaMix = colorValue.match(RE_ALPHA_MIX);
+  const alphaMix = parseAlphaMix(colorValue);
   if (alphaMix) {
-    return convertColorChainToComponentChain(alphaMix[1].trim());
+    return convertColorChainToComponentChain(alphaMix.color);
   }
 
   // Handle the legacy `func(var(--name-color-{suffix}) / alpha)` form, which

@@ -4,7 +4,7 @@ import { registerDefaultFunctions } from '../plugins/defaults';
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
 import { getNamedColorHex } from './color-math';
-import { RE_ALPHA_MIX } from './color-space';
+import { parseAlphaMix } from './color-space';
 
 export {
   getNamedColorHex,
@@ -420,8 +420,8 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
 
   // `#name.alpha` wraps the color in `color-mix()`, so the name and the opacity
   // are read off the wrapper's parts rather than the wrapper itself.
-  const alphaMix = firstColor.match(RE_ALPHA_MIX);
-  const baseColor = alphaMix ? alphaMix[1].trim() : firstColor;
+  const alphaMix = parseAlphaMix(firstColor);
+  const baseColor = alphaMix ? alphaMix.color : firstColor;
 
   // Extract color name (if present) from variable pattern using precompiled regex
   let nameMatch = baseColor.match(COLOR_VAR_PATTERN);
@@ -432,7 +432,7 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   let opacity: number | undefined;
   if (alphaMix) {
     // A dynamic percentage (`calc(var(--fade) * 100%)`) has no number to report.
-    const percentage = alphaMix[2];
+    const { percentage } = alphaMix;
     const v = parseFloat(percentage);
     if (percentage.endsWith('%') && !isNaN(v)) opacity = v;
   } else if (

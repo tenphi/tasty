@@ -484,6 +484,26 @@ export function overrideColorAlpha(color: string, alpha: string): string {
 }
 
 /**
+ * Compose an alpha onto a color, multiplying with any it already carries.
+ *
+ * This is the counterpart to {@link overrideColorAlpha}, and the difference is
+ * the point. A design token names a color, so fading it *sets* its alpha. But
+ * `currentcolor` is the color an element **inherits**, which an ancestor may
+ * already have faded — `#current.4` there means "40% of what reaches me", and a
+ * nested `#current.18` under it composes to `.072`. Design systems build ramps
+ * out of exactly that, so `#current` composes and a token replaces.
+ *
+ * `color-mix()` against `transparent` is what composes: mixing premultiplied
+ * leaves the channels alone and multiplies the alphas. Its percentage slot takes
+ * no `<number>`, so a `$prop` alpha has to be scaled — which is why an opacity
+ * property used as `#current.$prop` has to hold a unitless number, where a token
+ * accepts either form.
+ */
+export function mixColorAlpha(color: string, percentage: string): string {
+  return `color-mix(in oklab, ${color} ${percentage}, transparent)`;
+}
+
+/**
  * Matches what {@link overrideColorAlpha} builds. The first group is greedy so a
  * nested override splits on its outermost layer.
  */

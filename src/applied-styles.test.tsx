@@ -129,6 +129,36 @@ describe('generated CSS applies in the browser', () => {
       }
     });
 
+    it('composes a nested `#current` fade instead of replacing it', () => {
+      // A ramp built on `#current` depends on this: a label faded to `.4` and a
+      // fill authored at `.18` under it land at `.072`, which is what the fill's
+      // alpha was chosen against. Replacing would make it 2.5x more opaque.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const Inner = tasty({ qa: 'Inner', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ color: '#current.4' }}>
+          <Inner styles={{ fill: '#current.18' }} />
+        </Box>,
+      ).getByTestId('Inner');
+
+      expect(computed(el, 'background-color')).toContain('/ 0.072)');
+    });
+
+    it('composes a nested `#current` fade instead of replacing it', () => {
+      // A ramp built on `#current` depends on this: a label faded to `.4` with a
+      // fill authored at `.18` under it lands at `.072`, which is the value that
+      // alpha was chosen against. Replacing would make it 2.5x more opaque.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const Inner = tasty({ qa: 'Inner', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ color: '#current.4' }}>
+          <Inner styles={{ fill: '#current.18' }} />
+        </Box>,
+      ).getByTestId('Inner');
+
+      expect(computed(el, 'background-color')).toContain('/ 0.072)');
+    });
+
     it('fades without clamping a colour to sRGB', () => {
       // The channels are copied, not converted into a gamut-limited space, so a
       // display-p3 red keeps a chroma sRGB cannot hold. `rgb(from …)` — or a mix

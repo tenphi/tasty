@@ -463,7 +463,7 @@ describe('processTokens', () => {
 
       expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe(
-        'oklch(from currentcolor l c h / .5)',
+        'color-mix(in oklab, currentcolor 50%, transparent)',
       );
       // No RGB should be generated for currentcolor-based values
       expect(result!['--my-color-color-rgb']).toBeUndefined();
@@ -476,7 +476,7 @@ describe('processTokens', () => {
 
       expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe(
-        'oklch(from currentcolor l c h / var(--fade))',
+        'color-mix(in oklab, currentcolor calc(var(--fade) * 100%), transparent)',
       );
       // No RGB should be generated for currentcolor-based values
       expect(result!['--my-color-color-rgb']).toBeUndefined();

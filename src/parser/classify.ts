@@ -1,5 +1,5 @@
 import { getNamedColorHex } from '../utils/color-math';
-import { overrideColorAlpha } from '../utils/color-space';
+import { mixColorAlpha, overrideColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 
@@ -38,6 +38,34 @@ function alphaSuffixToAlpha(rawAlpha: string): string {
 /** Apply an opacity suffix to a color, replacing any alpha it already carries. */
 function fadeColor(color: string, rawAlpha: string): string {
   return overrideColorAlpha(color, alphaSuffixToAlpha(rawAlpha));
+}
+
+/**
+ * Convert an opacity suffix to the percentage `color-mix()` needs, by shifting
+ * the decimal point rather than multiplying: `.07` is `7%`, not the
+ * `7.000000000000001%` that `parseFloat('.07') * 100` produces.
+ */
+function alphaSuffixToPercentage(rawAlpha: string): string {
+  if (rawAlpha.startsWith('$')) {
+    // A mix percentage cannot be a `<number>`, so the reference has to be scaled.
+    return `calc(var(--${rawAlpha.slice(1)}) * 100%)`;
+  }
+  if (rawAlpha === '0') return '0%';
+
+  const digits = rawAlpha.length === 1 ? `${rawAlpha}0` : rawAlpha;
+  const whole = String(Number(digits.slice(0, 2)));
+  const fraction = digits.slice(2);
+
+  return `${fraction ? `${whole}.${fraction}` : whole}%`;
+}
+
+/**
+ * Apply an opacity suffix to `currentcolor`, composing with any alpha an
+ * ancestor already applied. See {@link mixColorAlpha} for why this differs from
+ * how a token is faded.
+ */
+function fadeCurrentColor(rawAlpha: string): string {
+  return mixColorAlpha('currentcolor', alphaSuffixToPercentage(rawAlpha));
 }
 
 /**
@@ -201,7 +229,7 @@ export function classify(
   if (currentAlphaMatch) {
     return {
       bucket: Bucket.Color,
-      processed: fadeColor('currentcolor', currentAlphaMatch[1]),
+      processed: fadeCurrentColor(currentAlphaMatch[1]),
     };
   }
 

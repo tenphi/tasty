@@ -1239,30 +1239,36 @@ describe('#current color token', () => {
 
   test('#current.5 uses color-mix with 50%', () => {
     const result = parser.process('#current.5');
-    expect(result.output).toBe('oklch(from currentcolor l c h / .5)');
+    expect(result.output).toBe(
+      'color-mix(in oklab, currentcolor 50%, transparent)',
+    );
   });
 
   test('#current.05 uses color-mix with 5%', () => {
     const result = parser.process('#current.05');
-    expect(result.output).toBe('oklch(from currentcolor l c h / .05)');
+    expect(result.output).toBe(
+      'color-mix(in oklab, currentcolor 5%, transparent)',
+    );
   });
 
   test('#current.0 uses color-mix with 0%', () => {
     const result = parser.process('#current.0');
-    expect(result.output).toBe('oklch(from currentcolor l c h / 0)');
+    expect(result.output).toBe(
+      'color-mix(in oklab, currentcolor 0%, transparent)',
+    );
   });
 
   test('#current.$opacity uses color-mix with calc()', () => {
     const result = parser.process('#current.$opacity');
     expect(result.output).toBe(
-      'oklch(from currentcolor l c h / var(--opacity))',
+      'color-mix(in oklab, currentcolor calc(var(--opacity) * 100%), transparent)',
     );
   });
 
   test('#current.$disabled uses color-mix with calc()', () => {
     const result = parser.process('#current.$disabled');
     expect(result.output).toBe(
-      'oklch(from currentcolor l c h / var(--disabled))',
+      'color-mix(in oklab, currentcolor calc(var(--disabled) * 100%), transparent)',
     );
   });
 
@@ -1320,7 +1326,9 @@ describe('#current color token', () => {
 
     // Using the token should produce color-mix
     const result = parser.process('#my-color');
-    expect(result.output).toBe('oklch(from currentcolor l c h / .5)');
+    expect(result.output).toBe(
+      'color-mix(in oklab, currentcolor 50%, transparent)',
+    );
 
     warnSpy.mockRestore();
   });

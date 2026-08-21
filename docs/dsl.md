@@ -163,6 +163,25 @@ Two properties follow from writing the alpha slot rather than compositing:
   `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
   which is what `--*-opacity` properties are registered to accept.
 
+### `#current` composes instead
+
+`#current` is the one exception, and the difference is deliberate. A token *names*
+a color, so fading it sets its alpha. `currentcolor` is the color an element
+**inherits**, which an ancestor may already have faded — `#current.4` means "40%
+of what reaches me":
+
+```jsx
+fill: '#current.4';
+// → color-mix(in oklab, currentcolor 40%, transparent)
+```
+
+So a `#current` fade nested inside another one composes: a label at `#current.4`
+with a fill of `#current.18` under it lands at `.072`. Color ramps built on
+`#current` depend on that — replacing would double the opacity of every nested
+step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
+custom property used as `#current.$fade` must hold a unitless number; a token
+accepts either form.
+
 The space is always `oklch`, whatever [`colorSpace`](configuration.md#color-space)
 is set to: it is unbounded, so a wide-gamut color survives a round trip that a
 gamut-limited space would clamp.

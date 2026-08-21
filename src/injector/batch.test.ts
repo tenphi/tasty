@@ -113,6 +113,48 @@ describe('batched injection', () => {
     });
   });
 
+  // One module-global queue serves every root, so the drain has to keep each
+  // root's writes in that root's own sheet and in that root's own order.
+  it('keeps per-root order when writes to two roots interleave', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+
+    const build = (inj: StyleInjector) => {
+      inj.inject([rule('.d1.d1', 'color: d1')], { cacheKey: 'd1' });
+      inj.inject([rule('.s1.s1', 'color: s1')], {
+        cacheKey: 's1',
+        root: shadow,
+      });
+      inj.inject([rule('.d2.d2', 'color: d2')], { cacheKey: 'd2' });
+      inj.inject([rule('.s2.s2', 'color: s2')], {
+        cacheKey: 's2',
+        root: shadow,
+      });
+    };
+
+    const sync = makeInjector(undefined);
+    build(sync);
+    const expectedDoc = sync.getCSSText();
+    const expectedShadow = sync.getCSSText({ root: shadow });
+    sync.destroy();
+    sync.destroy(shadow);
+
+    resetStyleBatch();
+    injector = makeInjector('always');
+    build(injector);
+    flushStyles();
+
+    expect(injector.getCSSText()).toBe(expectedDoc);
+    expect(injector.getCSSText({ root: shadow })).toBe(expectedShadow);
+    // ...and neither root picked up the other's rules.
+    expect(injector.getCSSText()).not.toContain('color: s1');
+    expect(injector.getCSSText({ root: shadow })).not.toContain('color: d1');
+
+    injector.destroy(shadow);
+    host.remove();
+  });
+
   // -------------------------------------------------------------------------
   // Window lifetime
   // -------------------------------------------------------------------------

@@ -4459,7 +4459,6 @@ describe('Token CSS deduplication with compound states', () => {
     clearConditionCache();
 
     configure({
-      colorSpace: 'rgb',
       states: {
         '@dark-root':
           'schema=dark | (!schema & @media(prefers-color-scheme: dark))',
@@ -5392,7 +5391,6 @@ describe('Compound state CSS bloat fixes', () => {
     clearConditionCache();
 
     configure({
-      colorSpace: 'rgb',
       states: {
         '@dark-root':
           'schema=dark | (!schema & @media(prefers-color-scheme: dark))',

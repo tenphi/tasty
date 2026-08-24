@@ -1,225 +1,75 @@
 import { configure, resetConfig } from '../config';
+import { createStyle } from '../styles/createStyle';
 
 import {
-  getColorSpace,
+  mixColorAlpha,
+  overrideColorAlpha,
   parseAlphaOverride,
-  resetColorSpace,
-  setColorSpace,
-  strToColorSpace,
 } from './color-space';
 
 afterEach(() => {
-  resetColorSpace();
   resetConfig();
 });
 
-describe('strToColorSpace — alpha preservation', () => {
-  describe('colorSpace = rgb', () => {
-    beforeEach(() => setColorSpace('rgb'));
+describe('overrideColorAlpha — replaces the alpha', () => {
+  it('writes the alpha slot with relative color syntax', () => {
+    expect(overrideColorAlpha('var(--purple-color)', '.5')).toBe(
+      'oklch(from var(--purple-color) l c h / .5)',
+    );
+  });
 
-    it('preserves full opacity (no alpha suffix)', () => {
-      expect(strToColorSpace('rgb(255, 128, 0)')).toBe('rgb(255 128 0)');
-    });
+  it('passes a percentage alpha through as authored', () => {
+    expect(overrideColorAlpha('var(--purple-color)', '50%')).toBe(
+      'oklch(from var(--purple-color) l c h / 50%)',
+    );
+  });
 
-    it('preserves alpha from rgba()', () => {
-      expect(strToColorSpace('rgba(0, 0, 0, 0)')).toBe('rgb(0 0 0 / 0)');
-    });
+  it('passes a var() alpha through as authored', () => {
+    expect(overrideColorAlpha('var(--purple-color)', 'var(--fade)')).toBe(
+      'oklch(from var(--purple-color) l c h / var(--fade))',
+    );
+  });
 
-    it('preserves alpha from rgb() with slash notation', () => {
-      expect(strToColorSpace('rgb(0 0 0 / 0)')).toBe('rgb(0 0 0 / 0)');
-    });
-
-    it('preserves fractional alpha', () => {
-      expect(strToColorSpace('rgba(255, 0, 0, 0.5)')).toBe(
-        'rgb(255 0 0 / 0.5)',
+  it('takes any color as the origin, including ones with no decomposable channels', () => {
+    // The point of relative color syntax: the browser resolves the channels, so
+    // the engine never has to evaluate the color.
+    for (const color of [
+      'color-mix(in oklab, red 50%, blue)',
+      'light-dark(#fff, #000)',
+      'color(display-p3 1 .5 0)',
+      'var(--from-hand-authored-css)',
+      'red',
+    ]) {
+      expect(overrideColorAlpha(color, '.5')).toBe(
+        `oklch(from ${color} l c h / .5)`,
       );
-    });
-
-    it('preserves alpha from 8-char hex', () => {
-      expect(strToColorSpace('#00000000')).toBe('rgb(0 0 0 / 0)');
-    });
-
-    it('preserves alpha from 4-char hex', () => {
-      expect(strToColorSpace('#0000')).toBe('rgb(0 0 0 / 0)');
-    });
-
-    it('treats 6-char hex as opaque', () => {
-      expect(strToColorSpace('#000000')).toBe('rgb(0 0 0)');
-    });
-
-    it('treats 3-char hex as opaque', () => {
-      expect(strToColorSpace('#000')).toBe('rgb(0 0 0)');
-    });
-
-    it('preserves alpha from hsl() with slash', () => {
-      expect(strToColorSpace('hsl(0 0% 0% / 0.5)')).toBe('rgb(0 0 0 / 0.5)');
-    });
-
-    it('preserves alpha from hsla()', () => {
-      expect(strToColorSpace('hsla(0, 0%, 0%, 0)')).toBe('rgb(0 0 0 / 0)');
-    });
-
-    it('preserves alpha from oklch() with slash', () => {
-      expect(strToColorSpace('oklch(0 0 0 / 0.5)')).toBe('rgb(0 0 0 / 0.5)');
-    });
+    }
   });
 
-  describe('colorSpace = oklch', () => {
-    beforeEach(() => setColorSpace('oklch'));
+  it('always uses oklch, which is unbounded', () => {
+    // A gamut-limited space would clamp a wide-gamut origin. Nothing configures
+    // this — `colorSpace` has no say in it.
+    configure({ colorSpace: 'rgb' });
 
-    it('preserves full opacity (no alpha suffix)', () => {
-      const result = strToColorSpace('#ff0000');
-      expect(result).toMatch(/^oklch\(/);
-      expect(result).not.toContain('/');
-    });
-
-    it('preserves alpha from rgba(0,0,0,0)', () => {
-      expect(strToColorSpace('rgba(0, 0, 0, 0)')).toMatch(/^oklch\(.+ \/ 0\)$/);
-    });
-
-    it('preserves alpha from 8-char hex', () => {
-      const result = strToColorSpace('#ff000080');
-      expect(result).toMatch(/^oklch\(.+ \/ .+\)$/);
-    });
-  });
-
-  describe('colorSpace = hsl', () => {
-    beforeEach(() => setColorSpace('hsl'));
-
-    it('preserves full opacity (no alpha suffix)', () => {
-      expect(strToColorSpace('#000000')).toBe('hsl(0 0% 0%)');
-    });
-
-    it('preserves alpha from rgba(0,0,0,0)', () => {
-      expect(strToColorSpace('rgba(0, 0, 0, 0)')).toBe('hsl(0 0% 0% / 0)');
-    });
+    expect(overrideColorAlpha('oklch(0.7 0.35 30)', '.5')).toBe(
+      'oklch(from oklch(0.7 0.35 30) l c h / .5)',
+    );
   });
 });
 
-describe('same-space fast path — preserves same-space values verbatim', () => {
-  describe('colorSpace = oklch', () => {
-    beforeEach(() => setColorSpace('oklch'));
-
-    it('preserves var() hue in oklch()', () => {
-      expect(strToColorSpace('oklch(var(--hue) .2 20)')).toBe(
-        'oklch(var(--hue) .2 20)',
-      );
-    });
-
-    it('preserves mixed-case var() names (custom properties are case-sensitive)', () => {
-      expect(strToColorSpace('oklch(var(--myHue) .2 20)')).toBe(
-        'oklch(var(--myHue) .2 20)',
-      );
-    });
-
-    it('preserves slash alpha with var()', () => {
-      expect(strToColorSpace('oklch(var(--hue) .2 20 / var(--a))')).toBe(
-        'oklch(var(--hue) .2 20 / var(--a))',
-      );
-    });
-
-    it('preserves calc() tokens', () => {
-      expect(strToColorSpace('oklch(calc(var(--l) + 0.1) .2 20)')).toBe(
-        'oklch(calc(var(--l) + 0.1) .2 20)',
-      );
-    });
-
-    it('preserves purely numeric oklch verbatim (no sRGB round-trip / gamut clamp)', () => {
-      // Static same-space values are kept as-is: no work, no sRGB gamut clamp.
-      expect(strToColorSpace('oklch(0.5 0.2 20)')).toBe('oklch(0.5 0.2 20)');
-    });
-
-    it('preserves wide-gamut oklch chroma that sRGB would clamp', () => {
-      expect(strToColorSpace('oklch(0.7 0.35 30)')).toBe('oklch(0.7 0.35 30)');
-    });
-
-    it('normalizes function name/whitespace but keeps values', () => {
-      expect(strToColorSpace('oklch(0.5   0.2   20)')).toBe(
-        'oklch(0.5 0.2 20)',
-      );
-    });
-
-    it('normalizes a percentage lightness to the canonical 0-1 number', () => {
-      expect(strToColorSpace('oklch(70% 0.2 20)')).toBe('oklch(70% 0.2 20)');
-    });
+describe('mixColorAlpha — composes the alpha', () => {
+  it('mixes against transparent so an inherited alpha multiplies', () => {
+    expect(mixColorAlpha('currentcolor', '40%')).toBe(
+      'color-mix(in oklab, currentcolor 40%, transparent)',
+    );
   });
 
-  describe('colorSpace = rgb', () => {
-    beforeEach(() => setColorSpace('rgb'));
-
-    it('preserves var() channels in rgb()', () => {
-      expect(strToColorSpace('rgb(var(--r) var(--g) var(--b))')).toBe(
-        'rgb(var(--r) var(--g) var(--b))',
-      );
-    });
-
-    it('normalizes legacy rgba commas to modern syntax', () => {
-      expect(strToColorSpace('rgba(0, 0, 0, 0)')).toBe('rgb(0 0 0 / 0)');
-    });
-
-    it('preserves var() alpha via slash notation', () => {
-      expect(
-        strToColorSpace('rgb(var(--r) var(--g) var(--b) / var(--a))'),
-      ).toBe('rgb(var(--r) var(--g) var(--b) / var(--a))');
-    });
-
-    it('preserves static rgb value verbatim (no round-trip)', () => {
-      expect(strToColorSpace('rgb(255 128 0)')).toBe('rgb(255 128 0)');
-    });
-
-    it('keeps static rgb percentage channels verbatim', () => {
-      // Mirrors okhsl()/okhst() -> rgb(...%) parser output.
-      expect(strToColorSpace('rgb(100% 100% 100%)')).toBe(
-        'rgb(100% 100% 100%)',
-      );
-    });
-  });
-
-  describe('colorSpace = hsl', () => {
-    beforeEach(() => setColorSpace('hsl'));
-
-    it('preserves var() hue in hsl()', () => {
-      expect(strToColorSpace('hsl(var(--h) 50% 50%)')).toBe(
-        'hsl(var(--h) 50% 50%)',
-      );
-    });
-
-    it('preserves slash alpha with var()', () => {
-      expect(strToColorSpace('hsl(var(--h) 50% 50% / var(--a))')).toBe(
-        'hsl(var(--h) 50% 50% / var(--a))',
-      );
-    });
-  });
-
-  describe('cross-space still round-trips through sRGB', () => {
-    beforeEach(() => setColorSpace('rgb'));
-
-    it('converts oklch numeric input to rgb (fallback path)', () => {
-      expect(strToColorSpace('oklch(0 0 0 / 0.5)')).toBe('rgb(0 0 0 / 0.5)');
-    });
-  });
-});
-
-describe('configure() colorSpace merge semantics', () => {
-  it('does not reset colorSpace when a subsequent configure() omits it', () => {
-    configure({ colorSpace: 'rgb' });
-    expect(getColorSpace()).toBe('rgb');
-
-    configure({ states: { '@mobile': '@media(w < 920px)' } });
-    expect(getColorSpace()).toBe('rgb');
-  });
-
-  it('overrides colorSpace when explicitly provided in a subsequent call', () => {
-    configure({ colorSpace: 'rgb' });
-    expect(getColorSpace()).toBe('rgb');
-
-    configure({ colorSpace: 'hsl' });
-    expect(getColorSpace()).toBe('hsl');
-  });
-
-  it('defaults to oklch when no configure() call sets colorSpace', () => {
-    configure({});
-    expect(getColorSpace()).toBe('oklch');
+  it('is distinct from overrideColorAlpha, which replaces', () => {
+    // `#current.N` composes and `#token.N` replaces; unifying them would double
+    // the opacity of every nested step in a `currentcolor` ramp.
+    expect(mixColorAlpha('currentcolor', '50%')).not.toBe(
+      overrideColorAlpha('currentcolor', '.5'),
+    );
   });
 });
 
@@ -269,103 +119,41 @@ describe('parseAlphaOverride', () => {
   });
 });
 
-describe('strToColorSpace — cross-space conversion', () => {
-  beforeEach(() => setColorSpace('rgb'));
+describe('the colorSpace option is inert', () => {
+  // It used to rewrite a `#name` token's value into the configured space. The
+  // value is now emitted as authored, whatever the option says. (The
+  // deprecation warning itself goes through config's `warnOnce`, which is
+  // suppressed under NODE_ENV=test, so the behavior is what gets asserted.)
+  const handler = createStyle('#brand');
 
-  it('converts hsl to rgb', () => {
-    expect(strToColorSpace('hsl(200 40% 50%)')).toBe('rgb(77 144 179)');
-    expect(strToColorSpace('hsl(0 100% 50%)')).toBe('rgb(255 0 0)');
-    expect(strToColorSpace('hsl(120 100% 50%)')).toBe('rgb(0 255 0)');
-    expect(strToColorSpace('hsl(240 100% 50%)')).toBe('rgb(0 0 255)');
+  it('leaves a hex literal alone in every space', () => {
+    for (const colorSpace of ['rgb', 'hsl', 'oklch'] as const) {
+      resetConfig();
+      configure({ colorSpace });
+
+      expect(handler({ '#brand': '#f80' })).toEqual({
+        '--brand-color': '#f80',
+      });
+    }
   });
 
-  it('converts an achromatic hsl (saturation 0)', () => {
-    expect(strToColorSpace('hsl(180 0% 50%)')).toBe('rgb(128 128 128)');
-    expect(strToColorSpace('hsl(0 0% 100%)')).toBe('rgb(255 255 255)');
-    expect(strToColorSpace('hsl(0 0% 0%)')).toBe('rgb(0 0 0)');
+  it('leaves a native color function alone in every space', () => {
+    for (const colorSpace of ['rgb', 'hsl', 'oklch'] as const) {
+      resetConfig();
+      configure({ colorSpace });
+
+      expect(handler({ '#brand': 'hsl(120 100% 50%)' })).toEqual({
+        '--brand-color': 'hsl(120 100% 50%)',
+      });
+    }
   });
 
-  it('converts a hex literal', () => {
-    expect(strToColorSpace('#ff8040')).toBe('rgb(255 128 64)');
-    expect(strToColorSpace('#f80')).toBe('rgb(255 136 0)');
-  });
+  it('leaves a bare CSS color name alone in every space', () => {
+    for (const colorSpace of ['rgb', 'hsl', 'oklch'] as const) {
+      resetConfig();
+      configure({ colorSpace });
 
-  describe('hue units and wrapping', () => {
-    it('accepts deg', () => {
-      expect(strToColorSpace('hsl(90deg 50% 50%)')).toBe(
-        strToColorSpace('hsl(90 50% 50%)'),
-      );
-    });
-
-    it('accepts turn', () => {
-      // 0.5turn = 180deg = cyan
-      expect(strToColorSpace('hsl(0.5turn 100% 50%)')).toBe('rgb(0 255 255)');
-    });
-
-    it('accepts rad', () => {
-      // π rad ≈ 180deg = cyan
-      expect(strToColorSpace('hsl(3.14159rad 100% 50%)')).toBe(
-        'rgb(0 255 255)',
-      );
-    });
-
-    it('wraps a negative hue', () => {
-      // -90deg is 270deg
-      expect(strToColorSpace('hsl(-90 100% 50%)')).toBe(
-        strToColorSpace('hsl(270 100% 50%)'),
-      );
-      expect(strToColorSpace('hsl(-90 100% 50%)')).toBe('rgb(128 0 255)');
-    });
-
-    it('wraps a hue above 360', () => {
-      // 450deg is 90deg
-      expect(strToColorSpace('hsl(450 100% 50%)')).toBe(
-        strToColorSpace('hsl(90 100% 50%)'),
-      );
-      expect(strToColorSpace('hsl(450 100% 50%)')).toBe('rgb(128 255 0)');
-    });
-  });
-});
-
-describe('same-space fast path — canonicalizes the function shape', () => {
-  // The function name is derived from the configured space plus an optional
-  // legacy `a`, so each space has to accept both spellings of its own function
-  // and emit the canonical one.
-  it('drops the legacy `a` suffix in rgb space', () => {
-    setColorSpace('rgb');
-    expect(strToColorSpace('rgba(1 2 3 / .5)')).toBe('rgb(1 2 3 / .5)');
-  });
-
-  it('drops the legacy `a` suffix in hsl space', () => {
-    setColorSpace('hsl');
-    expect(strToColorSpace('hsla(1 2% 3% / .5)')).toBe('hsl(1 2% 3% / .5)');
-  });
-
-  it('drops the legacy `a` suffix in oklch space', () => {
-    setColorSpace('oklch');
-    expect(strToColorSpace('oklcha(.1 .2 3 / .5)')).toBe('oklch(.1 .2 3 / .5)');
-  });
-
-  it('matches the function name case-insensitively', () => {
-    setColorSpace('rgb');
-    expect(strToColorSpace('RGBA(1 2 3 / .5)')).toBe('rgb(1 2 3 / .5)');
-  });
-
-  it('normalizes a comma-separated alpha to the slash form', () => {
-    setColorSpace('rgb');
-    expect(strToColorSpace('rgb(1, 2, 3, .5)')).toBe('rgb(1 2 3 / .5)');
-  });
-
-  it('does not take the fast path for a different space', () => {
-    // `hsl()` in rgb space is a genuine conversion, not a same-space value.
-    setColorSpace('rgb');
-    expect(strToColorSpace('hsl(0 100% 50%)')).toBe('rgb(255 0 0)');
-  });
-
-  it('rejects a function with the wrong number of channels', () => {
-    setColorSpace('rgb');
-    // Falls through to the sRGB round-trip, which cannot parse it either.
-    expect(strToColorSpace('rgb(1 2)')).toBeNull();
-    expect(strToColorSpace('rgb(  )')).toBeNull();
+      expect(handler({ '#brand': 'red' })).toEqual({ '--brand-color': 'red' });
+    }
   });
 });

@@ -1,12 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { configure, resetConfig } from '../config';
+import { resolveFunctionColor } from '../utils/function-color';
 import { parseColor, parseStyle } from '../utils/styles';
-import {
-  resetColorSpace,
-  setColorSpace,
-  strToColorSpace,
-} from '../utils/color-space';
 
 import { createColorFunc } from './color-func';
 
@@ -54,7 +50,6 @@ const hslStylePlugin: TastyPluginFactory = (): TastyPlugin => ({
 describe('custom color function plugin (no core special-casing)', () => {
   afterEach(() => {
     resetConfig();
-    resetColorSpace();
   });
 
   it('parses a custom color function into rgb() via the parser', () => {
@@ -63,12 +58,11 @@ describe('custom color function plugin (no core special-casing)', () => {
     expect(parseStyle('mycolor(255 0 0)').output).toBe('rgb(255 0 0)');
   });
 
-  it('resolves a custom color function through strToColorSpace', () => {
+  it('resolves a custom color function through resolveFunctionColor', () => {
     configure({ plugins: [mycolorPlugin()] });
-    setColorSpace('rgb');
 
-    expect(strToColorSpace('mycolor(255 0 0)')).toBe('rgb(255 0 0)');
-    expect(strToColorSpace('mycolor(255 0 0 / 0.5)')).toBe(
+    expect(resolveFunctionColor('mycolor(255 0 0)')).toBe('rgb(255 0 0)');
+    expect(resolveFunctionColor('mycolor(255 0 0 / 0.5)')).toBe(
       'rgb(255 0 0 / 0.5)',
     );
   });

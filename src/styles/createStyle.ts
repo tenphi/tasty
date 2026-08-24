@@ -1,4 +1,3 @@
-import { strToColorSpace } from '../utils/color-space';
 import { normalizeDslName, toSnakeCase } from '../utils/string';
 import {
   normalizeColorTokenValue,
@@ -68,22 +67,14 @@ export function createStyle(
       ) {
         styleValue = styleValue.trim();
 
-        // A literal the engine can evaluate is emitted in the configured color
-        // space. Everything else is whatever the parser resolved the value to —
-        // a `#token` or fallback chain becomes its `var()` chain, a color
-        // function keeps its expanded tokens, a keyword passes through.
-        //
-        // The two are mutually exclusive, so this is a precedence and not a
-        // merge: a value `strToColorSpace` can convert is a literal, and a
-        // literal never resolves to a `var(--name-color)` chain. Trying the
-        // conversion first also keeps the heavier `parseColor` off the path for
-        // plain literals — and off values it would warn about for no reason,
-        // since it cannot resolve a bare CSS color name like `red`.
-        const converted = strToColorSpace(styleValue as string);
-
+        // The color is emitted as the parser resolved it: a `#token` or fallback
+        // chain becomes its `var()` chain, a color function keeps its expanded
+        // tokens, a literal or keyword passes through as authored. Nothing needs
+        // rewriting into a particular color space — opacity is applied with
+        // relative color syntax, which reads the channels off whatever the
+        // browser resolves the value to.
         return {
-          [finalCssStyle]:
-            converted ?? parseColor(styleValue as string).color ?? '',
+          [finalCssStyle]: parseColor(styleValue as string).color ?? '',
         };
       }
 

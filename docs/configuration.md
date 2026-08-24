@@ -72,7 +72,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `plugins` | `TastyPlugin[]` | - | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
 | `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
 | `batchInjection` | `boolean \| 'always'` | `false` | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection) |
-| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space a statically known color is emitted in |
+| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | - | **Deprecated** — no longer has any effect. See [Color space](#color-space) |
 | `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
 
 ---
@@ -205,48 +205,60 @@ useLayoutEffect(() => {
 
 ## Color Space
 
-Controls the CSS color space a statically known color is emitted in. A `#name`
-token declares one variable, `--name-color`, and its value is converted into the
-configured space when the engine can evaluate it at build time.
+> **Deprecated.** `configure({ colorSpace })` no longer has any effect and will
+> be removed in the next major. Setting it warns in development.
+
+A `#name` token's value used to be rewritten into a configured color space, so
+`#brand: '#ff8800'` declared `--brand-color: oklch(0.75 0.16 55)`. That existed
+to serve the opacity suffix, which needed numeric channels to write an alpha
+into. Opacity now uses CSS relative color syntax —
+`oklch(from var(--brand-color) l c h / .5)` — which has the browser read the
+channels, so there is nothing left for the setting to decide.
+
+A color is emitted exactly as authored:
 
 ```jsx
-configure({
-  colorSpace: 'oklch', // default
-});
+configure({ tokens: { '#brand': '#ff8800' } });
+// → --brand-color: #ff8800
 ```
 
-| Color Space | `#brand: '#ff8800'` emits |
-|---|---|
-| `rgb` | `--brand-color: rgb(255 136 0)` |
-| `hsl` | `--brand-color: hsl(32 100% 50%)` |
-| `oklch` | `--brand-color: oklch(0.75 0.16 55)` |
+That holds for every form: a hex literal, a native color function, a bare CSS
+color name, a `color-mix()`, a `light-dark()`, a fallback chain. A `#token`
+reference still resolves to its `var()` chain, and a plugin color function such
+as `okhsl()` is still resolved by the parser to the color it denotes.
 
-The `oklch` color space is the default because it is perceptually uniform and
-wide-gamut, so a channel read off it — to shift a lightness, animate a hue,
-build a derived color — behaves the way the eye expects and is not clamped to
-sRGB.
+To address a token's channels, use relative color syntax against the token:
 
-A color the engine cannot evaluate at build time — a `color-mix()`, a
-`light-dark()`, a `color()` in a space it has no conversion for, anything reached
-through `var()` — is emitted as authored and left for the browser to resolve.
+```css
+background: oklch(from var(--brand-color) calc(l * 1.2) c h);
+```
 
-The setting does not affect the [opacity suffix](dsl.md#color-tokens--opacity),
-which always writes `oklch(from <color> l c h / <alpha>)`: alpha application is
-space-independent, and `oklch` is unbounded, so a wide-gamut color survives a
-round trip a narrower space would clamp.
+This works on any `<color>`, including the ones no build-time conversion could
+have evaluated — and it is what the [opacity suffix](dsl.md#color-tokens--opacity)
+itself uses. Its space is always `oklch`, which is unbounded, so a wide-gamut
+color survives a round trip a narrower space would clamp.
 
-To address a token's channels yourself, use relative color syntax against the
-token — `oklch(from var(--brand-color) calc(l * 1.2) c h)` — which works on any
-color, including the ones the engine cannot decompose.
+### Migrating off `colorSpace`
+
+Drop the option. If you relied on the uniform output format, nothing in Tasty
+needs it — author your tokens in the space you want them emitted in, since the
+value now passes through untouched:
+
+```jsx
+// before: any input, normalized to the configured space on the way out
+configure({ colorSpace: 'oklch', tokens: { '#brand': '#ff8800' } });
+
+// after: author it in the space you want
+configure({ tokens: { '#brand': 'oklch(0.75 0.16 55)' } });
+```
 
 ### Migrating off the channel companions
 
 A `#name` token used to declare a second variable beside `--name-color` holding
 its channels decomposed, suffixed with the configured space —
 `--brand-color-oklch: 0.75 0.16 55` — and a `color` style emitted
-`--current-color-{space}` beside `--current-color`. Both are gone: they existed
-so an opacity suffix had channels to write an alpha into, and nothing has read
-one since opacity moved to relative color syntax.
+`--current-color-{space}` beside `--current-color`. Both are gone, for the same
+reason: they existed so an opacity suffix had channels to write an alpha into.
 
 These were never part of the public API, but they were visible in the emitted
 CSS, so hand-authored CSS may reference one. Address the token itself instead:
@@ -457,7 +469,7 @@ See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside
 
 ### Custom color functions
 
-A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, conversion into the configured color space, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
+A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
 
 ```ts
 import { configure, createColorFunc } from '@tenphi/tasty';

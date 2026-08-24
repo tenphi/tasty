@@ -182,9 +182,9 @@ step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
 custom property used as `#current.$fade` must hold a unitless number; a token
 accepts either form.
 
-The space is always `oklch`, whatever [`colorSpace`](configuration.md#color-space)
-is set to: it is unbounded, so a wide-gamut color survives a round trip that a
-gamut-limited space would clamp.
+The space is always `oklch`: it is unbounded, so a wide-gamut color survives a
+round trip that a gamut-limited space would clamp. Nothing configures this —
+see [Color space](configuration.md#color-space).
 
 ---
 

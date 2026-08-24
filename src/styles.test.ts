@@ -1,6 +1,4 @@
-import { configure, resetConfig } from './config';
-import { strToColorSpace } from './utils/color-space';
-import { parseColor } from './utils/styles';
+import { resetConfig } from './config';
 
 import { borderStyle } from './styles/border';
 import { colorStyle } from './styles/color';
@@ -19,7 +17,6 @@ import { shadowStyle } from './styles/shadow';
 describe('Tasty style tests', () => {
   beforeEach(() => {
     resetConfig();
-    configure({ colorSpace: 'rgb' });
   });
 
   afterEach(() => {
@@ -501,25 +498,34 @@ describe('Tasty style tests', () => {
     // Every outcome of `createStyle`'s color branch. A `#name` key declares one
     // custom property, `--name-color`, and what lands in it depends only on
     // whether the value names a token and whether the engine can convert it.
-    it('converts a hex literal into the configured color space', () => {
+    it('keeps a hex literal as authored', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': '#f80' })).toEqual({
-        '--brand-color': 'rgb(255 136 0)',
+        '--brand-color': '#f80',
       });
     });
 
-    it('converts a bare CSS color name without warning about it', () => {
-      // `parseColor` cannot resolve `red`, but `strToColorSpace` can, and it is
-      // tried first — so the value converts and no warning is emitted.
+    it('keeps a bare CSS color name as authored, without warning', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
         /* noop */
       });
       const handler = createStyle('#brand');
 
-      expect(handler({ '#brand': 'red' })).toEqual({
-        '--brand-color': 'rgb(255 0 0)',
-      });
+      // Named colors starting with r/h/l/o/v/c/t used to miss `parseColor`'s
+      // first-character dispatch and warn; every letter resolves now.
+      for (const name of [
+        'red',
+        'hotpink',
+        'lime',
+        'orange',
+        'violet',
+        'coral',
+        'teal',
+        'blue',
+      ]) {
+        expect(handler({ '#brand': name })).toEqual({ '--brand-color': name });
+      }
       expect(warn).not.toHaveBeenCalled();
 
       warn.mockRestore();
@@ -533,20 +539,11 @@ describe('Tasty style tests', () => {
       });
     });
 
-    it('converts a bare literal into the configured color space', () => {
+    it('keeps a native color function as authored', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': 'hsl(120 100% 50%)' })).toEqual({
-        '--brand-color': 'rgb(0 255 0)',
-      });
-    });
-
-    it('follows the configured color space', () => {
-      configure({ colorSpace: 'oklch' });
-      const handler = createStyle('#brand');
-
-      expect(handler({ '#brand': 'rgb(255 0 0)' })).toEqual({
-        '--brand-color': 'oklch(0.62796 0.25768 29.23)',
+        '--brand-color': 'hsl(120 100% 50%)',
       });
     });
 
@@ -571,36 +568,44 @@ describe('Tasty style tests', () => {
       warn.mockRestore();
     });
 
-    it('never both converts a value and reads a token name off it', () => {
-      // The emitted value is a precedence, not a merge, and only stays correct
-      // while the two are mutually exclusive. `parseColor` derives `name` from
-      // the chain it resolved, so a value it names can never be one
-      // `strToColorSpace` converts.
+    it('resolves every shape a color value can take', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
         /* noop */
       });
+      const handler = createStyle('#brand');
 
-      for (const value of [
-        '#f80',
-        '#ff8040',
-        '#purple',
-        'red',
-        'rgb(0 0 0)',
-        'var(--purple-color)',
-        'transparent',
-        'currentcolor',
-        '(#purple, #red)',
-        '#purple.5',
-        'color-mix(in oklab, #purple 50%, #red)',
-      ]) {
-        const converted = strToColorSpace(value);
-        const { name } = parseColor(value, true);
-
-        expect(
-          converted != null && name != null,
-          `"${value}" both converted (${converted}) and named (${name})`,
-        ).toBe(false);
-      }
+      // Nothing is rewritten, so each of these is its own parsed form.
+      expect(
+        Object.fromEntries(
+          [
+            '#f80',
+            '#ff8040',
+            '#purple',
+            'red',
+            'rgb(0 0 0)',
+            'var(--purple-color)',
+            'transparent',
+            'currentcolor',
+            '(#purple, #red)',
+            '#purple.5',
+            'color-mix(in oklab, #purple 50%, #red)',
+          ].map((v) => [v, handler({ '#brand': v })!['--brand-color']]),
+        ),
+      ).toEqual({
+        '#f80': '#f80',
+        '#ff8040': '#ff8040',
+        '#purple': 'var(--purple-color)',
+        red: 'red',
+        'rgb(0 0 0)': 'rgb(0 0 0)',
+        'var(--purple-color)': 'var(--purple-color)',
+        transparent: 'transparent',
+        currentcolor: 'currentcolor',
+        '(#purple, #red)': 'var(--purple-color, var(--red-color))',
+        '#purple.5': 'oklch(from var(--purple-color) l c h / .5)',
+        'color-mix(in oklab, #purple 50%, #red)':
+          'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
+      });
+      expect(warn).not.toHaveBeenCalled();
 
       warn.mockRestore();
     });

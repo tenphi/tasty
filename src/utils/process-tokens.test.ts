@@ -5,7 +5,6 @@ import { processTokens } from './process-tokens';
 describe('processTokens', () => {
   beforeEach(() => {
     resetConfig();
-    configure({ colorSpace: 'rgb' });
   });
 
   afterEach(() => {
@@ -125,11 +124,8 @@ describe('processTokens', () => {
     // Regression: oklch(... var(...) ...) was round-tripped through sRGB,
     // NaN'ing the var() hue. Same-space native functions must preserve
     // var()/calc() tokens verbatim. See color-space.ts same-space fast path.
-    it('preserves var() in oklch() token (oklch space) with $hue replaceToken', () => {
-      configure({
-        colorSpace: 'oklch',
-        replaceTokens: { $hue: 'var(--hue)' },
-      });
+    it('preserves var() in an oklch() token with a $hue replaceToken', () => {
+      configure({ replaceTokens: { $hue: 'var(--hue)' } });
 
       const result = processTokens({
         '#accent': 'oklch($hue .2 20)',
@@ -139,9 +135,7 @@ describe('processTokens', () => {
       expect(result['--accent-color']).not.toContain('nan');
     });
 
-    it('preserves var() alpha in oklch() token (oklch space)', () => {
-      configure({ colorSpace: 'oklch' });
-
+    it('preserves var() alpha in oklch() token', () => {
       const result = processTokens({
         '#accent': 'oklch(var(--hue) .2 20 / var(--a))',
       }) as Record<string, string>;
@@ -151,8 +145,7 @@ describe('processTokens', () => {
       );
     });
 
-    it('preserves var() channels in rgb() token (rgb space)', () => {
-      // colorSpace=rgb is the default set in beforeEach; no replaceToken here.
+    it('preserves var() channels in an rgb() token', () => {
       const result = processTokens({
         '#accent': 'rgb(var(--r) var(--g) var(--b))',
       }) as Record<string, string>;

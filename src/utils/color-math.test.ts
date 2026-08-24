@@ -1,7 +1,6 @@
 import {
   getRgbValuesFromRgbaString,
   hexToRgb,
-  hexToRgbaValues,
   hexToRgbValues,
   hslStringToRgb,
   hslToRgbValues,
@@ -11,8 +10,6 @@ import {
   okhstToSrgb,
   oklchStringToRgb,
   oklchToRgbValues,
-  rgbToHsl,
-  rgbToOklch,
   srgbLinearToGamma,
   srgbToLinear,
   srgbToOkhsl,
@@ -117,60 +114,6 @@ describe('hslToRgbValues', () => {
     expect(Math.round(r)).toBe(0);
     expect(Math.round(g)).toBe(0);
     expect(Math.round(b)).toBe(0);
-  });
-});
-
-describe('rgbToHsl', () => {
-  it('converts red', () => {
-    const [h, s, l] = rgbToHsl(255, 0, 0);
-    expect(h).toBeCloseTo(0, 5);
-    expect(s).toBeCloseTo(1, 5);
-    expect(l).toBeCloseTo(0.5, 5);
-  });
-
-  it('converts achromatic gray', () => {
-    const [h, s, l] = rgbToHsl(128, 128, 128);
-    expect(h).toBe(0);
-    expect(s).toBe(0);
-    expect(l).toBeCloseTo(128 / 255, 5);
-  });
-
-  it('round-trips through hslToRgbValues', () => {
-    const origR = 100,
-      origG = 200,
-      origB = 50;
-    const [h, s, l] = rgbToHsl(origR, origG, origB);
-    const [r, g, b] = hslToRgbValues(h, s, l);
-    expect(Math.round(r)).toBe(origR);
-    expect(Math.round(g)).toBe(origG);
-    expect(Math.round(b)).toBe(origB);
-  });
-});
-
-// ============================================================================
-// RGB -> OKLCH
-// ============================================================================
-
-describe('rgbToOklch', () => {
-  it('returns L=0 for black', () => {
-    const [L, C, _H] = rgbToOklch(0, 0, 0);
-    expect(L).toBeCloseTo(0, 5);
-    expect(C).toBeCloseTo(0, 5);
-  });
-
-  it('returns L~1 for white', () => {
-    const [L, C, _H] = rgbToOklch(255, 255, 255);
-    expect(L).toBeCloseTo(1, 3);
-    expect(C).toBeCloseTo(0, 3);
-  });
-
-  it('returns plausible values for red', () => {
-    const [L, C, H] = rgbToOklch(255, 0, 0);
-    expect(L).toBeGreaterThan(0);
-    expect(L).toBeLessThan(1);
-    expect(C).toBeGreaterThan(0);
-    expect(H).toBeGreaterThan(0);
-    expect(H).toBeLessThan(360);
   });
 });
 
@@ -340,35 +283,6 @@ describe('hexToRgbValues', () => {
   });
 });
 
-describe('hexToRgbaValues', () => {
-  it('returns alpha=1 for 3-digit hex', () => {
-    expect(hexToRgbaValues('#f00')).toEqual([255, 0, 0, 1]);
-  });
-
-  it('returns alpha=1 for 6-digit hex', () => {
-    expect(hexToRgbaValues('#ff0000')).toEqual([255, 0, 0, 1]);
-  });
-
-  it('parses alpha from 4-digit hex', () => {
-    expect(hexToRgbaValues('#f000')).toEqual([255, 0, 0, 0]);
-    expect(hexToRgbaValues('#f00f')).toEqual([255, 0, 0, 1]);
-  });
-
-  it('parses alpha from 8-digit hex', () => {
-    expect(hexToRgbaValues('#ff000000')).toEqual([255, 0, 0, 0]);
-    expect(hexToRgbaValues('#ff0000ff')).toEqual([255, 0, 0, 1]);
-    const result = hexToRgbaValues('#ff000080');
-    expect(result).not.toBeNull();
-    expect(result![0]).toBe(255);
-    expect(result![3]).toBeCloseTo(128 / 255, 4);
-  });
-
-  it('returns null for invalid input', () => {
-    expect(hexToRgbaValues('#xyz')).toBeNull();
-    expect(hexToRgbaValues('')).toBeNull();
-  });
-});
-
 // ============================================================================
 // String converters
 // ============================================================================
@@ -439,7 +353,7 @@ describe('strToRgb', () => {
   it('returns null for plugin-provided color functions (okhsl)', () => {
     // strToRgb is a leaf converter for native CSS color formats only.
     // Plugin-provided color functions such as okhsl are resolved through the
-    // parser via strToColorSpace/resolveToRgbaValues, not here.
+    // parser (see `resolveFunctionColor`), not here.
     expect(strToRgb('okhsl(280 80% 52%)')).toBeNull();
   });
 
@@ -524,15 +438,12 @@ describe('oklchToRgbValues', () => {
     expect(Math.round(b)).toBe(255);
   });
 
-  it('round-trips through rgbToOklch', () => {
-    const origR = 100,
-      origG = 200,
-      origB = 50;
-    const [L, C, H] = rgbToOklch(origR, origG, origB);
-    const [r, g, b] = oklchToRgbValues(L, C, H);
-    expect(Math.round(r)).toBe(origR);
-    expect(Math.round(g)).toBe(origG);
-    expect(Math.round(b)).toBe(origB);
+  it('converts a chromatic colour to its sRGB values', () => {
+    // sRGB red is oklch(0.62796 0.25768 29.23).
+    const [r, g, b] = oklchToRgbValues(0.62796, 0.25768, 29.23);
+    expect(Math.round(r)).toBe(255);
+    expect(Math.round(g)).toBe(0);
+    expect(Math.round(b)).toBe(0);
   });
 
   it('clamps out-of-gamut values to 0-255', () => {

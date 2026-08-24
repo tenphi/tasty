@@ -1,5 +1,4 @@
 import { okhslFunction } from '../plugins/okhsl-plugin';
-import { resetColorSpace, setColorSpace } from '../utils/color-space';
 
 import { StyleParser } from './parser';
 import type { StyleDetails } from './types';
@@ -1403,14 +1402,12 @@ describe('Token opacity suffix', () => {
     );
   });
 
-  test('the space is oklab whatever the configured color space', () => {
-    // oklab is unbounded, so a wide-gamut token survives a round trip that a
-    // gamut-limited space would clamp.
-    setColorSpace('rgb');
+  test('the space is always oklch, which is unbounded', () => {
+    // A wide-gamut token survives the round trip that a gamut-limited space
+    // would clamp, and no configuration can change the space.
     expect(parser.process('#wide-token.5').output).toBe(
       'oklch(from var(--wide-token-color) l c h / .5)',
     );
-    resetColorSpace();
   });
 });
 

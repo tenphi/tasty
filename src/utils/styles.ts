@@ -140,26 +140,37 @@ const RE_VAR_COLOR = /^var\(--[a-z0-9-]+-color/;
 function isSimpleColorFast(val: string): boolean {
   const c0 = val.charCodeAt(0);
 
+  // Cheap first-character dispatch for the shapes that have one. A miss must
+  // fall through rather than answer `false`: the CSS named colors start with
+  // every letter these cases claim — `red`, `hotpink`, `lime`, `orange`,
+  // `violet`, `coral`, `teal` — and each one is a color too.
   switch (c0) {
     case 35: // '#'
       return RE_HEX_COLOR.test(val);
     case 114: // 'r'
-      return val.charCodeAt(1) === 103 && val.charCodeAt(2) === 98; // 'rgb'
+      if (val.charCodeAt(1) === 103 && val.charCodeAt(2) === 98) return true; // 'rgb'
+      break;
     case 104: // 'h'
-      return val.charCodeAt(1) === 115 && val.charCodeAt(2) === 108; // 'hsl'
+      if (val.charCodeAt(1) === 115 && val.charCodeAt(2) === 108) return true; // 'hsl'
+      break;
     case 108: // 'l'
-      return val.charCodeAt(1) === 99 && val.charCodeAt(2) === 104; // 'lch'
+      if (val.charCodeAt(1) === 99 && val.charCodeAt(2) === 104) return true; // 'lch'
+      break;
     case 111: // 'o'
-      return val.startsWith('oklch(');
+      if (val.startsWith('oklch(')) return true;
+      break;
     case 118: // 'v'
-      return RE_VAR_COLOR.test(val);
+      if (RE_VAR_COLOR.test(val)) return true;
+      break;
     case 99: // 'c'
-      return val === 'currentColor' || val === 'currentcolor';
+      if (val === 'currentColor' || val === 'currentcolor') return true;
+      break;
     case 116: // 't'
-      return val === 'transparent';
-    default:
-      return getNamedColorHex().has(val.toLowerCase());
+      if (val === 'transparent') return true;
+      break;
   }
+
+  return getNamedColorHex().has(val.toLowerCase());
 }
 
 // Rate limiting for dev warnings to avoid spam

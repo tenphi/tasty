@@ -46,10 +46,9 @@ When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallb
 
 This applies to all color fallback syntaxes, including nested fallbacks and literal values.
 
-A statically known color is converted into the configured `colorSpace`; a color
-the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a
-`color()` in a space it has no conversion for — is emitted as authored. Either
-way the opacity suffix works on it by reference; see §6.
+A color is emitted exactly as authored — a hex literal, a native color function,
+a bare CSS color name, a `color-mix()`, a `light-dark()`. Nothing is rewritten
+into a color space; the opacity suffix works on any of them by reference, see §6.
 
 ---
 

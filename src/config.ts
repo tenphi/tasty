@@ -32,7 +32,6 @@ import {
   resetBaseStyleProps,
 } from './styles/base-props';
 import { resetStyleWarnings } from './styles/shared';
-import { resetColorSpace, setColorSpace } from './utils/color-space';
 import { isDevEnv } from './utils/is-dev-env';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import {
@@ -118,21 +117,18 @@ export interface TastyConfig {
    */
   functions?: FunctionsConfig;
   /**
-   * Color space a static color is emitted in. A color the engine can evaluate
-   * at build time is converted, so `#brand: '#ff8800'` declares
-   * `--brand-color: oklch(0.75 0.16 55)` by default. Anything it cannot
-   * evaluate — a `color-mix()`, a `light-dark()`, a `var()` chain — is left
-   * as authored.
+   * @deprecated No longer has any effect; will be removed in the next major.
+   * Setting it warns in development.
    *
-   * - `'rgb'`   — e.g. `rgb(255 136 0)`
-   * - `'hsl'`   — e.g. `hsl(32 100% 50%)`
-   * - `'oklch'` — e.g. `oklch(0.75 0.16 55)`
+   * A `#name` token's value used to be rewritten into this color space so an
+   * opacity suffix had numeric channels to write an alpha into. Opacity now uses
+   * relative color syntax — `oklch(from var(--name-color) l c h / .5)` — which
+   * has the browser read the channels, so a color is emitted exactly as
+   * authored and there is nothing left for the setting to decide.
    *
-   * Opacity is applied with relative color syntax and is always written in
-   * `oklch`, independent of this setting — it is unbounded, so a wide-gamut
-   * color survives the round trip a narrower space would clamp.
-   *
-   * @default 'oklch'
+   * To address a token's channels yourself, write relative color syntax against
+   * the token: `oklch(from var(--brand-color) calc(l * 1.2) c h)`. It works on
+   * every `<color>`, including the ones no conversion could evaluate.
    */
   colorSpace?: ColorSpace;
   /**
@@ -1474,11 +1470,15 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     }
   }
 
-  // Handle color space (must be set before any token processing)
   if (config.colorSpace) {
-    setColorSpace(config.colorSpace);
-    // Color space affects parser output (e.g. #name.5 → oklch(...) vs rgb(...))
-    getGlobalParser().clearCache();
+    warnOnce(
+      'colorSpace-deprecated',
+      '[Tasty] configure({ colorSpace }) no longer has any effect and will be ' +
+        'removed in the next major. Colors are emitted as authored, and opacity ' +
+        "is applied with relative color syntax, which reads a color's channels " +
+        'in the browser. To address channels yourself, write ' +
+        '`oklch(from var(--name-color) l c h)` against the token.',
+    );
   }
 
   // Handle predefined states
@@ -1725,7 +1725,6 @@ export function resetConfig(): void {
   resetStyleChunks();
   resetPropHandlers();
   resetBaseStyleProps();
-  resetColorSpace();
   clearPipelineCache();
   emittedWarnings.clear();
   resetStyleWarnings();

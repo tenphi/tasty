@@ -506,58 +506,6 @@ export function hslToRgbValues(h: number, s: number, l: number): Vec3 {
 }
 
 /**
- * RGB (0-255) to HSL.
- * @returns [h (0-360), s (0-1), l (0-1)]
- */
-export function rgbToHsl(r: number, g: number, b: number): Vec3 {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-
-  if (max === min) {
-    return [0, 0, l];
-  }
-
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-
-  let h: number;
-  if (max === r) {
-    h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  } else if (max === g) {
-    h = ((b - r) / d + 2) / 6;
-  } else {
-    h = ((r - g) / d + 4) / 6;
-  }
-
-  return [h * 360, s, l];
-}
-
-/**
- * RGB (0-255) to OKLCH via sRGB -> linear sRGB -> OKLab -> OKLCH.
- * @returns [L, C, H] where H is in degrees (0-360)
- */
-export function rgbToOklch(r: number, g: number, b: number): Vec3 {
-  const lr = srgbToLinear(r / 255);
-  const lg = srgbToLinear(g / 255);
-  const lb = srgbToLinear(b / 255);
-
-  const linear: Vec3 = [lr, lg, lb];
-  const lab = linearSrgbToOklab(linear);
-
-  const [L, a, bLab] = lab;
-  const C = Math.sqrt(a * a + bLab * bLab);
-  let H = (Math.atan2(bLab, a) * 180) / Math.PI;
-  if (H < 0) H += 360;
-
-  return [L, C, H];
-}
-
-/**
  * OKHSL to sRGB (0-1 range).
  * @param h - Hue in degrees (0-360)
  * @param s - Saturation (0-1)
@@ -819,72 +767,6 @@ export function hexToRgbValues(hex: string): Vec3 | null {
     const b2 = hexCharToNum(hex.charCodeAt(start + 5));
     if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) return null;
     return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2];
-  }
-
-  return null;
-}
-
-/**
- * Parse a hex color string to RGBA values (RGB 0-255, alpha 0-1).
- * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
- * For 3/6-char hex (no alpha channel), alpha defaults to 1.
- */
-export function hexToRgbaValues(
-  hex: string,
-): [number, number, number, number] | null {
-  let start = 0;
-  if (hex.charCodeAt(0) === 35) start = 1; // '#'
-  const len = hex.length - start;
-
-  if (len === 3) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    if (r < 0 || g < 0 || b < 0) return null;
-    return [r * 17, g * 17, b * 17, 1];
-  }
-
-  if (len === 4) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    const a = hexCharToNum(hex.charCodeAt(start + 3));
-    if (r < 0 || g < 0 || b < 0 || a < 0) return null;
-    return [r * 17, g * 17, b * 17, (a * 17) / 255];
-  }
-
-  if (len === 6) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2, 1];
-  }
-
-  if (len === 8) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    const a1 = hexCharToNum(hex.charCodeAt(start + 6));
-    const a2 = hexCharToNum(hex.charCodeAt(start + 7));
-    if (
-      r1 < 0 ||
-      r2 < 0 ||
-      g1 < 0 ||
-      g2 < 0 ||
-      b1 < 0 ||
-      b2 < 0 ||
-      a1 < 0 ||
-      a2 < 0
-    )
-      return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2, (a1 * 16 + a2) / 255];
   }
 
   return null;

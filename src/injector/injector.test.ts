@@ -1,5 +1,4 @@
 import type { StyleResult } from '../pipeline';
-import { resetColorSpace, setColorSpace } from '../utils/color-space';
 
 import { StyleInjector } from './injector';
 import type { StyleInjectorConfig } from './types';
@@ -762,13 +761,7 @@ describe('StyleInjector', () => {
   });
 
   describe('property() — color tokens', () => {
-    afterEach(() => {
-      resetColorSpace();
-    });
-
     it('registers a single `<color>` property for a #name token', () => {
-      setColorSpace('rgb');
-
       injector.property('#accent', {
         initialValue: 'rgb(128 0 255)',
       });
@@ -780,8 +773,6 @@ describe('StyleInjector', () => {
     });
 
     it('does not register a channel-components companion', () => {
-      setColorSpace('rgb');
-
       injector.property('#brand', {
         initialValue: 'rgb(255 0 0)',
       });
@@ -792,8 +783,6 @@ describe('StyleInjector', () => {
     });
 
     it('registers a non-color property under its own name only', () => {
-      setColorSpace('rgb');
-
       injector.property('$rotation', {
         syntax: '<angle>',
         inherits: false,

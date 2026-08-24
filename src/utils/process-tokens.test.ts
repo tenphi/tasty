@@ -12,254 +12,50 @@ describe('processTokens', () => {
     resetConfig();
   });
 
-  describe('HSL color token processing', () => {
-    // Expected values calculated using CSS Color 4 spec algorithm
-    // Reference: https://en.wikipedia.org/wiki/HSL_and_HSV#HSL_to_RGB_alternative
-    // Same algorithm used in @texel/color test/spaces/hsl.js
-
-    it('converts HSL with space-separated values to RGB triplet', () => {
+  describe('color token values', () => {
+    // `processTokens` emits the parsed value as-is — the color space conversion
+    // that `#name` style keys go through does not apply to the `tokens` prop.
+    it('keeps a native color function verbatim', () => {
       const result = processTokens({
         '#primary': 'hsl(200 40% 50%)',
       });
 
       expect(result).toBeDefined();
       expect(result!['--primary-color']).toBe('hsl(200 40% 50%)');
-      // hsl(200 40% 50%) = rgb(76.5 144.5 178.5)
-      expect(result!['--primary-color-rgb']).toBe('76.5 144.5 178.5');
     });
 
-    it('converts HSL with comma-separated values to RGB triplet', () => {
+    it('keeps an alpha channel', () => {
       const result = processTokens({
-        '#accent': 'hsl(120, 50%, 50%)',
+        '#accent': 'hsla(200 40% 50% / 0.5)',
       });
 
-      expect(result).toBeDefined();
-      // Parser normalizes the spacing, just check it starts with hsl
-      expect(result!['--accent-color']).toMatch(/^hsl\(120/);
-      // hsl(120 50% 50%) = rgb(63.8 191.3 63.8)
-      expect(result!['--accent-color-rgb']).toBe('63.8 191.3 63.8');
+      expect(result!['--accent-color']).toBe('hsla(200 40% 50% / 0.5)');
     });
 
-    it('converts pure red HSL correctly', () => {
-      const result = processTokens({
-        '#red': 'hsl(0 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(0 100% 50%) = rgb(255 0 0)
-      expect(result!['--red-color-rgb']).toBe('255 0 0');
-    });
-
-    it('converts pure green HSL correctly', () => {
-      const result = processTokens({
-        '#green': 'hsl(120 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(120 100% 50%) = rgb(0 255 0)
-      expect(result!['--green-color-rgb']).toBe('0 255 0');
-    });
-
-    it('converts pure blue HSL correctly', () => {
-      const result = processTokens({
-        '#blue': 'hsl(240 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(240 100% 50%) = rgb(0 0 255)
-      expect(result!['--blue-color-rgb']).toBe('0 0 255');
-    });
-
-    it('converts white HSL correctly', () => {
-      const result = processTokens({
-        '#white': 'hsl(0 0% 100%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(0 0% 100%) = rgb(255 255 255)
-      expect(result!['--white-color-rgb']).toBe('255 255 255');
-    });
-
-    it('converts black HSL correctly', () => {
-      const result = processTokens({
-        '#black': 'hsl(0 0% 0%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(0 0% 0%) = rgb(0 0 0)
-      expect(result!['--black-color-rgb']).toBe('0 0 0');
-    });
-
-    it('converts gray HSL correctly (saturation = 0)', () => {
-      const result = processTokens({
-        '#gray': 'hsl(180 0% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(180 0% 50%) = rgb(127.5 127.5 127.5)
-      expect(result!['--gray-color-rgb']).toBe('127.5 127.5 127.5');
-    });
-
-    it('converts cyan HSL correctly', () => {
-      const result = processTokens({
-        '#cyan': 'hsl(180 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(180 100% 50%) = rgb(0 255 255)
-      expect(result!['--cyan-color-rgb']).toBe('0 255 255');
-    });
-
-    it('converts yellow-green HSL correctly', () => {
-      const result = processTokens({
-        '#yellowgreen': 'hsl(90 50% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(90 50% 50%) = rgb(127.5 191.3 63.8)
-      expect(result!['--yellowgreen-color-rgb']).toBe('127.5 191.3 63.8');
-    });
-
-    it('handles HSLA syntax (ignores alpha for rgb output)', () => {
-      const result = processTokens({
-        '#transparent': 'hsla(200 40% 50% / 0.5)',
-      });
-
-      expect(result).toBeDefined();
-      expect(result!['--transparent-color']).toBe('hsla(200 40% 50% / 0.5)');
-      // hsla(200 40% 50% / 0.5) -> rgb values same as hsl(200 40% 50%)
-      expect(result!['--transparent-color-rgb']).toBe('76.5 144.5 178.5');
-    });
-
-    it('handles hue with deg unit', () => {
-      const result = processTokens({
-        '#color': 'hsl(90deg 50% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // hsl(90deg 50% 50%) = hsl(90 50% 50%) = rgb(127.5 191.3 63.8)
-      expect(result!['--color-color-rgb']).toBe('127.5 191.3 63.8');
-    });
-
-    it('handles hue with turn unit', () => {
-      const result = processTokens({
-        '#color': 'hsl(0.5turn 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // 0.5turn = 180deg = cyan = rgb(0 255 255)
-      expect(result!['--color-color-rgb']).toBe('0 255 255');
-    });
-
-    it('handles hue with rad unit', () => {
-      const result = processTokens({
-        '#color': 'hsl(3.14159rad 100% 50%)',
-      });
-
-      expect(result).toBeDefined();
-      // π rad ≈ 180deg = cyan = rgb(0 255 255)
-      expect(result!['--color-color-rgb']).toBe('0 255 255');
-    });
-
-    it('handles negative hue values', () => {
-      const result1 = processTokens({ '#neg': 'hsl(-90 100% 50%)' });
-      const result2 = processTokens({ '#pos': 'hsl(270 100% 50%)' });
-
-      // -90deg should equal 270deg (violet)
-      expect(result1!['--neg-color-rgb']).toBe(result2!['--pos-color-rgb']);
-      expect(result1!['--neg-color-rgb']).toBe('127.5 0 255');
-    });
-
-    it('handles hue > 360', () => {
-      const result1 = processTokens({ '#over': 'hsl(450 100% 50%)' });
-      const result2 = processTokens({ '#norm': 'hsl(90 100% 50%)' });
-
-      // 450deg should equal 90deg (yellow-green)
-      expect(result1!['--over-color-rgb']).toBe(result2!['--norm-color-rgb']);
-      expect(result1!['--over-color-rgb']).toBe('127.5 255 0');
-    });
-  });
-
-  describe('hex color token processing', () => {
-    it('converts hex to RGB triplet', () => {
+    it('resolves a hex literal through its token name', () => {
       const result = processTokens({
         '#primary': '#ff8040',
       });
 
-      expect(result).toBeDefined();
-      expect(result!['--primary-color-rgb']).toBe('255 128 64');
+      expect(result!['--primary-color']).toBe('var(--ff8040-color, #ff8040)');
     });
 
-    it('converts short hex to RGB triplet', () => {
-      const result = processTokens({
-        '#primary': '#f80',
-      });
-
-      expect(result).toBeDefined();
-      expect(result!['--primary-color-rgb']).toBe('255 136 0');
-    });
-  });
-
-  describe('rgb color token processing', () => {
-    it('extracts RGB values from rgb() syntax', () => {
-      const result = processTokens({
-        '#primary': 'rgb(100 150 200)',
-      });
-
-      expect(result).toBeDefined();
-      expect(result!['--primary-color-rgb']).toBe('100 150 200');
-    });
-  });
-
-  describe('OKHSL color token processing', () => {
-    it('converts OKHSL to RGB triplet', () => {
+    it('resolves okhsl() to rgb() at parse time', () => {
       const result = processTokens({
         '#purple': 'okhsl(280.3 80% 52%)',
       });
 
-      expect(result).toBeDefined();
-      // okhsl is now a built-in parser function, so the color value is converted to rgb
       expect(result!['--purple-color']).toMatch(/^rgb\(/);
-      // Should be RGB triplet, not the OKHSL string
-      expect(result!['--purple-color-rgb']).toMatch(
-        /^\d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)?$/,
-      );
-      // Should NOT be the OKHSL string
-      expect(result!['--purple-color-rgb']).not.toContain('okhsl');
+      expect(result!['--purple-color']).not.toContain('okhsl');
     });
 
-    it('converts OKHSL with alpha to RGB triplet', () => {
+    it('keeps the alpha when resolving okhsl()', () => {
       const result = processTokens({
         '#custom': 'okhsl(280.3 80% 52% / 0.5)',
       });
 
-      expect(result).toBeDefined();
-      // Main color value should be rgb with alpha preserved
       expect(result!['--custom-color']).toMatch(/^rgb\(.+ \/ /);
       expect(result!['--custom-color']).not.toContain('okhsl');
-      // RGB triplet should not contain alpha
-      expect(result!['--custom-color-rgb']).toMatch(
-        /^\d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)?$/,
-      );
-      expect(result!['--custom-color-rgb']).not.toContain('okhsl');
-    });
-
-    it('converts white OKHSL correctly', () => {
-      const result = processTokens({
-        '#white': 'okhsl(0 0% 100%)',
-      });
-
-      expect(result).toBeDefined();
-      expect(result!['--white-color-rgb']).toBe('255 255 255');
-    });
-
-    it('converts black OKHSL correctly', () => {
-      const result = processTokens({
-        '#black': 'okhsl(0 0% 0%)',
-      });
-
-      expect(result).toBeDefined();
-      expect(result!['--black-color-rgb']).toBe('0 0 0');
     });
   });
 
@@ -310,8 +106,7 @@ describe('processTokens', () => {
       }) as Record<string, string>;
 
       expect(result['--accent-color']).toBe('oklch(var(--hue) .2 20)');
-      expect(result['--accent-color-oklch']).toBe('var(--hue) .2 20');
-      expect(result['--accent-color-oklch']).not.toContain('nan');
+      expect(result['--accent-color']).not.toContain('nan');
     });
 
     it('preserves var() alpha in oklch() token (oklch space)', () => {
@@ -324,7 +119,6 @@ describe('processTokens', () => {
       expect(result['--accent-color']).toBe(
         'oklch(var(--hue) .2 20 / var(--a))',
       );
-      expect(result['--accent-color-oklch']).toBe('var(--hue) .2 20');
     });
 
     it('preserves var() channels in rgb() token (rgb space)', () => {
@@ -334,16 +128,13 @@ describe('processTokens', () => {
       }) as Record<string, string>;
 
       expect(result['--accent-color']).toBe('rgb(var(--r) var(--g) var(--b))');
-      expect(result['--accent-color-rgb']).toBe('var(--r) var(--g) var(--b)');
     });
   });
 
   describe('derived color functions', () => {
-    // A color the engine cannot evaluate at build time has no channels to
-    // decompose, so the `--name-color-{space}` companion is expressed by
-    // reference with CSS relative color syntax. `#name.alpha` then composes
-    // opacity onto whatever the browser resolves the color to.
-    it('expresses a color-mix() token companion by reference', () => {
+    // A color the engine cannot evaluate at build time is emitted as authored;
+    // `#name.alpha` fades it by reference, so nothing has to be decomposed.
+    it('expands the tokens inside a color-mix()', () => {
       const result = processTokens({
         '#brand': 'color-mix(in oklab, #purple 50%, #red)',
       });
@@ -351,12 +142,9 @@ describe('processTokens', () => {
       expect(result!['--brand-color']).toBe(
         'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
       );
-      expect(result!['--brand-color-rgb']).toBe(
-        'from color-mix(in oklab,var(--purple-color) 50%,var(--red-color)) r g b',
-      );
     });
 
-    it('expresses a light-dark() token companion by reference', () => {
+    it('expands the tokens inside a light-dark()', () => {
       const result = processTokens({
         '#surface': 'light-dark(#light, #dark)',
       });
@@ -364,46 +152,23 @@ describe('processTokens', () => {
       expect(result!['--surface-color']).toBe(
         'light-dark(var(--light-color),var(--dark-color))',
       );
-      expect(result!['--surface-color-rgb']).toBe(
-        'from light-dark(var(--light-color),var(--dark-color)) r g b',
-      );
     });
 
-    it('expresses a color() token companion by reference', () => {
-      // display-p3 has no conversion here, so there are no numbers to emit.
+    it('keeps a color() in a space it cannot convert', () => {
       const result = processTokens({
         '#wide': 'color(display-p3 1 0.5 0)',
       });
 
-      expect(result!['--wide-color-rgb']).toBe(
-        'from color(display-p3 1 0.5 0) r g b',
-      );
+      expect(result!['--wide-color']).toBe('color(display-p3 1 0.5 0)');
     });
 
-    it('does not mistake an argument of a color function for the token color', () => {
-      configure({ colorSpace: 'oklch' });
-
-      const result = processTokens({
-        '#brand': 'color-mix(in oklab, #purple 50%, #red)',
-      });
-
-      // The `var(--purple-color)` inside the mix is an operand, not the token's
-      // own color — reading it as one would collapse the mix to purple.
-      expect(result!['--brand-color-oklch']).not.toBe(
-        'var(--purple-color-oklch)',
-      );
-    });
-
-    it('keeps the whole fallback chain in the companion', () => {
+    it('keeps the whole fallback chain', () => {
       const result = processTokens({
         '#brand': '(#primary, #fallback)',
       });
 
       expect(result!['--brand-color']).toBe(
         'var(--primary-color, var(--fallback-color))',
-      );
-      expect(result!['--brand-color-rgb']).toBe(
-        'var(--primary-color-rgb, var(--fallback-color-rgb))',
       );
     });
   });
@@ -417,8 +182,6 @@ describe('processTokens', () => {
       expect(result).toBeDefined();
       // Boolean true converts to 'transparent' which the parser keeps as-is
       expect(result!['--overlay-color']).toBe('transparent');
-      // RGB extraction for transparent yields 0 0 0
-      expect(result!['--overlay-color-rgb']).toBe('transparent');
     });
 
     it('skips color tokens with boolean false', () => {
@@ -445,41 +208,33 @@ describe('processTokens', () => {
   });
 
   describe('#current color token', () => {
-    it('processes #current to currentcolor without RGB', () => {
+    it('processes #current to currentcolor', () => {
       const result = processTokens({
         '#my-color': '#current',
       });
 
       expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe('currentcolor');
-      // No RGB should be generated for currentcolor
-      expect(result!['--my-color-color-rgb']).toBeUndefined();
     });
 
-    it('processes #current.5 to color-mix without RGB', () => {
+    it('composes #current.5 with color-mix', () => {
       const result = processTokens({
         '#my-color': '#current.5',
       });
 
-      expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe(
         'color-mix(in oklab, currentcolor 50%, transparent)',
       );
-      // No RGB should be generated for currentcolor-based values
-      expect(result!['--my-color-color-rgb']).toBeUndefined();
     });
 
-    it('processes #current.$opacity to color-mix without RGB', () => {
+    it('composes #current.$opacity with color-mix', () => {
       const result = processTokens({
         '#my-color': '#current.$fade',
       });
 
-      expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe(
         'color-mix(in oklab, currentcolor calc(var(--fade) * 100%), transparent)',
       );
-      // No RGB should be generated for currentcolor-based values
-      expect(result!['--my-color-color-rgb']).toBeUndefined();
     });
 
     it('does not match #current-theme or similar token names', () => {
@@ -488,11 +243,7 @@ describe('processTokens', () => {
         '#accent': '#current-theme',
       });
 
-      expect(result).toBeDefined();
-      // Should be processed as a regular color token reference
       expect(result!['--accent-color']).toBe('var(--current-theme-color)');
-      // RGB should be generated since this is NOT #current
-      expect(result!['--accent-color-rgb']).toBeDefined();
     });
 
     it('does not match #currently-used or similar token names', () => {
@@ -500,10 +251,7 @@ describe('processTokens', () => {
         '#my-color': '#currently-used',
       });
 
-      expect(result).toBeDefined();
       expect(result!['--my-color-color']).toBe('var(--currently-used-color)');
-      // RGB should be generated since this is NOT #current
-      expect(result!['--my-color-color-rgb']).toBeDefined();
     });
   });
 });

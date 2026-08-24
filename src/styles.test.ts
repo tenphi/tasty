@@ -34,7 +34,6 @@ describe('Tasty style tests', () => {
     expect(colorStyle({ color: 'var(--primary-color)' })).toEqual({
       color: 'var(--primary-color)',
       '--current-color': 'var(--primary-color)',
-      '--current-color-rgb': 'var(--primary-color-rgb)',
     });
 
     // Color with fallback chain
@@ -43,8 +42,6 @@ describe('Tasty style tests', () => {
     ).toEqual({
       color: 'var(--placeholder-color, var(--dark-04-color))',
       '--current-color': 'var(--placeholder-color, var(--dark-04-color))',
-      '--current-color-rgb':
-        'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
     });
 
     // Nested fallbacks
@@ -58,8 +55,6 @@ describe('Tasty style tests', () => {
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
       '--current-color':
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
-      '--current-color-rgb':
-        'var(--primary-color-rgb, var(--secondary-color-rgb, var(--tertiary-color-rgb)))',
     });
   });
 
@@ -469,7 +464,7 @@ describe('Tasty style tests', () => {
   });
 
   describe('Color fallback syntax', () => {
-    it('should generate both color and RGB variants for color fallback', () => {
+    it('should keep the fallback chain for a color fallback', () => {
       const handler = createStyle('#local-placeholder');
       const result = handler({
         '#local-placeholder': '(#placeholder, #dark-04)',
@@ -478,12 +473,10 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--local-placeholder-color':
           'var(--placeholder-color, var(--dark-04-color))',
-        '--local-placeholder-color-rgb':
-          'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
       });
     });
 
-    it('should handle nested color fallbacks with RGB variants', () => {
+    it('should handle nested color fallbacks', () => {
       const handler = createStyle('#theme');
       const result = handler({
         '#theme': '(#primary, (#secondary, #tertiary))',
@@ -492,8 +485,6 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--theme-color':
           'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
-        '--theme-color-rgb':
-          'var(--primary-color-rgb, var(--secondary-color-rgb, var(--tertiary-color-rgb)))',
       });
     });
 
@@ -505,8 +496,6 @@ describe('Tasty style tests', () => {
 
       expect(result).toEqual({
         '--custom-color': 'var(--primary-color, var(--fff-color, #fff))',
-        '--custom-color-rgb':
-          'var(--primary-color-rgb, var(--fff-color-rgb, 255 255 255))',
       });
     });
 
@@ -518,7 +507,6 @@ describe('Tasty style tests', () => {
 
       expect(result).toEqual({
         '--background-color': 'var(--theme-color, rgb(255 0 0))',
-        '--background-color-rgb': 'var(--theme-color-rgb, 255 0 0)',
       });
     });
 
@@ -531,8 +519,6 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--local-placeholder-color':
           'var(--placeholder-color, var(--dark-04-color))',
-        '--local-placeholder-color-rgb':
-          'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
       });
     });
   });
@@ -593,36 +579,29 @@ describe('Tasty style tests', () => {
       expect(colorStyle({ color: THEME })).toEqual({
         color: THEME_CSS,
         '--current-color': THEME_CSS,
-        '--current-color-rgb': `from ${THEME_CSS} r g b`,
       });
     });
 
-    it('emits a components companion for a derived color token', () => {
+    it('emits a derived color function as the token value', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': MIX })).toEqual({
         '--brand-color': MIX_CSS,
-        '--brand-color-rgb': `from ${MIX_CSS} r g b`,
       });
     });
 
-    it('keeps the components companion pointing at the faded token', () => {
-      // Components carry no alpha, so the opacity wrapper is peeled off and the
-      // companion still names the token's own channels — which is what keeps
-      // `$current-color-{space}` usable downstream.
+    it('keeps a faded token faded in `--current-color`', () => {
       expect(colorStyle({ color: '#purple.5' })).toEqual({
         color: 'oklch(from var(--purple-color) l c h / .5)',
         '--current-color': 'oklch(from var(--purple-color) l c h / .5)',
-        '--current-color-rgb': 'var(--purple-color-rgb)',
       });
     });
 
-    it('defines a token from a faded token without losing its channels', () => {
+    it('defines a token from a faded token', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': '#purple.5' })).toEqual({
         '--brand-color': 'oklch(from var(--purple-color) l c h / .5)',
-        '--brand-color-rgb': 'var(--purple-color-rgb)',
       });
     });
 

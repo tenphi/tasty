@@ -153,7 +153,7 @@ these:
   Tasty cannot convert — none of which have channels to decompose
 - `#current`, which resolves to `currentcolor`
 - a `--name-color` variable declared in your own CSS, with no Tasty token
-  definition and no companion variable behind it
+  definition behind it
 
 Two properties follow from writing the alpha slot rather than compositing:
 

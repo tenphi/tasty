@@ -64,14 +64,13 @@ describe('generated CSS applies in the browser', () => {
 
       // `#black.5` becomes `oklch(from var(--black-color) l c h / .5)` — the
       // channels copied over and the alpha slot written — so this is black at
-      // half alpha, reported in the same shape the channel-components form was.
+      // half alpha.
       expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
     });
 
     it('fades a colour variable Tasty never registered', () => {
-      // The token lives only in hand-authored CSS: no `@property`, and no
-      // `--ink-color-oklch` companion for opacity to compose onto. Applying the
-      // alpha to the colour itself is what makes this resolve at all.
+      // The token lives only in hand-authored CSS, with no `@property` behind
+      // it. Applying the alpha to the colour itself is what makes this resolve.
       const sheet = document.createElement('style');
       sheet.textContent = ':root { --ink-color: rgb(0 0 255); }';
       document.head.append(sheet);

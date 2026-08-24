@@ -8,11 +8,6 @@ import {
   getEffectiveDefinition,
   normalizePropertyDefinition,
 } from '../properties';
-import {
-  colorInitialValueToComponents,
-  getColorSpaceSuffix,
-  getComponentPropertySyntax,
-} from '../utils/color-space';
 import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
 import {
@@ -884,27 +879,6 @@ export class StyleInjector {
     const definition = effectiveResult.definition;
 
     this.insertPropertyRule(registry, root, cssName, definition, name);
-
-    // For color tokens, also register the decomposed-components companion
-    // (`--{name}-color-{colorSpace}`) so it can be transitioned/animated and
-    // referenced as a single design-system token. Mirrors the SSR formatter
-    // in `src/ssr/format-property.ts`.
-    if (effectiveResult.isColor) {
-      const suffix = getColorSpaceSuffix();
-      const companionCssName = `${cssName}-${suffix}`;
-      const companionDefinition: PropertyDefinition = {
-        syntax: getComponentPropertySyntax(),
-        inherits: definition.inherits,
-        initialValue: colorInitialValueToComponents(definition.initialValue),
-      };
-      this.insertPropertyRule(
-        registry,
-        root,
-        companionCssName,
-        companionDefinition,
-        `${name}:components`,
-      );
-    }
   }
 
   /**

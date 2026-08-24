@@ -1,10 +1,4 @@
-import { colorFuncName } from '../parser/const';
-import {
-  convertColorChainToComponentChain,
-  getColorSpaceComponents,
-  getColorSpaceSuffix,
-  strToColorSpace,
-} from '../utils/color-space';
+import { strToColorSpace } from '../utils/color-space';
 import { normalizeDslName, toSnakeCase } from '../utils/string';
 import {
   normalizeColorTokenValue,
@@ -73,55 +67,22 @@ export function createStyle(
         finalCssStyle.endsWith('-color')
       ) {
         styleValue = styleValue.trim();
-        const suffix = getColorSpaceSuffix();
 
         const colorSpaceStr = strToColorSpace(styleValue as string);
-
         const { color, name } = parseColor(styleValue as string);
 
-        if (name && colorSpaceStr) {
+        // A token name resolves through its own variable, falling back to the
+        // literal color when nothing defines it; a bare color is emitted in the
+        // configured color space when it can be converted, verbatim otherwise.
+        if (name) {
           return {
-            [finalCssStyle]: `var(--${name}-color, ${colorSpaceStr})`,
-            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix}, ${getColorSpaceComponents(
-              colorSpaceStr,
-            )})`,
-          };
-        } else if (name) {
-          if (color) {
-            return {
-              [finalCssStyle]: color,
-              [`${finalCssStyle}-${suffix}`]:
-                convertColorChainToComponentChain(color),
-            };
-          }
-
-          return {
-            [finalCssStyle]: `var(--${name}-color)`,
-            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix})`,
-          };
-        } else if (colorSpaceStr) {
-          return {
-            [finalCssStyle]: colorSpaceStr,
-            [`${finalCssStyle}-${suffix}`]:
-              getColorSpaceComponents(colorSpaceStr),
+            [finalCssStyle]: colorSpaceStr
+              ? `var(--${name}-color, ${colorSpaceStr})`
+              : (color ?? `var(--${name}-color)`),
           };
         }
 
-        // A color with no token name of its own — a `color-mix()`, a
-        // `light-dark()`, any derived color function — still needs its
-        // components companion, or `#name.alpha` on the token would compose
-        // opacity onto nothing.
-        if (color && colorFuncName(color)) {
-          return {
-            [finalCssStyle]: color,
-            [`${finalCssStyle}-${suffix}`]:
-              convertColorChainToComponentChain(color),
-          };
-        }
-
-        return {
-          [finalCssStyle]: color ?? '',
-        };
+        return { [finalCssStyle]: colorSpaceStr ?? color ?? '' };
       }
 
       const processed = parseStyle(styleValue as StyleValue);

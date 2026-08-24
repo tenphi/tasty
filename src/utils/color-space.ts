@@ -1,4 +1,3 @@
-import { colorFuncName } from '../parser/const';
 import { Lru } from '../parser/lru';
 import { resolveFunctionColor } from './function-color';
 
@@ -17,11 +16,9 @@ export type ColorSpace = 'rgb' | 'hsl' | 'oklch';
 let currentColorSpace: ColorSpace = 'oklch';
 
 const colorSpaceCache = new Lru<string, string | null>(500);
-const componentsCache = new Lru<string, string>(500);
 
 function clearColorCaches(): void {
   colorSpaceCache.clear();
-  componentsCache.clear();
 }
 
 export function getColorSpace(): ColorSpace {
@@ -38,20 +35,12 @@ export function resetColorSpace(): void {
   clearColorCaches();
 }
 
-export function getColorSpaceSuffix(): string {
-  return currentColorSpace;
-}
-
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
 function formatNum(n: number, precision: number): string {
   return parseFloat(n.toFixed(precision)).toString();
-}
-
-function formatRgbComponent(n: number): string {
-  return parseFloat(n.toFixed(1)).toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -84,30 +73,6 @@ function rgbValuesToColorString(
     case 'oklch': {
       const [L, C, H] = rgbToOklch(r, g, b);
       return `oklch(${formatNum(L, 5)} ${formatNum(C, 5)} ${formatNum(H, 2)}${alphaSuffix})`;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Extract decomposed components string (no wrapping function)
-// ---------------------------------------------------------------------------
-
-function rgbValuesToComponents(
-  r: number,
-  g: number,
-  b: number,
-  space: ColorSpace,
-): string {
-  switch (space) {
-    case 'rgb':
-      return `${formatRgbComponent(r)} ${formatRgbComponent(g)} ${formatRgbComponent(b)}`;
-    case 'hsl': {
-      const [h, s, l] = rgbToHsl(r, g, b);
-      return `${formatNum(h, 2)} ${formatNum(s * 100, 2)}% ${formatNum(l * 100, 2)}%`;
-    }
-    case 'oklch': {
-      const [L, C, H] = rgbToOklch(r, g, b);
-      return `${formatNum(L, 5)} ${formatNum(C, 5)} ${formatNum(H, 2)}`;
     }
   }
 }
@@ -365,51 +330,6 @@ function buildSameSpaceString(
     : `${func}(${body})`;
 }
 
-/**
- * Build the decomposed component list for a same-space value.
- *
- * Dynamic tokens (`var()` / `calc()` / …) are preserved verbatim — they can't
- * be parsed and must survive into the CSS output. Purely static components are
- * normalized to the canonical numeric form for the space so the companion
- * `--*-color-{space}` variable stays a valid `<number>+` value (rgb/oklch) —
- * WITHOUT round-tripping through sRGB, which would clamp wide-gamut oklch.
- *
- * Non-native, parse-time-only functions (`okhsl()` / `okhst()`) are always
- * resolved to a static `rgb(...%)` upstream, so this is the path that turns
- * their percentage channels back into 0-255 numbers.
- */
-function buildSameSpaceComponents(
-  parsed: SameSpaceParse,
-  space: ColorSpace,
-): string {
-  const parts = parsed.parts;
-
-  // Any nested function → can't normalize numerically; preserve verbatim.
-  if (parts.some((p) => p.includes('('))) {
-    return parts.join(' ');
-  }
-
-  switch (space) {
-    case 'rgb':
-      return parts
-        .map((p) =>
-          p.endsWith('%') ? formatRgbComponent((parseFloat(p) / 100) * 255) : p,
-        )
-        .join(' ');
-    case 'hsl':
-      // hsl components are `h s% l%`; saturation/lightness keep their percent
-      // units, so the static tokens are already canonical.
-      return parts.join(' ');
-    case 'oklch': {
-      // Preserve chroma and hue verbatim (no sRGB clamp). A percentage
-      // lightness maps to its 0-1 number so the component stays `<number>+`.
-      const [l, c, h] = parts;
-      const lNorm = l.endsWith('%') ? formatNum(parseFloat(l) / 100, 5) : l;
-      return [lNorm, c, h].join(' ');
-    }
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -519,190 +439,4 @@ export function parseAlphaOverride(
   const match = value.match(RE_ALPHA_OVERRIDE);
 
   return match ? { color: match[1], alpha: match[2] } : null;
-}
-
-/** Channel names of each color space, in `<func>()` argument order. */
-const COLOR_SPACE_CHANNELS: Record<ColorSpace, string> = {
-  rgb: 'r g b',
-  hsl: 'h s l',
-  oklch: 'l c h',
-};
-
-/**
- * Express a color as components of the configured color space *by reference*,
- * using CSS relative color syntax: `from <color> l c h`.
- *
- * Static colors are decomposed into numbers (see `getColorSpaceComponents`), but
- * a color the engine cannot evaluate at build time — a `color-mix()`, a
- * `light-dark()`, a `color()` in a space with no conversion, anything reached
- * through `var()` — has no numbers to decompose. Handing back the relative form
- * keeps the `--name-color-{space}` companion usable anyway: the browser resolves
- * the channels, so `oklch(var(--name-color-oklch) / .5)` still applies opacity to
- * whatever the color turns out to be.
- */
-function toRelativeColorSpaceComponents(color: string): string {
-  return `from ${color} ${COLOR_SPACE_CHANNELS[currentColorSpace]}`;
-}
-
-/**
- * Extract the decomposed components of a color in the configured color space.
- * Returns a space-separated string of components without the wrapping function.
- * Alpha is NOT included — components are used for alpha composition via `/ alpha`.
- */
-export function getColorSpaceComponents(color: string): string {
-  const cached = componentsCache.get(color);
-  if (cached !== undefined) return cached;
-
-  // Same-space fast path (see strToColorSpace): derive components without a
-  // gamut-clamping sRGB round-trip. Dynamic tokens are kept verbatim; static
-  // channels are normalized to canonical numbers.
-  const sameSpace = parseSameSpaceFunc(color, currentColorSpace);
-  if (sameSpace) {
-    const result = buildSameSpaceComponents(sameSpace, currentColorSpace);
-    componentsCache.set(color, result);
-    return result;
-  }
-
-  const rgba = resolveToRgbaValues(color);
-  if (!rgba) return color;
-
-  const result = rgbValuesToComponents(
-    rgba[0],
-    rgba[1],
-    rgba[2],
-    currentColorSpace,
-  );
-  componentsCache.set(color, result);
-  return result;
-}
-
-/**
- * Rewrite a color into the `--name-color-{space}` components that `#name.alpha`
- * composes opacity onto.
- *
- * A `var()` chain is rewritten reference by reference so the fallback order
- * survives; a color the engine can evaluate is decomposed into numbers; anything
- * left — a derived color function, a `color()` in a space with no conversion —
- * falls back to relative color syntax and lets the browser do it.
- *
- * Returns the input unchanged when there is nothing to rewrite, so callers can
- * tell whether the conversion found anything.
- *
- * Example: `var(--primary-color, var(--secondary-color))`
- *   → `var(--primary-color-oklch, var(--secondary-color-oklch))`
- */
-export function convertColorChainToComponentChain(colorValue: string): string {
-  const suffix = getColorSpaceSuffix();
-
-  // Components carry no alpha, so an opacity override is peeled off and the color
-  // underneath is converted instead. `#name.5` parses to
-  // `oklab(from var(--name-color) l a b / .5)`, whose components are simply
-  // `--name-color`'s.
-  const faded = parseAlphaOverride(colorValue);
-  if (faded) {
-    return convertColorChainToComponentChain(faded.color);
-  }
-
-  // Handle the legacy `func(var(--name-color-{suffix}) / alpha)` form, which
-  // hand-written CSS and older cached values can still hold: the component chain
-  // is just the inner var() reference.
-  const componentVarMatch = colorValue.match(
-    /^(?:rgb|hsl|oklch)a?\(\s*(var\(--[a-z0-9-]+-color-(?:rgb|hsl|oklch)\))\s*\//,
-  );
-  if (componentVarMatch) {
-    return componentVarMatch[1];
-  }
-
-  // A color function call is decomposed as a whole. Its arguments may hold
-  // var() references of their own, and those belong to the arguments — matching
-  // one below would substitute a single argument for the whole color, so a
-  // `color-mix()` would silently collapse to one of its operands.
-  if (colorFuncName(colorValue)) {
-    const components = getColorSpaceComponents(colorValue);
-
-    return components !== colorValue
-      ? components
-      : toRelativeColorSpaceComponents(colorValue);
-  }
-
-  // Match var(--name-color, ...) pattern
-  const varPattern = /var\(--([a-z0-9-]+)-color\s*(?:,\s*(.+))?\)/;
-  const match = colorValue.match(varPattern);
-
-  if (!match) {
-    // Not a color variable — try to convert to components
-    const components = getColorSpaceComponents(colorValue);
-    if (components !== colorValue) return components;
-    return colorValue;
-  }
-
-  const [, name, fallback] = match;
-
-  if (!fallback) {
-    return `var(--${name}-color-${suffix})`;
-  }
-
-  const processedFallback = convertColorChainToComponentChain(fallback.trim());
-  return `var(--${name}-color-${suffix}, ${processedFallback})`;
-}
-
-/**
- * Convert a color initial value (from @property definitions) to components
- * in the configured color space.
- */
-export function colorInitialValueToComponents(
-  initialValue: string | number | undefined,
-): string {
-  if (initialValue == null) return getDefaultComponents();
-
-  const val = String(initialValue).trim().toLowerCase();
-
-  if (val === 'transparent' || val === 'rgba(0,0,0,0)' || val === '') {
-    return getDefaultComponents();
-  }
-
-  if (val === 'white') {
-    return rgbValuesToComponents(255, 255, 255, currentColorSpace);
-  }
-  if (val === 'black') {
-    return rgbValuesToComponents(0, 0, 0, currentColorSpace);
-  }
-
-  const rgbMatch = val.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
-  if (rgbMatch) {
-    return rgbValuesToComponents(
-      parseInt(rgbMatch[1]),
-      parseInt(rgbMatch[2]),
-      parseInt(rgbMatch[3]),
-      currentColorSpace,
-    );
-  }
-
-  return getDefaultComponents();
-}
-
-export function getDefaultComponents(): string {
-  switch (currentColorSpace) {
-    case 'rgb':
-      return '0 0 0';
-    case 'hsl':
-      return '0 0% 0%';
-    case 'oklch':
-      return '0 0 0';
-  }
-}
-
-/**
- * Get the CSS @property syntax for the companion components variable.
- * RGB and OKLCH components are all plain numbers, so `<number>+` works.
- * HSL includes percentages (`h s% l%`), so `*` is the only safe choice.
- */
-export function getComponentPropertySyntax(): string {
-  switch (currentColorSpace) {
-    case 'rgb':
-    case 'oklch':
-      return '<number>+';
-    default:
-      return '*';
-  }
 }

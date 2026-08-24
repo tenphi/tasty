@@ -64,19 +64,6 @@ export const POLYMORPHIC_COLOR_FUNC = 'light-dark';
 /** A value that is a single `name(args)` call: captures the name and the args. */
 export const RE_FUNC_CALL = /^([a-z][a-z0-9-]*)\((.+)\)$/i;
 
-/**
- * The color function a value calls at its top level, lowercased — or `null` when
- * the value is not a single color function call.
- */
-export function colorFuncName(value: string): string | null {
-  const match = value.match(RE_FUNC_CALL);
-  if (!match) return null;
-
-  const name = match[1].toLowerCase();
-
-  return COLOR_FUNCS.has(name) ? name : null;
-}
-
 export const RE_UNIT_NUM = /^[+-]?(?:\d*\.\d+|\d+)([a-z][a-z0-9]*)$/;
 export const RE_NUMBER = /^[+-]?(?:\d*\.\d+|\d+)$/;
 export const RE_HEX = /^(?:[0-9a-f]{3,4}|[0-9a-f]{6}(?:[0-9a-f]{2})?)$/;

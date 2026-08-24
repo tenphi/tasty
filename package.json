@@ -203,19 +203,19 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "59 kB"
+      "limit": "58 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "55.75 kB"
+      "limit": "54.9 kB"
     },
     {
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "19.25 kB"
+      "limit": "19 kB"
     },
     {
       "name": "zero",
@@ -226,7 +226,7 @@
         "path",
         "crypto"
       ],
-      "limit": "33.75 kB"
+      "limit": "33.4 kB"
     },
     {
       "name": "babel-plugin",
@@ -237,7 +237,7 @@
         "path",
         "crypto"
       ],
-      "limit": "52 kB"
+      "limit": "51.3 kB"
     }
   ]
 }

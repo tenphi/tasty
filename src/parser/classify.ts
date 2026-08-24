@@ -452,11 +452,11 @@ export function classify(
     if (alphaMatch) {
       const [, base, rawAlpha] = alphaMatch;
 
-      // Opacity applies to the color variable itself, not to its channel
-      // components. The token may hold anything a `<color>` can be — including a
-      // `color-mix()` or a `light-dark()` with no channels to decompose, or a
-      // value written straight into `--name-color` by hand-authored CSS with no
-      // companion at all — and relative color syntax fades all of them.
+      // Opacity applies to the color variable as a whole. The token may hold
+      // anything a `<color>` can be — including a `color-mix()` or a
+      // `light-dark()` with no channels to decompose, or a value written
+      // straight into `--name-color` by hand-authored CSS that Tasty never
+      // defined — and relative color syntax fades all of them.
       return {
         bucket: Bucket.Color,
         processed: fadeColor(`var(--${base}-color)`, rawAlpha),

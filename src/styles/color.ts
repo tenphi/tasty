@@ -1,7 +1,3 @@
-import {
-  convertColorChainToComponentChain,
-  getColorSpaceSuffix,
-} from '../utils/color-space';
 import { parseColor, resolveCustomProperties } from '../utils/styles';
 
 export function colorStyle({ color }: { color?: string | boolean }) {
@@ -15,23 +11,15 @@ export function colorStyle({ color }: { color?: string | boolean }) {
   // the raw DSL leaks into the declaration.
   color = parseColor(color, true).color || resolveCustomProperties(color);
 
-  const match = color.match(/var\(--(.+?)-color/);
-  let name = '';
+  const styles: Record<string, string> = { color };
 
-  if (match) {
-    name = match[1];
-  }
-
-  const styles = {
-    color: color,
-  };
+  // A named color is republished as `--current-color` so descendants can pick
+  // the inherited color up as a token. `#current` itself would only alias
+  // itself, so it is left alone.
+  const name = color.match(/var\(--(.+?)-color/)?.[1];
 
   if (name && name !== 'current') {
-    const suffix = getColorSpaceSuffix();
-    Object.assign(styles, {
-      '--current-color': color,
-      [`--current-color-${suffix}`]: convertColorChainToComponentChain(color),
-    });
+    styles['--current-color'] = color;
   }
 
   return styles;

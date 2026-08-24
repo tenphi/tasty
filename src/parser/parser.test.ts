@@ -593,7 +593,7 @@ describe('StyleProcessor', () => {
     });
 
     const expr =
-      'blur(10px) drop-shadow(0 0 1px oklch(var(--dark-color-oklch) / 20%)';
+      'blur(10px) drop-shadow(0 0 1px oklch(from var(--dark-color) l c h / 20%)';
     const res = parser.process(expr);
 
     expect(res.groups[0].values).toEqual(['blur(10px)']);
@@ -871,7 +871,7 @@ describe('Predefined tokens', () => {
     });
 
     const result = parser.process('#primary');
-    // #primary = '#purple.5' -> oklch(var(--purple-color-oklch) / .5)
+    // #primary = '#purple.5' -> the fade applies to the token it resolves to
     expect(result.output).toBe('oklch(from var(--purple-color) l c h / .5)');
   });
 

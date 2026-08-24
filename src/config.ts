@@ -118,12 +118,19 @@ export interface TastyConfig {
    */
   functions?: FunctionsConfig;
   /**
-   * Color space used for decomposed color token companion variables.
-   * Controls the CSS function and suffix for alpha composition.
+   * Color space a static color is emitted in. A color the engine can evaluate
+   * at build time is converted, so `#brand: '#ff8800'` declares
+   * `--brand-color: oklch(0.75 0.16 55)` by default. Anything it cannot
+   * evaluate — a `color-mix()`, a `light-dark()`, a `var()` chain — is left
+   * as authored.
    *
-   * - `'rgb'`   — suffix `-rgb`, e.g. `rgb(var(--name-color-rgb) / .5)`
-   * - `'hsl'`   — suffix `-hsl`, e.g. `hsl(var(--name-color-hsl) / .5)`
-   * - `'oklch'` — suffix `-oklch`, e.g. `oklch(var(--name-color-oklch) / .5)`
+   * - `'rgb'`   — e.g. `rgb(255 136 0)`
+   * - `'hsl'`   — e.g. `hsl(32 100% 50%)`
+   * - `'oklch'` — e.g. `oklch(0.75 0.16 55)`
+   *
+   * Opacity is applied with relative color syntax and is always written in
+   * `oklch`, independent of this setting — it is unbounded, so a wide-gamut
+   * color survives the round trip a narrower space would clamp.
    *
    * @default 'oklch'
    */

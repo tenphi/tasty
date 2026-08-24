@@ -224,7 +224,7 @@ const ProgressBar = tasty({
 
 <ProgressBar progress="75%" accentColor="#purple" />
 // 'progress'    → $progress    → --progress
-// 'accentColor' → #accent      → --accent-color + --accent-color-oklch
+// 'accentColor' → #accent      → --accent-color
 ```
 
 ### Object form

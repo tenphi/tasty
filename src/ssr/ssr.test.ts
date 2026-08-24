@@ -159,14 +159,13 @@ describe('formatPropertyCSS', () => {
     expect(css).toContain('initial-value: 0deg');
   });
 
-  it('formats a color property with companion component property', () => {
+  it('formats a color property as a single `<color>` rule', () => {
     const css = formatPropertyCSS('#accent', {
       initialValue: 'rgb(128 0 255)',
     });
     expect(css).toContain('@property --accent-color');
     expect(css).toContain('syntax: "<color>"');
-    expect(css).toContain('@property --accent-color-oklch');
-    expect(css).toContain('syntax: "<number>+"');
+    expect(css).not.toContain('--accent-color-oklch');
   });
 
   it('returns empty string for invalid token', () => {
@@ -352,9 +351,9 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('@property --border-width');
     expect(css).toContain('@property --font-sans-fallback');
     expect(css).toContain('@property --font-mono-fallback');
-    // Color properties get companion -rgb rules
+    // Color properties are a single `<color>` rule, with no channel companion
     expect(css).toContain('@property --white-color');
-    expect(css).toContain('@property --white-color-oklch');
+    expect(css).not.toContain('@property --white-color-oklch');
   });
 
   it('collectInternals is idempotent', () => {
@@ -826,29 +825,6 @@ describe('collectAutoInferredProperties', () => {
 
     const css = collector.getCSS();
     expect(css).not.toContain('@property --angle');
-  });
-
-  it('types a components companion expressed by reference as `*` once', () => {
-    const collector = new ServerStyleCollector();
-
-    collectAutoInferredProperties(
-      [
-        {
-          selector: '',
-          declarations:
-            '--brand-color: color-mix(in oklab, red 50%, blue); ' +
-            '--brand-color-oklch: from color-mix(in oklab, red 50%, blue) l c h',
-        },
-      ],
-      collector,
-    );
-
-    const css = collector.getCSS();
-    // A second companion rule with the default `<number>+` syntax would come
-    // later in the sheet and make the engine drop the relative value.
-    expect(css).toContain('@property --brand-color-oklch');
-    expect(css).not.toContain('"<number>+"');
-    expect(css).toContain('"*"');
   });
 
   it('handles multiple properties in a single declaration block', () => {

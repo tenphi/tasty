@@ -72,7 +72,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `plugins` | `TastyPlugin[]` | - | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
 | `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
 | `batchInjection` | `boolean \| 'always'` | `false` | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection) |
-| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space for decomposed color token companion variables |
+| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | `'oklch'` | Color space a statically known color is emitted in |
 | `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
 
 ---
@@ -205,7 +205,9 @@ useLayoutEffect(() => {
 
 ## Color Space
 
-Controls the CSS color space used for decomposed color token companion variables. When you define `#name` color tokens, tasty generates both `--name-color` (the color) and `--name-color-{suffix}` (its channels, decomposed).
+Controls the CSS color space a statically known color is emitted in. A `#name`
+token declares one variable, `--name-color`, and its value is converted into the
+configured space when the engine can evaluate it at build time.
 
 ```jsx
 configure({
@@ -213,17 +215,29 @@ configure({
 });
 ```
 
-| Color Space | Suffix | Components Format | Channel Reference |
-|---|---|---|---|
-| `rgb` | `-rgb` | `255 128 0` | `rgb(var(--name-color-rgb))` |
-| `hsl` | `-hsl` | `300 100% 25%` | `hsl(var(--name-color-hsl))` |
-| `oklch` | `-oklch` | `0.42 0.16 328` | `oklch(var(--name-color-oklch))` |
+| Color Space | `#brand: '#ff8800'` emits |
+|---|---|
+| `rgb` | `--brand-color: rgb(255 136 0)` |
+| `hsl` | `--brand-color: hsl(32 100% 50%)` |
+| `oklch` | `--brand-color: oklch(0.75 0.16 55)` |
 
-The `oklch` color space is the default because it provides perceptually uniform color manipulation — reaching for a channel to shift lightness or hue produces more natural-looking results.
+The `oklch` color space is the default because it is perceptually uniform and
+wide-gamut, so a channel read off it — to shift a lightness, animate a hue,
+build a derived color — behaves the way the eye expects and is not clamped to
+sRGB.
 
-The companion is there so you can *address the channels*: shift a lightness, animate a hue, build a derived color. It is not how the [opacity suffix](dsl.md#color-tokens--opacity) works — that sets the alpha on `--name-color` itself with relative color syntax, so it needs nothing from the companion and works on any color.
+A color the engine cannot evaluate at build time — a `color-mix()`, a
+`light-dark()`, a `color()` in a space it has no conversion for, anything reached
+through `var()` — is emitted as authored and left for the browser to resolve.
 
-A color the engine cannot evaluate at build time — a `color-mix()`, a `light-dark()`, a `color()` in a space it has no conversion for — has no channels to decompose, so its companion is expressed *by reference* using CSS relative color syntax (`--name-color-oklch: from color-mix(…) l c h`). Reading a channel off it still works; the browser resolves them.
+The setting does not affect the [opacity suffix](dsl.md#color-tokens--opacity),
+which always writes `oklch(from <color> l c h / <alpha>)`: alpha application is
+space-independent, and `oklch` is unbounded, so a wide-gamut color survives a
+round trip a narrower space would clamp.
+
+To address a token's channels yourself, use relative color syntax against the
+token — `oklch(from var(--brand-color) calc(l * 1.2) c h)` — which works on any
+color, including the ones the engine cannot decompose.
 
 ---
 
@@ -294,7 +308,7 @@ configure({
 ```
 
 - `$name` keys become `--name` CSS custom properties
-- `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties (suffix depends on `colorSpace`, default `oklch`)
+- `#name` keys become `--name-color` custom properties
 - Names keep their case, since CSS custom properties are case-sensitive: `$myVar` is `--myVar` and is referenced as `$myVar`. A leading capital is not supported and folds — `$Foo` and `#Purple` become `--foo` and `--purple-color` — so start names lowercase. Kebab-case (`$my-var`) remains the convention.
 
 Tokens are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin).
@@ -416,7 +430,7 @@ See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside
 
 ### Custom color functions
 
-A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, token decomposition into the configured color space, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
+A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, conversion into the configured color space, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
 
 ```ts
 import { configure, createColorFunc } from '@tenphi/tasty';

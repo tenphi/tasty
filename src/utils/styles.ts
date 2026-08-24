@@ -133,8 +133,6 @@ const devMode = process.env.NODE_ENV !== 'production';
 // not the color's own name — `color-mix(in oklab, var(--purple-color) 50%, …)`
 // is not named `purple`.
 const COLOR_VAR_PATTERN = /^var\(--([a-z0-9-]+)-color[,)]/;
-const COLOR_VAR_COMPONENTS_PATTERN =
-  /^(?:[a-z-]+\(\s*)?var\(--([a-z0-9-]+)-color-(?:rgb|hsl|oklch)[,)]/;
 const RGB_ALPHA_PATTERN = /\/\s*([0-9.]+)\)/;
 const RE_HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const RE_VAR_COLOR = /^var\(--[a-z0-9-]+-color/;
@@ -424,10 +422,7 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   const baseColor = faded ? faded.color : firstColor;
 
   // Extract color name (if present) from variable pattern using precompiled regex
-  let nameMatch = baseColor.match(COLOR_VAR_PATTERN);
-  if (!nameMatch) {
-    nameMatch = baseColor.match(COLOR_VAR_COMPONENTS_PATTERN);
-  }
+  const nameMatch = baseColor.match(COLOR_VAR_PATTERN);
 
   let opacity: number | undefined;
   if (faded) {

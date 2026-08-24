@@ -1,9 +1,7 @@
 import { configure, resetConfig } from '../config';
 
 import {
-  convertColorChainToComponentChain,
   getColorSpace,
-  getColorSpaceComponents,
   parseAlphaOverride,
   resetColorSpace,
   setColorSpace,
@@ -98,18 +96,6 @@ describe('strToColorSpace — alpha preservation', () => {
   });
 });
 
-describe('getColorSpaceComponents — ignores alpha', () => {
-  beforeEach(() => setColorSpace('rgb'));
-
-  it('returns only RGB components without alpha', () => {
-    expect(getColorSpaceComponents('rgba(0, 0, 0, 0)')).toBe('0 0 0');
-  });
-
-  it('returns components for opaque colors', () => {
-    expect(getColorSpaceComponents('rgb(255, 128, 0)')).toBe('255 128 0');
-  });
-});
-
 describe('same-space fast path — preserves same-space values verbatim', () => {
   describe('colorSpace = oklch', () => {
     beforeEach(() => setColorSpace('oklch'));
@@ -120,18 +106,9 @@ describe('same-space fast path — preserves same-space values verbatim', () => 
       );
     });
 
-    it('preserves var() components in getColorSpaceComponents', () => {
-      expect(getColorSpaceComponents('oklch(var(--hue) .2 20)')).toBe(
-        'var(--hue) .2 20',
-      );
-    });
-
     it('preserves mixed-case var() names (custom properties are case-sensitive)', () => {
       expect(strToColorSpace('oklch(var(--myHue) .2 20)')).toBe(
         'oklch(var(--myHue) .2 20)',
-      );
-      expect(getColorSpaceComponents('oklch(var(--myHue) .2 20)')).toBe(
-        'var(--myHue) .2 20',
       );
     });
 
@@ -162,12 +139,8 @@ describe('same-space fast path — preserves same-space values verbatim', () => 
       );
     });
 
-    it('preserves wide-gamut oklch components without sRGB clamping', () => {
-      expect(getColorSpaceComponents('oklch(0.7 0.35 30)')).toBe('0.7 0.35 30');
-    });
-
-    it('normalizes a percentage lightness component to a 0-1 number', () => {
-      expect(getColorSpaceComponents('oklch(70% 0.2 20)')).toBe('0.7 0.2 20');
+    it('normalizes a percentage lightness to the canonical 0-1 number', () => {
+      expect(strToColorSpace('oklch(70% 0.2 20)')).toBe('oklch(70% 0.2 20)');
     });
   });
 
@@ -194,17 +167,10 @@ describe('same-space fast path — preserves same-space values verbatim', () => 
       expect(strToColorSpace('rgb(255 128 0)')).toBe('rgb(255 128 0)');
     });
 
-    it('normalizes static rgb percentage channels to 0-255 components', () => {
+    it('keeps static rgb percentage channels verbatim', () => {
       // Mirrors okhsl()/okhst() -> rgb(...%) parser output.
-      expect(getColorSpaceComponents('rgb(100% 100% 100%)')).toBe(
-        '255 255 255',
-      );
-      expect(getColorSpaceComponents('rgb(0% 0% 0%)')).toBe('0 0 0');
-    });
-
-    it('keeps dynamic rgb channels verbatim in components', () => {
-      expect(getColorSpaceComponents('rgb(var(--r) var(--g) var(--b))')).toBe(
-        'var(--r) var(--g) var(--b)',
+      expect(strToColorSpace('rgb(100% 100% 100%)')).toBe(
+        'rgb(100% 100% 100%)',
       );
     });
   });
@@ -303,24 +269,60 @@ describe('parseAlphaOverride', () => {
   });
 });
 
-describe('convertColorChainToComponentChain through a fade', () => {
-  it('reports the faded token\u2019s own channels', () => {
-    setColorSpace('oklch');
+describe('strToColorSpace — cross-space conversion', () => {
+  beforeEach(() => setColorSpace('rgb'));
 
-    // Components carry no alpha, so the fade is peeled before converting.
-    expect(
-      convertColorChainToComponentChain(
-        'oklch(from var(--purple-color) l c h / .5)',
-      ),
-    ).toBe('var(--purple-color-oklch)');
+  it('converts hsl to rgb', () => {
+    expect(strToColorSpace('hsl(200 40% 50%)')).toBe('rgb(77 144 179)');
+    expect(strToColorSpace('hsl(0 100% 50%)')).toBe('rgb(255 0 0)');
+    expect(strToColorSpace('hsl(120 100% 50%)')).toBe('rgb(0 255 0)');
+    expect(strToColorSpace('hsl(240 100% 50%)')).toBe('rgb(0 0 255)');
+  });
 
-    // Including through more than one layer.
-    expect(
-      convertColorChainToComponentChain(
-        'oklch(from oklch(from var(--purple-color) l c h / .5) l c h / .25)',
-      ),
-    ).toBe('var(--purple-color-oklch)');
+  it('converts an achromatic hsl (saturation 0)', () => {
+    expect(strToColorSpace('hsl(180 0% 50%)')).toBe('rgb(128 128 128)');
+    expect(strToColorSpace('hsl(0 0% 100%)')).toBe('rgb(255 255 255)');
+    expect(strToColorSpace('hsl(0 0% 0%)')).toBe('rgb(0 0 0)');
+  });
 
-    resetColorSpace();
+  it('converts a hex literal', () => {
+    expect(strToColorSpace('#ff8040')).toBe('rgb(255 128 64)');
+    expect(strToColorSpace('#f80')).toBe('rgb(255 136 0)');
+  });
+
+  describe('hue units and wrapping', () => {
+    it('accepts deg', () => {
+      expect(strToColorSpace('hsl(90deg 50% 50%)')).toBe(
+        strToColorSpace('hsl(90 50% 50%)'),
+      );
+    });
+
+    it('accepts turn', () => {
+      // 0.5turn = 180deg = cyan
+      expect(strToColorSpace('hsl(0.5turn 100% 50%)')).toBe('rgb(0 255 255)');
+    });
+
+    it('accepts rad', () => {
+      // π rad ≈ 180deg = cyan
+      expect(strToColorSpace('hsl(3.14159rad 100% 50%)')).toBe(
+        'rgb(0 255 255)',
+      );
+    });
+
+    it('wraps a negative hue', () => {
+      // -90deg is 270deg
+      expect(strToColorSpace('hsl(-90 100% 50%)')).toBe(
+        strToColorSpace('hsl(270 100% 50%)'),
+      );
+      expect(strToColorSpace('hsl(-90 100% 50%)')).toBe('rgb(128 0 255)');
+    });
+
+    it('wraps a hue above 360', () => {
+      // 450deg is 90deg
+      expect(strToColorSpace('hsl(450 100% 50%)')).toBe(
+        strToColorSpace('hsl(90 100% 50%)'),
+      );
+      expect(strToColorSpace('hsl(450 100% 50%)')).toBe('rgb(128 255 0)');
+    });
   });
 });

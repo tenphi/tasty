@@ -231,15 +231,15 @@ describe('processTokens', () => {
   });
 
   describe('#current color token', () => {
-    it('processes #current through --current-color', () => {
-      // Resolving through the variable is what lets the token be faded: a
-      // concrete origin works from Safari 16.4, `from currentcolor` needs 18.
+    it('processes #current to currentcolor', () => {
+      // The keyword, so the token resolves against each element's own color
+      // rather than freezing the color of whatever declared it.
       const result = processTokens({
         '#my-color': '#current',
       });
 
       expect(result).toBeDefined();
-      expect(result!['--my-color-color']).toBe('var(--current-color)');
+      expect(result!['--my-color-color']).toBe('currentcolor');
     });
 
     it('composes #current.5 with color-mix', () => {

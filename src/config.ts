@@ -631,12 +631,12 @@ const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: false,
     initialValue: 'transparent',
   },
-  // What `#current` resolves through. The `color` handler publishes it, and
-  // `initial-value: currentcolor` is what makes it a true stand-in where nothing
-  // has: a registered `<color>` property keeps the keyword as its computed value
-  // and resolves it against each element's own color, so an unpublished
-  // `#current` behaves exactly as the keyword would. `transparent` here would
-  // render it invisible instead.
+  // The inherited color, published by the `color` handler for anything that
+  // wants it as a color rather than as the `currentcolor` keyword. (`#current`
+  // itself compiles to the keyword.) `initial-value: currentcolor` makes it a
+  // true stand-in where nothing published it: a registered `<color>` property
+  // keeps the keyword as its computed value and resolves it against each
+  // element's own color. `transparent` here would render a reader invisible.
   '#current': {
     inherits: true,
     initialValue: 'currentcolor',

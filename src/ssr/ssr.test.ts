@@ -355,9 +355,9 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('@property --white-color');
     expect(css).not.toContain('@property --white-color-oklch');
 
-    // `--current-color` is what `#current` resolves through, so its initial
-    // value has to be the keyword — `transparent` would render an unpublished
-    // `#current` invisible instead of as the colour the element inherits.
+    // `--current-color` carries the inherited colour for anything that reads it
+    // as a colour, so its initial value has to be the keyword — `transparent`
+    // would render an unpublished reader invisible instead.
     expect(css).toContain(
       '@property --current-color { syntax: "<color>"; inherits: true; initial-value: currentcolor; }',
     );

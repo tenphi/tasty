@@ -1,5 +1,6 @@
-import { isDevEnv } from '../utils/is-dev-env';
 import { Lru } from '../parser/lru';
+import { warnOnceDev } from '../styles/shared';
+import { isDevEnv } from '../utils/is-dev-env';
 import type { StyleDetails } from '../parser/types';
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -28,7 +29,9 @@ const parseAngle = (value: string): number => {
 };
 
 /**
- * Parse a percentage value (e.g., "50%") to a 0-1 range.
+ * Parse a percentage value (e.g., "50%") to a 0-1 range. A unitless number is
+ * read as the factor it already looks like, so `okhsl(280 .8 .52)` and
+ * `okhsl(280 80% 52%)` are the same color.
  */
 const parsePercentage = (value: string): number => {
   const match = value.match(/^([+-]?\d*\.?\d+)%?$/);
@@ -88,6 +91,19 @@ export function createColorFunc(
     const h = parseAngle(tokens[0]);
     const c2 = parsePercentage(tokens[1]);
     const c3 = parsePercentage(tokens[2]);
+
+    // A unitless channel above 1 cannot be a factor, so it is a missing `%`.
+    // Clamping it quietly is the worst outcome: `okhsl(280 80 52)` renders as
+    // white, which looks like a color rather than like a mistake. `1` itself is
+    // a legitimate factor, so the check is strict.
+    if (c2 > 1 || c3 > 1) {
+      warnOnceDev(
+        `${name}:percent-scale`,
+        `${name}(): channels are factors (0-1) or percentages, so ` +
+          `"${tokens[1]} ${tokens[2]}" clamps to 1 — add the missing '%', or ` +
+          `write the value as a 0-1 number.`,
+      );
+    }
 
     const [r, g, b] = convert(h, clamp(c2, 0, 1), clamp(c3, 0, 1));
 

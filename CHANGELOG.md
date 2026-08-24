@@ -1,5 +1,115 @@
 # @tenphi/tasty
 
+## 3.3.0
+
+### Minor Changes
+
+- [#271](https://github.com/tenphi/tasty/pull/271) [`5184052`](https://github.com/tenphi/tasty/commit/5184052dd3d1767a21ca80129e38b34a44702cc0) Thanks [@tenphi](https://github.com/tenphi)! - Colors are emitted as authored, and the `--name-color-{colorSpace}` channel
+  companions are gone.
+
+  Two things existed only to serve the opacity suffix back when it needed numeric
+  channels to write an alpha into:
+  - A `#name` token declared a second variable holding its channels decomposed —
+    `--brand-color-oklch: 0.75 0.16 55` — plus a matching `@property` rule, and a
+    `color` style emitted `--current-color-{space}` beside `--current-color`.
+  - A token's value was rewritten into the configured `colorSpace`, so
+    `#brand: '#ff8800'` declared `--brand-color: oklch(0.75 0.16 55)`.
+
+  Opacity now uses relative color syntax — `oklch(from var(--brand-color) l c h /
+.5)` — which has the browser read the channels off whatever the value resolves
+  to. Neither is load-bearing any more, so both are removed and a color passes
+  through untouched: `--brand-color: #ff8800`.
+
+  `configure({ colorSpace })` is **deprecated** — still accepted, no longer has any
+  effect, warns in development, and will be removed in the next major.
+
+  No public API changes: nothing exported moves and class name hashes are
+  identical. What changes is the emitted CSS.
+
+  ```css
+  /* before */
+  color: oklch(var(--brand-color-oklch) / 0.5);
+  background: oklch(var(--brand-color-oklch));
+
+  /* after */
+  color: oklch(from var(--brand-color) l c h / 0.5);
+  background: var(--brand-color);
+  ```
+
+  If you relied on `colorSpace` for uniform output, author the token in the space
+  you want — the value is no longer rewritten. See
+  [Color space](https://github.com/tenphi/tasty/blob/main/docs/configuration.md#color-space).
+
+  What it buys:
+  - **~2.0 kB brotli off `main` and `core`, ~2.6 kB off `static`, `zero` and
+    `babel-plugin`** — the whole sRGB round-trip and the LRU cache that memoized
+    it are gone.
+  - One declaration less per color in every emitted rule, and one fewer inline
+    style property per `#name` entry in the `tokens` prop.
+  - One `@property` registration less per color token, on the runtime, SSR, RSC and
+    zero-runtime paths.
+  - A pre-pass removed from `PropertyTypeResolver.scanDeclarations`, so every
+    injection does less work.
+
+  Also fixes `parseColor()` not recognizing a CSS named color that starts with
+  `r`, `h`, `l`, `o`, `v`, `c`, or `t` — `red`, `hotpink`, `lime`, `orange`,
+  `violet`, `coral` and `teal` were rejected (and warned about) where `blue` and
+  `green` were accepted, purely because of the first-character dispatch. Every
+  named color resolves now.
+
+### Patch Changes
+
+- [#271](https://github.com/tenphi/tasty/pull/271) [`5184052`](https://github.com/tenphi/tasty/commit/5184052dd3d1767a21ca80129e38b34a44702cc0) Thanks [@tenphi](https://github.com/tenphi)! - `#current` resolves through `--current-color` instead of the `currentcolor`
+  keyword, which lets a token defined as `#current` be faded on Safari 16.4 rather
+  than 18.
+
+  Relative color syntax takes a concrete origin from Safari 16.4, but
+  `oklch(from currentcolor …)` needs Safari 18. A token defined as `#current` used
+  to emit the bare keyword, so fading it — `{ '#ink': '#current', fill: '#ink.5' }`
+  — produced exactly that unsupported form. `#current` now emits
+  `var(--current-color)`, so the origin is a real color wherever a `color` style
+  published one.
+
+  Three things make the swap invisible everywhere else:
+  - `--current-color` is registered with `initial-value: currentcolor`. A
+    registered `<color>` property keeps the keyword as its computed value and
+    resolves it against each element's own color, so an unpublished `#current` is
+    indistinguishable from the keyword rather than falling back to `transparent`.
+  - The `color` style now publishes `--current-color` for **every** color, not only
+    a named token. A literal `color: 'red'` has to displace an ancestor's token
+    color, or a descendant's `#current` would read the ancestor's.
+  - `#current.N` keeps `currentcolor` inside its `color-mix()`. The mix composes, so
+    a nested fade must read the already-faded color that reaches it — `#current.4`
+    with `#current.18` under it still lands at `.072`. It has worked since Safari
+    16.2 regardless.
+
+  Still uncovered, and unchanged from before: a token defined as `#current` and
+  faded where no `color` style published the variable — the origin is the keyword
+  again, so that one case needs Safari 18.
+
+  Verified against Safari 16.5.1, 17.3 and 18.4, and the whole chain is pinned by
+  computed-style tests in a real engine.
+
+- [#271](https://github.com/tenphi/tasty/pull/271) [`5184052`](https://github.com/tenphi/tasty/commit/5184052dd3d1767a21ca80129e38b34a44702cc0) Thanks [@tenphi](https://github.com/tenphi)! - Warn when a color function's channel arrives on the percentage scale without its
+  `%`.
+
+  `okhsl()` / `okhst()` and any `createColorFunc()` plugin read a unitless channel
+  as the factor it looks like, so `okhsl(280 .8 .52)` and `okhsl(280 80% 52%)` are
+  the same color. Dropping the `%` therefore lands `80` in a 0-1 slot, where it
+  clamps to full saturation and renders as **white** — a plausible-looking color
+  rather than an obvious mistake.
+
+  A unitless channel above 1 cannot be a factor, so it now warns once per function
+  in development, naming the offending values. `1` itself is a legitimate factor
+  and stays silent, and the emitted color is unchanged.
+
+  Found while checking whether the producer/writer scale mismatch fixed in
+  [glaze#94](https://github.com/tenphi/glaze/pull/94) applied here. It does not —
+  `createColorFunc` already takes factors and scales to percentages on output, and
+  every other converter boundary (`hslStringToRgb`, `oklchStringToRgb`,
+  `okhstToSrgb`'s `fromTone(t * 100)`) was verified correct — but the silent
+  clamp on misscaled input was the same footgun.
+
 ## 3.2.0
 
 ### Minor Changes

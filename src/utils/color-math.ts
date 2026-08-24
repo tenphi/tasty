@@ -123,6 +123,11 @@ function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
   return Math.exp((t / 100) * den + Math.log(eps)) - eps;
 }
 
+/**
+ * Lightness to OKHST tone — the reverse of {@link fromTone}, which is the
+ * direction `okhst()` uses. Kept for the same reason as {@link srgbToOkhsl}:
+ * it lets the forward transfer be round-tripped in tests.
+ */
 export function toTone(l: number, eps: number = OKHST_REF_EPS): number {
   return toneFromY(lToY(l), eps);
 }
@@ -556,6 +561,12 @@ export function oklchToRgbValues(L: number, C: number, H: number): Vec3 {
 
 /**
  * sRGB (0-1 range) to OKHSL.
+ *
+ * The reverse of {@link okhslToSrgb}, which is the direction the `okhsl()`
+ * plugin uses. Nothing in the engine calls this — it exists so the forward
+ * conversion can be round-tripped in tests, which checks its accuracy without
+ * depending on hand-written fixtures.
+ *
  * @returns [H (0-360), S (0-1), L (0-1)]
  */
 export function srgbToOkhsl(rgb: Vec3): Vec3 {
@@ -733,45 +744,6 @@ export function getNamedColorHex(): Map<string, string> {
 // String Converters
 // ============================================================================
 
-const hexCharToNum = (c: number): number => {
-  if (c >= 48 && c <= 57) return c - 48; // 0-9
-  if (c >= 65 && c <= 70) return c - 55; // A-F
-  if (c >= 97 && c <= 102) return c - 87; // a-f
-  return -1;
-};
-
-/**
- * Parse a hex color string directly to RGB 0-255 values.
- * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
- * Returns null for invalid input.
- */
-export function hexToRgbValues(hex: string): Vec3 | null {
-  let start = 0;
-  if (hex.charCodeAt(0) === 35) start = 1; // '#'
-  const len = hex.length - start;
-
-  if (len === 3 || len === 4) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    if (r < 0 || g < 0 || b < 0) return null;
-    return [r * 17, g * 17, b * 17];
-  }
-
-  if (len === 6 || len === 8) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2];
-  }
-
-  return null;
-}
-
 /**
  * Convert hex color string to `rgb()` CSS string.
  * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
@@ -893,94 +865,6 @@ export function hslStringToRgb(hslStr: string): string | null {
   }
 
   return `rgb(${Math.round(r)} ${Math.round(g)} ${Math.round(b)})`;
-}
-
-/**
- * Convert an `okhsl()` color string to an `rgb()`/`rgba()` CSS string.
- * Supports deg/turn/rad hue units and percentage saturation/lightness.
- */
-export function okhslStringToRgb(okhslStr: string): string | null {
-  const match = okhslStr.match(/okhsl\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const inner = match[1].trim();
-  const [colorPart, alphaPart] = inner.split('/');
-  const parts = colorPart
-    .trim()
-    .split(/[,\s]+/)
-    .filter(Boolean);
-
-  if (parts.length < 3) return null;
-
-  let h = parseFloat(parts[0]);
-  const hueStr = parts[0].toLowerCase();
-  if (hueStr.endsWith('turn')) h = parseFloat(hueStr) * 360;
-  else if (hueStr.endsWith('rad')) h = (parseFloat(hueStr) * 180) / Math.PI;
-  else if (hueStr.endsWith('deg')) h = parseFloat(hueStr);
-
-  const parsePercent = (val: string): number => {
-    const num = parseFloat(val);
-    return val.includes('%') ? num / 100 : num;
-  };
-  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
-  const l = Math.max(0, Math.min(1, parsePercent(parts[2])));
-
-  const [r, g, b] = okhslToSrgb(h, s, l);
-
-  const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
-  const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);
-  const b255 = Math.round(Math.max(0, Math.min(1, b)) * 255);
-
-  if (alphaPart) {
-    const alpha = parseFloat(alphaPart.trim());
-    return `rgba(${r255}, ${g255}, ${b255}, ${alpha})`;
-  }
-
-  return `rgb(${r255} ${g255} ${b255})`;
-}
-
-/**
- * Convert an `okhst()` color string to an `rgb()`/`rgba()` CSS string.
- * Supports deg/turn/rad hue units and percentage saturation/tone.
- */
-export function okhstStringToRgb(okhstStr: string): string | null {
-  const match = okhstStr.match(/okhst\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const inner = match[1].trim();
-  const [colorPart, alphaPart] = inner.split('/');
-  const parts = colorPart
-    .trim()
-    .split(/[,\s]+/)
-    .filter(Boolean);
-
-  if (parts.length < 3) return null;
-
-  let h = parseFloat(parts[0]);
-  const hueStr = parts[0].toLowerCase();
-  if (hueStr.endsWith('turn')) h = parseFloat(hueStr) * 360;
-  else if (hueStr.endsWith('rad')) h = (parseFloat(hueStr) * 180) / Math.PI;
-  else if (hueStr.endsWith('deg')) h = parseFloat(hueStr);
-
-  const parsePercent = (val: string): number => {
-    const num = parseFloat(val);
-    return val.includes('%') ? num / 100 : num;
-  };
-  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
-  const t = Math.max(0, Math.min(1, parsePercent(parts[2])));
-
-  const [r, g, b] = okhstToSrgb(h, s, t);
-
-  const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
-  const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);
-  const b255 = Math.round(Math.max(0, Math.min(1, b)) * 255);
-
-  if (alphaPart) {
-    const alpha = parseFloat(alphaPart.trim());
-    return `rgba(${r255}, ${g255}, ${b255}, ${alpha})`;
-  }
-
-  return `rgb(${r255} ${g255} ${b255})`;
 }
 
 /**

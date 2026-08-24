@@ -1,12 +1,9 @@
 import {
   getRgbValuesFromRgbaString,
   hexToRgb,
-  hexToRgbValues,
   hslStringToRgb,
   hslToRgbValues,
-  okhslStringToRgb,
   okhslToSrgb,
-  okhstStringToRgb,
   okhstToSrgb,
   oklchStringToRgb,
   oklchToRgbValues,
@@ -66,13 +63,6 @@ describe('OKHST tone transfers', () => {
       expect(rgbFromHst[1]).toBeCloseTo(rgbFromHsl[1], 4);
       expect(rgbFromHst[2]).toBeCloseTo(rgbFromHsl[2], 4);
     }
-  });
-
-  it('parses okhst strings', () => {
-    expect(okhstStringToRgb('okhst(180 50% 50%)')).toBe('rgb(70 130 119)');
-    expect(okhstStringToRgb('okhst(180 50% 50% / 0.5)')).toBe(
-      'rgba(70, 130, 119, 0.5)',
-    );
   });
 });
 
@@ -228,61 +218,6 @@ describe('OKHSL green-region accuracy', () => {
 // hexToRgbValues
 // ============================================================================
 
-describe('hexToRgbValues', () => {
-  it('parses 6-digit hex', () => {
-    expect(hexToRgbValues('#ff0000')).toEqual([255, 0, 0]);
-    expect(hexToRgbValues('#00ff00')).toEqual([0, 255, 0]);
-    expect(hexToRgbValues('#0000ff')).toEqual([0, 0, 255]);
-  });
-
-  it('parses 3-digit hex', () => {
-    expect(hexToRgbValues('#fff')).toEqual([255, 255, 255]);
-    expect(hexToRgbValues('#000')).toEqual([0, 0, 0]);
-    expect(hexToRgbValues('#f00')).toEqual([255, 0, 0]);
-  });
-
-  it('parses without # prefix', () => {
-    expect(hexToRgbValues('ff0000')).toEqual([255, 0, 0]);
-    expect(hexToRgbValues('fff')).toEqual([255, 255, 255]);
-  });
-
-  it('parses 8-digit hex (ignores alpha)', () => {
-    expect(hexToRgbValues('#ff000080')).toEqual([255, 0, 0]);
-  });
-
-  it('is case-insensitive', () => {
-    expect(hexToRgbValues('#FF0000')).toEqual([255, 0, 0]);
-    expect(hexToRgbValues('#aAbBcC')).toEqual([170, 187, 204]);
-  });
-
-  it('returns null for invalid input', () => {
-    expect(hexToRgbValues('#xyz')).toBeNull();
-    expect(hexToRgbValues('')).toBeNull();
-    expect(hexToRgbValues('#')).toBeNull();
-    expect(hexToRgbValues('#1')).toBeNull();
-    expect(hexToRgbValues('#12')).toBeNull();
-    expect(hexToRgbValues('#12345')).toBeNull();
-  });
-
-  it('matches hexToRgb output for valid colors', () => {
-    const testCases = [
-      '#ff0000',
-      '#00ff00',
-      '#0000ff',
-      '#fff',
-      '#abc',
-      '#123456',
-    ];
-    for (const hex of testCases) {
-      const values = hexToRgbValues(hex);
-      const rgbStr = hexToRgb(hex);
-      expect(values).not.toBeNull();
-      expect(rgbStr).not.toBeNull();
-      expect(rgbStr).toBe(`rgb(${values![0]} ${values![1]} ${values![2]})`);
-    }
-  });
-});
-
 // ============================================================================
 // String converters
 // ============================================================================
@@ -390,32 +325,6 @@ describe('hslStringToRgb', () => {
 
   it('returns null for invalid', () => {
     expect(hslStringToRgb('invalid')).toBeNull();
-  });
-});
-
-describe('okhslStringToRgb', () => {
-  it('converts basic okhsl', () => {
-    const result = okhslStringToRgb('okhsl(280.3 80% 52%)');
-    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
-  });
-
-  it('handles alpha', () => {
-    const result = okhslStringToRgb('okhsl(280.3 80% 52% / 0.5)');
-    expect(result).toMatch(/^rgba\(\d+, \d+, \d+, 0\.5\)$/);
-  });
-
-  it('returns null for invalid', () => {
-    expect(okhslStringToRgb('invalid')).toBeNull();
-  });
-
-  it('handles turn units', () => {
-    const result = okhslStringToRgb('okhsl(0.5turn 80% 52%)');
-    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
-  });
-
-  it('handles rad units', () => {
-    const result = okhslStringToRgb('okhsl(3.14rad 80% 52%)');
-    expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
   });
 });
 

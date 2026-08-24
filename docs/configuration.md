@@ -239,6 +239,33 @@ To address a token's channels yourself, use relative color syntax against the
 token — `oklch(from var(--brand-color) calc(l * 1.2) c h)` — which works on any
 color, including the ones the engine cannot decompose.
 
+### Migrating off the channel companions
+
+A `#name` token used to declare a second variable beside `--name-color` holding
+its channels decomposed, suffixed with the configured space —
+`--brand-color-oklch: 0.75 0.16 55` — and a `color` style emitted
+`--current-color-{space}` beside `--current-color`. Both are gone: they existed
+so an opacity suffix had channels to write an alpha into, and nothing has read
+one since opacity moved to relative color syntax.
+
+These were never part of the public API, but they were visible in the emitted
+CSS, so hand-authored CSS may reference one. Address the token itself instead:
+
+```css
+/* before */
+color: oklch(var(--brand-color-oklch) / 0.5);
+background: oklch(var(--brand-color-oklch));
+
+/* after */
+color: oklch(from var(--brand-color) l c h / 0.5);
+background: var(--brand-color);
+```
+
+The replacement is strictly more capable — the companion could only be
+decomposed for a color the engine could evaluate at build time, while relative
+color syntax works on every `<color>`, including a `color-mix()`, a
+`light-dark()`, and a variable Tasty never defined.
+
 ---
 
 ## Name Prefix

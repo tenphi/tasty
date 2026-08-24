@@ -68,6 +68,36 @@ describe('processTokens', () => {
       expect(result).toBeDefined();
       expect(result!['--gap']).toBe('16px');
     });
+
+    it('converts boolean true to an empty value', () => {
+      expect(processTokens({ $flag: true })).toEqual({ '--flag': '' });
+    });
+
+    it('keeps a numeric 0 as `0` rather than giving it a unit', () => {
+      expect(processTokens({ $gap: 0 })).toEqual({ '--gap': '0' });
+    });
+  });
+
+  describe('one property per token key', () => {
+    it('declares exactly one property for each key', () => {
+      const result = processTokens({
+        $gap: '2x',
+        '#brand': '#purple',
+        '#surface': 'hsl(200 40% 50%)',
+        '#mix': 'color-mix(in oklab, #purple 50%, #red)',
+      });
+
+      expect(Object.keys(result!).sort()).toEqual([
+        '--brand-color',
+        '--gap',
+        '--mix-color',
+        '--surface-color',
+      ]);
+    });
+
+    it('ignores a key with no recognized sigil', () => {
+      expect(processTokens({ gap: '2x' } as never)).toBeUndefined();
+    });
   });
 
   describe('edge cases', () => {

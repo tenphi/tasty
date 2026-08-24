@@ -1,4 +1,7 @@
 import { configure, resetConfig } from './config';
+import { strToColorSpace } from './utils/color-space';
+import { parseColor } from './utils/styles';
+
 import { borderStyle } from './styles/border';
 import { colorStyle } from './styles/color';
 import { createStyle } from './styles/createStyle';
@@ -55,6 +58,37 @@ describe('Tasty style tests', () => {
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
       '--current-color':
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
+    });
+  });
+
+  describe('`--current-color` republishing', () => {
+    it('does not republish `#current` as itself', () => {
+      // `--current-color: var(--current-color)` would be a self-reference.
+      expect(colorStyle({ color: '#current' })).toEqual({
+        color: 'currentcolor',
+      });
+    });
+
+    it('does not republish a bare `currentColor`', () => {
+      expect(colorStyle({ color: true })).toEqual({ color: 'currentColor' });
+    });
+
+    it('does not republish a keyword', () => {
+      expect(colorStyle({ color: 'inherit' })).toEqual({ color: 'inherit' });
+    });
+
+    it('republishes a named token', () => {
+      expect(colorStyle({ color: '#purple' })).toEqual({
+        color: 'var(--purple-color)',
+        '--current-color': 'var(--purple-color)',
+      });
+    });
+
+    it('republishes exactly one property alongside `color`', () => {
+      expect(Object.keys(colorStyle({ color: '#purple' })!)).toEqual([
+        'color',
+        '--current-color',
+      ]);
     });
   });
 
@@ -460,6 +494,132 @@ describe('Tasty style tests', () => {
     ).toEqual({
       $: '& > *:not(:last-child)',
       'margin-bottom': '1rem',
+    });
+  });
+
+  describe('Color token values', () => {
+    // Every outcome of `createStyle`'s color branch. A `#name` key declares one
+    // custom property, `--name-color`, and what lands in it depends only on
+    // whether the value names a token and whether the engine can convert it.
+    it('converts a hex literal into the configured color space', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': '#f80' })).toEqual({
+        '--brand-color': 'rgb(255 136 0)',
+      });
+    });
+
+    it('converts a bare CSS color name without warning about it', () => {
+      // `parseColor` cannot resolve `red`, but `strToColorSpace` can, and it is
+      // tried first — so the value converts and no warning is emitted.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'red' })).toEqual({
+        '--brand-color': 'rgb(255 0 0)',
+      });
+      expect(warn).not.toHaveBeenCalled();
+
+      warn.mockRestore();
+    });
+
+    it('resolves a bare token reference through its own variable', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': '#purple' })).toEqual({
+        '--brand-color': 'var(--purple-color)',
+      });
+    });
+
+    it('converts a bare literal into the configured color space', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'hsl(120 100% 50%)' })).toEqual({
+        '--brand-color': 'rgb(0 255 0)',
+      });
+    });
+
+    it('follows the configured color space', () => {
+      configure({ colorSpace: 'oklch' });
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'rgb(255 0 0)' })).toEqual({
+        '--brand-color': 'oklch(0.62796 0.25768 29.23)',
+      });
+    });
+
+    it('keeps a color it cannot convert as authored', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'color(display-p3 1 0.5 0)' })).toEqual({
+        '--brand-color': 'color(display-p3 1 0.5 0)',
+      });
+    });
+
+    it('declares an empty value for something that is not a color', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'not-a-color' })).toEqual({
+        '--brand-color': '',
+      });
+
+      warn.mockRestore();
+    });
+
+    it('never both converts a value and reads a token name off it', () => {
+      // The emitted value is a precedence, not a merge, and only stays correct
+      // while the two are mutually exclusive. `parseColor` derives `name` from
+      // the chain it resolved, so a value it names can never be one
+      // `strToColorSpace` converts.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      for (const value of [
+        '#f80',
+        '#ff8040',
+        '#purple',
+        'red',
+        'rgb(0 0 0)',
+        'var(--purple-color)',
+        'transparent',
+        'currentcolor',
+        '(#purple, #red)',
+        '#purple.5',
+        'color-mix(in oklab, #purple 50%, #red)',
+      ]) {
+        const converted = strToColorSpace(value);
+        const { name } = parseColor(value, true);
+
+        expect(
+          converted != null && name != null,
+          `"${value}" both converted (${converted}) and named (${name})`,
+        ).toBe(false);
+      }
+
+      warn.mockRestore();
+    });
+
+    it('emits no channel-components companion for any of them', () => {
+      const handler = createStyle('#brand');
+
+      for (const value of [
+        '#f80',
+        '#purple',
+        'hsl(120 100% 50%)',
+        'color-mix(in oklab, #purple 50%, #red)',
+        '(#primary, #fallback)',
+        '#purple.5',
+      ]) {
+        expect(Object.keys(handler({ '#brand': value })!)).toEqual([
+          '--brand-color',
+        ]);
+      }
     });
   });
 

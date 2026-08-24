@@ -53,9 +53,35 @@ function processTokenValue(value: string | number): string {
 }
 
 /**
+ * Resolve one `$name` / `#name` entry to the custom property it declares and
+ * the value to declare, or `null` when the entry declares nothing.
+ *
+ * The two sigils differ only in the property name they build and in how `true`
+ * is read: for a custom property it is the empty value, for a color it is
+ * `transparent`.
+ */
+function resolveTokenEntry(
+  key: string,
+  value: Exclude<TokenValue, undefined | null | false>,
+): [name: string, value: string] | null {
+  const name = `--${normalizeDslName(key.slice(1))}`;
+
+  if (key[0] === '$') {
+    // Boolean true for custom properties converts to empty string (valid CSS value)
+    return [name, processTokenValue(value === true ? '' : value)];
+  }
+
+  const colorValue = normalizeColorTokenValue(value);
+  // Skip if normalized to null (shouldn't happen since false is filtered by isValidTokenValue)
+  if (colorValue === null) return null;
+
+  return [`${name}-color`, processTokenValue(colorValue)];
+}
+
+/**
  * Process tokens object into inline style properties.
- * - $name -> --name with parsed value
- * - #name -> --name-color with parsed value
+ * - `$name` -> `--name` with the parsed value
+ * - `#name` -> `--name-color` with the parsed value
  *
  * @param tokens - The tokens object to process
  * @returns CSSProperties object or undefined if no tokens to process
@@ -82,26 +108,13 @@ export function processTokens(
       continue;
     }
 
-    if (key.startsWith('$')) {
-      // Custom property token: $name -> --name
-      const propName = `--${normalizeDslName(key.slice(1))}`;
-      // Boolean true for custom properties converts to empty string (valid CSS value)
-      const effectiveValue = value === true ? '' : value;
-      const processedValue = processTokenValue(effectiveValue);
+    if (key[0] !== '$' && key[0] !== '#') continue;
 
-      if (!result) result = {};
-      result[propName] = processedValue;
-    } else if (key.startsWith('#')) {
-      const colorName = normalizeDslName(key.slice(1));
+    const entry = resolveTokenEntry(key, value);
+    if (!entry) continue;
 
-      // Normalize color token value (true → 'transparent', false is already filtered by isValidTokenValue)
-      const effectiveValue = normalizeColorTokenValue(value);
-      // Skip if normalized to null (shouldn't happen since false is filtered by isValidTokenValue)
-      if (effectiveValue === null) continue;
-
-      if (!result) result = {};
-      result[`--${colorName}-color`] = processTokenValue(effectiveValue);
-    }
+    if (!result) result = {};
+    result[entry[0]] = entry[1];
   }
 
   return result as CSSProperties | undefined;

@@ -326,3 +326,46 @@ describe('strToColorSpace — cross-space conversion', () => {
     });
   });
 });
+
+describe('same-space fast path — canonicalizes the function shape', () => {
+  // The function name is derived from the configured space plus an optional
+  // legacy `a`, so each space has to accept both spellings of its own function
+  // and emit the canonical one.
+  it('drops the legacy `a` suffix in rgb space', () => {
+    setColorSpace('rgb');
+    expect(strToColorSpace('rgba(1 2 3 / .5)')).toBe('rgb(1 2 3 / .5)');
+  });
+
+  it('drops the legacy `a` suffix in hsl space', () => {
+    setColorSpace('hsl');
+    expect(strToColorSpace('hsla(1 2% 3% / .5)')).toBe('hsl(1 2% 3% / .5)');
+  });
+
+  it('drops the legacy `a` suffix in oklch space', () => {
+    setColorSpace('oklch');
+    expect(strToColorSpace('oklcha(.1 .2 3 / .5)')).toBe('oklch(.1 .2 3 / .5)');
+  });
+
+  it('matches the function name case-insensitively', () => {
+    setColorSpace('rgb');
+    expect(strToColorSpace('RGBA(1 2 3 / .5)')).toBe('rgb(1 2 3 / .5)');
+  });
+
+  it('normalizes a comma-separated alpha to the slash form', () => {
+    setColorSpace('rgb');
+    expect(strToColorSpace('rgb(1, 2, 3, .5)')).toBe('rgb(1 2 3 / .5)');
+  });
+
+  it('does not take the fast path for a different space', () => {
+    // `hsl()` in rgb space is a genuine conversion, not a same-space value.
+    setColorSpace('rgb');
+    expect(strToColorSpace('hsl(0 100% 50%)')).toBe('rgb(255 0 0)');
+  });
+
+  it('rejects a function with the wrong number of channels', () => {
+    setColorSpace('rgb');
+    // Falls through to the sRGB round-trip, which cannot parse it either.
+    expect(strToColorSpace('rgb(1 2)')).toBeNull();
+    expect(strToColorSpace('rgb(  )')).toBeNull();
+  });
+});

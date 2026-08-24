@@ -2,31 +2,48 @@
 '@tenphi/tasty': minor
 ---
 
-Removed the `--name-color-{colorSpace}` companion variables.
+Removed the `--name-color-{colorSpace}` channel companion variables.
 
-**Breaking (CSS surface):** every `#name` color token used to declare a second
-variable holding its channels decomposed — `--purple-color-oklch: 0.42 0.16 328`
-— alongside `--purple-color`, plus a matching `@property` rule, and `color` also
-emitted `--current-color-{space}` next to `--current-color`. All of those are
-gone. External CSS reading a companion directly should address the token itself
-with relative color syntax instead: `oklch(from var(--purple-color) l c h)` in
-place of `oklch(var(--purple-color-oklch))`, which additionally works on the
-colors the companion could never decompose.
+A `#name` color token used to declare a second variable beside `--name-color`
+holding its channels decomposed — `--brand-color-oklch: 0.75 0.16 55` — plus a
+matching `@property` rule, and a `color` style emitted `--current-color-{space}`
+beside `--current-color`. They existed so an opacity suffix had channels to write
+an alpha into; nothing has read one since opacity moved to relative color syntax,
+so this removes emitted output with no consumer.
 
-The companion existed to give `#token.alpha` channels to write an alpha into.
-Since opacity moved to relative color syntax it has had no reader inside Tasty,
-so this removes emitted output nothing consumed:
+No public API changes — nothing exported moved, and class name hashes are
+identical. What changes is the emitted CSS, so hand-authored CSS that reached for
+a companion needs the token itself instead:
 
-- **One declaration less per color** in every rule that sets a color, and one
-  fewer inline style property per `#name` entry in the `tokens` prop.
-- **One `@property` rule less per color token**, on all of the runtime, SSR, RSC
-  and zero-runtime paths — registration is the expensive part of `@property`.
-- **A pass removed from auto-property inference.** `PropertyTypeResolver` no
-  longer scans declarations for companions ahead of its main pass, so every
+```css
+/* before */
+color: oklch(var(--brand-color-oklch) / 0.5);
+background: oklch(var(--brand-color-oklch));
+
+/* after */
+color: oklch(from var(--brand-color) l c h / 0.5);
+background: var(--brand-color);
+```
+
+Relative color syntax is strictly more capable here: the companion could only
+carry channels for a color the engine could evaluate at build time, while
+`from <color>` works on every `<color>` — a `color-mix()`, a `light-dark()`, a
+variable Tasty never defined. See [Color space](https://github.com/tenphi/tasty/blob/main/docs/configuration.md#migrating-off-the-channel-companions).
+
+What it buys:
+
+- One declaration less per color in every emitted rule, and one fewer inline
+  style property per `#name` entry in the `tokens` prop.
+- One `@property` registration less per color token, on the runtime, SSR, RSC and
+  zero-runtime paths.
+- A pre-pass removed from `PropertyTypeResolver.scanDeclarations`, so every
   injection does less work.
-- **~0.7 kB brotli off `main`** (0.8 off `core`, 0.5 off `static`), and the
-  colour LRU cache that memoized decomposed channels is gone.
+- ~0.8 kB brotli off `main` (0.9 off `core`, 0.5 off `static` and `zero`, 0.7 off
+  `babel-plugin`), plus the LRU cache that memoized decomposed channels.
+
+Also fixes a spurious `[Tasty] unable to parse color` warning for a `#name` token
+set to a bare CSS color keyword such as `red`, which converted correctly but
+warned anyway.
 
 `colorSpace` keeps its job — it still decides the space a statically known color
-is emitted in (`#brand: '#ff8800'` → `--brand-color: oklch(0.75 0.16 55)`).
-Opacity is unaffected: it was already always written in `oklch`.
+is emitted in. Opacity is unaffected: it was already always written in `oklch`.

@@ -36,16 +36,12 @@ export function resetColorSpace(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Formatting helpers
+// Convert RGB 0-255 values to the configured color space CSS string
 // ---------------------------------------------------------------------------
 
 function formatNum(n: number, precision: number): string {
   return parseFloat(n.toFixed(precision)).toString();
 }
-
-// ---------------------------------------------------------------------------
-// Convert RGB 0-255 values to the configured color space CSS string
-// ---------------------------------------------------------------------------
 
 function formatAlpha(a: number): string {
   if (a === 0) return '0';
@@ -208,62 +204,45 @@ function resolveToRgbaValues(color: string): RgbaResult | null {
 // Same-space fast path
 // ---------------------------------------------------------------------------
 
-// Native CSS color function names that map directly to a ColorSpace.
-// When the input function matches the configured output space, the value is
-// already in the target representation and must NOT be round-tripped through
-// sRGB. Round-tripping would (a) do needless work for static values, (b)
-// `parseFloat` non-numeric tokens like `var()` / `calc()` to NaN and destroy
-// them, and (c) clamp wide-gamut `oklch()` colors to the sRGB gamut.
-const SPACE_FUNCS: Record<ColorSpace, string[]> = {
-  rgb: ['rgb', 'rgba'],
-  hsl: ['hsl', 'hsla'],
-  oklch: ['oklch', 'oklcha'],
-};
-
-const CANONICAL_FUNC: Record<ColorSpace, string> = {
-  rgb: 'rgb',
-  hsl: 'hsl',
-  oklch: 'oklch',
-};
-
-interface SameSpaceParse {
-  parts: string[];
-  alpha: string | null;
-}
-
 /**
- * Parse a native CSS color function ONLY when its name matches the configured
- * output space. Splits arguments at the top level, preserving every token
- * (numbers, percentages, `var()`, `calc()`, `min()`, …) verbatim — no numeric
- * parsing or normalization is performed.
+ * Normalize a native CSS color function, but ONLY when its name matches the
+ * configured output space — `rgb()`/`rgba()` for `rgb`, and likewise for `hsl`
+ * and `oklch`. Such a value is already in the target representation and must
+ * NOT be round-tripped through sRGB: that would (a) do needless work for static
+ * values, (b) `parseFloat` non-numeric tokens like `var()` / `calc()` to NaN and
+ * destroy them, and (c) clamp wide-gamut `oklch()` colors to the sRGB gamut.
  *
- * Returns null when the input is not a same-space function (caller falls back
- * to the sRGB round-trip for genuine cross-space conversion / hex / named colors).
+ * Arguments are split at the top level and every token — numbers, percentages,
+ * `var()`, `calc()`, `min()`, … — survives verbatim. Only the shape is
+ * canonicalized: the legacy `a` suffix is dropped from the function name and
+ * comma separators become the modern space-and-slash form.
+ *
+ * Returns null when the input is not a same-space function, leaving the caller
+ * to fall back to the sRGB round-trip for genuine cross-space conversion, hex,
+ * and named colors.
  */
-function parseSameSpaceFunc(
+function normalizeSameSpaceFunc(
   color: string,
   space: ColorSpace,
-): SameSpaceParse | null {
+): string | null {
   // Match the function name case-insensitively, but tokenize the ORIGINAL
   // string: CSS custom-property names are case-sensitive, so lowercasing the
   // whole value would corrupt tokens like `var(--myHue)`.
   const original = color.trim();
   const lower = original.toLowerCase();
-  const funcs = SPACE_FUNCS[space];
 
-  let funcName: string | null = null;
-  for (const f of funcs) {
-    if (lower.startsWith(`${f}(`)) {
-      funcName = f;
-      break;
-    }
-  }
-  if (!funcName) return null;
+  // Every space is named after its own function, optionally carrying the legacy
+  // `a` suffix — `rgb`/`rgba`, `hsl`/`hsla`, `oklch`/`oklcha`.
+  const nameLength = lower.startsWith(`${space}(`)
+    ? space.length
+    : lower.startsWith(`${space}a(`)
+      ? space.length + 1
+      : 0;
+  if (!nameLength) return null;
 
-  const start = funcName.length;
   const end = original.lastIndexOf(')');
-  if (end < start) return null;
-  const inner = original.slice(start + 1, end).trim();
+  if (end < nameLength) return null;
+  const inner = original.slice(nameLength + 1, end).trim();
   if (!inner) return null;
 
   // Split top-level on whitespace and commas, respecting nested parens.
@@ -316,18 +295,9 @@ function parseSameSpaceFunc(
   // Reject empty tokens (e.g. "rgb(  )").
   if (parts.some((p) => !p)) return null;
 
-  return { parts, alpha };
-}
+  const body = parts.join(' ');
 
-function buildSameSpaceString(
-  parsed: SameSpaceParse,
-  space: ColorSpace,
-): string {
-  const func = CANONICAL_FUNC[space];
-  const body = parsed.parts.join(' ');
-  return parsed.alpha != null
-    ? `${func}(${body} / ${parsed.alpha})`
-    : `${func}(${body})`;
+  return alpha != null ? `${space}(${body} / ${alpha})` : `${space}(${body})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -349,11 +319,10 @@ export function strToColorSpace(color: string): string | null | undefined {
   // the configured output space, preserve it verbatim instead of round-tripping
   // through sRGB. This avoids needless work for static values, keeps var()/calc()
   // tokens intact, and preserves wide-gamut oklch colors the round-trip would clamp.
-  const sameSpace = parseSameSpaceFunc(color, currentColorSpace);
+  const sameSpace = normalizeSameSpaceFunc(color, currentColorSpace);
   if (sameSpace) {
-    const result = buildSameSpaceString(sameSpace, currentColorSpace);
-    colorSpaceCache.set(color, result);
-    return result;
+    colorSpaceCache.set(color, sameSpace);
+    return sameSpace;
   }
 
   const rgba = resolveToRgbaValues(color);

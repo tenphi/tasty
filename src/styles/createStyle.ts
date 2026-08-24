@@ -68,21 +68,23 @@ export function createStyle(
       ) {
         styleValue = styleValue.trim();
 
-        const colorSpaceStr = strToColorSpace(styleValue as string);
-        const { color, name } = parseColor(styleValue as string);
+        // A literal the engine can evaluate is emitted in the configured color
+        // space. Everything else is whatever the parser resolved the value to —
+        // a `#token` or fallback chain becomes its `var()` chain, a color
+        // function keeps its expanded tokens, a keyword passes through.
+        //
+        // The two are mutually exclusive, so this is a precedence and not a
+        // merge: a value `strToColorSpace` can convert is a literal, and a
+        // literal never resolves to a `var(--name-color)` chain. Trying the
+        // conversion first also keeps the heavier `parseColor` off the path for
+        // plain literals — and off values it would warn about for no reason,
+        // since it cannot resolve a bare CSS color name like `red`.
+        const converted = strToColorSpace(styleValue as string);
 
-        // A token name resolves through its own variable, falling back to the
-        // literal color when nothing defines it; a bare color is emitted in the
-        // configured color space when it can be converted, verbatim otherwise.
-        if (name) {
-          return {
-            [finalCssStyle]: colorSpaceStr
-              ? `var(--${name}-color, ${colorSpaceStr})`
-              : (color ?? `var(--${name}-color)`),
-          };
-        }
-
-        return { [finalCssStyle]: colorSpaceStr ?? color ?? '' };
+        return {
+          [finalCssStyle]:
+            converted ?? parseColor(styleValue as string).color ?? '',
+        };
       }
 
       const processed = parseStyle(styleValue as StyleValue);

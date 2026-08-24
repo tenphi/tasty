@@ -24,14 +24,13 @@ export type ColorSpace = 'rgb' | 'hsl' | 'oklch';
  * emits. `oklch(from <color> l c h / <alpha>)` copies the channels over and
  * writes the alpha slot, which needs nothing from the color except that it *is*
  * a color: a `color-mix()`, a `light-dark()`, a `currentcolor`, a
- * `--name-color` written by hand-authored CSS with no companion variable — all
- * of them work, where writing into a channel slot directly requires components
- * the engine may have no way to compute.
+ * `--name-color` written by hand-authored CSS that Tasty never defined — all of
+ * them work, where writing into a channel slot directly would require channels
+ * the engine has no way to compute.
  *
  * Alpha is *replaced*, not composed. A token holding `rgb(255 0 0 / .8)` faded
- * to `.5` is alpha `.5`, matching what the channel-components form did and what
- * a statically-known color still does. `color-mix()` against `transparent`
- * cannot do this — it would multiply the two to `.4`.
+ * to `.5` is alpha `.5`. `color-mix()` against `transparent` cannot do this —
+ * it would multiply the two to `.4`.
  *
  * The alpha slot takes a `<number>` or a `<percentage>`, so an opacity custom
  * property passes straight through in whichever form the author declared it.

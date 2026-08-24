@@ -411,7 +411,7 @@ export interface TastyConfig {
    * for responsive/theme-aware tokens.
    *
    * - `$name` keys become `--name` CSS custom properties
-   * - `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties
+   * - `#name` keys become `--name-color` properties
    *
    * Tokens are injected once when the first style is rendered.
    *

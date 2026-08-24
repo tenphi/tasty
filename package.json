@@ -111,6 +111,7 @@
     "version": "changeset version",
     "release": "changeset publish",
     "knip": "knip",
+    "check:test-only": "node scripts/check-test-only-code.mjs",
     "hygiene": "pnpm lint && pnpm format:check && pnpm typecheck",
     "hygiene:fix": "pnpm lint:fix && pnpm format && pnpm typecheck"
   },

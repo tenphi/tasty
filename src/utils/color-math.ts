@@ -62,6 +62,11 @@ const dotXY = (a: [number, number], b: [number, number]): number =>
 // sRGB Gamma <-> Linear
 // ============================================================================
 
+/**
+ * sRGB gamma to linear. Only the sRGB-to-OKLab direction needs it, so this is
+ * test-only for the same reason as {@link srgbToOkhsl} — the forward path goes
+ * through {@link srgbLinearToGamma} instead.
+ */
 export function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
@@ -125,8 +130,10 @@ function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
 
 /**
  * Lightness to OKHST tone — the reverse of {@link fromTone}, which is the
- * direction `okhst()` uses. Kept for the same reason as {@link srgbToOkhsl}:
- * it lets the forward transfer be round-tripped in tests.
+ * direction `okhst()` uses. Kept for the same reason as {@link srgbToOkhsl},
+ * and kept out of the build the same way: it lets the forward transfer be
+ * round-tripped in tests, and `scripts/check-test-only-code.mjs` verifies it
+ * never reaches an emitted file.
  */
 export function toTone(l: number, eps: number = OKHST_REF_EPS): number {
   return toneFromY(lToY(l), eps);
@@ -566,6 +573,10 @@ export function oklchToRgbValues(L: number, C: number, H: number): Vec3 {
  * plugin uses. Nothing in the engine calls this — it exists so the forward
  * conversion can be round-tripped in tests, which checks its accuracy without
  * depending on hand-written fixtures.
+ *
+ * Test-only, and kept out of the build by not being reachable from any package
+ * entry point. `scripts/check-test-only-code.mjs` fails the build if that ever
+ * stops being true.
  *
  * @returns [H (0-360), S (0-1), L (0-1)]
  */

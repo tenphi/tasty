@@ -92,16 +92,25 @@ export function createColorFunc(
     const c2 = parsePercentage(tokens[1]);
     const c3 = parsePercentage(tokens[2]);
 
-    // A unitless channel above 1 cannot be a factor, so it is a missing `%`.
+    // A *unitless* channel above 1 cannot be a factor, so it is a missing `%`.
     // Clamping it quietly is the worst outcome: `okhsl(280 80 52)` renders as
-    // white, which looks like a color rather than like a mistake. `1` itself is
-    // a legitimate factor, so the check is strict.
-    if (c2 > 1 || c3 > 1) {
+    // white, which looks like a color rather than like a mistake.
+    //
+    // The raw token decides, not the parsed number: `150%` parses to `1.5`,
+    // which is over-saturation that legitimately clamps, and warning about it
+    // would also burn the dedup slot and silence a real `80` later. `1` itself
+    // is a legitimate factor, so the comparison is strict.
+    const misscaled = [tokens[1], tokens[2]].filter(
+      (raw, i) => !raw.includes('%') && (i === 0 ? c2 : c3) > 1,
+    );
+
+    if (misscaled.length) {
       warnOnceDev(
         `${name}:percent-scale`,
         `${name}(): channels are factors (0-1) or percentages, so ` +
-          `"${tokens[1]} ${tokens[2]}" clamps to 1 — add the missing '%', or ` +
-          `write the value as a 0-1 number.`,
+          `${misscaled.map((v) => `"${v}"`).join(' and ')} ` +
+          `${misscaled.length > 1 ? 'clamp' : 'clamps'} to 1 — add the ` +
+          `missing '%', or write the value as a 0-1 number.`,
       );
     }
 

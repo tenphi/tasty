@@ -50,6 +50,11 @@ const hslStylePlugin: TastyPluginFactory = (): TastyPlugin => ({
 describe('custom color function plugin (no core special-casing)', () => {
   afterEach(() => {
     resetConfig();
+    // Not in the test bodies: an assertion that throws would skip the cleanup
+    // and leak the mocked `console.warn` — with its call history — into the
+    // next test, turning one failure into a cascade.
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('parses a custom color function into rgb() via the parser', () => {
@@ -146,14 +151,54 @@ describe('custom color function plugin (no core special-casing)', () => {
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy.mock.calls[0][0]).toContain('okhsl()');
-      expect(warnSpy.mock.calls[0][0]).toContain('clamps to 1');
+      expect(warnSpy.mock.calls[0][0]).toContain('"80"');
+      expect(warnSpy.mock.calls[0][0]).toContain('to 1');
 
       // Deduped per function, so a second offending value stays quiet.
       parseStyle('okhsl(100 90 40)');
       expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
 
-      warnSpy.mockRestore();
-      vi.unstubAllEnvs();
+    it('stays quiet for a percentage above 100%', () => {
+      // `150%` parses to 1.5, which is over-saturation that legitimately
+      // clamps — the raw token carries its unit, so it is not a missing `%`.
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      expect(parseStyle('okhsl(280 150% 52%)').output).toBe(
+        parseStyle('okhsl(280 100% 52%)').output,
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not let a percentage above 100% suppress a later typo', () => {
+      // The warning is deduped per function, so a false positive would burn the
+      // slot and silence the genuine missing-`%` case that follows.
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      parseStyle('okhsl(190 140% 44%)');
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      parseStyle('okhsl(190 70 44)');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toContain('"70"');
+    });
+
+    it('names only the offending channel', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      parseStyle('okhsl(240 60 30%)');
+
+      expect(warnSpy.mock.calls[0][0]).toContain('"60" clamps to 1');
+      expect(warnSpy.mock.calls[0][0]).not.toContain('30%');
     });
 
     it('stays quiet at the 1 endpoint, which is a legitimate factor', () => {
@@ -165,9 +210,6 @@ describe('custom color function plugin (no core special-casing)', () => {
       parseStyle('okhsl(280 1 1)');
 
       expect(warnSpy).not.toHaveBeenCalled();
-
-      warnSpy.mockRestore();
-      vi.unstubAllEnvs();
     });
 
     it('stays quiet in production', () => {
@@ -182,9 +224,6 @@ describe('custom color function plugin (no core special-casing)', () => {
       expect(parseStyle('okhsl(210 60 35)').output).toBe('rgb(100% 100% 100%)');
 
       expect(warnSpy).not.toHaveBeenCalled();
-
-      warnSpy.mockRestore();
-      vi.unstubAllEnvs();
     });
   });
 });

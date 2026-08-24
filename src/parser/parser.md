@@ -41,19 +41,14 @@ The parser operates in a single pass and never throws on malformed input.
 
 **Style System Integration:**
 
-When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallback)'`), the style system automatically generates both a color variable and a companion components variable (suffix depends on the configured `colorSpace`, default `oklch`):
+When defining custom color tokens (e.g., `#local-placeholder: '(#primary, #fallback)'`), the style system generates a single color variable:
 - `--local-placeholder-color: var(--primary-color, var(--fallback-color))`
-- `--local-placeholder-color-oklch: var(--primary-color-oklch, var(--fallback-color-oklch))`
 
 This applies to all color fallback syntaxes, including nested fallbacks and literal values.
 
-The companion exists so the channels can be *addressed* — shifting a lightness,
-animating a hue. It is not what the opacity suffix uses; see §6.
-
-A color the engine cannot evaluate at build time — a `color-mix()`, a
-`light-dark()`, a `color()` in a space it has no conversion for — has no channels
-to decompose, so the companion is expressed *by reference* with CSS relative
-color syntax: `--brand-color-oklch: from color-mix(…) l c h`.
+A color is emitted exactly as authored — a hex literal, a native color function,
+a bare CSS color name, a `color-mix()`, a `light-dark()`. Nothing is rewritten
+into a color space; the opacity suffix works on any of them by reference, see §6.
 
 ---
 
@@ -183,7 +178,7 @@ group (`border`, `outline`) must place such a reference once, not in both slots.
 | Color fallback           | `(#name, fallback)` → `var(--name-color, <processed fallback>)`<br>Fallback is recursively processed, supporting unlimited nesting: `(#a, (#b, #c))` → `var(--a-color, var(--b-color, var(--c-color)))`. |
 | Custom property          | `$ident` → `var(--ident)` \| `($ident,fallback)` → `var(--ident, <processed fallback>)`<br>If ident ends with `-color`, filed under both the color and value buckets. |
 | Hash colors              | As in §5-3.                                                                                 |
-| Opacity suffix           | `#name.5` → `oklch(from var(--name-color) l c h / .5)`; the authored digits are kept verbatim (`.05` → `.05`, `.0` → `0`) and `.$prop` → `/ var(--prop)`.<br>Alpha applies to the color, never to its channel components: a token may hold any `<color>`, including one with no components to write into and one Tasty never defined.<br>Writing the alpha slot **replaces** any alpha the color carries, and the slot takes a `<number>` or a `<percentage>`, so an opacity property works in either form.<br>The space is always `oklch` — it is unbounded, so a gamut-limited space would clamp a wide-gamut color. |
+| Opacity suffix           | `#name.5` → `oklch(from var(--name-color) l c h / .5)`; the authored digits are kept verbatim (`.05` → `.05`, `.0` → `0`) and `.$prop` → `/ var(--prop)`.<br>Alpha applies to the color as a whole, so a token may hold any `<color>` — including one with no channels to decompose and one Tasty never defined.<br>Writing the alpha slot **replaces** any alpha the color carries, and the slot takes a `<number>` or a `<percentage>`, so an opacity property works in either form.<br>The space is always `oklch` — it is unbounded, so a gamut-limited space would clamp a wide-gamut color. |
 | Opacity on `#current`    | `#current.5` → `color-mix(in oklab, currentcolor 50%, transparent)`, which **composes** with any alpha an ancestor already applied — `currentcolor` is inherited, so `.4` means "40% of what reaches me" and a nested `.18` under it lands at `.072`.<br>The percentage is derived by shifting the decimal point (`.07` → `7%`), not by multiplying. A `$prop` alpha is scaled (`calc(var(--prop) * 100%)`), so it must hold a unitless number — a mix percentage cannot be a `<number>`. |
 | Opacity on a static color | A *predefined token* resolving to a literal color function is faded in place, since its channels are right there: a channel function takes the alpha after a slash (`#brand: 'hsl(220 90% 50%)'` → `#brand.5` → `hsl(220 90% 50% / .5)`), a derived one goes through relative syntax (`#brand: 'light-dark(#a, #b)'` → `oklch(from light-dark(…) l c h / .5)`). See §12.2. |
 | Color functions          | Arguments are parsed, inner colors re-expanded; function name retained.                     |

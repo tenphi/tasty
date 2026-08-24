@@ -1,12 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { configure, resetConfig } from '../config';
+import { resolveFunctionColor } from '../utils/function-color';
 import { parseColor, parseStyle } from '../utils/styles';
-import {
-  resetColorSpace,
-  setColorSpace,
-  strToColorSpace,
-} from '../utils/color-space';
 
 import { createColorFunc } from './color-func';
 
@@ -54,7 +50,11 @@ const hslStylePlugin: TastyPluginFactory = (): TastyPlugin => ({
 describe('custom color function plugin (no core special-casing)', () => {
   afterEach(() => {
     resetConfig();
-    resetColorSpace();
+    // Not in the test bodies: an assertion that throws would skip the cleanup
+    // and leak the mocked `console.warn` — with its call history — into the
+    // next test, turning one failure into a cascade.
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('parses a custom color function into rgb() via the parser', () => {
@@ -63,12 +63,11 @@ describe('custom color function plugin (no core special-casing)', () => {
     expect(parseStyle('mycolor(255 0 0)').output).toBe('rgb(255 0 0)');
   });
 
-  it('resolves a custom color function through strToColorSpace', () => {
+  it('resolves a custom color function through resolveFunctionColor', () => {
     configure({ plugins: [mycolorPlugin()] });
-    setColorSpace('rgb');
 
-    expect(strToColorSpace('mycolor(255 0 0)')).toBe('rgb(255 0 0)');
-    expect(strToColorSpace('mycolor(255 0 0 / 0.5)')).toBe(
+    expect(resolveFunctionColor('mycolor(255 0 0)')).toBe('rgb(255 0 0)');
+    expect(resolveFunctionColor('mycolor(255 0 0 / 0.5)')).toBe(
       'rgb(255 0 0 / 0.5)',
     );
   });
@@ -127,5 +126,104 @@ describe('custom color function plugin (no core special-casing)', () => {
 
     warnSpy.mockRestore();
     vi.unstubAllEnvs();
+  });
+
+  describe('percentage-scale input', () => {
+    // `parsePercentage` reads a unitless number as the factor it looks like, so
+    // `okhsl(280 .8 .52)` and `okhsl(280 80% 52%)` are the same color. Dropping
+    // the `%` therefore lands 80 in a 0-1 slot, which clamps to full saturation
+    // and renders as white — a plausible-looking color, not an obvious mistake.
+    it('reads a unitless channel as the same factor a percentage denotes', () => {
+      configure({ plugins: [mycolorPlugin()] });
+
+      expect(parseStyle('okhsl(280 0.8 0.52)').output).toBe(
+        parseStyle('okhsl(280 80% 52%)').output,
+      );
+    });
+
+    it('warns once when a channel arrives on the percentage scale', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      expect(parseStyle('okhsl(280 80 52)').output).toBe('rgb(100% 100% 100%)');
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toContain('okhsl()');
+      expect(warnSpy.mock.calls[0][0]).toContain('"80"');
+      expect(warnSpy.mock.calls[0][0]).toContain('to 1');
+
+      // Deduped per function, so a second offending value stays quiet.
+      parseStyle('okhsl(100 90 40)');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays quiet for a percentage above 100%', () => {
+      // `150%` parses to 1.5, which is over-saturation that legitimately
+      // clamps — the raw token carries its unit, so it is not a missing `%`.
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      expect(parseStyle('okhsl(280 150% 52%)').output).toBe(
+        parseStyle('okhsl(280 100% 52%)').output,
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not let a percentage above 100% suppress a later typo', () => {
+      // The warning is deduped per function, so a false positive would burn the
+      // slot and silence the genuine missing-`%` case that follows.
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      parseStyle('okhsl(190 140% 44%)');
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      parseStyle('okhsl(190 70 44)');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toContain('"70"');
+    });
+
+    it('names only the offending channel', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      parseStyle('okhsl(240 60 30%)');
+
+      expect(warnSpy.mock.calls[0][0]).toContain('"60" clamps to 1');
+      expect(warnSpy.mock.calls[0][0]).not.toContain('30%');
+    });
+
+    it('stays quiet at the 1 endpoint, which is a legitimate factor', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      parseStyle('okhsl(280 1 1)');
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('stays quiet in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      // A value no earlier test used: `createColorFunc`'s LRU lives for the
+      // process, so a cached value would return before reaching the check and
+      // the assertion would pass for the wrong reason.
+      expect(parseStyle('okhsl(210 60 35)').output).toBe('rgb(100% 100% 100%)');
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 });

@@ -7,62 +7,23 @@
 
 import type { PropertyDefinition } from '../injector/types';
 import { getEffectiveDefinition } from '../properties';
-import {
-  colorInitialValueToComponents,
-  getColorSpaceSuffix,
-  getComponentPropertySyntax,
-} from '../utils/color-space';
 import type { StyleValue } from '../utils/styles';
 import { parseStyle } from '../utils/styles';
-
-export interface FormatPropertyOptions {
-  /**
-   * Whether a CSS property name is already registered. The components companion
-   * of a color property is skipped when it is — the caller registered it from
-   * its own declaration, and a second rule with the default `<number>+` syntax
-   * would come later in the sheet and override it.
-   */
-  isPropertyDefined?: (cssName: string) => boolean;
-}
 
 /**
  * Format a single @property rule as a CSS string.
  *
  * Returns the full `@property --name { ... }` text, or empty string
- * if the token is invalid. For color properties, also returns
- * the companion component property.
+ * if the token is invalid.
  */
 export function formatPropertyCSS(
   token: string,
   definition: PropertyDefinition,
-  options?: FormatPropertyOptions,
 ): string {
   const result = getEffectiveDefinition(token, definition);
   if (!result.isValid) return '';
 
-  const rules: string[] = [];
-
-  rules.push(buildPropertyRule(result.cssName, result.definition));
-
-  if (result.isColor) {
-    const suffix = getColorSpaceSuffix();
-    const componentCssName = `${result.cssName}-${suffix}`;
-
-    if (!options?.isPropertyDefined?.(componentCssName)) {
-      const componentInitial = colorInitialValueToComponents(
-        result.definition.initialValue,
-      );
-      rules.push(
-        buildPropertyRule(componentCssName, {
-          syntax: getComponentPropertySyntax(),
-          inherits: result.definition.inherits,
-          initialValue: componentInitial,
-        }),
-      );
-    }
-  }
-
-  return rules.join('\n');
+  return buildPropertyRule(result.cssName, result.definition);
 }
 
 function buildPropertyRule(

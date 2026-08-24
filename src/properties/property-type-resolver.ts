@@ -5,17 +5,10 @@
  * Supports deferred resolution for var() reference chains of arbitrary depth.
  */
 
-import { getDefaultComponents } from '../utils/color-space';
-
 import { inferSyntaxFromValue } from './index';
 
 const CUSTOM_PROP_DECL = /^\s*(--[a-z0-9_-]+)\s*:\s*(.+?)\s*$/i;
 const SINGLE_VAR_REF = /^var\((--[a-z0-9_-]+)\)$/i;
-/** A `--name-color-{space}` companion holding a color's channel components. */
-const COLOR_COMPONENTS_DECL =
-  /^\s*(--[a-z0-9_-]+-color-(?:rgb|hsl|oklch))\s*:\s*(.+?)\s*$/i;
-/** A component list the browser can type as `<number>+`. */
-const NUMERIC_COMPONENTS = /^[\d\s.+-]+$/;
 
 export class PropertyTypeResolver {
   /** propName → the prop it depends on */
@@ -39,28 +32,6 @@ export class PropertyTypeResolver {
     if (!declarations.includes('--')) return;
 
     const parts = declarations.split(/;+/);
-
-    // A components companion whose value is not a plain number list — a color
-    // expressed by reference, because it could not be decomposed at build time
-    // — has to be registered as `*`. Its `--name-color` sibling would otherwise
-    // register it as `<number>+` (see `getComponentPropertySyntax`) and the
-    // engine would drop the value for the property's initial one. This runs
-    // ahead of the main pass because the sibling is declared first.
-    for (const part of parts) {
-      const match = COLOR_COMPONENTS_DECL.exec(part);
-      if (!match) continue;
-
-      const propName = match[1];
-      if (isPropertyDefined(propName)) continue;
-      if (NUMERIC_COMPONENTS.test(match[2])) continue;
-
-      // An explicitly declared color property brings its own companion; leave
-      // that definition alone rather than racing it.
-      const colorProp = propName.slice(0, propName.lastIndexOf('-'));
-      if (isPropertyDefined(colorProp)) continue;
-
-      registerProperty(propName, '*', getDefaultComponents());
-    }
 
     for (const part of parts) {
       if (!part.trim()) continue;

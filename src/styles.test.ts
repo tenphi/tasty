@@ -1,4 +1,5 @@
-import { configure, resetConfig } from './config';
+import { resetConfig } from './config';
+
 import { borderStyle } from './styles/border';
 import { colorStyle } from './styles/color';
 import { createStyle } from './styles/createStyle';
@@ -16,7 +17,6 @@ import { shadowStyle } from './styles/shadow';
 describe('Tasty style tests', () => {
   beforeEach(() => {
     resetConfig();
-    configure({ colorSpace: 'rgb' });
   });
 
   afterEach(() => {
@@ -34,7 +34,6 @@ describe('Tasty style tests', () => {
     expect(colorStyle({ color: 'var(--primary-color)' })).toEqual({
       color: 'var(--primary-color)',
       '--current-color': 'var(--primary-color)',
-      '--current-color-rgb': 'var(--primary-color-rgb)',
     });
 
     // Color with fallback chain
@@ -43,8 +42,6 @@ describe('Tasty style tests', () => {
     ).toEqual({
       color: 'var(--placeholder-color, var(--dark-04-color))',
       '--current-color': 'var(--placeholder-color, var(--dark-04-color))',
-      '--current-color-rgb':
-        'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
     });
 
     // Nested fallbacks
@@ -58,8 +55,62 @@ describe('Tasty style tests', () => {
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
       '--current-color':
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
-      '--current-color-rgb':
-        'var(--primary-color-rgb, var(--secondary-color-rgb, var(--tertiary-color-rgb)))',
+    });
+  });
+
+  describe('`--current-color` republishing', () => {
+    it('does not republish `#current`, which reads the variable itself', () => {
+      // `--current-color: var(--current-color)` is a self-reference: it
+      // invalidates the declaration and silently drops to the initial value.
+      expect(colorStyle({ color: '#current' })).toEqual({
+        color: 'var(--current-color)',
+      });
+    });
+
+    it('does not republish a bare `currentColor`', () => {
+      // Republishing the keyword would let a descendant resolve it a second
+      // time against its own color.
+      expect(colorStyle({ color: true })).toEqual({ color: 'currentColor' });
+    });
+
+    it('does not republish a faded `#current`', () => {
+      // The `color-mix()` composes against the inherited color; resolving it
+      // again one level down would fade twice.
+      expect(colorStyle({ color: '#current.4' })).toEqual({
+        color: 'color-mix(in oklab, currentcolor 40%, transparent)',
+      });
+    });
+
+    it('republishes a named token', () => {
+      expect(colorStyle({ color: '#purple' })).toEqual({
+        color: 'var(--purple-color)',
+        '--current-color': 'var(--purple-color)',
+      });
+    });
+
+    it('republishes a literal, so it displaces an ancestor token color', () => {
+      // Without this, a descendant's `#current` would read the nearest *token*
+      // color rather than this element's actual color.
+      expect(colorStyle({ color: 'red' })).toEqual({
+        color: 'red',
+        '--current-color': 'red',
+      });
+    });
+
+    it('republishes a keyword', () => {
+      // `--current-color: inherit` takes the parent's published value, which is
+      // what `color: inherit` does for the color itself.
+      expect(colorStyle({ color: 'inherit' })).toEqual({
+        color: 'inherit',
+        '--current-color': 'inherit',
+      });
+    });
+
+    it('republishes exactly one property alongside `color`', () => {
+      expect(Object.keys(colorStyle({ color: '#purple' })!)).toEqual([
+        'color',
+        '--current-color',
+      ]);
     });
   });
 
@@ -468,8 +519,142 @@ describe('Tasty style tests', () => {
     });
   });
 
+  describe('Color token values', () => {
+    // Every outcome of `createStyle`'s color branch. A `#name` key declares one
+    // custom property, `--name-color`, and what lands in it depends only on
+    // whether the value names a token and whether the engine can convert it.
+    it('keeps a hex literal as authored', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': '#f80' })).toEqual({
+        '--brand-color': '#f80',
+      });
+    });
+
+    it('keeps a bare CSS color name as authored, without warning', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+      const handler = createStyle('#brand');
+
+      // Named colors starting with r/h/l/o/v/c/t used to miss `parseColor`'s
+      // first-character dispatch and warn; every letter resolves now.
+      for (const name of [
+        'red',
+        'hotpink',
+        'lime',
+        'orange',
+        'violet',
+        'coral',
+        'teal',
+        'blue',
+      ]) {
+        expect(handler({ '#brand': name })).toEqual({ '--brand-color': name });
+      }
+      expect(warn).not.toHaveBeenCalled();
+
+      warn.mockRestore();
+    });
+
+    it('resolves a bare token reference through its own variable', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': '#purple' })).toEqual({
+        '--brand-color': 'var(--purple-color)',
+      });
+    });
+
+    it('keeps a native color function as authored', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'hsl(120 100% 50%)' })).toEqual({
+        '--brand-color': 'hsl(120 100% 50%)',
+      });
+    });
+
+    it('keeps a color it cannot convert as authored', () => {
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'color(display-p3 1 0.5 0)' })).toEqual({
+        '--brand-color': 'color(display-p3 1 0.5 0)',
+      });
+    });
+
+    it('declares an empty value for something that is not a color', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+      const handler = createStyle('#brand');
+
+      expect(handler({ '#brand': 'not-a-color' })).toEqual({
+        '--brand-color': '',
+      });
+
+      warn.mockRestore();
+    });
+
+    it('resolves every shape a color value can take', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+      const handler = createStyle('#brand');
+
+      // Nothing is rewritten, so each of these is its own parsed form.
+      expect(
+        Object.fromEntries(
+          [
+            '#f80',
+            '#ff8040',
+            '#purple',
+            'red',
+            'rgb(0 0 0)',
+            'var(--purple-color)',
+            'transparent',
+            'currentcolor',
+            '(#purple, #red)',
+            '#purple.5',
+            'color-mix(in oklab, #purple 50%, #red)',
+          ].map((v) => [v, handler({ '#brand': v })!['--brand-color']]),
+        ),
+      ).toEqual({
+        '#f80': '#f80',
+        '#ff8040': '#ff8040',
+        '#purple': 'var(--purple-color)',
+        red: 'red',
+        'rgb(0 0 0)': 'rgb(0 0 0)',
+        'var(--purple-color)': 'var(--purple-color)',
+        transparent: 'transparent',
+        currentcolor: 'currentcolor',
+        '(#purple, #red)': 'var(--purple-color, var(--red-color))',
+        '#purple.5': 'oklch(from var(--purple-color) l c h / .5)',
+        'color-mix(in oklab, #purple 50%, #red)':
+          'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
+      });
+      expect(warn).not.toHaveBeenCalled();
+
+      warn.mockRestore();
+    });
+
+    it('emits no channel-components companion for any of them', () => {
+      const handler = createStyle('#brand');
+
+      for (const value of [
+        '#f80',
+        '#purple',
+        'hsl(120 100% 50%)',
+        'color-mix(in oklab, #purple 50%, #red)',
+        '(#primary, #fallback)',
+        '#purple.5',
+      ]) {
+        expect(Object.keys(handler({ '#brand': value })!)).toEqual([
+          '--brand-color',
+        ]);
+      }
+    });
+  });
+
   describe('Color fallback syntax', () => {
-    it('should generate both color and RGB variants for color fallback', () => {
+    it('should keep the fallback chain for a color fallback', () => {
       const handler = createStyle('#local-placeholder');
       const result = handler({
         '#local-placeholder': '(#placeholder, #dark-04)',
@@ -478,12 +663,10 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--local-placeholder-color':
           'var(--placeholder-color, var(--dark-04-color))',
-        '--local-placeholder-color-rgb':
-          'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
       });
     });
 
-    it('should handle nested color fallbacks with RGB variants', () => {
+    it('should handle nested color fallbacks', () => {
       const handler = createStyle('#theme');
       const result = handler({
         '#theme': '(#primary, (#secondary, #tertiary))',
@@ -492,8 +675,6 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--theme-color':
           'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
-        '--theme-color-rgb':
-          'var(--primary-color-rgb, var(--secondary-color-rgb, var(--tertiary-color-rgb)))',
       });
     });
 
@@ -505,8 +686,6 @@ describe('Tasty style tests', () => {
 
       expect(result).toEqual({
         '--custom-color': 'var(--primary-color, var(--fff-color, #fff))',
-        '--custom-color-rgb':
-          'var(--primary-color-rgb, var(--fff-color-rgb, 255 255 255))',
       });
     });
 
@@ -518,7 +697,6 @@ describe('Tasty style tests', () => {
 
       expect(result).toEqual({
         '--background-color': 'var(--theme-color, rgb(255 0 0))',
-        '--background-color-rgb': 'var(--theme-color-rgb, 255 0 0)',
       });
     });
 
@@ -531,8 +709,6 @@ describe('Tasty style tests', () => {
       expect(result).toEqual({
         '--local-placeholder-color':
           'var(--placeholder-color, var(--dark-04-color))',
-        '--local-placeholder-color-rgb':
-          'var(--placeholder-color-rgb, var(--dark-04-color-rgb))',
       });
     });
   });
@@ -593,36 +769,29 @@ describe('Tasty style tests', () => {
       expect(colorStyle({ color: THEME })).toEqual({
         color: THEME_CSS,
         '--current-color': THEME_CSS,
-        '--current-color-rgb': `from ${THEME_CSS} r g b`,
       });
     });
 
-    it('emits a components companion for a derived color token', () => {
+    it('emits a derived color function as the token value', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': MIX })).toEqual({
         '--brand-color': MIX_CSS,
-        '--brand-color-rgb': `from ${MIX_CSS} r g b`,
       });
     });
 
-    it('keeps the components companion pointing at the faded token', () => {
-      // Components carry no alpha, so the opacity wrapper is peeled off and the
-      // companion still names the token's own channels — which is what keeps
-      // `$current-color-{space}` usable downstream.
+    it('keeps a faded token faded in `--current-color`', () => {
       expect(colorStyle({ color: '#purple.5' })).toEqual({
         color: 'oklch(from var(--purple-color) l c h / .5)',
         '--current-color': 'oklch(from var(--purple-color) l c h / .5)',
-        '--current-color-rgb': 'var(--purple-color-rgb)',
       });
     });
 
-    it('defines a token from a faded token without losing its channels', () => {
+    it('defines a token from a faded token', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': '#purple.5' })).toEqual({
         '--brand-color': 'oklch(from var(--purple-color) l c h / .5)',
-        '--brand-color-rgb': 'var(--purple-color-rgb)',
       });
     });
 

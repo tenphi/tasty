@@ -62,6 +62,11 @@ const dotXY = (a: [number, number], b: [number, number]): number =>
 // sRGB Gamma <-> Linear
 // ============================================================================
 
+/**
+ * sRGB gamma to linear. Only the sRGB-to-OKLab direction needs it, so this is
+ * test-only for the same reason as {@link srgbToOkhsl} — the forward path goes
+ * through {@link srgbLinearToGamma} instead.
+ */
 export function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
@@ -123,6 +128,13 @@ function yFromTone(t: number, eps: number = OKHST_REF_EPS): number {
   return Math.exp((t / 100) * den + Math.log(eps)) - eps;
 }
 
+/**
+ * Lightness to OKHST tone — the reverse of {@link fromTone}, which is the
+ * direction `okhst()` uses. Kept for the same reason as {@link srgbToOkhsl},
+ * and kept out of the build the same way: it lets the forward transfer be
+ * round-tripped in tests, and `scripts/check-test-only-code.mjs` verifies it
+ * never reaches an emitted file.
+ */
 export function toTone(l: number, eps: number = OKHST_REF_EPS): number {
   return toneFromY(lToY(l), eps);
 }
@@ -506,58 +518,6 @@ export function hslToRgbValues(h: number, s: number, l: number): Vec3 {
 }
 
 /**
- * RGB (0-255) to HSL.
- * @returns [h (0-360), s (0-1), l (0-1)]
- */
-export function rgbToHsl(r: number, g: number, b: number): Vec3 {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-
-  if (max === min) {
-    return [0, 0, l];
-  }
-
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-
-  let h: number;
-  if (max === r) {
-    h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  } else if (max === g) {
-    h = ((b - r) / d + 2) / 6;
-  } else {
-    h = ((r - g) / d + 4) / 6;
-  }
-
-  return [h * 360, s, l];
-}
-
-/**
- * RGB (0-255) to OKLCH via sRGB -> linear sRGB -> OKLab -> OKLCH.
- * @returns [L, C, H] where H is in degrees (0-360)
- */
-export function rgbToOklch(r: number, g: number, b: number): Vec3 {
-  const lr = srgbToLinear(r / 255);
-  const lg = srgbToLinear(g / 255);
-  const lb = srgbToLinear(b / 255);
-
-  const linear: Vec3 = [lr, lg, lb];
-  const lab = linearSrgbToOklab(linear);
-
-  const [L, a, bLab] = lab;
-  const C = Math.sqrt(a * a + bLab * bLab);
-  let H = (Math.atan2(bLab, a) * 180) / Math.PI;
-  if (H < 0) H += 360;
-
-  return [L, C, H];
-}
-
-/**
  * OKHSL to sRGB (0-1 range).
  * @param h - Hue in degrees (0-360)
  * @param s - Saturation (0-1)
@@ -608,6 +568,16 @@ export function oklchToRgbValues(L: number, C: number, H: number): Vec3 {
 
 /**
  * sRGB (0-1 range) to OKHSL.
+ *
+ * The reverse of {@link okhslToSrgb}, which is the direction the `okhsl()`
+ * plugin uses. Nothing in the engine calls this — it exists so the forward
+ * conversion can be round-tripped in tests, which checks its accuracy without
+ * depending on hand-written fixtures.
+ *
+ * Test-only, and kept out of the build by not being reachable from any package
+ * entry point. `scripts/check-test-only-code.mjs` fails the build if that ever
+ * stops being true.
+ *
  * @returns [H (0-360), S (0-1), L (0-1)]
  */
 export function srgbToOkhsl(rgb: Vec3): Vec3 {
@@ -785,111 +755,6 @@ export function getNamedColorHex(): Map<string, string> {
 // String Converters
 // ============================================================================
 
-const hexCharToNum = (c: number): number => {
-  if (c >= 48 && c <= 57) return c - 48; // 0-9
-  if (c >= 65 && c <= 70) return c - 55; // A-F
-  if (c >= 97 && c <= 102) return c - 87; // a-f
-  return -1;
-};
-
-/**
- * Parse a hex color string directly to RGB 0-255 values.
- * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
- * Returns null for invalid input.
- */
-export function hexToRgbValues(hex: string): Vec3 | null {
-  let start = 0;
-  if (hex.charCodeAt(0) === 35) start = 1; // '#'
-  const len = hex.length - start;
-
-  if (len === 3 || len === 4) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    if (r < 0 || g < 0 || b < 0) return null;
-    return [r * 17, g * 17, b * 17];
-  }
-
-  if (len === 6 || len === 8) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2];
-  }
-
-  return null;
-}
-
-/**
- * Parse a hex color string to RGBA values (RGB 0-255, alpha 0-1).
- * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
- * For 3/6-char hex (no alpha channel), alpha defaults to 1.
- */
-export function hexToRgbaValues(
-  hex: string,
-): [number, number, number, number] | null {
-  let start = 0;
-  if (hex.charCodeAt(0) === 35) start = 1; // '#'
-  const len = hex.length - start;
-
-  if (len === 3) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    if (r < 0 || g < 0 || b < 0) return null;
-    return [r * 17, g * 17, b * 17, 1];
-  }
-
-  if (len === 4) {
-    const r = hexCharToNum(hex.charCodeAt(start));
-    const g = hexCharToNum(hex.charCodeAt(start + 1));
-    const b = hexCharToNum(hex.charCodeAt(start + 2));
-    const a = hexCharToNum(hex.charCodeAt(start + 3));
-    if (r < 0 || g < 0 || b < 0 || a < 0) return null;
-    return [r * 17, g * 17, b * 17, (a * 17) / 255];
-  }
-
-  if (len === 6) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2, 1];
-  }
-
-  if (len === 8) {
-    const r1 = hexCharToNum(hex.charCodeAt(start));
-    const r2 = hexCharToNum(hex.charCodeAt(start + 1));
-    const g1 = hexCharToNum(hex.charCodeAt(start + 2));
-    const g2 = hexCharToNum(hex.charCodeAt(start + 3));
-    const b1 = hexCharToNum(hex.charCodeAt(start + 4));
-    const b2 = hexCharToNum(hex.charCodeAt(start + 5));
-    const a1 = hexCharToNum(hex.charCodeAt(start + 6));
-    const a2 = hexCharToNum(hex.charCodeAt(start + 7));
-    if (
-      r1 < 0 ||
-      r2 < 0 ||
-      g1 < 0 ||
-      g2 < 0 ||
-      b1 < 0 ||
-      b2 < 0 ||
-      a1 < 0 ||
-      a2 < 0
-    )
-      return null;
-    return [r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2, (a1 * 16 + a2) / 255];
-  }
-
-  return null;
-}
-
 /**
  * Convert hex color string to `rgb()` CSS string.
  * Supports 3, 4, 6, and 8 character hex values (with or without `#`).
@@ -1011,94 +876,6 @@ export function hslStringToRgb(hslStr: string): string | null {
   }
 
   return `rgb(${Math.round(r)} ${Math.round(g)} ${Math.round(b)})`;
-}
-
-/**
- * Convert an `okhsl()` color string to an `rgb()`/`rgba()` CSS string.
- * Supports deg/turn/rad hue units and percentage saturation/lightness.
- */
-export function okhslStringToRgb(okhslStr: string): string | null {
-  const match = okhslStr.match(/okhsl\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const inner = match[1].trim();
-  const [colorPart, alphaPart] = inner.split('/');
-  const parts = colorPart
-    .trim()
-    .split(/[,\s]+/)
-    .filter(Boolean);
-
-  if (parts.length < 3) return null;
-
-  let h = parseFloat(parts[0]);
-  const hueStr = parts[0].toLowerCase();
-  if (hueStr.endsWith('turn')) h = parseFloat(hueStr) * 360;
-  else if (hueStr.endsWith('rad')) h = (parseFloat(hueStr) * 180) / Math.PI;
-  else if (hueStr.endsWith('deg')) h = parseFloat(hueStr);
-
-  const parsePercent = (val: string): number => {
-    const num = parseFloat(val);
-    return val.includes('%') ? num / 100 : num;
-  };
-  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
-  const l = Math.max(0, Math.min(1, parsePercent(parts[2])));
-
-  const [r, g, b] = okhslToSrgb(h, s, l);
-
-  const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
-  const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);
-  const b255 = Math.round(Math.max(0, Math.min(1, b)) * 255);
-
-  if (alphaPart) {
-    const alpha = parseFloat(alphaPart.trim());
-    return `rgba(${r255}, ${g255}, ${b255}, ${alpha})`;
-  }
-
-  return `rgb(${r255} ${g255} ${b255})`;
-}
-
-/**
- * Convert an `okhst()` color string to an `rgb()`/`rgba()` CSS string.
- * Supports deg/turn/rad hue units and percentage saturation/tone.
- */
-export function okhstStringToRgb(okhstStr: string): string | null {
-  const match = okhstStr.match(/okhst\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const inner = match[1].trim();
-  const [colorPart, alphaPart] = inner.split('/');
-  const parts = colorPart
-    .trim()
-    .split(/[,\s]+/)
-    .filter(Boolean);
-
-  if (parts.length < 3) return null;
-
-  let h = parseFloat(parts[0]);
-  const hueStr = parts[0].toLowerCase();
-  if (hueStr.endsWith('turn')) h = parseFloat(hueStr) * 360;
-  else if (hueStr.endsWith('rad')) h = (parseFloat(hueStr) * 180) / Math.PI;
-  else if (hueStr.endsWith('deg')) h = parseFloat(hueStr);
-
-  const parsePercent = (val: string): number => {
-    const num = parseFloat(val);
-    return val.includes('%') ? num / 100 : num;
-  };
-  const s = Math.max(0, Math.min(1, parsePercent(parts[1])));
-  const t = Math.max(0, Math.min(1, parsePercent(parts[2])));
-
-  const [r, g, b] = okhstToSrgb(h, s, t);
-
-  const r255 = Math.round(Math.max(0, Math.min(1, r)) * 255);
-  const g255 = Math.round(Math.max(0, Math.min(1, g)) * 255);
-  const b255 = Math.round(Math.max(0, Math.min(1, b)) * 255);
-
-  if (alphaPart) {
-    const alpha = parseFloat(alphaPart.trim());
-    return `rgba(${r255}, ${g255}, ${b255}, ${alpha})`;
-  }
-
-  return `rgb(${r255} ${g255} ${b255})`;
 }
 
 /**

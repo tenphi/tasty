@@ -172,7 +172,7 @@ describe('Global Style Injector API', () => {
       expect(allCssText).toContain('8px');
     });
 
-    it('should inject color tokens with -color and companion properties', () => {
+    it('should inject color tokens as a single -color property', () => {
       configure({
         forceTextInjection: true,
         tokens: {
@@ -188,7 +188,7 @@ describe('Global Style Injector API', () => {
         .join('');
 
       expect(allCssText).toContain('--primary-color');
-      expect(allCssText).toContain('--primary-color-oklch');
+      expect(allCssText).not.toContain('--primary-color-oklch');
     });
 
     it('should inject tokens with state maps', () => {

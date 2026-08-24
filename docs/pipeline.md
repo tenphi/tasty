@@ -683,7 +683,7 @@ The default entry's exclusive is `!hovered & !@media(dark)` — no top-level OR,
 
 ### Stages 4–5: Compute combinations and call handler
 
-Single style, three snapshots; the `color` handler emits `color` plus `--current-color*` variables.
+Single style, three snapshots; the `color` handler emits `color` plus a `--current-color` variable.
 
 ### Stage 6: Merge by value
 
@@ -697,20 +697,17 @@ Using `renderStyles(styles, '.t1')` (the class is doubled — `.t1.t1` — so Ta
 .t1[data-hovered] {
   color: var(--highlight-color);
   --current-color: var(--highlight-color);
-  --current-color-oklch: var(--highlight-color-oklch);
 }
 @media (prefers-color-scheme: dark) {
   .t1:not([data-hovered]) {
     color: var(--dark-color);
     --current-color: var(--dark-color);
-    --current-color-oklch: var(--dark-color-oklch);
   }
 }
 @media (not (prefers-color-scheme: dark)) {
   .t1:not([data-hovered]) {
     color: var(--white-color);
     --current-color: var(--white-color);
-    --current-color-oklch: var(--white-color-oklch);
   }
 }
 ```

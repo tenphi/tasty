@@ -290,7 +290,12 @@ Text color with design token support.
 | `"light-dark(#dark, #light)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 | `true` | `currentColor` |
 
-When set to a named color token, also sets `$current-color` and `$current-color-{colorSpace}` custom properties for downstream use (suffix depends on the configured `colorSpace`, default `oklch`). An opacity suffix does not move the companion: `color="#purple.5"` still reports `#purple`'s channels, since components carry no alpha.
+Also sets `$current-color` to the same color, which is what `#current` resolves
+through. Every color publishes it, not just a named token, so a descendant's
+`#current` always reads the nearest `color` rather than the nearest *token*
+color. A value that already reads the inherited color — `#current` itself, a
+`#current` fade, a bare `currentColor` — is not republished: that would be a
+self-reference, or would resolve a second time one level down.
 
 ### `svgFill`
 

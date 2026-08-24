@@ -64,14 +64,13 @@ describe('generated CSS applies in the browser', () => {
 
       // `#black.5` becomes `oklch(from var(--black-color) l c h / .5)` — the
       // channels copied over and the alpha slot written — so this is black at
-      // half alpha, reported in the same shape the channel-components form was.
+      // half alpha.
       expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
     });
 
     it('fades a colour variable Tasty never registered', () => {
-      // The token lives only in hand-authored CSS: no `@property`, and no
-      // `--ink-color-oklch` companion for opacity to compose onto. Applying the
-      // alpha to the colour itself is what makes this resolve at all.
+      // The token lives only in hand-authored CSS, with no `@property` behind
+      // it. Applying the alpha to the colour itself is what makes this resolve.
       const sheet = document.createElement('style');
       sheet.textContent = ':root { --ink-color: rgb(0 0 255); }';
       document.head.append(sheet);
@@ -399,6 +398,122 @@ describe('generated CSS applies in the browser', () => {
 
       await page.viewport(900, 600);
       expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
+    });
+  });
+
+  describe('`#current` resolves through `--current-color`', () => {
+    // `#current` emits `var(--current-color)` rather than the `currentcolor`
+    // keyword, so a token defined as `#current` can be faded: relative colour
+    // syntax takes a concrete origin from Safari 16.4, where
+    // `oklch(from currentcolor …)` needs Safari 18. These assert the whole
+    // chain in a real engine, because every step is a computed-value-time rule
+    // that CSS text cannot show.
+    it('fades a token defined as `#current`', () => {
+      configure({ tokens: { '#purple': 'rgb(128 0 255)' } });
+
+      const Outer = tasty({
+        qa: 'Outer',
+        styles: { display: 'block', color: '#purple' },
+      });
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+
+      const el = render(
+        <Outer>
+          <Box styles={{ '#ink': '#current', fill: '#ink.5' }} />
+        </Outer>,
+      ).getByTestId('Box');
+
+      // Purple at half alpha — the origin was concrete, not the keyword.
+      expect(computed(el, '--ink-color')).toBe('rgb(128, 0, 255)');
+      expect(computed(el, 'background-color')).toMatch(/^oklch\(0\.53\d+ /);
+      expect(computed(el, 'background-color')).toContain('/ 0.5');
+    });
+
+    it('behaves as the keyword where no `color` style published it', () => {
+      // The `initial-value: currentcolor` registration is what makes this hold.
+      // `transparent` would render an unpublished `#current` invisible.
+      const Box = tasty({
+        qa: 'Box',
+        styles: { display: 'block', fill: '#current' },
+      });
+
+      const el = render(
+        <div style={{ color: 'rgb(0 128 0)' }}>
+          <Box />
+        </div>,
+      ).getByTestId('Box');
+
+      expect(computed(el, 'background-color')).toBe('rgb(0, 128, 0)');
+    });
+
+    it('lets a literal colour displace an ancestor token colour', () => {
+      // Every colour republishes, not only a named token — otherwise `#current`
+      // below would read the nearest *token* rather than the nearest colour.
+      configure({ tokens: { '#purple': 'rgb(128 0 255)' } });
+
+      const Outer = tasty({
+        qa: 'Outer',
+        styles: { display: 'block', color: '#purple' },
+      });
+      const Mid = tasty({
+        qa: 'Mid',
+        styles: { display: 'block', color: 'rgb(255 0 0)' },
+      });
+      const Leaf = tasty({
+        qa: 'Leaf',
+        styles: { display: 'block', fill: '#current' },
+      });
+
+      const el = render(
+        <Outer>
+          <Mid>
+            <Leaf />
+          </Mid>
+        </Outer>,
+      ).getByTestId('Leaf');
+
+      expect(computed(el, 'background-color')).toBe('rgb(255, 0, 0)');
+    });
+
+    it('keeps a nested `#current` fade composing', () => {
+      // `#current.4` with `#current.18` under it lands at `.072`. The fade keeps
+      // the `currentcolor` keyword inside its `color-mix()` for exactly this —
+      // reading the variable would mix the outer fade's operand a second time.
+      const L1 = tasty({
+        qa: 'L1',
+        styles: { display: 'block', color: '#current.4' },
+      });
+      const L2 = tasty({
+        qa: 'L2',
+        styles: { display: 'block', fill: '#current.18' },
+      });
+
+      const el = render(
+        <div style={{ color: 'rgb(0 128 0)' }}>
+          <L1>
+            <L2 />
+          </L1>
+        </div>,
+      ).getByTestId('L2');
+
+      expect(computed(el, 'background-color')).toContain('/ 0.072');
+    });
+
+    it('does not republish a value that reads the colour it inherits', () => {
+      // Publishing `var(--current-color)` into itself is a self-reference, which
+      // invalidates the declaration and silently drops the value.
+      const Box = tasty({
+        qa: 'Box',
+        styles: { display: 'block', color: '#current' },
+      });
+
+      const el = render(
+        <div style={{ color: 'rgb(0 128 0)' }}>
+          <Box />
+        </div>,
+      ).getByTestId('Box');
+
+      expect(computed(el, 'color')).toBe('rgb(0, 128, 0)');
     });
   });
 

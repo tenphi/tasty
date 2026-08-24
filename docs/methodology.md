@@ -275,7 +275,7 @@ const ProgressBar = tasty({
 
 // Conversion:
 //   'progress'    → $progress    → --progress
-//   'accentColor' → #accent      → --accent-color + --accent-color-oklch
+//   'accentColor' → #accent      → --accent-color
 ```
 
 #### Object form

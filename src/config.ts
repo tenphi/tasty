@@ -32,7 +32,6 @@ import {
   resetBaseStyleProps,
 } from './styles/base-props';
 import { resetStyleWarnings } from './styles/shared';
-import { resetColorSpace, setColorSpace } from './utils/color-space';
 import { isDevEnv } from './utils/is-dev-env';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import {
@@ -118,14 +117,18 @@ export interface TastyConfig {
    */
   functions?: FunctionsConfig;
   /**
-   * Color space used for decomposed color token companion variables.
-   * Controls the CSS function and suffix for alpha composition.
+   * @deprecated No longer has any effect; will be removed in the next major.
+   * Setting it warns in development.
    *
-   * - `'rgb'`   — suffix `-rgb`, e.g. `rgb(var(--name-color-rgb) / .5)`
-   * - `'hsl'`   — suffix `-hsl`, e.g. `hsl(var(--name-color-hsl) / .5)`
-   * - `'oklch'` — suffix `-oklch`, e.g. `oklch(var(--name-color-oklch) / .5)`
+   * A `#name` token's value used to be rewritten into this color space so an
+   * opacity suffix had numeric channels to write an alpha into. Opacity now uses
+   * relative color syntax — `oklch(from var(--name-color) l c h / .5)` — which
+   * has the browser read the channels, so a color is emitted exactly as
+   * authored and there is nothing left for the setting to decide.
    *
-   * @default 'oklch'
+   * To address a token's channels yourself, write relative color syntax against
+   * the token: `oklch(from var(--brand-color) calc(l * 1.2) c h)`. It works on
+   * every `<color>`, including the ones no conversion could evaluate.
    */
   colorSpace?: ColorSpace;
   /**
@@ -408,7 +411,7 @@ export interface TastyConfig {
    * for responsive/theme-aware tokens.
    *
    * - `$name` keys become `--name` CSS custom properties
-   * - `#name` keys become `--name-color` and `--name-color-{colorSpace}` properties
+   * - `#name` keys become `--name-color` properties
    *
    * Tokens are injected once when the first style is rendered.
    *
@@ -628,10 +631,15 @@ const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: false,
     initialValue: 'transparent',
   },
-  // Current color context variable (set by the color style handler).
+  // What `#current` resolves through. The `color` handler publishes it, and
+  // `initial-value: currentcolor` is what makes it a true stand-in where nothing
+  // has: a registered `<color>` property keeps the keyword as its computed value
+  // and resolves it against each element's own color, so an unpublished
+  // `#current` behaves exactly as the keyword would. `transparent` here would
+  // render it invisible instead.
   '#current': {
     inherits: true,
-    initialValue: 'transparent',
+    initialValue: 'currentcolor',
   },
   // White and black are fundamental colors that need explicit initial values.
   '#white': {
@@ -1467,11 +1475,15 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     }
   }
 
-  // Handle color space (must be set before any token processing)
   if (config.colorSpace) {
-    setColorSpace(config.colorSpace);
-    // Color space affects parser output (e.g. #name.5 → oklch(...) vs rgb(...))
-    getGlobalParser().clearCache();
+    warnOnce(
+      'colorSpace-deprecated',
+      '[Tasty] configure({ colorSpace }) no longer has any effect and will be ' +
+        'removed in the next major. Colors are emitted as authored, and opacity ' +
+        "is applied with relative color syntax, which reads a color's channels " +
+        'in the browser. To address channels yourself, write ' +
+        '`oklch(from var(--name-color) l c h)` against the token.',
+    );
   }
 
   // Handle predefined states
@@ -1718,7 +1730,6 @@ export function resetConfig(): void {
   resetStyleChunks();
   resetPropHandlers();
   resetBaseStyleProps();
-  resetColorSpace();
   clearPipelineCache();
   emittedWarnings.clear();
   resetStyleWarnings();

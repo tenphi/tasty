@@ -92,7 +92,6 @@ describe('DSL name case', () => {
         '--foo': '16px',
         '--myVar': '24px',
         '--myBrand-color': 'var(--purple-color)',
-        '--myBrand-color-oklch': 'var(--purple-color-oklch)',
       });
       // …which is exactly what a reference to each one asks for.
       expect(parseStyle('$Foo').output).toBe('var(--foo)');

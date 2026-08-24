@@ -631,10 +631,15 @@ const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: false,
     initialValue: 'transparent',
   },
-  // Current color context variable (set by the color style handler).
+  // What `#current` resolves through. The `color` handler publishes it, and
+  // `initial-value: currentcolor` is what makes it a true stand-in where nothing
+  // has: a registered `<color>` property keeps the keyword as its computed value
+  // and resolves it against each element's own color, so an unpublished
+  // `#current` behaves exactly as the keyword would. `transparent` here would
+  // render it invisible instead.
   '#current': {
     inherits: true,
-    initialValue: 'transparent',
+    initialValue: 'currentcolor',
   },
   // White and black are fundamental colors that need explicit initial values.
   '#white': {

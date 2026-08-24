@@ -134,7 +134,7 @@ color: '#purple',           // Full opacity
 color: '#purple.5',         // 50% opacity
 color: '#purple.05',        // 5% opacity
 color: '#purple.$fade',     // Opacity from a custom property
-fill: '#current',           // → currentcolor
+fill: '#current',           // → var(--current-color)
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
@@ -151,7 +151,7 @@ these:
 
 - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
   Tasty cannot convert — none of which have channels to decompose
-- `#current`, which resolves to `currentcolor`
+- `#current`, which resolves to the color the element inherits
 - a `--name-color` variable declared in your own CSS, with no Tasty token
   definition behind it
 
@@ -162,6 +162,28 @@ Two properties follow from writing the alpha slot rather than compositing:
 - **The alpha may be a number or a percentage.** `#purple.$fade` emits
   `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
   which is what `--*-opacity` properties are registered to accept.
+
+### Why `#current` is a variable
+
+`#current` emits `var(--current-color)`, not the `currentcolor` keyword. The
+`color` style publishes `--current-color` alongside every color it sets, and the
+property is registered with `initial-value: currentcolor` — so where nothing has
+published it, the variable resolves against each element's own inherited color
+and is indistinguishable from the keyword.
+
+The difference shows when a token is *defined* as `#current` and then faded:
+
+```jsx
+{ '#ink': '#current', fill: '#ink.5' }
+// --ink-color: var(--current-color)  → a concrete color where one was published
+// fill: oklch(from var(--ink-color) l c h / .5)
+```
+
+Relative color syntax accepts a concrete origin from Safari 16.4, while
+`oklch(from currentcolor …)` needs Safari 18. Resolving through the variable is
+what keeps that token fadeable on the wider floor. Where no `color` style
+published the variable, the origin is the keyword again and the Safari 18 floor
+applies to that case alone.
 
 ### `#current` composes instead
 

@@ -5739,9 +5739,13 @@ describe('Top-level pseudo-class / pseudo-element keys', () => {
 
     restore();
 
-    // Only the valid `color: red` rule should survive.
+    // Only the valid `color: red` rule should survive. `color` also republishes
+    // `--current-color` so a descendant's `#current` reads this element.
     expect(result).toEqual([
-      { selector: '.subject', declarations: 'color: red;' },
+      {
+        selector: '.subject',
+        declarations: 'color: red; --current-color: red;',
+      },
     ]);
 
     // No declarations should leak pseudo-keys as property names.

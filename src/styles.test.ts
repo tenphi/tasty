@@ -59,25 +59,50 @@ describe('Tasty style tests', () => {
   });
 
   describe('`--current-color` republishing', () => {
-    it('does not republish `#current` as itself', () => {
-      // `--current-color: var(--current-color)` would be a self-reference.
+    it('does not republish `#current`, which reads the variable itself', () => {
+      // `--current-color: var(--current-color)` is a self-reference: it
+      // invalidates the declaration and silently drops to the initial value.
       expect(colorStyle({ color: '#current' })).toEqual({
-        color: 'currentcolor',
+        color: 'var(--current-color)',
       });
     });
 
     it('does not republish a bare `currentColor`', () => {
+      // Republishing the keyword would let a descendant resolve it a second
+      // time against its own color.
       expect(colorStyle({ color: true })).toEqual({ color: 'currentColor' });
     });
 
-    it('does not republish a keyword', () => {
-      expect(colorStyle({ color: 'inherit' })).toEqual({ color: 'inherit' });
+    it('does not republish a faded `#current`', () => {
+      // The `color-mix()` composes against the inherited color; resolving it
+      // again one level down would fade twice.
+      expect(colorStyle({ color: '#current.4' })).toEqual({
+        color: 'color-mix(in oklab, currentcolor 40%, transparent)',
+      });
     });
 
     it('republishes a named token', () => {
       expect(colorStyle({ color: '#purple' })).toEqual({
         color: 'var(--purple-color)',
         '--current-color': 'var(--purple-color)',
+      });
+    });
+
+    it('republishes a literal, so it displaces an ancestor token color', () => {
+      // Without this, a descendant's `#current` would read the nearest *token*
+      // color rather than this element's actual color.
+      expect(colorStyle({ color: 'red' })).toEqual({
+        color: 'red',
+        '--current-color': 'red',
+      });
+    });
+
+    it('republishes a keyword', () => {
+      // `--current-color: inherit` takes the parent's published value, which is
+      // what `color: inherit` does for the color itself.
+      expect(colorStyle({ color: 'inherit' })).toEqual({
+        color: 'inherit',
+        '--current-color': 'inherit',
       });
     });
 

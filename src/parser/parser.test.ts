@@ -1230,10 +1230,12 @@ describe('#current color token', () => {
     resetGlobalPredefinedTokens();
   });
 
-  test('#current produces currentcolor', () => {
+  test('#current resolves through --current-color', () => {
+    // The variable is registered with `initial-value: currentcolor`, so where
+    // no `color` style published it the two are indistinguishable.
     const result = parser.process('#current');
-    expect(result.output).toBe('currentcolor');
-    expect(result.groups[0].colors).toEqual(['currentcolor']);
+    expect(result.output).toBe('var(--current-color)');
+    expect(result.groups[0].colors).toEqual(['var(--current-color)']);
   });
 
   test('#current.5 uses color-mix with 50%', () => {
@@ -1273,7 +1275,7 @@ describe('#current color token', () => {
 
   test('#current is classified as color', () => {
     const result = parser.process('#current 1x');
-    expect(result.groups[0].colors).toEqual(['currentcolor']);
+    expect(result.groups[0].colors).toEqual(['var(--current-color)']);
     expect(result.groups[0].values).toEqual(['8px']);
   });
 
@@ -1282,9 +1284,9 @@ describe('#current color token', () => {
       '#current': '#purple',
     });
 
-    // Should still produce currentcolor, not var(--purple-color)
+    // Should still resolve through --current-color, not var(--purple-color)
     const result = parser.process('#current');
-    expect(result.output).toBe('currentcolor');
+    expect(result.output).toBe('var(--current-color)');
   });
 
   test('warning is logged when defining token with bare #current value', () => {
@@ -1500,7 +1502,7 @@ describe('Modern color functions', () => {
     );
 
     expect(result.groups[0].colors).toEqual([
-      'color-mix(in oklab,light-dark(var(--light-color),var(--dark-color)) 30%,currentcolor)',
+      'color-mix(in oklab,light-dark(var(--light-color),var(--dark-color)) 30%,var(--current-color))',
     ]);
   });
 

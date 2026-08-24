@@ -215,14 +215,29 @@ export function classify(
     }
   }
 
-  // 0b. Special handling for #current (reserved keyword, cannot be overridden by predefined tokens)
-  // #current maps to CSS currentcolor keyword
+  // 0b. Special handling for #current (reserved keyword, cannot be overridden by
+  // predefined tokens).
+  //
+  // `#current` resolves through `--current-color` rather than to the
+  // `currentcolor` keyword directly. The variable is registered with
+  // `initial-value: currentcolor`, so where nothing publishes it the two are
+  // indistinguishable — it resolves per element exactly as the keyword does.
+  // Where a `color` style *has* published it, the variable holds a concrete
+  // color, and that is the difference that matters: a token defined as
+  // `#current` can then be faded, because `oklch(from <concrete> l c h / a)`
+  // works from Safari 16.4 while `oklch(from currentcolor …)` needs Safari 18.
   if (token === '#current') {
-    return { bucket: Bucket.Color, processed: 'currentcolor' };
+    return { bucket: Bucket.Color, processed: 'var(--current-color)' };
   }
 
   // #current with opacity: #current.5 or #current.$opacity
-  // Uses color-mix since currentcolor doesn't support rgb() alpha syntax
+  //
+  // Deliberately keeps the `currentcolor` keyword rather than the variable.
+  // `color-mix()` *composes*, so a nested fade has to read the already-faded
+  // color that reaches it — `#current.4` with `#current.18` under it lands at
+  // `.072`. The keyword resolves to that faded color at each element; the
+  // variable would carry the outer fade's own operand and mix it a second time.
+  // `color-mix()` with `currentcolor` has worked since Safari 16.2 regardless.
   const currentAlphaMatch = token.match(
     /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
   );

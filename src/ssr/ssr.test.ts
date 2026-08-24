@@ -354,6 +354,13 @@ describe('ServerStyleCollector', () => {
     // Color properties are a single `<color>` rule, with no channel companion
     expect(css).toContain('@property --white-color');
     expect(css).not.toContain('@property --white-color-oklch');
+
+    // `--current-color` is what `#current` resolves through, so its initial
+    // value has to be the keyword — `transparent` would render an unpublished
+    // `#current` invisible instead of as the colour the element inherits.
+    expect(css).toContain(
+      '@property --current-color { syntax: "<color>"; inherits: true; initial-value: currentcolor; }',
+    );
   });
 
   it('collectInternals is idempotent', () => {

@@ -59,11 +59,11 @@ describe('Tasty style tests', () => {
   });
 
   describe('`--current-color` republishing', () => {
-    it('does not republish `#current`, which reads the variable itself', () => {
-      // `--current-color: var(--current-color)` is a self-reference: it
-      // invalidates the declaration and silently drops to the initial value.
+    it('does not republish `#current`, which reads the color it inherits', () => {
+      // Republishing the keyword would let a descendant resolve it a second
+      // time against its own color.
       expect(colorStyle({ color: '#current' })).toEqual({
-        color: 'var(--current-color)',
+        color: 'currentcolor',
       });
     });
 

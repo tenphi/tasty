@@ -218,26 +218,25 @@ export function classify(
   // 0b. Special handling for #current (reserved keyword, cannot be overridden by
   // predefined tokens).
   //
-  // `#current` resolves through `--current-color` rather than to the
-  // `currentcolor` keyword directly. The variable is registered with
-  // `initial-value: currentcolor`, so where nothing publishes it the two are
-  // indistinguishable — it resolves per element exactly as the keyword does.
-  // Where a `color` style *has* published it, the variable holds a concrete
-  // color, and that is the difference that matters: a token defined as
-  // `#current` can then be faded, because `oklch(from <concrete> l c h / a)`
-  // works from Safari 16.4 while `oklch(from currentcolor …)` needs Safari 18.
+  // `#current` is the `currentcolor` keyword, and emitting the keyword itself is
+  // what makes it compose: it resolves against each element's own color, so a
+  // `#current` under an ancestor that faded its color reads the *faded* color.
+  // `var(--current-color)` cannot do that — the variable carries whatever the
+  // nearest publishing ancestor put in it, and a faded color is deliberately not
+  // published (see `colorStyle`), so a ramp built on `#current` would read
+  // through to the unfaded color above it.
   if (token === '#current') {
-    return { bucket: Bucket.Color, processed: 'var(--current-color)' };
+    return { bucket: Bucket.Color, processed: 'currentcolor' };
   }
 
   // #current with opacity: #current.5 or #current.$opacity
   //
-  // Deliberately keeps the `currentcolor` keyword rather than the variable.
-  // `color-mix()` *composes*, so a nested fade has to read the already-faded
-  // color that reaches it — `#current.4` with `#current.18` under it lands at
-  // `.072`. The keyword resolves to that faded color at each element; the
-  // variable would carry the outer fade's own operand and mix it a second time.
-  // `color-mix()` with `currentcolor` has worked since Safari 16.2 regardless.
+  // `color-mix()` rather than the relative color syntax a token fade uses.
+  // Fading a token *names* a color, so it replaces the alpha; `currentcolor` is
+  // the color an element inherits, which an ancestor may already have faded, so
+  // `#current.4` means "40% of what reaches me" and composes — `#current.4` with
+  // `#current.18` under it lands at `.072`. `color-mix()` with `currentcolor`
+  // has worked since Safari 16.2.
   const currentAlphaMatch = token.match(
     /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
   );

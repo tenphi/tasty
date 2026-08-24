@@ -290,12 +290,14 @@ Text color with design token support.
 | `"light-dark(#dark, #light)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 | `true` | `currentColor` |
 
-Also sets `$current-color` to the same color, which is what `#current` resolves
-through. Every color publishes it, not just a named token, so a descendant's
-`#current` always reads the nearest `color` rather than the nearest *token*
-color. A value that already reads the inherited color — `#current` itself, a
-`#current` fade, a bare `currentColor` — is not republished: that would be a
-self-reference, or would resolve a second time one level down.
+Also sets `$current-color` to the same color, for anything that needs the
+inherited color as a color rather than as the `currentcolor` keyword. Every color
+publishes it, not just a named token, so a reader below always takes the nearest
+`color` rather than the nearest *token* color. A value that already reads the
+inherited color — `#current` itself, a `#current` fade, a bare `currentColor` —
+is not republished: resolving it a second time one level down would fade it
+twice, and the variable into itself is a self-reference. `#current` does not go
+through it; it is the keyword.
 
 ### `svgFill`
 

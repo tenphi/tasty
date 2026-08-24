@@ -134,7 +134,7 @@ color: '#purple',           // Full opacity
 color: '#purple.5',         // 50% opacity
 color: '#purple.05',        // 5% opacity
 color: '#purple.$fade',     // Opacity from a custom property
-fill: '#current',           // → var(--current-color)
+fill: '#current',           // → currentcolor
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
@@ -163,27 +163,40 @@ Two properties follow from writing the alpha slot rather than compositing:
   `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
   which is what `--*-opacity` properties are registered to accept.
 
-### Why `#current` is a variable
+### `#current` is the keyword
 
-`#current` emits `var(--current-color)`, not the `currentcolor` keyword. The
-`color` style publishes `--current-color` alongside every color it sets, and the
-property is registered with `initial-value: currentcolor` — so where nothing has
-published it, the variable resolves against each element's own inherited color
-and is indistinguishable from the keyword.
+`#current` emits the `currentcolor` keyword, so it resolves against the element
+that reads it. That is what lets it follow a color an ancestor faded — a ramp
+that expresses its disabled state once, in `color`, fades everything painted from
+`#current` below it with no further declarations.
 
-The difference shows when a token is *defined* as `#current` and then faded:
+The `color` style also publishes `--current-color` beside every color it sets,
+for anything that needs the inherited color *as a color* rather than as the
+keyword — hand-authored CSS, or a place the keyword will not do. Read it as
+`$current-color`. It is registered with `initial-value: currentcolor`, so where
+nothing published it, it still resolves against each element's own color:
+
+```jsx
+fill: '$current-color'; // → var(--current-color)
+```
+
+A color that already reads the color it inherits — `#current`, a `#current` fade
+— is not published into it: resolving such a value a second time at a descendant
+would fade it twice.
+
+One case needs the wider floor to be considered. A token *defined* as `#current`
+and then faded gives relative color syntax a `currentcolor` origin, which Safari
+supports only from 18:
 
 ```jsx
 { '#ink': '#current', fill: '#ink.5' }
-// --ink-color: var(--current-color)  → a concrete color where one was published
-// fill: oklch(from var(--ink-color) l c h / .5)
+// --ink-color: currentcolor
+// fill: oklch(from currentcolor l c h / .5)  → Chrome, Firefox, Safari 18+
 ```
 
-Relative color syntax accepts a concrete origin from Safari 16.4, while
-`oklch(from currentcolor …)` needs Safari 18. Resolving through the variable is
-what keeps that token fadeable on the wider floor. Where no `color` style
-published the variable, the origin is the keyword again and the Safari 18 floor
-applies to that case alone.
+Put the fade in the token instead — `{ '#ink': '#current.5' }` — and it goes
+through `color-mix()`, which works from Safari 16.2 and composes like every other
+`#current` fade.
 
 ### `#current` composes instead
 

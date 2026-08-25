@@ -39,10 +39,12 @@ component measures **1.8x faster end to end**, not just in key generation.
 
 The flag gates only the write. Reading an existing entry is free and
 unconditional, so nothing has to opt in to benefit from what already ran, and
-a per-render merged styles object — the common client case — is never stored
-and pays nothing. Deliberately not enabled for objects tasty cannot vouch for:
-recipe resolution rewrites the styles object, and a rewritten object is treated
-as per-render.
+anything that would be stored without being read back is left out: a per-render
+merged styles object, a styles object rewritten by recipe resolution, and every
+client render — where the factory-level class-name cache answers everything
+after the first, so `computeStyles()` never sees the same object twice. Storing
+an entry costs roughly twice what generating the key does, so a write-only opt
+-in is worse than no memo at all.
 
 A memo hit re-reads every value the key was built from and confirms none of
 them changed, using the same shallow reference comparison `stableStyles`'

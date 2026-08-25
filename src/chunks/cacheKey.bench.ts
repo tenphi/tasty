@@ -82,14 +82,29 @@ function keyAllChunks(entry: Entry, reusable = false) {
 
 let idx = 0;
 
+function freshCopy(): Entry {
+  const entry = pool[idx++ % POOL_SIZE];
+  return {
+    styles: { ...(entry.styles as Record<string, unknown>) } as Styles,
+    chunks: entry.chunks,
+  };
+}
+
 describe('generateChunkCacheKey', () => {
   bench('all chunks (fresh styles object every call)', () => {
-    const entry = pool[idx++ % POOL_SIZE];
-    keyAllChunks({
-      styles: { ...(entry.styles as Record<string, unknown>) } as Styles,
-      chunks: entry.chunks,
-    });
+    keyAllChunks(freshCopy());
   });
+
+  // The shape a write-only opt-in has: an object keyed once, stored, and never
+  // looked up again — what the client would pay if `tasty()` opted in on the
+  // single render that reaches computeStyles before classNameCache takes over.
+  // The gap to the row above is exactly what that mistake costs.
+  bench(
+    'all chunks (fresh styles object every call, stored but never read)',
+    () => {
+      keyAllChunks(freshCopy(), true);
+    },
+  );
 
   // A styles object that survives across renders — what SSR sees on every
   // render of a `tasty({ styles })` definition, since the client-side

@@ -749,8 +749,11 @@ function tastyElement<
   const classNameCache = new Map<Styles | undefined, string>();
 
   // Passed when the styles object handed to computeStyles() is the factory's
-  // own — it will be back on the next render, so chunk cache keys generated
-  // from it are worth memoizing. Hoisted so the hot path does not allocate it.
+  // own AND computeStyles() will see it again — which is only true where
+  // classNameCache is unavailable, i.e. the server. On the client that cache
+  // answers every render after the first, so memoizing chunk keys during that
+  // first render would write entries nothing ever reads back. Hoisted so the
+  // hot path does not allocate it.
   const STABLE_STYLES: ComputeStylesOptions = { stableStyles: true };
 
   const _TastyComponent = forwardRef<
@@ -875,7 +878,9 @@ function tastyElement<
     } else {
       stylesResult = computeStyles(
         allStyles,
-        allStyles === baseStyles ? STABLE_STYLES : undefined,
+        !useFactoryCache && allStyles === baseStyles
+          ? STABLE_STYLES
+          : undefined,
       );
       if (useFactoryCache && allStyles === baseStyles) {
         classNameCache.set(allStyles, stylesResult.className);

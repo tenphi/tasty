@@ -209,8 +209,6 @@ interface EffectiveDefinitionResult {
   cssName: string;
   /** The effective property definition */
   definition: PropertyDefinition;
-  /** Whether this is a color property */
-  isColor: boolean;
   /** Whether the token was valid */
   isValid: boolean;
   /** Error message if invalid */
@@ -235,7 +233,6 @@ export function getEffectiveDefinition(
     return {
       cssName: '',
       definition: userDefinition,
-      isColor: false,
       isValid: false,
       error: parsed.error,
     };
@@ -250,7 +247,6 @@ export function getEffectiveDefinition(
         inherits: userDefinition.inherits, // Allow inherits to be customized
         initialValue: userDefinition.initialValue ?? 'transparent', // Default to transparent
       },
-      isColor: true,
       isValid: true,
     };
   }
@@ -259,7 +255,6 @@ export function getEffectiveDefinition(
   return {
     cssName: parsed.cssName,
     definition: userDefinition,
-    isColor: false,
     isValid: true,
   };
 }

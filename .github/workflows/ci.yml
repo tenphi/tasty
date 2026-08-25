@@ -62,6 +62,9 @@ jobs:
       - name: Dead code check
         run: pnpm knip
 
+      - name: Test-only code check
+        run: pnpm check:test-only
+
       - name: Test
         run: pnpm test
 

@@ -1,10 +1,3 @@
-import { colorFuncName } from '../parser/const';
-import {
-  convertColorChainToComponentChain,
-  getColorSpaceComponents,
-  getColorSpaceSuffix,
-  strToColorSpace,
-} from '../utils/color-space';
 import { normalizeDslName, toSnakeCase } from '../utils/string';
 import {
   normalizeColorTokenValue,
@@ -73,54 +66,15 @@ export function createStyle(
         finalCssStyle.endsWith('-color')
       ) {
         styleValue = styleValue.trim();
-        const suffix = getColorSpaceSuffix();
 
-        const colorSpaceStr = strToColorSpace(styleValue as string);
-
-        const { color, name } = parseColor(styleValue as string);
-
-        if (name && colorSpaceStr) {
-          return {
-            [finalCssStyle]: `var(--${name}-color, ${colorSpaceStr})`,
-            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix}, ${getColorSpaceComponents(
-              colorSpaceStr,
-            )})`,
-          };
-        } else if (name) {
-          if (color) {
-            return {
-              [finalCssStyle]: color,
-              [`${finalCssStyle}-${suffix}`]:
-                convertColorChainToComponentChain(color),
-            };
-          }
-
-          return {
-            [finalCssStyle]: `var(--${name}-color)`,
-            [`${finalCssStyle}-${suffix}`]: `var(--${name}-color-${suffix})`,
-          };
-        } else if (colorSpaceStr) {
-          return {
-            [finalCssStyle]: colorSpaceStr,
-            [`${finalCssStyle}-${suffix}`]:
-              getColorSpaceComponents(colorSpaceStr),
-          };
-        }
-
-        // A color with no token name of its own — a `color-mix()`, a
-        // `light-dark()`, any derived color function — still needs its
-        // components companion, or `#name.alpha` on the token would compose
-        // opacity onto nothing.
-        if (color && colorFuncName(color)) {
-          return {
-            [finalCssStyle]: color,
-            [`${finalCssStyle}-${suffix}`]:
-              convertColorChainToComponentChain(color),
-          };
-        }
-
+        // The color is emitted as the parser resolved it: a `#token` or fallback
+        // chain becomes its `var()` chain, a color function keeps its expanded
+        // tokens, a literal or keyword passes through as authored. Nothing needs
+        // rewriting into a particular color space — opacity is applied with
+        // relative color syntax, which reads the channels off whatever the
+        // browser resolves the value to.
         return {
-          [finalCssStyle]: color ?? '',
+          [finalCssStyle]: parseColor(styleValue as string).color ?? '',
         };
       }
 

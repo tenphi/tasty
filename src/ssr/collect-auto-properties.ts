@@ -48,11 +48,11 @@ function scanAndEmitAutoProperties(
       (name) => registered.has(name),
       (name, syntax, initialValue) => {
         registered.add(name);
-        const css = formatPropertyCSS(
-          name,
-          { syntax, inherits: true, initialValue },
-          { isPropertyDefined: (cssName) => registered.has(cssName) },
-        );
+        const css = formatPropertyCSS(name, {
+          syntax,
+          inherits: true,
+          initialValue,
+        });
         if (css) {
           emit(name, css);
         }

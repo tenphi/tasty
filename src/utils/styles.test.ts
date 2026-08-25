@@ -1,6 +1,6 @@
 import { color } from './colors';
 import { getRgbValuesFromRgbaString, parseColor, strToRgb } from './styles';
-import { resetColorSpace, setColorSpace, strToColorSpace } from './color-space';
+import { resolveFunctionColor } from './function-color';
 
 describe('getRgbValuesFromRgbaString', () => {
   it('extracts RGB values from comma-separated integers', () => {
@@ -88,37 +88,6 @@ describe('strToRgb', () => {
     expect(strToRgb('hsla(120, 100%, 50%, 0.8)')).toBe('rgba(0, 255, 0, 0.8)');
   });
 
-  it('converts okhsl to rgb', () => {
-    // okhsl is a plugin-provided color function, so conversion goes through
-    // the parser via strToColorSpace rather than the leaf strToRgb helper.
-    setColorSpace('rgb');
-    try {
-      // Purple: okhsl(280.3 80% 52%) should produce a blueish-purple color
-      const result = strToColorSpace('okhsl(280.3 80% 52%)');
-      expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
-
-      // Extract RGB values and verify they're in the purple range
-      const match = result?.match(/rgb\((\d+) (\d+) (\d+)\)/);
-      expect(match).toBeTruthy();
-
-      const [, _r, g, b] = match!;
-      // Purple should have significant blue, lower red, and low green
-      expect(parseInt(b)).toBeGreaterThan(parseInt(g));
-    } finally {
-      resetColorSpace();
-    }
-  });
-
-  it('converts okhsl with alpha to rgba', () => {
-    setColorSpace('rgb');
-    try {
-      const result = strToColorSpace('okhsl(280.3 80% 52% / 0.5)');
-      expect(result).toMatch(/^rgb\(\d+ \d+ \d+ \/ 0\.5\)$/);
-    } finally {
-      resetColorSpace();
-    }
-  });
-
   it('converts oklch to rgb', () => {
     const result = strToRgb('oklch(50% 0.2 250)');
     expect(result).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
@@ -194,5 +163,37 @@ describe('color() helper', () => {
     expect(color('purple', 0.025)).toBe(
       'oklch(from var(--purple-color) l c h / 0.025)',
     );
+  });
+});
+
+describe('resolveFunctionColor', () => {
+  // A plugin-provided color function is not a native CSS format, so the leaf
+  // `strToRgb` converter returns null for it (asserted in color-math.test.ts).
+  // It resolves through the parser instead — this is the generic path that
+  // replaced the hardcoded okhsl/okhst branches.
+  it('resolves okhsl() to an rgb() color', () => {
+    const result = resolveFunctionColor('okhsl(280.3 80% 52%)');
+
+    expect(result).toMatch(/^rgb\(/);
+
+    // Purple: significant blue, low green.
+    const [, r, g, b] =
+      result!.match(/rgb\(([\d.]+)% ([\d.]+)% ([\d.]+)%\)/) ?? [];
+    expect(parseFloat(b)).toBeGreaterThan(parseFloat(g));
+    expect(parseFloat(b)).toBeGreaterThan(parseFloat(r));
+  });
+
+  it('keeps the alpha when resolving okhsl()', () => {
+    expect(resolveFunctionColor('okhsl(280.3 80% 52% / 0.5)')).toMatch(
+      /^rgb\(.+ \/ 0\.5\)$/,
+    );
+  });
+
+  it('returns null for a function that is not registered', () => {
+    expect(resolveFunctionColor('notafunc(1 2 3)')).toBeNull();
+  });
+
+  it('returns null for a value that is not a function call', () => {
+    expect(resolveFunctionColor('red')).toBeNull();
   });
 });

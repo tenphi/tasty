@@ -151,9 +151,9 @@ these:
 
 - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
   Tasty cannot convert — none of which have channels to decompose
-- `#current`, which resolves to `currentcolor`
+- `#current`, which resolves to the color the element inherits
 - a `--name-color` variable declared in your own CSS, with no Tasty token
-  definition and no companion variable behind it
+  definition behind it
 
 Two properties follow from writing the alpha slot rather than compositing:
 
@@ -162,6 +162,41 @@ Two properties follow from writing the alpha slot rather than compositing:
 - **The alpha may be a number or a percentage.** `#purple.$fade` emits
   `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
   which is what `--*-opacity` properties are registered to accept.
+
+### `#current` is the keyword
+
+`#current` emits the `currentcolor` keyword, so it resolves against the element
+that reads it. That is what lets it follow a color an ancestor faded — a ramp
+that expresses its disabled state once, in `color`, fades everything painted from
+`#current` below it with no further declarations.
+
+The `color` style also publishes `--current-color` beside every color it sets,
+for anything that needs the inherited color *as a color* rather than as the
+keyword — hand-authored CSS, or a place the keyword will not do. Read it as
+`$current-color`. It is registered with `initial-value: currentcolor`, so where
+nothing published it, it still resolves against each element's own color:
+
+```jsx
+fill: '$current-color'; // → var(--current-color)
+```
+
+A color that already reads the color it inherits — `#current`, a `#current` fade
+— is not published into it: resolving such a value a second time at a descendant
+would fade it twice.
+
+One case needs the wider floor to be considered. A token *defined* as `#current`
+and then faded gives relative color syntax a `currentcolor` origin, which Safari
+supports only from 18:
+
+```jsx
+{ '#ink': '#current', fill: '#ink.5' }
+// --ink-color: currentcolor
+// fill: oklch(from currentcolor l c h / .5)  → Chrome, Firefox, Safari 18+
+```
+
+Put the fade in the token instead — `{ '#ink': '#current.5' }` — and it goes
+through `color-mix()`, which works from Safari 16.2 and composes like every other
+`#current` fade.
 
 ### `#current` composes instead
 
@@ -182,9 +217,9 @@ step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
 custom property used as `#current.$fade` must hold a unitless number; a token
 accepts either form.
 
-The space is always `oklch`, whatever [`colorSpace`](configuration.md#color-space)
-is set to: it is unbounded, so a wide-gamut color survives a round trip that a
-gamut-limited space would clamp.
+The space is always `oklch`: it is unbounded, so a wide-gamut color survives a
+round trip that a gamut-limited space would clamp. Nothing configures this —
+see [Color space](configuration.md#color-space).
 
 ---
 

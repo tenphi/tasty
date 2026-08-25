@@ -8,7 +8,10 @@ import type {
   RefAttributes,
 } from 'react';
 import { createElement, forwardRef, Fragment } from 'react';
-import type { ComputeStylesResult } from './compute-styles';
+import type {
+  ComputeStylesOptions,
+  ComputeStylesResult,
+} from './compute-styles';
 import { computeStyles } from './compute-styles';
 import type { PropHandlerProps } from './prop-handlers';
 import { propHandlerRegistry } from './prop-handlers';
@@ -745,6 +748,14 @@ function tastyElement<
   // For the common case (no instance overrides), this avoids recomputation.
   const classNameCache = new Map<Styles | undefined, string>();
 
+  // Passed when the styles object handed to computeStyles() is the factory's
+  // own AND computeStyles() will see it again — which is only true where
+  // classNameCache is unavailable, i.e. the server. On the client that cache
+  // answers every render after the first, so memoizing chunk keys during that
+  // first render would write entries nothing ever reads back. Hoisted so the
+  // hot path does not allocate it.
+  const STABLE_STYLES: ComputeStylesOptions = { stableStyles: true };
+
   const _TastyComponent = forwardRef<
     unknown,
     AllBasePropsWithMods<K> & WithVariant<V>
@@ -865,7 +876,12 @@ function tastyElement<
       stylesResult = { className: classNameCache.get(allStyles)! };
       touch(stylesResult.className);
     } else {
-      stylesResult = computeStyles(allStyles);
+      stylesResult = computeStyles(
+        allStyles,
+        !useFactoryCache && allStyles === baseStyles
+          ? STABLE_STYLES
+          : undefined,
+      );
       if (useFactoryCache && allStyles === baseStyles) {
         classNameCache.set(allStyles, stylesResult.className);
       }

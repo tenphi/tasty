@@ -86,6 +86,13 @@ export interface ComputeStylesOptions {
   ssrCollector?: ServerStyleCollector | null;
   /** Target root for style injection (client only). Defaults to `document`. */
   root?: Document | ShadowRoot;
+  /**
+   * Set when `styles` outlives this call and will be passed in again — a
+   * `tasty()` factory's own styles object rather than a per-render merge.
+   * It lets chunk cache keys be memoized on the object, which is worth the
+   * bookkeeping only when there is a next render to spend it on.
+   */
+  stableStyles?: boolean;
 }
 
 interface ProcessedChunk {
@@ -209,6 +216,7 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
 function computeStylesRSC(
   styles: Styles,
   chunkMap: Map<string, string[]>,
+  stableStyles: boolean,
 ): ComputeStylesResult {
   const rscCache = getRSCCache();
   const cssParts: string[] = [];
@@ -224,7 +232,12 @@ function computeStylesRSC(
   for (const [chunkName, chunkStyleKeys] of chunkMap) {
     if (chunkStyleKeys.length === 0) continue;
 
-    const cacheKey = generateChunkCacheKey(styles, chunkName, chunkStyleKeys);
+    const cacheKey = generateChunkCacheKey(
+      styles,
+      chunkName,
+      chunkStyleKeys,
+      stableStyles,
+    );
     const { className, isNew } = rscAllocateClassName(rscCache, cacheKey);
     classNames.push(className);
 
@@ -283,10 +296,16 @@ function processChunkSSR(
   styles: Styles,
   chunkName: string,
   styleKeys: string[],
+  stableStyles: boolean,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
-  const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
+  const cacheKey = generateChunkCacheKey(
+    styles,
+    chunkName,
+    styleKeys,
+    stableStyles,
+  );
   const { className, isNewAllocation } = collector.allocateClassName(cacheKey);
 
   if (isNewAllocation) {
@@ -315,11 +334,17 @@ function processChunkSync(
   styles: Styles,
   chunkName: string,
   styleKeys: string[],
+  stableStyles: boolean,
   root?: Document | ShadowRoot,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
-  const cacheKey = generateChunkCacheKey(styles, chunkName, styleKeys);
+  const cacheKey = generateChunkCacheKey(
+    styles,
+    chunkName,
+    styleKeys,
+    stableStyles,
+  );
   const renderResult = renderStylesForChunk(
     styles,
     chunkName,
@@ -523,6 +548,11 @@ export function computeStyles(
 
   const resolved = resolveRecipes(styles);
 
+  // Only the caller's own object can be declared reusable. When recipe
+  // resolution rewrites it, `resolved` is a fresh per-render object and
+  // memoizing on it would be pure overhead.
+  const stableStyles = options?.stableStyles === true && resolved === styles;
+
   // @function polyfill: register local definitions as inline closures BEFORE
   // any chunk is rendered, so call sites in this component expand to plain CSS.
   if (isFunctionsPolyfillEnabled() && hasLocalFunctions(resolved)) {
@@ -547,6 +577,7 @@ export function computeStyles(
         resolved,
         chunkName,
         chunkStyleKeys,
+        stableStyles,
       );
       if (chunk) chunks.push(chunk);
     }
@@ -554,7 +585,7 @@ export function computeStyles(
     collectAncillarySSR(collector, resolved, chunks);
   } else if (typeof document === 'undefined') {
     // RSC path: render CSS to strings for inline <style> emission
-    return computeStylesRSC(resolved, chunkMap);
+    return computeStylesRSC(resolved, chunkMap, stableStyles);
   } else {
     const root = options?.root;
 
@@ -564,7 +595,13 @@ export function computeStyles(
     const nameMap = usedKf ? injectKeyframesSync(usedKf, root) : null;
 
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
-      const chunk = processChunkSync(resolved, chunkName, chunkStyleKeys, root);
+      const chunk = processChunkSync(
+        resolved,
+        chunkName,
+        chunkStyleKeys,
+        stableStyles,
+        root,
+      );
       if (chunk) chunks.push(chunk);
     }
 

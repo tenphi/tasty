@@ -60,6 +60,10 @@ const pool: Entry[] = Array.from({ length: POOL_SIZE }, (_, i) =>
 // One stable object, the shape a `tasty({ styles })` definition produces.
 const warm = toEntry(makeStyles(0));
 const warmWithStates = toEntry(makeStylesWithLocalStates(0));
+// Separate objects for the memoized rows, so opting in cannot alter the
+// baseline rows through the shared cache.
+const warmMemo = toEntry(makeStyles(1));
+const warmStatesMemo = toEntry(makeStylesWithLocalStates(1));
 
 for (const [chunkName, styleKeys] of warm.chunks) {
   generateChunkCacheKey(warm.styles, chunkName, styleKeys);
@@ -67,10 +71,12 @@ for (const [chunkName, styleKeys] of warm.chunks) {
 for (const [chunkName, styleKeys] of warmWithStates.chunks) {
   generateChunkCacheKey(warmWithStates.styles, chunkName, styleKeys);
 }
+keyAllChunks(warmMemo, true);
+keyAllChunks(warmStatesMemo, true);
 
-function keyAllChunks(entry: Entry) {
+function keyAllChunks(entry: Entry, reusable = false) {
   for (const [chunkName, styleKeys] of entry.chunks) {
-    generateChunkCacheKey(entry.styles, chunkName, styleKeys);
+    generateChunkCacheKey(entry.styles, chunkName, styleKeys, reusable);
   }
 }
 
@@ -87,12 +93,21 @@ describe('generateChunkCacheKey', () => {
 
   // A styles object that survives across renders — what SSR sees on every
   // render of a `tasty({ styles })` definition, since the client-side
-  // `classNameCache` in tasty.tsx is disabled on the server.
+  // `classNameCache` in tasty.tsx is disabled on the server. Only these
+  // callers opt into the memo.
   bench('all chunks (stable styles object)', () => {
     keyAllChunks(warm);
   });
 
+  bench('all chunks (stable styles object, memoized)', () => {
+    keyAllChunks(warmMemo, true);
+  });
+
   bench('all chunks (stable styles object with local states)', () => {
     keyAllChunks(warmWithStates);
+  });
+
+  bench('all chunks (stable styles object with local states, memoized)', () => {
+    keyAllChunks(warmStatesMemo, true);
   });
 });

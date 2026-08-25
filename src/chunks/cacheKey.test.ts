@@ -205,3 +205,93 @@ describe('generateChunkCacheKey', () => {
     expect(restored).toBe(first);
   });
 });
+
+// The `reusable` opt-in stores the generated key on the styles object. Every
+// invalidation rule above has to survive that, because a stored key is the one
+// thing that can outlive the values it was built from.
+describe('generateChunkCacheKey (reusable: true)', () => {
+  const memo = (styles: Styles, chunk: string, keys: string[]) =>
+    generateChunkCacheKey(styles, chunk, keys, true);
+
+  it('returns a stable key across repeat calls', () => {
+    const styles = { display: 'flex', padding: '2x' } as Styles;
+
+    const first = memo(styles, 'display', ['display']);
+
+    expect(memo(styles, 'display', ['display'])).toBe(first);
+    expect(first).toContain('flex');
+  });
+
+  it('invalidates when a top-level primitive value is mutated in place', () => {
+    const styles = { display: 'flex' } as Styles;
+
+    const first = memo(styles, 'display', ['display']);
+    (styles as Record<string, unknown>).display = 'grid';
+
+    expect(memo(styles, 'display', ['display'])).not.toBe(first);
+  });
+
+  it('invalidates when a top-level object value is replaced', () => {
+    const styles = {
+      color: { '': '#text', ':hover': '#primary' },
+    } as unknown as Styles;
+
+    const first = memo(styles, 'appearance', ['color']);
+    (styles as Record<string, unknown>).color = {
+      '': '#text',
+      ':hover': '#danger',
+    };
+
+    expect(memo(styles, 'appearance', ['color'])).not.toBe(first);
+  });
+
+  it('invalidates when a top-level value is deleted', () => {
+    const styles = { display: 'flex' } as Styles;
+
+    const first = memo(styles, 'display', ['display']);
+    delete (styles as Record<string, unknown>).display;
+
+    expect(memo(styles, 'display', ['display'])).not.toBe(first);
+  });
+
+  it("does not hold on to the caller's styleKeys array", () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+    const styleKeys = ['display'];
+
+    const first = memo(styles, 'display', styleKeys);
+    styleKeys.push('flow');
+
+    expect(memo(styles, 'display', styleKeys)).not.toBe(first);
+  });
+
+  it('keeps chunks of one styles object independent', () => {
+    const styles = { display: 'flex', color: '#text', width: '10x' } as Styles;
+    const chunks = chunksOf(styles);
+
+    const keys = chunks.map(([name, styleKeys]) =>
+      memo(styles, name, styleKeys),
+    );
+
+    expect(new Set(keys).size).toBe(keys.length);
+    chunks.forEach(([name, styleKeys], i) => {
+      expect(memo(styles, name, styleKeys)).toBe(keys[i]);
+    });
+  });
+
+  it('agrees with a non-reusable call on the same input', () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+
+    const stored = memo(styles, 'display', ['display', 'flow']);
+
+    // A stored entry is readable without opting in again, and both paths must
+    // produce the same key for the same input either way.
+    expect(generateChunkCacheKey(styles, 'display', ['display', 'flow'])).toBe(
+      stored,
+    );
+
+    const twin = { display: 'flex', flow: 'column' } as Styles;
+    expect(generateChunkCacheKey(twin, 'display', ['display', 'flow'])).toBe(
+      stored,
+    );
+  });
+});

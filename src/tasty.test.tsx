@@ -468,7 +468,6 @@ describe('tasty() API', () => {
     // Check token processing
     expect(style).toContain('--size: 16');
     expect(style).toContain('--accent-color:');
-    expect(style).toContain('--accent-color-oklch:');
     // Check that explicit style prop is also applied
     expect(style).toContain('padding: 10px');
   });
@@ -787,9 +786,7 @@ describe('tokens prop', () => {
     expect(element.style.getPropertyValue('--accent-color')).toBe(
       'var(--purple-color)',
     );
-    expect(element.style.getPropertyValue('--accent-color-oklch')).toBe(
-      'var(--purple-color-oklch)',
-    );
+    expect(element.style.getPropertyValue('--accent-color-oklch')).toBe('');
   });
 
   it('should merge default tokens with instance tokens', () => {
@@ -886,16 +883,13 @@ describe('tokens prop', () => {
     expect(element.style.getPropertyValue('--spacing')).toBe('24px'); // raw unit: 3 * 8px
   });
 
-  it('should handle hex color values for RGB extraction', () => {
+  it('should handle hex color values', () => {
     const Element = tasty({});
 
     const { container } = render(<Element tokens={{ '#custom': '#ff8800' }} />);
     const element = container.firstElementChild as HTMLElement;
 
-    // Should have color property
     expect(element.style.getPropertyValue('--custom-color')).toBeTruthy();
-    // Should have RGB property
-    expect(element.style.getPropertyValue('--custom-color-oklch')).toBeTruthy();
   });
 
   it('should convert boolean true to transparent for color tokens', () => {
@@ -906,10 +900,6 @@ describe('tokens prop', () => {
 
     // Should convert true to transparent
     expect(element.style.getPropertyValue('--overlay-color')).toBe(
-      'transparent',
-    );
-    // Should have RGB property (transparent yields 'transparent' as fallback)
-    expect(element.style.getPropertyValue('--overlay-color-oklch')).toBe(
       'transparent',
     );
   });

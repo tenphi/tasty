@@ -74,6 +74,7 @@ describe('custom property references in handler output', () => {
     });
     expect(colorStyle({ color: '$current-fill-hover' })).toEqual({
       color: 'var(--current-fill-hover)',
+      '--current-color': 'var(--current-fill-hover)',
     });
     expect(svgFillStyle({ svgFill: '$current-fill-hover' })).toEqual({
       fill: 'var(--current-fill-hover)',
@@ -233,6 +234,7 @@ describe('custom property references in handler output', () => {
     });
     expect(colorStyle({ color: 'var(--myColor)' })).toEqual({
       color: 'var(--myColor)',
+      '--current-color': 'var(--myColor)',
     });
     expect(displayStyle({ display: 'inline-flex' })).toEqual({
       display: 'inline-flex',

@@ -23,6 +23,7 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm bench` | Run pipeline benchmarks (Node project — the numbers quoted in the README) |
 | `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
 | `pnpm size` | Check bundle sizes (size-limit) |
+| `pnpm check:test-only` | Verify test-only code stays out of the build (run after `pnpm build`) |
 | `pnpm hygiene` | Run lint + format check + typecheck together |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
 
@@ -177,7 +178,7 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 ## CI/CD
 
-- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
+- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
 - **Release**: Changesets — on push to `main`, either creates a version PR or publishes to npm
 - **Snapshots**: comment `/snapshot` on a PR for `0.0.0-snapshot.<sha>` release
 - **npm trusted publishing**: OIDC provenance via the `release` GitHub environment

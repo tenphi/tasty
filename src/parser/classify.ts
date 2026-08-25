@@ -215,14 +215,28 @@ export function classify(
     }
   }
 
-  // 0b. Special handling for #current (reserved keyword, cannot be overridden by predefined tokens)
-  // #current maps to CSS currentcolor keyword
+  // 0b. Special handling for #current (reserved keyword, cannot be overridden by
+  // predefined tokens).
+  //
+  // `#current` is the `currentcolor` keyword, and emitting the keyword itself is
+  // what makes it compose: it resolves against each element's own color, so a
+  // `#current` under an ancestor that faded its color reads the *faded* color.
+  // `var(--current-color)` cannot do that — the variable carries whatever the
+  // nearest publishing ancestor put in it, and a faded color is deliberately not
+  // published (see `colorStyle`), so a ramp built on `#current` would read
+  // through to the unfaded color above it.
   if (token === '#current') {
     return { bucket: Bucket.Color, processed: 'currentcolor' };
   }
 
   // #current with opacity: #current.5 or #current.$opacity
-  // Uses color-mix since currentcolor doesn't support rgb() alpha syntax
+  //
+  // `color-mix()` rather than the relative color syntax a token fade uses.
+  // Fading a token *names* a color, so it replaces the alpha; `currentcolor` is
+  // the color an element inherits, which an ancestor may already have faded, so
+  // `#current.4` means "40% of what reaches me" and composes — `#current.4` with
+  // `#current.18` under it lands at `.072`. `color-mix()` with `currentcolor`
+  // has worked since Safari 16.2.
   const currentAlphaMatch = token.match(
     /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
   );
@@ -452,11 +466,11 @@ export function classify(
     if (alphaMatch) {
       const [, base, rawAlpha] = alphaMatch;
 
-      // Opacity applies to the color variable itself, not to its channel
-      // components. The token may hold anything a `<color>` can be — including a
-      // `color-mix()` or a `light-dark()` with no channels to decompose, or a
-      // value written straight into `--name-color` by hand-authored CSS with no
-      // companion at all — and relative color syntax fades all of them.
+      // Opacity applies to the color variable as a whole. The token may hold
+      // anything a `<color>` can be — including a `color-mix()` or a
+      // `light-dark()` with no channels to decompose, or a value written
+      // straight into `--name-color` by hand-authored CSS that Tasty never
+      // defined — and relative color syntax fades all of them.
       return {
         bucket: Bucket.Color,
         processed: fadeColor(`var(--${base}-color)`, rawAlpha),

@@ -1,5 +1,4 @@
 import { okhslFunction } from '../plugins/okhsl-plugin';
-import { resetColorSpace, setColorSpace } from '../utils/color-space';
 
 import { StyleParser } from './parser';
 import type { StyleDetails } from './types';
@@ -593,7 +592,7 @@ describe('StyleProcessor', () => {
     });
 
     const expr =
-      'blur(10px) drop-shadow(0 0 1px oklch(var(--dark-color-oklch) / 20%)';
+      'blur(10px) drop-shadow(0 0 1px oklch(from var(--dark-color) l c h / 20%)';
     const res = parser.process(expr);
 
     expect(res.groups[0].values).toEqual(['blur(10px)']);
@@ -871,7 +870,7 @@ describe('Predefined tokens', () => {
     });
 
     const result = parser.process('#primary');
-    // #primary = '#purple.5' -> oklch(var(--purple-color-oklch) / .5)
+    // #primary = '#purple.5' -> the fade applies to the token it resolves to
     expect(result.output).toBe('oklch(from var(--purple-color) l c h / .5)');
   });
 
@@ -1232,6 +1231,9 @@ describe('#current color token', () => {
   });
 
   test('#current produces currentcolor', () => {
+    // The keyword itself, not `var(--current-color)`: it has to resolve against
+    // each element's own color so a `#current` under a faded ancestor reads the
+    // faded color.
     const result = parser.process('#current');
     expect(result.output).toBe('currentcolor');
     expect(result.groups[0].colors).toEqual(['currentcolor']);
@@ -1403,14 +1405,12 @@ describe('Token opacity suffix', () => {
     );
   });
 
-  test('the space is oklab whatever the configured color space', () => {
-    // oklab is unbounded, so a wide-gamut token survives a round trip that a
-    // gamut-limited space would clamp.
-    setColorSpace('rgb');
+  test('the space is always oklch, which is unbounded', () => {
+    // A wide-gamut token survives the round trip that a gamut-limited space
+    // would clamp, and no configuration can change the space.
     expect(parser.process('#wide-token.5').output).toBe(
       'oklch(from var(--wide-token-color) l c h / .5)',
     );
-    resetColorSpace();
   });
 });
 

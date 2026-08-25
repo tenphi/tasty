@@ -2,47 +2,12 @@ import type { Tokens, TokenValue } from '../types';
 
 import type { CSSProperties } from './css-types';
 
-import {
-  convertColorChainToComponentChain,
-  getColorSpaceComponents,
-  getColorSpaceSuffix,
-} from './color-space';
 import { normalizeDslName } from './string';
 import { normalizeColorTokenValue, parseStyle } from './styles';
 
 export { hslToRgbValues } from './color-math';
 
 const devMode = process.env.NODE_ENV !== 'production';
-
-/**
- * Extract color components in the configured color space.
- * Returns a CSS variable reference for token colors, or decomposed
- * components as a space-separated string.
- */
-function extractColorSpaceValue(
-  colorValue: string,
-  parsedOutput: string,
-): string {
-  // Try the parsed (replace-token-substituted) output first, then the raw
-  // original. Using the parsed output ensures replaceTokens like `$hue` ->
-  // `var(--hue)` are substituted before component extraction; the original is
-  // only needed when the parser rewrote the value (e.g. okhsl -> rgb).
-  const componentsFromParsed = getColorSpaceComponents(parsedOutput);
-  if (componentsFromParsed !== parsedOutput) return componentsFromParsed;
-
-  const components = getColorSpaceComponents(colorValue);
-  if (components !== colorValue) return components;
-
-  // Nothing decomposes as a whole, so rewrite it reference by reference: a
-  // `var()` chain keeps its fallback order, and a color the engine cannot
-  // evaluate — a `color-mix()`, a `light-dark()` — defers to the browser
-  // through relative color syntax.
-  const chain = convertColorChainToComponentChain(parsedOutput);
-  if (chain !== parsedOutput) return chain;
-
-  // Fallback: return the parsed output
-  return parsedOutput;
-}
 
 /**
  * Check if a value is a valid token value (string, number, or boolean - not object).
@@ -88,9 +53,35 @@ function processTokenValue(value: string | number): string {
 }
 
 /**
+ * Resolve one `$name` / `#name` entry to the custom property it declares and
+ * the value to declare, or `null` when the entry declares nothing.
+ *
+ * The two sigils differ only in the property name they build and in how `true`
+ * is read: for a custom property it is the empty value, for a color it is
+ * `transparent`.
+ */
+function resolveTokenEntry(
+  key: string,
+  value: Exclude<TokenValue, undefined | null | false>,
+): [name: string, value: string] | null {
+  const name = `--${normalizeDslName(key.slice(1))}`;
+
+  if (key[0] === '$') {
+    // Boolean true for custom properties converts to empty string (valid CSS value)
+    return [name, processTokenValue(value === true ? '' : value)];
+  }
+
+  const colorValue = normalizeColorTokenValue(value);
+  // Skip if normalized to null (shouldn't happen since false is filtered by isValidTokenValue)
+  if (colorValue === null) return null;
+
+  return [`${name}-color`, processTokenValue(colorValue)];
+}
+
+/**
  * Process tokens object into inline style properties.
- * - $name -> --name with parsed value
- * - #name -> --name-color AND --name-color-{colorSpace} with parsed values
+ * - `$name` -> `--name` with the parsed value
+ * - `#name` -> `--name-color` with the parsed value
  *
  * @param tokens - The tokens object to process
  * @returns CSSProperties object or undefined if no tokens to process
@@ -117,44 +108,13 @@ export function processTokens(
       continue;
     }
 
-    if (key.startsWith('$')) {
-      // Custom property token: $name -> --name
-      const propName = `--${normalizeDslName(key.slice(1))}`;
-      // Boolean true for custom properties converts to empty string (valid CSS value)
-      const effectiveValue = value === true ? '' : value;
-      const processedValue = processTokenValue(effectiveValue);
+    if (key[0] !== '$' && key[0] !== '#') continue;
 
-      if (!result) result = {};
-      result[propName] = processedValue;
-    } else if (key.startsWith('#')) {
-      const colorName = normalizeDslName(key.slice(1));
-      const suffix = getColorSpaceSuffix();
+    const entry = resolveTokenEntry(key, value);
+    if (!entry) continue;
 
-      // Normalize color token value (true → 'transparent', false is already filtered by isValidTokenValue)
-      const effectiveValue = normalizeColorTokenValue(value);
-      // Skip if normalized to null (shouldn't happen since false is filtered by isValidTokenValue)
-      if (effectiveValue === null) continue;
-
-      const originalValue =
-        typeof effectiveValue === 'number'
-          ? String(effectiveValue)
-          : effectiveValue;
-      const lowerValue = originalValue.toLowerCase();
-      const processedValue = processTokenValue(effectiveValue);
-
-      if (!result) result = {};
-      result[`--${colorName}-color`] = processedValue;
-
-      // Skip component generation for #current values (currentcolor is dynamic, cannot decompose)
-      if (/^#current(?:\.|$)/i.test(lowerValue)) {
-        continue;
-      }
-
-      result[`--${colorName}-color-${suffix}`] = extractColorSpaceValue(
-        originalValue,
-        processedValue,
-      );
-    }
+    if (!result) result = {};
+    result[entry[0]] = entry[1];
   }
 
   return result as CSSProperties | undefined;

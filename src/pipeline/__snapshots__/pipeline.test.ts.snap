@@ -232,21 +232,21 @@ exports[`@supports queries snapshot tests > should render @supports with modifie
     "atRules": [
       "@supports (not (display: grid))",
     ],
-    "declarations": "color: black;",
+    "declarations": "color: black; --current-color: black;",
     "selector": ".component",
   },
   {
     "atRules": [
       "@supports (display: grid)",
     ],
-    "declarations": "color: black;",
+    "declarations": "color: black; --current-color: black;",
     "selector": ".component:where(:not([data-hovered]))",
   },
   {
     "atRules": [
       "@supports (display: grid)",
     ],
-    "declarations": "color: blue;",
+    "declarations": "color: blue; --current-color: blue;",
     "selector": ".component:where([data-hovered])",
   },
 ]
@@ -307,15 +307,15 @@ exports[`@supports queries snapshot tests > should render multiple @supports wit
 exports[`_ fallback floor > persists the floor alongside a "" default and other states 1`] = `
 [
   {
-    "declarations": "color: gray;",
+    "declarations": "color: gray; --current-color: gray;",
     "selector": ".btn",
   },
   {
-    "declarations": "color: black;",
+    "declarations": "color: black; --current-color: black;",
     "selector": ".btn:where(:not([data-pressed]))",
   },
   {
-    "declarations": "color: red;",
+    "declarations": "color: red; --current-color: red;",
     "selector": ".btn:where([data-pressed])",
   },
 ]

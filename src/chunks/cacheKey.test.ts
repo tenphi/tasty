@@ -115,4 +115,93 @@ describe('generateChunkCacheKey', () => {
       generateChunkCacheKey(plain, 'display', ['display']),
     );
   });
+
+  // `Styles` is a plain mutable object and nothing in the public
+  // `computeStyles` / `useStyles` contract asks callers to freeze it, so a
+  // top-level change must always be reflected in the key. These pin that
+  // contract down: an earlier attempt to memoize the key on the styles
+  // object's identity broke every one of them.
+  it('invalidates when a top-level primitive value is mutated in place', () => {
+    const styles = { display: 'flex' } as Styles;
+
+    const first = generateChunkCacheKey(styles, 'display', ['display']);
+    (styles as Record<string, unknown>).display = 'grid';
+
+    expect(generateChunkCacheKey(styles, 'display', ['display'])).not.toBe(
+      first,
+    );
+  });
+
+  it('invalidates when a top-level object value is replaced', () => {
+    const styles = {
+      color: { '': '#text', ':hover': '#primary' },
+    } as unknown as Styles;
+
+    const first = generateChunkCacheKey(styles, 'appearance', ['color']);
+    (styles as Record<string, unknown>).color = {
+      '': '#text',
+      ':hover': '#danger',
+    };
+
+    expect(generateChunkCacheKey(styles, 'appearance', ['color'])).not.toBe(
+      first,
+    );
+  });
+
+  it('invalidates when a top-level value is deleted', () => {
+    const styles = { display: 'flex' } as Styles;
+
+    const first = generateChunkCacheKey(styles, 'display', ['display']);
+    delete (styles as Record<string, unknown>).display;
+
+    expect(generateChunkCacheKey(styles, 'display', ['display'])).not.toBe(
+      first,
+    );
+  });
+
+  // `styleKeys` belongs to the caller and `generateChunkCacheKey` is a public
+  // export, so any future cache must not hold on to the array it was handed.
+  it('invalidates when the caller mutates the styleKeys array it passed', () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+    const styleKeys = ['display'];
+
+    const first = generateChunkCacheKey(styles, 'display', styleKeys);
+    styleKeys.push('flow');
+
+    expect(generateChunkCacheKey(styles, 'display', styleKeys)).not.toBe(first);
+  });
+
+  it('does not let a mutated styleKeys array corrupt an unrelated lookup', () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+    const styleKeys = ['display', 'flow'];
+
+    const both = generateChunkCacheKey(styles, 'display', styleKeys);
+    styleKeys.pop();
+    const one = generateChunkCacheKey(styles, 'display', styleKeys);
+
+    expect(one).not.toBe(both);
+    // The original key must still be reproducible from an equivalent array.
+    expect(generateChunkCacheKey(styles, 'display', ['display', 'flow'])).toBe(
+      both,
+    );
+  });
+
+  it('returns the same key again once a changed value is restored', () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+
+    const first = generateChunkCacheKey(styles, 'display', ['display', 'flow']);
+    (styles as Record<string, unknown>).flow = 'row';
+    const changed = generateChunkCacheKey(styles, 'display', [
+      'display',
+      'flow',
+    ]);
+    (styles as Record<string, unknown>).flow = 'column';
+    const restored = generateChunkCacheKey(styles, 'display', [
+      'display',
+      'flow',
+    ]);
+
+    expect(changed).not.toBe(first);
+    expect(restored).toBe(first);
+  });
 });

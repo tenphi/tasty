@@ -14,29 +14,8 @@ import {
   extractPredefinedStateRefs,
 } from '../states';
 import type { Styles } from '../styles/types';
-import { hasKeys } from '../utils/has-keys';
 
 const _stableStringifyCache = new WeakMap<object, string>();
-
-/**
- * Per-styles-object memo of the generated keys, keyed by chunk name.
- *
- * The key is derived purely from the styles object, the chunk name and the
- * chunk's style keys, so a styles object that survives across renders — the
- * common case for `tasty({ styles })` definitions — can skip the whole
- * serialization pass. `styleKeys` is verified rather than assumed, because
- * `categorizeStyleKeys` allocates a fresh array per call and callers are free
- * to pass their own.
- *
- * Like `_stableStringifyCache` and the local-predefined-states cache in
- * `../states`, this treats a styles object as immutable once it has been
- * handed to the engine. Mutating a styles object in place instead of creating
- * a new one was already unsupported.
- */
-const _chunkKeyCache = new WeakMap<
-  object,
-  Map<string, { styleKeys: string[]; key: string }>
->();
 
 /**
  * Recursively serialize a value with sorted keys for stable output.
@@ -76,27 +55,25 @@ function stableStringify(value: unknown): string {
   return result;
 }
 
-function sameStyleKeys(a: string[], b: string[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-function computeChunkCacheKey(
+/**
+ * Generate a cache key for a specific chunk.
+ *
+ * Only includes the styles that belong to this chunk, allowing
+ * chunks to be cached independently.
+ *
+ * Also includes relevant local predefined states that are referenced
+ * by this chunk's styles.
+ *
+ * @param styles - The full styles object
+ * @param chunkName - Name of the chunk
+ * @param styleKeys - Keys of styles belonging to this chunk
+ * @returns A stable cache key string
+ */
+export function generateChunkCacheKey(
   styles: Styles,
   chunkName: string,
   styleKeys: string[],
 ): string {
-  // Extract local predefined states from the full styles object.
-  // Cached by object identity in `../states`, so this is a lookup in the
-  // steady state — and knowing up front whether any exist lets the loop below
-  // skip building `chunkStylesStr`, which is only ever read when they do.
-  const localStates = extractLocalPredefinedStates(styles);
-  const hasLocalStates = hasKeys(localStates);
-
   // Start with chunk name for namespace separation
   const parts: string[] = [chunkName];
 
@@ -109,12 +86,15 @@ function computeChunkCacheKey(
       // Use stable stringify for consistent serialization regardless of key order
       const serialized = stableStringify(value);
       parts.push(`${key}:${serialized}`);
-      if (hasLocalStates) chunkStylesStr += serialized;
+      chunkStylesStr += serialized;
     }
   }
 
+  // Extract local predefined states from the full styles object
+  const localStates = extractLocalPredefinedStates(styles);
+
   // Only include local predefined states that are actually referenced in this chunk
-  if (hasLocalStates) {
+  if (Object.keys(localStates).length > 0) {
     const referencedStates = extractPredefinedStateRefs(chunkStylesStr);
     const relevantLocalStates: string[] = [];
 
@@ -133,47 +113,4 @@ function computeChunkCacheKey(
 
   // Use null character as separator (safe, not in JSON output)
   return parts.join('\0');
-}
-
-/**
- * Generate a cache key for a specific chunk.
- *
- * Only includes the styles that belong to this chunk, allowing
- * chunks to be cached independently.
- *
- * Also includes relevant local predefined states that are referenced
- * by this chunk's styles.
- *
- * The result is memoized on the identity of `styles`, so repeat renders of a
- * stable styles object pay a single Map lookup instead of re-serializing every
- * value just to decide that nothing changed.
- *
- * @param styles - The full styles object
- * @param chunkName - Name of the chunk
- * @param styleKeys - Keys of styles belonging to this chunk
- * @returns A stable cache key string
- */
-export function generateChunkCacheKey(
-  styles: Styles,
-  chunkName: string,
-  styleKeys: string[],
-): string {
-  let perStyles = _chunkKeyCache.get(styles as object);
-
-  if (perStyles !== undefined) {
-    const entry = perStyles.get(chunkName);
-    if (entry !== undefined && sameStyleKeys(entry.styleKeys, styleKeys)) {
-      return entry.key;
-    }
-  }
-
-  const key = computeChunkCacheKey(styles, chunkName, styleKeys);
-
-  if (perStyles === undefined) {
-    perStyles = new Map();
-    _chunkKeyCache.set(styles as object, perStyles);
-  }
-  perStyles.set(chunkName, { styleKeys, key });
-
-  return key;
 }

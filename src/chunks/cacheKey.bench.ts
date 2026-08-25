@@ -49,10 +49,10 @@ function toEntry(styles: Styles): Entry {
   };
 }
 
-// A rotating pool of distinct styles objects. Callers copy one per iteration
-// so every call misses the identity memo and pays the full serialization pass
-// — the shape `mergeStyles()` produces for a component with instance styles.
-// Nested values keep their identity, exactly as they do across a real render.
+// A rotating pool of distinct styles objects. Callers copy one per iteration,
+// which is the shape `mergeStyles()` produces for a component with instance
+// styles: a fresh top-level object whose nested values keep their identity.
+// This is the dominant client render path, so it is the one to protect.
 const pool: Entry[] = Array.from({ length: POOL_SIZE }, (_, i) =>
   toEntry(makeStyles(i)),
 );
@@ -77,7 +77,7 @@ function keyAllChunks(entry: Entry) {
 let idx = 0;
 
 describe('generateChunkCacheKey', () => {
-  bench('all chunks (fresh styles object every call, memo miss)', () => {
+  bench('all chunks (fresh styles object every call)', () => {
     const entry = pool[idx++ % POOL_SIZE];
     keyAllChunks({
       styles: { ...(entry.styles as Record<string, unknown>) } as Styles,
@@ -85,7 +85,9 @@ describe('generateChunkCacheKey', () => {
     });
   });
 
-  // The warm render path: the same styles object re-keyed on every render.
+  // A styles object that survives across renders — what SSR sees on every
+  // render of a `tasty({ styles })` definition, since the client-side
+  // `classNameCache` in tasty.tsx is disabled on the server.
   bench('all chunks (stable styles object)', () => {
     keyAllChunks(warm);
   });

@@ -21,30 +21,30 @@ Most of the work is mechanical renames — see the [search-and-replace cheat she
 
 ## At a glance
 
-| v2.11 | v3.0 | Find it with |
-|---|---|---|
-| `'@properties': { … }` | `'@property': { … }` | `rg "'@properties'"` |
-| `'@fontFace': { … }` | `'@font-face': { … }` | `rg "'@fontFace'"` |
-| `'@counterStyle': { … }` | `'@counter-style': { … }` | `rg "'@counterStyle'"` |
-| `padding: '2x 4x top right'` | `padding: '2x top, 4x right'` | dev-mode console warning |
-| `fade: '3x 1x top bottom'` | `fade: '3x top, 1x bottom'` | dev-mode console warning |
-| `configure({ funcs })` | `configure({ functions })` | `rg "funcs"` |
-| `configure({ fontFace })` | `configure({ fontFaces })` | `rg "fontFace:"` |
-| `configure({ counterStyle })` | `configure({ counterStyles })` | `rg "counterStyle:"` |
-| `getCssText()` | `getCSSText()` | `rg "getCssText"` |
-| `getCssTextForNode()` | `getCSSTextForNode()` | `rg "getCssTextForNode"` |
-| `getCssTextForClasses()` | `getCSSTextForClasses()` | `rg "getCssTextForClasses"` |
-| `getGlobalFontFace()` | `getGlobalFontFaces()` | `rg "getGlobalFontFace\b"` |
-| `getGlobalCounterStyle()` | `getGlobalCounterStyles()` | `rg "getGlobalCounterStyle\b"` |
-| `getGlobalFunction()` | `getGlobalFunctions()` | `rg "getGlobalFunction\b"` |
-| `okhslFunc` / `okhstFunc` | `okhslFunction` / `okhstFunction` | `rg "okhs[lt]Func\b"` |
-| `CssOptions` | `CSSOptions` | `rg "CssOptions"` |
-| `ParserOptions.funcs` | `ParserOptions.functions` | `rg "funcs:"` |
-| `StyleParser#setFuncs()` | `StyleParser#setFunctions()` | `rg "setFuncs"` |
-| `ChunkInfo` (from `tastyDebug`) | `DebugChunkInfo` | `rg "ChunkInfo"` |
-| `@tenphi/tasty/next` | `@tenphi/tasty/zero/next` | `rg "tasty/next"` |
-| `getIsTestEnvironment()` | `isTestEnvironment()` | `rg "getIsTestEnvironment"` |
-| `hydrateTastyCache()` | `hydrateTastyClasses()` | `rg "hydrateTastyCache"` |
+| v2.11                           | v3.0                              | Find it with                   |
+| ------------------------------- | --------------------------------- | ------------------------------ |
+| `'@properties': { … }`          | `'@property': { … }`              | `rg "'@properties'"`           |
+| `'@fontFace': { … }`            | `'@font-face': { … }`             | `rg "'@fontFace'"`             |
+| `'@counterStyle': { … }`        | `'@counter-style': { … }`         | `rg "'@counterStyle'"`         |
+| `padding: '2x 4x top right'`    | `padding: '2x top, 4x right'`     | dev-mode console warning       |
+| `fade: '3x 1x top bottom'`      | `fade: '3x top, 1x bottom'`       | dev-mode console warning       |
+| `configure({ funcs })`          | `configure({ functions })`        | `rg "funcs"`                   |
+| `configure({ fontFace })`       | `configure({ fontFaces })`        | `rg "fontFace:"`               |
+| `configure({ counterStyle })`   | `configure({ counterStyles })`    | `rg "counterStyle:"`           |
+| `getCssText()`                  | `getCSSText()`                    | `rg "getCssText"`              |
+| `getCssTextForNode()`           | `getCSSTextForNode()`             | `rg "getCssTextForNode"`       |
+| `getCssTextForClasses()`        | `getCSSTextForClasses()`          | `rg "getCssTextForClasses"`    |
+| `getGlobalFontFace()`           | `getGlobalFontFaces()`            | `rg "getGlobalFontFace\b"`     |
+| `getGlobalCounterStyle()`       | `getGlobalCounterStyles()`        | `rg "getGlobalCounterStyle\b"` |
+| `getGlobalFunction()`           | `getGlobalFunctions()`            | `rg "getGlobalFunction\b"`     |
+| `okhslFunc` / `okhstFunc`       | `okhslFunction` / `okhstFunction` | `rg "okhs[lt]Func\b"`          |
+| `CssOptions`                    | `CSSOptions`                      | `rg "CssOptions"`              |
+| `ParserOptions.funcs`           | `ParserOptions.functions`         | `rg "funcs:"`                  |
+| `StyleParser#setFuncs()`        | `StyleParser#setFunctions()`      | `rg "setFuncs"`                |
+| `ChunkInfo` (from `tastyDebug`) | `DebugChunkInfo`                  | `rg "ChunkInfo"`               |
+| `@tenphi/tasty/next`            | `@tenphi/tasty/zero/next`         | `rg "tasty/next"`              |
+| `getIsTestEnvironment()`        | `isTestEnvironment()`             | `rg "getIsTestEnvironment"`    |
+| `hydrateTastyCache()`           | `hydrateTastyClasses()`           | `rg "hydrateTastyCache"`       |
 
 ---
 
@@ -73,7 +73,7 @@ At-rule keys now match the real CSS at-rule names Tasty already emits, so they a
 
 **This is the one change that can alter rendered CSS without a rename.** A style group that names direction modifiers now takes a **single** value, applied to every direction it names.
 
-The old form looked positional but never was: the parser buckets values and modifiers into separate arrays per comma group, so `'2x 4x top right'`, `'2x top 4x right'`, and `'top 2x right 4x'` were all the same input, and the pairing was decided by the order the *modifiers* happened to appear in. `'1x 2x right top'` and `'1x 2x top right'` produced different CSS, and `'1x 2x top top'` silently assigned `top` twice.
+The old form looked positional but never was: the parser buckets values and modifiers into separate arrays per comma group, so `'2x 4x top right'`, `'2x top 4x right'`, and `'top 2x right 4x'` were all the same input, and the pairing was decided by the order the _modifiers_ happened to appear in. `'1x 2x right top'` and `'1x 2x top right'` produced different CSS, and `'1x 2x top top'` silently assigned `top` twice.
 
 Per-side values now come from comma-separated groups:
 
@@ -155,25 +155,25 @@ A key whose prefix doesn't match its value type is ignored with a development wa
 
 ## 5. Removed exports
 
-| Removed | Use instead |
-|---|---|
-| `getIsTestEnvironment()` | `isTestEnvironment()` |
-| `hydrateTastyCache()` | `hydrateTastyClasses()` |
-| `customFunc()` | `configure({ functions })` |
-| `getGlobalFuncs()` | `getGlobalFunctions()` for `@function` definitions; the parse-function registry is internal |
-| `resetGlobalFuncs()` | `resetConfig()` |
-| `setGlobalPredefinedTokens()` | `configure({ replaceTokens })` |
-| `resetGlobalPredefinedTokens()` | `resetConfig()` |
-| `setMiddlewareTransferCache()` / `getMiddlewareTransferCache()` | internal; no replacement needed |
-| `clearWriterCache()` | internal test utility |
-| `DEFAULT_PLUGINS` | nothing — it was never consumed, and passing it to `configure({ plugins })` was a no-op. The default `okhsl`/`okhst` functions are registered automatically. |
-| `registerDefaultFunctions()` | internal bootstrap helper |
-| `warn()` / `deprecationWarning()` | internal helpers with no callers |
-| `Bucket` enum | parser-internal |
-| `Props` type | inline `Record<string, any>` |
-| `UseStylesOptions` | `useStyles()` takes `Styles \| undefined` directly |
-| `GlobalStyledProps` | its only member was the already-dead `breakpoints` prop |
-| duplicate `PropertyOptions` | the single `PropertyOptions` from `injector/types` |
+| Removed                                                         | Use instead                                                                                                                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `getIsTestEnvironment()`                                        | `isTestEnvironment()`                                                                                                                                        |
+| `hydrateTastyCache()`                                           | `hydrateTastyClasses()`                                                                                                                                      |
+| `customFunc()`                                                  | `configure({ functions })`                                                                                                                                   |
+| `getGlobalFuncs()`                                              | `getGlobalFunctions()` for `@function` definitions; the parse-function registry is internal                                                                  |
+| `resetGlobalFuncs()`                                            | `resetConfig()`                                                                                                                                              |
+| `setGlobalPredefinedTokens()`                                   | `configure({ replaceTokens })`                                                                                                                               |
+| `resetGlobalPredefinedTokens()`                                 | `resetConfig()`                                                                                                                                              |
+| `setMiddlewareTransferCache()` / `getMiddlewareTransferCache()` | internal; no replacement needed                                                                                                                              |
+| `clearWriterCache()`                                            | internal test utility                                                                                                                                        |
+| `DEFAULT_PLUGINS`                                               | nothing — it was never consumed, and passing it to `configure({ plugins })` was a no-op. The default `okhsl`/`okhst` functions are registered automatically. |
+| `registerDefaultFunctions()`                                    | internal bootstrap helper                                                                                                                                    |
+| `warn()` / `deprecationWarning()`                               | internal helpers with no callers                                                                                                                             |
+| `Bucket` enum                                                   | parser-internal                                                                                                                                              |
+| `Props` type                                                    | inline `Record<string, any>`                                                                                                                                 |
+| `UseStylesOptions`                                              | `useStyles()` takes `Styles \| undefined` directly                                                                                                           |
+| `GlobalStyledProps`                                             | its only member was the already-dead `breakpoints` prop                                                                                                      |
+| duplicate `PropertyOptions`                                     | the single `PropertyOptions` from `injector/types`                                                                                                           |
 
 `getGlobalFuncs()` deserves a note: it returned the **live mutable internal registry**, and writing to it bypassed the parser's cache invalidation, so the write silently never took effect. If you were mutating it, move to `configure({ functions })`.
 
@@ -192,13 +192,13 @@ A key whose prefix doesn't match its value type is ignored with a development wa
 + import { withTasty } from '@tenphi/tasty/zero/next';
 ```
 
-The zero-runtime Next.js wrapper already lived under the `zero` namespace internally; the top-level `/next` path collided confusingly with `@tenphi/tasty/ssr/next`, which is a different integration.
+The build-time extraction Next.js wrapper already lived under the `zero` namespace internally; the top-level `/next` path collided confusingly with `@tenphi/tasty/ssr/next`, which is a different integration.
 
 ---
 
 ## 8. Behavior changes that are not renames
 
-**Repeated `configure()` calls now merge.** `recipes`, `keyframes`, `properties`, `fontFaces`, `counterStyles`, and CSS `@function` definitions used to replace wholesale, so a design-system `configure()` followed by an application `configure()` silently dropped the design system's values. All of them now merge, with the later call winning on a key conflict — matching `tokens` and `globalStyles`, which already merged. If you were relying on a second call to *clear* a collection, use `resetConfig()`.
+**Repeated `configure()` calls now merge.** `recipes`, `keyframes`, `properties`, `fontFaces`, `counterStyles`, and CSS `@function` definitions used to replace wholesale, so a design-system `configure()` followed by an application `configure()` silently dropped the design system's values. All of them now merge, with the later call winning on a key conflict — matching `tokens` and `globalStyles`, which already merged. If you were relying on a second call to _clear_ a collection, use `resetConfig()`.
 
 `configure({ polyfills })` is now correctly rejected after the first render, like every sibling option, and shallow-merges so an unrelated later call cannot switch a polyfill off.
 
@@ -208,7 +208,7 @@ The zero-runtime Next.js wrapper already lived under the `zero` namespace intern
 
 **Replacing a built-in style handler now warns.** Built-in handlers are shared across style names, so `configure({ handlers: { fill } })` also takes over `image` and the whole `background-*` family, and `configure({ handlers: { display } })` takes down `flow`, `gap`, `hide`, `overflow`, `whiteSpace`, and `textOverflow`. This was always true; what's new is that a development-mode warning now names exactly what was displaced. If you see it, either declare the whole group and delegate the rest to `styleHandlers.*`, or pick a narrower name. See [Plugins](plugins.md#custom-style-handlers).
 
-**Multi-dependency custom handlers are fixed.** A handler whose dependencies mixed known and unknown style names was invoked once per chunk with only *part* of its dependencies, and could emit stale CSS. Unknown names now join their handler's chunk, so it is invoked once with all of them. No built-in style moved, so no existing class name changes.
+**Multi-dependency custom handlers are fixed.** A handler whose dependencies mixed known and unknown style names was invoked once per chunk with only _part_ of its dependencies, and could emit stale CSS. Unknown names now join their handler's chunk, so it is invoked once with all of them. No built-in style moved, so no existing class name changes.
 
 **`isChecked` added to the root prop types.** It already worked at runtime; it was just missing from `BaseProps` / `AllBaseProps`.
 
@@ -220,7 +220,7 @@ The zero-runtime Next.js wrapper already lived under the `zero` namespace intern
 
 Nothing here is required to upgrade.
 
-- **CSS `@function` support** — reusable, parameterized functions via the `'@function'` styles key, the `useFunction` style function, or `configure({ functions })`. Works across client, SSR/RSC, and zero-runtime. `configure({ polyfills: { functions: true } })` inlines every call into plain CSS for browsers that don't ship the at-rule yet. See [Style DSL](dsl.md#functions-function).
+- **CSS `@function` support** — reusable, parameterized functions via the `'@function'` styles key, the `useFunction` style function, or `configure({ functions })`. Works across client rendering, SSR/RSC, and build-time extraction. `configure({ polyfills: { functions: true } })` inlines every call into plain CSS for browsers that don't ship the at-rule yet. See [Style DSL](dsl.md#functions-function).
 - **Custom color plugins with no core special-casing** — `okhsl`/`okhst` are now ordinary one-line plugins, and a third-party color space can achieve identical integration. New `createColorFunc` and `resolveFunctionColor` helpers.
 - **`configure({ propHandlers })`** — props middleware for every component: props in, props out. The extension point for props that aren't style values.
 - **`configure({ baseStyleProps })`** — expose style properties as props on every component without listing them in each `styleProps`.
@@ -279,7 +279,7 @@ Worth stating explicitly, because it's easy to assume otherwise:
 
 - **At-rule styles-object keys are CSS-spec-faithful, not JS-conventional.** `@keyframes`, `@property`, `@font-face`, `@counter-style`, `@function`, `@starting` — kebab-case, matching what Tasty emits.
 - **The `func()` injector method stays abbreviated.** `function` is a reserved word.
-- `injector.fontFace()` and `injector.counterStyle()` keep their singular names — only the *config keys* and *getters* were pluralized.
+- `injector.fontFace()` and `injector.counterStyle()` keep their singular names — only the _config keys_ and _getters_ were pluralized.
 - `useFontFace` and `useCounterStyle` are unchanged.
 - `configure({ properties })` and `autoPropertyTypes` are unchanged; only the styles-object `@property` key was renamed.
 - **The deprecated style aliases are retained deliberately.** `backgroundColor`, `background`, `backgroundImage`, `flex`, `grid`, and `flexDirection` still carry `@deprecated` tags and still work. They are the guardrail that discourages their use in projects that have not enabled `@tenphi/eslint-plugin-tasty` yet — read the tags as guidance, not as a removal notice.

@@ -39,7 +39,7 @@ Later branches have higher priority. If this button is both hovered and disabled
 
 That is the core promise: add states, variants, themes, and overrides without reopening selector logic by hand.
 
-Tasty fits best when you are building a design system or component library whose components need to stay predictable as their state logic grows. Alongside state maps, it provides a CSS-like DSL, typed style props, tokens, recipes, sub-elements, and runtime or build-time rendering.
+Tasty fits best when you are building a design system or component library whose components need to stay predictable as their state logic grows. Alongside state maps, it provides a CSS-like DSL, typed style props, tokens, recipes, sub-elements, and client-side, server-only, or build-time CSS delivery.
 
 - **Ready to try it?** Follow [Getting Started](docs/getting-started.md).
 - **Evaluating fit?** Read [Comparison](docs/comparison.md) and the [Adoption Guide](docs/adoption.md).
@@ -53,14 +53,14 @@ Tasty fits best when you are building a design system or component library whose
 - **Built for component systems** — Model roots and sub-elements together and expose governed, typed component APIs.
 - **Your design system’s language** — Define tokens, units, aliases, recipes, style props, and parser rules for your system.
 - **One model for every state** — Pseudo-classes, modifiers, root and parent states, media and container queries, `:has()`, and `@supports` all use state maps.
-- **Runtime, server, or build time** — Keep the same styling model in client React, React Server Components and SSR, or zero-runtime extraction.
+- **Client, server, or build time** — Use `tasty()` in client React, React Server Components, SSR, and static server rendering, or use `tastyStatic()` for framework-agnostic build-time extraction.
 
 ### Supporting capabilities
 
 - **Typed style props and mod props** — `styleProps` exposes selected CSS properties as typed React props (`<Space flow="row" gap="2x">`); `modProps` does the same for modifier keys (`<Button isLoading size="large">`). Both support state maps and full TypeScript autocomplete. See [Style Props](#style-props) and [Mod Props](#mod-props).
-- **Server-compatible by default, zero client JS in server-only contexts** — All `tasty()` components and style functions are hook-free. In server-only rendering (Next.js RSC, Astro without islands, SSG), they produce zero client JavaScript with the full feature set. Add SSR integration only when your app also has client-side hydration. Use `tastyStatic()` only when you need build-time extraction without React.
+- **Zero client styling runtime with the full React API** — All `tasty()` components and style functions are hook-free. In server-only rendering, they generate CSS on the server and ship no Tasty styling runtime to the browser. Astro without islands is the concrete integration; server-only Next.js RSC follows the same architecture. Use `tastyStatic()` when you specifically need build-time extraction without React.
 - **Broad modern CSS coverage** — Media queries, container queries, `@supports`, `:has()`, `@starting-style`, `@property`, `@keyframes`, `@font-face`, `@counter-style`, `@function`, and more. Features that do not fit the component model (such as `@layer` and `!important`) are intentionally left out.
-- **Performance and caching** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
+- **Performance and caching** — When styles are generated in the browser, Tasty injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
 - **TypeScript-first and AI-friendly** — Style definitions are declarative, structurally consistent, and fully typed, which helps both humans and tooling understand advanced stateful styles without hidden cascade logic.
 
 ## Why State Maps Matter
@@ -96,7 +96,7 @@ For the fuller docs map beyond the quick routes above, start here:
 - **[Adoption Guide](docs/adoption.md)** — understand who Tasty is for, where it fits, and how to introduce it incrementally
 - **[Getting Started](docs/getting-started.md)** — the canonical onboarding path: install, first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection
 - **[Style rendering pipeline](docs/pipeline.md)** — see the selector model behind deterministic style resolution
-- **[Docs Hub](docs/README.md)** — choose docs by role and task: runtime, zero-runtime, runtime SSR integration, design-system authoring, internals, and debugging
+- **[Docs Hub](docs/README.md)** — choose docs by role and task: React rendering, zero-client-runtime delivery, build-time extraction, design-system authoring, internals, and debugging
 - **[Methodology](docs/methodology.md)** — the recommended component model and public API conventions for design-system code
 
 ## Quick Start
@@ -211,15 +211,15 @@ See [Style Props](#style-props) and [Mod Props](#mod-props) below, or the full r
 
 ## Choose a Styling Approach
 
-Once you understand the component model, pick the rendering mode that matches your app.
+Once you understand the component model, choose where Tasty should generate CSS. Zero-runtime delivery is an outcome, not a synonym for `tastyStatic()`.
 
-| Approach                      | Entry point                                 | Best for                                                                                 | Trade-off                                                                       |
-| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Runtime (default)**         | `tasty()` from `@tenphi/tasty`              | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set; CSS computed during React rendering (server or client)        |
-| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*`                   | Apps with client-side hydration (Next.js client components, Astro islands)               | Adds CSS deduplication, FOUC prevention, and client cache hydration             |
-| **Zero-runtime**              | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or when you need build-time extraction without React                | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
+| Approach                  | Authoring API                               | CSS is generated                    | Tasty runtime in the browser | Best for                                                            |
+| ------------------------- | ------------------------------------------- | ----------------------------------- | ---------------------------- | ------------------------------------------------------------------- |
+| **Server-only React**     | `tasty()`; optional `@tenphi/tasty/ssr/*`   | During server or static rendering   | None                         | Astro without islands, server-only RSC, SSG                         |
+| **Hydrated React**        | `tasty()` plus `@tenphi/tasty/ssr/*`        | During SSR, then on demand in React | Only in hydrated components  | Interactive React apps, Next.js client components, Astro islands    |
+| **Build-time extraction** | `tastyStatic()` from `@tenphi/tasty/static` | During the build                    | None in file mode            | Non-React frameworks or CSS that must be extracted before rendering |
 
-All `tasty()` components are hook-free and work as React Server Components. In server-only contexts — Next.js RSC without `'use client'`, Astro without `client:*` directives, and other SSG setups — they produce the same end result as `tastyStatic()` (static HTML + CSS, zero client JavaScript) but with the full feature set including `styleProps`, sub-elements, and variants. SSR integration is only needed when your app also has client-side rendering. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
+The first approach and `tastyStatic()`'s default file mode both ship zero Tasty styling runtime to the browser. The difference is authoring and timing: server-only `tasty()` retains `styleProps`, sub-elements, variants, and the rest of the React API, while `tastyStatic()` extracts build-time-known styles without a React dependency. (`tastyStatic()` inject mode intentionally ships a tiny CSS injector.) Astro supports the server-only path directly with `tastyIntegration({ islands: false })`; the same server-only model applies to Next.js RSC, though you should verify the output for your deployment. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Build-Time Extraction](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
 
 ## How It Actually Works
 
@@ -439,7 +439,7 @@ See [React API - Mod Props](docs/react-api.md#mod-props) and [Methodology - modP
 
 ### Variants
 
-Variants let one component expose named visual versions without pre-generating a separate class for every possible combination. In runtime mode, Tasty emits only the variant CSS that is actually used.
+Variants let one component expose named visual versions without pre-generating a separate class for every possible combination. With `tasty()`, Tasty emits only the variant CSS that is actually used, whether rendering happens on the server or in the browser.
 
 See [React API - Variants](docs/react-api.md#variants).
 
@@ -480,7 +480,7 @@ const Card = tasty({
 });
 ```
 
-Definitions can also come from `configure({ functions })` or the `useFunction` style function, and work across client, SSR/RSC, and zero-runtime modes. `@function` is an experimental CSS feature, so for browsers that do not ship it yet enable `configure({ polyfills: { functions: true } })` to inline every call into plain CSS at parse time.
+Definitions can also come from `configure({ functions })` or the `useFunction` style function, and work across client rendering, SSR/RSC, and build-time extraction. `@function` is an experimental CSS feature, so for browsers that do not ship it yet enable `configure({ polyfills: { functions: true } })` to inline every call into plain CSS at parse time.
 
 See [Style DSL - Functions](docs/dsl.md#functions-function) and [Configuration - Polyfills](docs/configuration.md#polyfills).
 
@@ -490,21 +490,24 @@ When you do not need a full component wrapper, use the style functions directly:
 
 See [React API - Style Functions](docs/react-api.md#style-functions).
 
-### Zero-Runtime Mode
+### Zero-Runtime Delivery
 
-Use `tastyStatic` when you want the same DSL and state model, but with CSS extracted at build time and no styling runtime in the client bundle. It is a strong fit for static sites, landing pages, and other build-time-first setups.
+There are two ways to ship no Tasty styling runtime to the browser:
 
-See [Zero Runtime (tastyStatic)](docs/tasty-static.md) and [Getting Started - Choosing a rendering mode](docs/getting-started.md#choosing-a-rendering-mode).
+- Render `tasty()` components only on the server, retaining the full React component API. Astro's `tastyIntegration({ islands: false })` is the clearest example.
+- Use `tastyStatic()` to extract build-time-known CSS without React.
+
+See [Server-Side Rendering](docs/ssr.md), [Build-Time Extraction (`tastyStatic`)](docs/tasty-static.md), and [Getting Started - Choosing a rendering mode](docs/getting-started.md#choosing-a-rendering-mode).
 
 ### `tasty` vs `tastyStatic`
 
-`tasty()` returns React components that compute CSS during rendering. In server-only contexts, this produces static HTML + CSS with zero client JavaScript — the same end result as `tastyStatic()` but with the full feature set. `tastyStatic()` returns class names and extracts CSS during the build via a Babel plugin, with no React dependency at runtime. Both share the same DSL, tokens, units, state mappings, and recipes. Use `tasty()` as the default for any React-based setup; use `tastyStatic()` when you need build-time extraction without React.
+`tasty()` returns React components that compute CSS during rendering. That render can happen in the browser or only on the server; the server-only path ships no Tasty styling runtime while retaining the full feature set. `tastyStatic()` returns class names and extracts CSS during the build via a Babel plugin, with no React dependency. Both share the same DSL, tokens, units, state mappings, and recipes. Use `tasty()` as the default for React; use `tastyStatic()` when extraction must happen before rendering or the consumer is not React.
 
-See [Zero Runtime (tastyStatic)](docs/tasty-static.md), [React API](docs/react-api.md), and [Comparison - Build-time vs runtime](docs/comparison.md#build-time-vs-runtime).
+See [Build-Time Extraction (`tastyStatic`)](docs/tasty-static.md), [React API](docs/react-api.md), and [Comparison - Where styles are computed](docs/comparison.md#where-styles-are-computed).
 
 ### Server-Side Rendering
 
-`tasty()` components already work on the server without any SSR integration — they are hook-free and render as React Server Components by default. In server-only contexts (Next.js RSC, Astro without islands), they produce zero client JavaScript with the full feature set.
+`tasty()` components already work on the server without any SSR integration — they are hook-free and render as React Server Components by default. In server-only contexts, they ship no Tasty styling runtime while retaining the full feature set. Astro without islands is the explicit zero-client-JavaScript setup; server-only Next.js RSC follows the same architecture, with output depending on the application deployment.
 
 SSR integration (`TastyRegistry`, `tastyIntegration`) adds CSS batching, deduplication across component trees, FOUC prevention, and client cache hydration. Use it when your app also has client-side rendering:
 
@@ -518,11 +521,11 @@ See the [full SSR guide](docs/ssr.md).
 
 | Import                           | Description                                                                                             | Platform       |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
-| `@tenphi/tasty`                  | Runtime style engine (`tasty`, style functions, `configure`)                                            | Browser        |
-| `@tenphi/tasty/static`           | Zero-runtime static styles (`tastyStatic`)                                                              | Browser        |
+| `@tenphi/tasty`                  | React style engine (`tasty`, style functions, `configure`)                                              | Browser / Node |
+| `@tenphi/tasty/static`           | Build-time extraction authoring API (`tastyStatic`)                                                     | Browser        |
 | `@tenphi/tasty/static/inject`    | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode                        | Browser        |
 | `@tenphi/tasty/core`             | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
-| `@tenphi/tasty/babel-plugin`     | Babel plugin for zero-runtime CSS extraction                                                            | Node           |
+| `@tenphi/tasty/babel-plugin`     | Babel plugin for build-time CSS extraction                                                              | Node           |
 | `@tenphi/tasty/zero`             | Programmatic extraction API                                                                             | Node           |
 | `@tenphi/tasty/zero/next`        | Next.js integration wrapper                                                                             | Node           |
 | `@tenphi/tasty/ssr`              | Core SSR API (collector, context, hydration)                                                            | Node           |
@@ -546,9 +549,9 @@ All sizes measured with [size-limit](https://github.com/ai/size-limit) — minif
 
 | Entry point                                       | Size     |
 | ------------------------------------------------- | -------- |
-| `@tenphi/tasty` (runtime + SSR)                   | 50.19 kB |
+| `@tenphi/tasty` (client + server rendering)       | 50.19 kB |
 | `@tenphi/tasty/core` (runtime, no SSR)            | 47.76 kB |
-| `@tenphi/tasty/static` (zero-runtime)             | 16.43 kB |
+| `@tenphi/tasty/static` (build-time authoring API) | 16.43 kB |
 | `@tenphi/tasty/zero` (programmatic extraction)    | 29.6 kB  |
 | `@tenphi/tasty/babel-plugin` (Babel plugin entry) | 43.7 kB  |
 
@@ -556,7 +559,7 @@ Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 
 ### Runtime Benchmarks
 
-If you choose the runtime approach, performance is usually a non-issue in practice. The numbers below show single-call throughput for the core pipeline stages, measured with `pnpm bench` on an Apple M1 Max (Node 22).
+When styles are computed during React rendering, performance is usually a non-issue in practice. The numbers below show single-call throughput for the core pipeline stages, measured with `pnpm bench` on an Apple M1 Max (Node 22).
 
 | Operation                                                   |              ops/sec | Latency (mean) |
 | ----------------------------------------------------------- | -------------------: | -------------: |
@@ -638,7 +641,7 @@ Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Hi
 
 ### [tasty.style](https://tasty.style) ([source](https://github.com/tenphi/tasty.style))
 
-The official Tasty documentation and landing page — itself built entirely with Tasty. A showcase for zero-runtime styling via `tastyStatic`, SSR with Next.js, and OKHSL color theming with Glaze.
+The official Tasty documentation and landing page — itself built entirely with `tasty()`. A showcase for server-rendered Tasty with Next.js and OKHSL color theming with Glaze.
 
 ### [Cube Cloud](https://cube.dev/)
 
@@ -656,7 +659,7 @@ Open-source React UI kit built on Tasty + React Aria. 100+ production components
 
 Start from the docs hub if you want the shortest path to the right guide for your role or styling approach.
 
-- **[Docs Hub](docs/README.md)** — audience-based navigation across onboarding, design-system authoring, runtime, zero-runtime, runtime SSR integration, debugging, and internals
+- **[Docs Hub](docs/README.md)** — audience-based navigation across onboarding, design-system authoring, client and server rendering, build-time extraction, debugging, and internals
 
 ### Start here
 
@@ -683,7 +686,7 @@ Start from the docs hub if you want the shortest path to the right guide for you
 
 ### Rendering modes
 
-- **[Zero Runtime (tastyStatic)](docs/tasty-static.md)** — Build-time static styling: Babel plugin setup, Next.js integration, and static style patterns
+- **[Build-Time Extraction (`tastyStatic`)](docs/tasty-static.md)** — Babel plugin setup, Next.js integration, and static style patterns
 - **[Server-Side Rendering](docs/ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks: streaming support, cache hydration, and troubleshooting
 
 ### Internals

@@ -407,7 +407,7 @@ On the client, CSS is injected synchronously into the DOM (idempotent via the in
 
 All style functions below are plain functions (not React hooks) and can be used in any environment: client components, SSR with a `ServerStyleCollector`, and React Server Components. They retain their `use` prefix for backward compatibility, but do not use any React hooks internally.
 
-In server-only contexts (Next.js RSC without `'use client'`, Astro without `client:*` directives, SSG), components that use only Tasty style functions produce zero client JavaScript. Tasty never forces the `'use client'` boundary — that decision belongs to your component when it needs React interactivity (state, effects, event handlers).
+In server-only contexts, components that use only Tasty style functions ship no Tasty styling runtime. Astro without `client:*` directives produces no client JavaScript; server-only Next.js RSC follows the same Tasty architecture, while final output depends on the application deployment. Tasty never forces the `'use client'` boundary — that decision belongs to your component when it needs React interactivity (state, effects, event handlers).
 
 ### useStyles
 
@@ -676,6 +676,6 @@ See the [Functions section of the DSL reference](dsl.md#functions-function) for 
 - **[Methodology](methodology.md)** — Recommended patterns: root + sub-elements, styleProps, tokens, wrapping
 - **[Configuration](configuration.md)** — Tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
-- **[Zero Runtime (tastyStatic)](tasty-static.md)** — Build-time static styling with Babel plugin
+- **[Build-Time Extraction (`tastyStatic`)](tasty-static.md)** — Static styling with the Babel plugin
 - **[Server-Side Rendering](ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks
 - **[Debug Utilities](debug.md)** — Inspect injected CSS, cache state, and active styles at runtime

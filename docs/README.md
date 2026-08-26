@@ -16,13 +16,14 @@ Use this hub to move from the core idea to a working component, then into design
 
 - **Application developer using an existing design system**: [Getting Started](getting-started.md), then [React API](react-api.md).
 - **Design-system author**: [Methodology](methodology.md), [Building a Design System](design-system.md), [Configuration](configuration.md), and [Adoption Guide](adoption.md).
-- **Platform or tooling engineer**: [Configuration](configuration.md), [Zero Runtime (tastyStatic)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
+- **Platform or tooling engineer**: [Configuration](configuration.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
 
 ## By Styling Approach
 
 - **React components**: [React API](react-api.md)
-- **Zero-runtime / build-time extraction**: [Zero Runtime (tastyStatic)](tasty-static.md)
-- **Runtime `tasty()` with server collection and hydration**: [Server-Side Rendering](ssr.md)
+- **Zero-client-runtime React with `tasty()`**: [Server-Side Rendering](ssr.md), especially the static Astro integration
+- **Build-time extraction with `tastyStatic()`**: [Build-Time Extraction](tasty-static.md)
+- **Hydrated `tasty()` with server collection**: [Server-Side Rendering](ssr.md)
 - **Upgrading from v2**: [Migration Guide (v2 → v3)](migration-v3.md)
 
 ## By Task

@@ -200,19 +200,19 @@ export default [tasty.configs.strict];
 
 ## Choosing a rendering mode
 
-`tasty()` is the default for all React apps. All `tasty()` components and style functions are hook-free and work as React Server Components without `'use client'`. In server-only contexts, they produce zero client JavaScript with the full feature set.
+`tasty()` is the default for all React apps. All `tasty()` components and style functions are hook-free and work as React Server Components without `'use client'`. Zero-runtime delivery is not tied to one API: both server-only `tasty()` and build-time `tastyStatic()` can ship no Tasty styling runtime to the browser.
 
-| Approach                      | Entry point                                 | Best for                                                                                 | Trade-off                                                                            |
-| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Runtime (default)**         | `tasty()` from `@tenphi/tasty`              | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set (styleProps, sub-elements, variants); CSS computed during rendering |
-| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*`                   | Apps with client-side hydration (Next.js client components, Astro islands)               | Adds CSS batching, deduplication, FOUC prevention, and client cache hydration        |
-| **Zero-runtime**              | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or build-time extraction without React                              | Requires Babel plugin; no `styleProps` or runtime-only APIs                          |
+| Approach                  | Authoring API                               | CSS is generated                    | Tasty runtime in the browser | Best for                                                         |
+| ------------------------- | ------------------------------------------- | ----------------------------------- | ---------------------------- | ---------------------------------------------------------------- |
+| **Server-only React**     | `tasty()`; optional `@tenphi/tasty/ssr/*`   | During server or static rendering   | None                         | Astro without islands, server-only RSC, SSG                      |
+| **Hydrated React**        | `tasty()` plus `@tenphi/tasty/ssr/*`        | During SSR, then on demand in React | Only in hydrated components  | Interactive React apps, Next.js client components, Astro islands |
+| **Build-time extraction** | `tastyStatic()` from `@tenphi/tasty/static` | During the build                    | None in file mode            | Non-React frameworks or extraction before rendering              |
 
 Both `tasty()` and `tastyStatic()` share the same DSL, tokens, units, and state mappings.
 
-- **Runtime** is the default and requires no extra setup beyond `@tenphi/tasty`. In server-only contexts (Next.js RSC, Astro without `client:*` directives, SSG), `tasty()` produces static HTML + CSS with zero client JavaScript — the same end result as `tastyStatic()` but with the full feature set. For example, `tasty()` + `tastyIntegration()` in Astro without islands gives you the complete API with zero JS shipped.
-- **SSR integration** is only needed when your app also has client-side rendering. Add `@tenphi/tasty/ssr/next`, `@tenphi/tasty/ssr/astro`, or the core SSR API to get CSS deduplication and cache hydration. See [Server-Side Rendering](ssr.md).
-- **Zero-runtime** requires the Babel plugin and additional peer dependencies. Use it when you need build-time extraction without a React runtime. See [Zero Runtime (tastyStatic)](tasty-static.md).
+- **Server-only `tasty()`** keeps the full feature set (`styleProps`, sub-elements, variants) while generating CSS during server rendering. `tasty()` plus `tastyIntegration({ islands: false })` in Astro is the verified concrete setup and ships no client JavaScript. The same server-only architecture applies to Next.js RSC; verify the generated output for your deployment.
+- **Hydrated `tasty()`** uses the SSR integrations to batch and deduplicate server CSS, prevent FOUC, and hydrate the client cache. The browser styling pipeline is available only where React components hydrate. See [Server-Side Rendering](ssr.md).
+- **Build-time extraction** uses the Babel plugin and additional peer dependencies. Choose `tastyStatic()` when CSS must be generated before rendering or when the consumer is not React. File mode ships no styling runtime; inject mode intentionally includes a tiny CSS injector. See [Build-Time Extraction (`tastyStatic`)](tasty-static.md).
 
 ---
 
@@ -235,4 +235,4 @@ Both `tasty()` and `tastyStatic()` share the same DSL, tokens, units, and state 
 
 - Styles are missing on first render: make sure the file that calls `configure()` is imported before any `tasty()` component renders.
 - Token or unit values are not what you expect: check your `configure({ tokens, units })` setup, then inspect the generated CSS variables with [Debug Utilities](debug.md).
-- You need build-time extraction or server-rendered CSS delivery: use [Zero Runtime (tastyStatic)](tasty-static.md) for extraction, or add [Server-Side Rendering](ssr.md) on top of runtime `tasty()` when your framework renders on the server.
+- You need zero-runtime delivery: use server-only [`tasty()` with server rendering](ssr.md) to keep the full React API, or use [`tastyStatic()` build-time extraction](tasty-static.md) when styles must be compiled before rendering.

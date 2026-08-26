@@ -2,9 +2,9 @@
 
 This is the language behind Tasty’s predictable state resolution. Every property can use a state map; later branches declare higher priority, and Tasty compiles them so only one generated selector can match.
 
-The same value syntax, state maps, tokens, units, extension semantics, and special declarations apply to runtime `tasty()` and build-time `tastyStatic()`.
+The same value syntax, state maps, tokens, units, extension semantics, and special declarations apply to React `tasty()`—whether rendered on the client or server—and build-time `tastyStatic()`.
 
-For the runtime React API (`tasty()`, hooks, component props), see [React API](react-api.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
+For the React API (`tasty()`, style functions, component props), see [React API](react-api.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
 
 ---
 
@@ -1018,4 +1018,4 @@ For a complete reference of all enhanced style properties — syntax, values, mo
 - **[Methodology](methodology.md)** — Recommended patterns: root + sub-elements, styleProps, tokens, wrapping
 - **[Configuration](configuration.md)** — Tokens, recipes, custom units, style handlers, TypeScript extensions
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
-- **[Zero Runtime (tastyStatic)](tasty-static.md)** — Build-time static styling with Babel plugin
+- **[Build-Time Extraction (`tastyStatic`)](tasty-static.md)** — Static styling with the Babel plugin

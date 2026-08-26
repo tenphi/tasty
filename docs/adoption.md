@@ -252,7 +252,7 @@ const Card = tasty({
 
 ### Phase 7 -- Expand to full DS coverage
 
-Migrate the remaining components, add the [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) to enforce style conventions at lint time, and consider [zero-runtime mode](tasty-static.md) for static or performance-critical pages.
+Migrate the remaining components, add the [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) to enforce style conventions at lint time, and choose between [server-only `tasty()`](ssr.md) and [`tastyStatic()` build-time extraction](tasty-static.md) when a page should ship no Tasty styling runtime.
 
 ---
 
@@ -295,7 +295,7 @@ const LoadingButton = tasty(Button, {
 </Space>
 ```
 
-**Components are server components by default.** All `tasty()` components and style functions are hook-free, so they work as React Server Components without `'use client'`. In server-only contexts (Next.js RSC, Astro without `client:*` directives), they produce zero client JavaScript. Product engineers only add `'use client'` when their component needs actual React interactivity (state, effects, event handlers), never because of styling.
+**Components are server components by default.** All `tasty()` components and style functions are hook-free, so they work as React Server Components without `'use client'`. In server-only contexts they ship no Tasty styling runtime. Astro without `client:*` directives ships no client JavaScript; server-only Next.js RSC follows the same Tasty architecture, while final output depends on the application deployment. Product engineers only add `'use client'` when their component needs actual React interactivity (state, effects, event handlers), never because of styling.
 
 **No cascade/specificity concerns.** Tasty's mutually exclusive selectors mean extending a component cannot accidentally break another. Import order, class name collisions, and specificity arithmetic are non-issues.
 
@@ -320,4 +320,4 @@ const LoadingButton = tasty(Button, {
 - [Configuration](configuration.md) -- tokens, recipes, custom units, style handlers, and TypeScript extensions
 - [Style Properties](styles.md) -- complete reference for all enhanced style properties
 - [Comparison](comparison.md) -- positioning and trade-offs vs. other styling systems
-- [Zero Runtime (tastyStatic)](tasty-static.md) -- build-time static styling with Babel plugin
+- [Build-Time Extraction (`tastyStatic`)](tasty-static.md) -- static styling with the Babel plugin

@@ -5,8 +5,8 @@
 <h1 align="center">Tasty</h1>
 
 <p align="center">
-  <strong>Deterministic styling for stateful component systems.</strong><br>
-  A design-system styling engine that compiles component states into mutually exclusive selectors, so complex components stay predictable as they evolve.
+  <strong>CSS-in-JS for React design systems.</strong><br>
+  Build components whose styles don’t fight.
 </p>
 
 <p align="center">
@@ -17,30 +17,43 @@
 
 ---
 
-Tasty is a styling engine for design systems that generates deterministic CSS for stateful components.
+Describe hover, disabled, variants, themes, and responsive behavior as state maps. Tasty makes one branch win by design—without specificity fights or source-order surprises.
 
-It compiles state maps into **mutually exclusive selectors**, so for a given property and component state, one branch wins by construction instead of competing through cascade and specificity.
+```tsx
+import { tasty } from '@tenphi/tasty';
 
-That is the core guarantee: component styling resolves from declared state logic, not from source-order accidents or specificity fights.
+const Button = tasty({
+  as: 'button',
+  styles: {
+    fill: {
+      '': '#primary',
+      ':hover': '#primary-hover',
+      ':active': '#primary-pressed',
+      '[disabled]': '#surface',
+    },
+  },
+});
+```
 
-The practical payoff shows up later: adding states, variants, and overrides stays inside the state map instead of reopening selector logic by hand.
+Later branches have higher priority. If this button is both hovered and disabled, `[disabled]` wins and the hover rule is excluded. Tasty compiles that decision into mutually exclusive selectors, so the result does not depend on CSS source order.
 
-Tasty fits best when you are building a design system or component library with intersecting states, variants, tokens, sub-elements, responsive rules, and extension semantics that need to stay predictable over time.
+That is the core promise: add states, variants, themes, and overrides without reopening selector logic by hand.
 
-On top of that foundation, Tasty gives teams a governed styling model: a CSS-like DSL, tokens, recipes, typed style props, sub-elements, and multiple rendering modes.
+Tasty fits best when you are building a design system or component library whose components need to stay predictable as their state logic grows. Alongside state maps, it provides a CSS-like DSL, typed style props, tokens, recipes, sub-elements, and runtime or build-time rendering.
 
-- **New here?** Start with [Comparison](docs/comparison.md) if you are evaluating fit.
-- **Adopting Tasty?** Read the [Adoption Guide](docs/adoption.md).
-- **Want the mechanism first?** Jump to [How It Actually Works](#how-it-actually-works).
-- **Ready to build?** Go to [Getting Started](docs/getting-started.md).
+- **Ready to try it?** Follow [Getting Started](docs/getting-started.md).
+- **Evaluating fit?** Read [Comparison](docs/comparison.md) and the [Adoption Guide](docs/adoption.md).
+- **Want the compiler model?** Jump to [How It Actually Works](#how-it-actually-works).
+- **Building a component library?** See [Methodology](docs/methodology.md) and [Building a Design System](docs/design-system.md).
 
 ## Why Tasty
 
-- **Deterministic composition, not cascade fights** — Stateful styles resolve from the state map you declared, not from selector competition. See [How It Actually Works](#how-it-actually-works).
-- **Easier to extend over time** — When components gain new states, variants, or overrides, you update declared branches instead of re-deriving selector interactions by hand.
-- **Built for design-system teams** — Best fit for reusable component systems with complex state interactions.
-- **A governed styling model, not just syntax sugar** — Design-system authors define the styling language product teams consume.
-- **DSL that still feels like CSS** — Familiar property names, less selector boilerplate. Start with the [Style DSL](docs/dsl.md), then use [Style Properties](docs/styles.md) as the handler reference.
+- **States that don’t fight** — Each property’s state map compiles into mutually exclusive selectors, so one branch wins by construction.
+- **Safe to extend** — Add variants, overrides, and new states without re-deriving selector interactions.
+- **Built for component systems** — Model roots and sub-elements together and expose governed, typed component APIs.
+- **Your design system’s language** — Define tokens, units, aliases, recipes, style props, and parser rules for your system.
+- **One model for every state** — Pseudo-classes, modifiers, root and parent states, media and container queries, `:has()`, and `@supports` all use state maps.
+- **Runtime, server, or build time** — Keep the same styling model in client React, React Server Components and SSR, or zero-runtime extraction.
 
 ### Supporting capabilities
 
@@ -50,11 +63,11 @@ On top of that foundation, Tasty gives teams a governed styling model: a CSS-lik
 - **Performance and caching** — Runtime mode injects CSS on demand, reuses chunks aggressively, and relies on multi-level caching so large component systems stay practical.
 - **TypeScript-first and AI-friendly** — Style definitions are declarative, structurally consistent, and fully typed, which helps both humans and tooling understand advanced stateful styles without hidden cascade logic.
 
-## Why It Exists
+## Why State Maps Matter
 
-Modern component styling becomes fragile when multiple selectors can still win for the same property. Hover, disabled, theme, breakpoint, parent state, and root state rules start competing through specificity and source order.
+Component styling becomes fragile when multiple selectors can win for the same property. Hover, disabled, theme, breakpoint, parent state, and root state rules start competing through specificity and source order.
 
-Tasty replaces that competition with explicit state-map resolution. Each property compiles into mutually exclusive branches, so component styling stays deterministic as systems grow. For the full mechanism, jump to [How It Actually Works](#how-it-actually-works).
+Tasty replaces that competition with explicit priority in the state map. Each property compiles into mutually exclusive branches, so only one generated selector can match. For the full mechanism, jump to [How It Actually Works](#how-it-actually-works).
 
 ## Installation
 
@@ -108,7 +121,7 @@ const Card = tasty({
 });
 
 // Just a React component
-<Card>Hello World</Card>
+<Card>Hello World</Card>;
 ```
 
 Every value maps to CSS you'd recognize. This example is intentionally a simple first contact, not a tour of the whole DSL.
@@ -171,7 +184,8 @@ configure({
   states: {
     '@mobile': '@media(w < 768px)',
     '@tablet': '@media(w < 1024px)',
-    '@dark': '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
+    '@dark':
+      '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
   },
   recipes: {
     card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
@@ -187,7 +201,9 @@ Use `configure()` once when your app or design system needs shared aliases, toke
 
 ```tsx
 <Space flow="row" gap="2x" placeItems="center">
-  <Button isLoading size="large" placeSelf="end">Submit</Button>
+  <Button isLoading size="large" placeSelf="end">
+    Submit
+  </Button>
 </Space>
 ```
 
@@ -197,11 +213,11 @@ See [Style Props](#style-props) and [Mod Props](#mod-props) below, or the full r
 
 Once you understand the component model, pick the rendering mode that matches your app.
 
-| Approach | Entry point | Best for | Trade-off |
-|----------|-------------|----------|-----------|
-| **Runtime (default)** | `tasty()` from `@tenphi/tasty` | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set; CSS computed during React rendering (server or client) |
-| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*` | Apps with client-side hydration (Next.js client components, Astro islands) | Adds CSS deduplication, FOUC prevention, and client cache hydration |
-| **Zero-runtime** | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or when you need build-time extraction without React | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
+| Approach                      | Entry point                                 | Best for                                                                                 | Trade-off                                                                       |
+| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Runtime (default)**         | `tasty()` from `@tenphi/tasty`              | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set; CSS computed during React rendering (server or client)        |
+| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*`                   | Apps with client-side hydration (Next.js client components, Astro islands)               | Adds CSS deduplication, FOUC prevention, and client cache hydration             |
+| **Zero-runtime**              | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or when you need build-time extraction without React                | Requires the Babel plugin; no component-level `styleProps` or runtime-only APIs |
 
 All `tasty()` components are hook-free and work as React Server Components. In server-only contexts — Next.js RSC without `'use client'`, Astro without `client:*` directives, and other SSG setups — they produce the same end result as `tastyStatic()` (static HTML + CSS, zero client JavaScript) but with the full feature set including `styleProps`, sub-elements, and variants. SSR integration is only needed when your app also has client-side rendering. See [Getting Started](docs/getting-started.md#choosing-a-rendering-mode), [Zero Runtime](docs/tasty-static.md), and [Server-Side Rendering](docs/ssr.md).
 
@@ -218,15 +234,19 @@ First, the **cascade** resolves conflicts by specificity and source order: when 
 A small example makes this tangible. Two rules for a button's background:
 
 ```css
-.btn:hover     { background: dodgerblue; }
-.btn[disabled] { background: gray; }
+.btn:hover {
+  background: dodgerblue;
+}
+.btn[disabled] {
+  background: gray;
+}
 ```
 
-Both selectors have specificity `(0, 1, 1)`. When the button is hovered **and** disabled, both match — and the last rule in source order wins. Swap the two lines and a hovered disabled button silently turns blue instead of gray. This class of bug is invisible in code review because the logic is correct; only the ordering is wrong.
+Both selectors have specificity `(0, 2, 0)`. When the button is hovered **and** disabled, both match — and the last rule in source order wins. Swap the two lines and a hovered disabled button silently turns blue instead of gray. This class of bug is invisible in code review because the logic is correct; only the ordering is wrong.
 
 ### Why real state logic is hard to author by hand
 
-Authoring selectors that capture real-world state logic is fundamentally hard. A single state like "dark mode" may depend on a root attribute, an OS preference, or both — each branch needing its own selector, proper negation of competing branches, and correct `@media` nesting. The example below shows the CSS you'd write by hand for just *one* property with *one* state. Scale that across dozens of properties, then add breakpoints and container queries, and the selector logic quickly becomes unmanageable.
+Authoring selectors that capture real-world state logic is fundamentally hard. A single state like "dark mode" may depend on a root attribute, an OS preference, or both — each branch needing its own selector, proper negation of competing branches, and correct `@media` nesting. The example below shows the CSS you'd write by hand for just _one_ property with _one_ state. Scale that across dozens of properties, then add breakpoints and container queries, and the selector logic quickly becomes unmanageable.
 
 ### What Tasty generates instead
 
@@ -251,10 +271,16 @@ If `@dark` expands to `@root(schema=dark) | (!@root(schema) & @media(prefers-col
 
 ```css
 /* First attempt — the @media branch is too broad */
-.t0 { color: var(--text-color); }
-:root[data-schema="dark"] .t0 { color: var(--text-on-dark-color); }
+.t0 {
+  color: var(--text-color);
+}
+:root[data-schema='dark'] .t0 {
+  color: var(--text-on-dark-color);
+}
 @media (prefers-color-scheme: dark) {
-  .t0 { color: var(--text-on-dark-color); }
+  .t0 {
+    color: var(--text-on-dark-color);
+  }
 }
 ```
 
@@ -262,20 +288,26 @@ The `@media` branch fires even when `data-schema="light"` is explicitly set. Fix
 
 ```css
 /* Second attempt — @media is scoped, but the default is still too broad */
-.t0 { color: var(--text-color); }
-:root[data-schema="dark"] .t0 { color: var(--text-on-dark-color); }
+.t0 {
+  color: var(--text-color);
+}
+:root[data-schema='dark'] .t0 {
+  color: var(--text-on-dark-color);
+}
 @media (prefers-color-scheme: dark) {
-  :root:not([data-schema]) .t0 { color: var(--text-on-dark-color); }
+  :root:not([data-schema]) .t0 {
+    color: var(--text-on-dark-color);
+  }
 }
 ```
 
 Better — but the bare `.t0` default still matches unconditionally. It matches in dark mode, it matches when `data-schema="dark"` is set, and it can beat the attribute selector by source order if another rule re-declares it later. There is no selector that says "apply this default only when none of the dark branches win."
 
-This is just *one* property with *one* state, and getting it right already takes multiple iterations. The correct selectors require negating every other branch — which is exactly what Tasty generates automatically:
+This is just _one_ property with _one_ state, and getting it right already takes multiple iterations. The correct selectors require negating every other branch — which is exactly what Tasty generates automatically:
 
 ```css
 /* Branch 1: Explicit dark schema */
-:root[data-schema="dark"] .t0.t0 {
+:root[data-schema='dark'] .t0.t0 {
   color: var(--text-on-dark-color);
 }
 
@@ -288,13 +320,13 @@ This is just *one* property with *one* state, and getting it right already takes
 
 /* Default: no schema + OS does not prefer dark */
 @media (not (prefers-color-scheme: dark)) {
-  :root:not([data-schema="dark"]) .t0.t0 {
+  :root:not([data-schema='dark']) .t0.t0 {
     color: var(--text-color);
   }
 }
 
 /* Default: schema is set but not dark (any OS preference) */
-:root:not([data-schema="dark"])[data-schema] .t0.t0 {
+:root:not([data-schema='dark'])[data-schema] .t0.t0 {
   color: var(--text-color);
 }
 ```
@@ -323,13 +355,13 @@ radius: '1r',             // → var(--radius)
 border: '1bw solid #border',
 ```
 
-| Unit | Maps to | Example |
-|------|---------|---------|
-| `x` | `--gap` multiplier | `2x` → `calc(var(--gap) * 2)` |
-| `r` | `--radius` multiplier | `1r` → `var(--radius)` |
-| `bw` | `--border-width` multiplier | `1bw` → `var(--border-width)` |
+| Unit | Maps to                      | Example                        |
+| ---- | ---------------------------- | ------------------------------ |
+| `x`  | `--gap` multiplier           | `2x` → `calc(var(--gap) * 2)`  |
+| `r`  | `--radius` multiplier        | `1r` → `var(--radius)`         |
+| `bw` | `--border-width` multiplier  | `1bw` → `var(--border-width)`  |
 | `ow` | `--outline-width` multiplier | `1ow` → `var(--outline-width)` |
-| `cr` | `--card-radius` multiplier | `1cr` → `var(--card-radius)` |
+| `cr` | `--card-radius` multiplier   | `1cr` → `var(--card-radius)`   |
 
 Define your own units via `configure({ units: { ... } })`.
 
@@ -337,19 +369,19 @@ Define your own units via `configure({ units: { ... } })`.
 
 Every style property accepts a state mapping object. Keys can be combined with boolean logic:
 
-| State type | Syntax | CSS output |
-|------------|--------|------------|
-| Data attribute (boolean modifier) | `disabled` | `[data-disabled]` |
-| Data attribute (value modifier) | `theme=danger` | `[data-theme="danger"]` |
-| Pseudo-class | `:hover` | `:hover` |
-| Attribute selector | `[role="tab"]` | `[role="tab"]` |
-| Class selector (supported) | `.is-active` | `.is-active` |
-| Media query | `@media(w < 768px)` | `@media (width < 768px)` |
-| Container query | `@(panel, w >= 300px)` | `@container panel (width >= 300px)` |
-| Root state | `@root(schema=dark)` | `:root[data-schema="dark"]` |
-| Parent state | `@parent(theme=danger)` | `:is([data-theme="danger"] *)` |
-| Feature query | `@supports(display: grid)` | `@supports (display: grid)` |
-| Entry animation | `@starting` | `@starting-style` |
+| State type                        | Syntax                     | CSS output                          |
+| --------------------------------- | -------------------------- | ----------------------------------- |
+| Data attribute (boolean modifier) | `disabled`                 | `[data-disabled]`                   |
+| Data attribute (value modifier)   | `theme=danger`             | `[data-theme="danger"]`             |
+| Pseudo-class                      | `:hover`                   | `:hover`                            |
+| Attribute selector                | `[role="tab"]`             | `[role="tab"]`                      |
+| Class selector (supported)        | `.is-active`               | `.is-active`                        |
+| Media query                       | `@media(w < 768px)`        | `@media (width < 768px)`            |
+| Container query                   | `@(panel, w >= 300px)`     | `@container panel (width >= 300px)` |
+| Root state                        | `@root(schema=dark)`       | `:root[data-schema="dark"]`         |
+| Parent state                      | `@parent(theme=danger)`    | `:is([data-theme="danger"] *)`      |
+| Feature query                     | `@supports(display: grid)` | `@supports (display: grid)`         |
+| Entry animation                   | `@starting`                | `@starting-style`                   |
 
 Combine with `&` (AND), `|` (OR), `!` (NOT), `^` (XOR):
 
@@ -398,7 +430,9 @@ const Button = tasty({
   },
 });
 
-<Button isLoading size="lg">Submit</Button>
+<Button isLoading size="lg">
+  Submit
+</Button>;
 ```
 
 See [React API - Mod Props](docs/react-api.md#mod-props) and [Methodology - modProps](docs/methodology.md#modprops-and-mods).
@@ -482,19 +516,19 @@ See the [full SSR guide](docs/ssr.md).
 
 ## Entry Points
 
-| Import | Description | Platform |
-|--------|-------------|----------|
-| `@tenphi/tasty` | Runtime style engine (`tasty`, style functions, `configure`) | Browser |
-| `@tenphi/tasty/static` | Zero-runtime static styles (`tastyStatic`) | Browser |
-| `@tenphi/tasty/static/inject` | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode | Browser |
-| `@tenphi/tasty/core` | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
-| `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
-| `@tenphi/tasty/zero` | Programmatic extraction API | Node |
-| `@tenphi/tasty/zero/next` | Next.js integration wrapper | Node |
-| `@tenphi/tasty/ssr` | Core SSR API (collector, context, hydration) | Node |
-| `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
-| `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
-| `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
+| Import                           | Description                                                                                             | Platform       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
+| `@tenphi/tasty`                  | Runtime style engine (`tasty`, style functions, `configure`)                                            | Browser        |
+| `@tenphi/tasty/static`           | Zero-runtime static styles (`tastyStatic`)                                                              | Browser        |
+| `@tenphi/tasty/static/inject`    | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode                        | Browser        |
+| `@tenphi/tasty/core`             | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
+| `@tenphi/tasty/babel-plugin`     | Babel plugin for zero-runtime CSS extraction                                                            | Node           |
+| `@tenphi/tasty/zero`             | Programmatic extraction API                                                                             | Node           |
+| `@tenphi/tasty/zero/next`        | Next.js integration wrapper                                                                             | Node           |
+| `@tenphi/tasty/ssr`              | Core SSR API (collector, context, hydration)                                                            | Node           |
+| `@tenphi/tasty/ssr/next`         | Next.js App Router SSR integration                                                                      | Node           |
+| `@tenphi/tasty/ssr/astro`        | Astro integration + middleware                                                                          | Node           |
+| `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration                                                                       | Browser        |
 
 ## Browser Requirements
 
@@ -510,13 +544,13 @@ Tasty's exclusive selector system relies on modern CSS pseudo-class syntax:
 
 All sizes measured with [size-limit](https://github.com/ai/size-limit) — minified and brotli-compressed, including all dependencies.
 
-| Entry point | Size |
-|-------------|------|
-| `@tenphi/tasty` (runtime + SSR) | 50.19 kB |
-| `@tenphi/tasty/core` (runtime, no SSR) | 47.76 kB |
-| `@tenphi/tasty/static` (zero-runtime) | 16.43 kB |
-| `@tenphi/tasty/zero` (programmatic extraction) | 29.6 kB |
-| `@tenphi/tasty/babel-plugin` (Babel plugin entry) | 43.7 kB |
+| Entry point                                       | Size     |
+| ------------------------------------------------- | -------- |
+| `@tenphi/tasty` (runtime + SSR)                   | 50.19 kB |
+| `@tenphi/tasty/core` (runtime, no SSR)            | 47.76 kB |
+| `@tenphi/tasty/static` (zero-runtime)             | 16.43 kB |
+| `@tenphi/tasty/zero` (programmatic extraction)    | 29.6 kB  |
+| `@tenphi/tasty/babel-plugin` (Babel plugin entry) | 43.7 kB  |
 
 Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 
@@ -524,17 +558,17 @@ Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 
 If you choose the runtime approach, performance is usually a non-issue in practice. The numbers below show single-call throughput for the core pipeline stages, measured with `pnpm bench` on an Apple M1 Max (Node 22).
 
-| Operation | ops/sec | Latency (mean) |
-|-----------|--------:|---------------:|
-| `renderStyles` — 5 flat properties (cold) | ~60,000 | ~17 us |
-| `renderStyles` — state map with media/hover/modifier (cold) | ~18,500 | ~54 us |
-| `renderStyles` — same styles (cached) | ~5,800,000 | ~0.17 us |
-| `parseStateKey` — simple key like `:hover` (cold) | ~790,000 | ~1.3 us |
-| `parseStateKey` — complex OR/AND/NOT key (cold) | ~140,000 | ~7 us |
-| `parseStateKey` — any key (cached) | ~3,400,000–8,300,000 | ~0.1–0.3 us |
-| `parseStyle` — value tokens like `2x 4x` (cold) | ~344,000 | ~2.9 us |
-| `parseStyle` — color tokens (cold) | ~567,000 | ~1.8 us |
-| `parseStyle` — any value (cached) | ~15,250,000 | ~0.07 us |
+| Operation                                                   |              ops/sec | Latency (mean) |
+| ----------------------------------------------------------- | -------------------: | -------------: |
+| `renderStyles` — 5 flat properties (cold)                   |              ~60,000 |         ~17 us |
+| `renderStyles` — state map with media/hover/modifier (cold) |              ~18,500 |         ~54 us |
+| `renderStyles` — same styles (cached)                       |           ~5,800,000 |       ~0.17 us |
+| `parseStateKey` — simple key like `:hover` (cold)           |             ~790,000 |        ~1.3 us |
+| `parseStateKey` — complex OR/AND/NOT key (cold)             |             ~140,000 |          ~7 us |
+| `parseStateKey` — any key (cached)                          | ~3,400,000–8,300,000 |    ~0.1–0.3 us |
+| `parseStyle` — value tokens like `2x 4x` (cold)             |             ~344,000 |        ~2.9 us |
+| `parseStyle` — color tokens (cold)                          |             ~567,000 |        ~1.8 us |
+| `parseStyle` — any value (cached)                           |          ~15,250,000 |       ~0.07 us |
 
 "Cold" benchmarks use unique inputs to bypass all caches. Cached benchmarks reuse a single input and measure the LRU hot path. Expect roughly ±10% between runs on an otherwise idle machine.
 

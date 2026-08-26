@@ -1,8 +1,10 @@
 # Adoption Guide
 
-Tasty is not a drop-in replacement for another styling library. It is a **substrate for building a design-system-defined styling language**: what the comparison guide calls a house styling language. That means adoption usually starts where styling for reusable, stateful components has already become a composition problem, not with an all-at-once rewrite.
+Tasty is most useful where reusable component styling has become a state-resolution problem: hover intersects with disabled, variants intersect with themes, and every extension makes selector behavior harder to predict.
 
-This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase. Use this document for rollout strategy and adoption sequencing; use the [Comparison guide](comparison.md) when the open question is whether Tasty is the right tool in the first place.
+It normally sits underneath a design system’s existing components. You can preserve their public React APIs while moving their style logic into state maps that produce one declared winner. Adoption should start with a small, state-heavy component—not an all-at-once rewrite.
+
+This guide is for design-system maintainers and platform engineers evaluating Tasty or introducing it into an existing codebase. Use it for rollout strategy and adoption sequencing; use the [Comparison guide](comparison.md) when the open question is whether Tasty is the right tool.
 
 ---
 
@@ -18,12 +20,14 @@ Product code
 ```
 
 **What Tasty owns:**
+
 - The DSL and value parser (tokens, custom units, auto-calc, color opacity)
 - State compilation (mutually exclusive selectors from state maps)
 - Style injection and deduplication (runtime or build-time)
 - The `tasty()` component factory and hooks API
 
 **What the DS team owns:**
+
 - Token names and values (colors, spacing, typography)
 - Custom units and their semantics
 - State aliases (`@mobile`, `@dark`, `@compact`)
@@ -39,12 +43,14 @@ Two teams using Tasty can end up with very different authoring models. That is b
 ## Who should adopt Tasty
 
 **Strong fit:**
-- A design-system or platform team that wants to define a governed styling language
+
+- A design-system or platform team that owns shared component APIs
 - Components with complex, intersecting states (hover + disabled + theme + breakpoint)
 - Teams that need deterministic style resolution without cascade/specificity bugs
-- Organizations where styling decisions should be centralized, not distributed
+- Organizations that want tokens, states, and extension rules to stay consistent across products
 
 **Not the right fit:**
+
 - Solo developers building a one-off app with minimal UI structure
 - Teams that want a shared utility vocabulary and direct markup authoring (Tailwind is better here)
 - Projects where low ceremony matters more than central governance
@@ -58,16 +64,16 @@ For a detailed comparison with Tailwind, Panda CSS, vanilla-extract, StyleX, Sti
 
 Tasty provides the engine. The DS team defines the language that runs on it. Here is what that typically involves:
 
-| Layer | What you define | Where |
-|-------|----------------|-------|
-| **Tokens** | Color names, spacing scale, border widths, radii | `configure({ tokens })` |
-| **Units** | Custom multiplier units (`x`, `r`, `bw`, or your own) | `configure({ units })` |
-| **State aliases** | Responsive breakpoints, theme modes, feature flags | `configure({ states })` |
-| **Recipes** | Reusable style bundles (card, elevated, input-reset) | `configure({ recipes })` |
-| **Typography** | Preset definitions (h1-h6, t1-t4, etc.) | `configure({ presets: { ... } })` |
-| **Style props** | Which CSS properties each component exposes as React props | `styleProps` in each component |
-| **Sub-elements** | Inner parts of compound components (Title, Icon, Content) | `elements` + capitalized keys in `styles` |
-| **Override rules** | How product engineers extend or constrain components | Styled wrappers via `tasty(Base, { ... })` |
+| Layer              | What you define                                            | Where                                      |
+| ------------------ | ---------------------------------------------------------- | ------------------------------------------ |
+| **Tokens**         | Color names, spacing scale, border widths, radii           | `configure({ tokens })`                    |
+| **Units**          | Custom multiplier units (`x`, `r`, `bw`, or your own)      | `configure({ units })`                     |
+| **State aliases**  | Responsive breakpoints, theme modes, feature flags         | `configure({ states })`                    |
+| **Recipes**        | Reusable style bundles (card, elevated, input-reset)       | `configure({ recipes })`                   |
+| **Typography**     | Preset definitions (h1-h6, t1-t4, etc.)                    | `configure({ presets: { ... } })`          |
+| **Style props**    | Which CSS properties each component exposes as React props | `styleProps` in each component             |
+| **Sub-elements**   | Inner parts of compound components (Title, Icon, Content)  | `elements` + capitalized keys in `styles`  |
+| **Override rules** | How product engineers extend or constrain components       | Styled wrappers via `tasty(Base, { ... })` |
 
 The same engine can power a minimal design system with a handful of tokens:
 
@@ -85,9 +91,15 @@ Here is how the layers connect end-to-end. The DS team configures the engine, de
 ```tsx
 // ds/config.ts — DS team defines the language
 configure({
-  tokens: { '#primary': 'oklch(55% 0.25 265)', '#surface': '#fff', '#text': '#111' },
+  tokens: {
+    '#primary': 'oklch(55% 0.25 265)',
+    '#surface': '#fff',
+    '#text': '#111',
+  },
   states: { '@mobile': '@media(w < 768px)', '@dark': '@root(schema=dark)' },
-  recipes: { card: { padding: '4x', fill: '#surface', radius: '1r', border: true } },
+  recipes: {
+    card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
+  },
 });
 
 // ds/components/Card.tsx — DS team builds components on top
@@ -105,7 +117,7 @@ const Card = tasty({
 <Card padding={{ '': '4x', '@mobile': '2x' }}>
   <Card.Title>Monthly Revenue</Card.Title>
   <Card.Body>$1.2M — up 12% from last month</Card.Body>
-</Card>
+</Card>;
 ```
 
 See [Configuration](configuration.md) for the full `configure()` API.
@@ -116,9 +128,21 @@ See [Configuration](configuration.md) for the full `configure()` API.
 
 You do not need to adopt everything at once. Tasty is designed to be introduced layer by layer.
 
-A practical way to start is with the components that already suffer from intersecting state and variant logic: buttons, inputs, menus, disclosures, dialogs, list items, interactive cards, and compound components. Those are the places where deterministic resolution pays off fastest.
+A practical first slice is one component that already suffers from intersecting state and variant logic: a button, input, menu item, disclosure, or interactive card. Keep its public API unchanged, move one or two properties into Tasty state maps, and verify that the declared priority matches the behavior your team expects.
 
-### Phase 1 -- Tokens and units
+This proves the differentiator before you invest in a complete token vocabulary or migrate an entire component library.
+
+### Phase 1 -- Pilot one state-heavy component
+
+Choose a component with a known hover/disabled, focus/error, or variant/theme interaction. Preserve its external props and visual behavior. The pilot should answer three questions:
+
+1. Is the state map easier to review than the existing selectors or conditional class logic?
+2. Does extending the component keep the intended state priority?
+3. Can your current tokens and component API move over without product-code churn?
+
+If the answer is yes, establish the shared design-system vocabulary around the successful slice.
+
+### Phase 2 -- Tokens and units
 
 Start by defining your design tokens and custom units. This is the lowest-risk step: it only configures the parser and does not require rewriting any components.
 
@@ -136,14 +160,14 @@ configure({
   // A DS typically redefines them to use CSS custom properties
   // so that the actual scale is controlled via CSS, not JS:
   units: {
-    x: 'var(--gap)',   // 2x → calc(var(--gap) * 2)
+    x: 'var(--gap)', // 2x → calc(var(--gap) * 2)
     r: 'var(--radius)',
     bw: 'var(--border-width)',
   },
 });
 ```
 
-### Phase 2 -- State aliases and recipes
+### Phase 3 -- State aliases and recipes
 
 Define the state vocabulary your components will share. This is where you start encoding your team's conventions.
 
@@ -152,7 +176,8 @@ configure({
   states: {
     '@mobile': '@media(w < 768px)',
     '@tablet': '@media(w < 1024px)',
-    '@dark': '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
+    '@dark':
+      '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
   },
   recipes: {
     card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
@@ -161,7 +186,7 @@ configure({
 });
 ```
 
-### Phase 3 -- Migrate a few primitives
+### Phase 4 -- Migrate a few primitives
 
 Pick 2-3 widely used primitives (Box, Text, Button) and rewrite them with `tasty()`. Keep the public API identical so product code does not need to change.
 
@@ -179,7 +204,7 @@ const Box = tasty({
 
 At this point you can validate the DSL, token workflow, and component authoring experience before expanding the rollout.
 
-### Phase 4 -- Encode complex states
+### Phase 5 -- Expand state resolution
 
 Move the components with the most painful intersecting states (buttons with hover + disabled + theme variants, inputs with focus + error + readonly) to Tasty's state map syntax. This is where mutually exclusive selectors start paying off.
 
@@ -209,7 +234,7 @@ const Button = tasty({
 });
 ```
 
-### Phase 5 -- Standardize style props and sub-elements
+### Phase 6 -- Standardize style props and sub-elements
 
 Define which style props each component category exposes. Layout components get flow/gap/padding. Interactive components get positioning. Compound components declare sub-elements.
 
@@ -225,7 +250,7 @@ const Card = tasty({
 });
 ```
 
-### Phase 6 -- Expand to full DS coverage
+### Phase 7 -- Expand to full DS coverage
 
 Migrate the remaining components, add the [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) to enforce style conventions at lint time, and consider [zero-runtime mode](tasty-static.md) for static or performance-critical pages.
 
@@ -254,8 +279,8 @@ const DangerButton = tasty(Button, {
 const LoadingButton = tasty(Button, {
   styles: {
     fill: {
-      loading: '#yellow',       // new state appended
-      disabled: '#gray.20',     // existing state overridden in place
+      loading: '#yellow', // new state appended
+      disabled: '#gray.20', // existing state overridden in place
     },
   },
 });

@@ -1,6 +1,8 @@
 # Methodology
 
-Tasty has opinions about how components should be structured. The patterns described here are not mandatory — Tasty works without them — but following them gets the most out of the engine: deterministic state resolution, cleaner component APIs, simpler overrides, and fewer surprises as the system grows.
+State maps keep a property’s branches from fighting. This guide applies the same goal to component architecture: keep state ownership explicit, expose intentional public APIs, and make extension predictable as a component system grows.
+
+The patterns are recommended rather than required. Tasty works without them, but they help design-system teams carry its state-resolution guarantees across roots, sub-elements, typed props, tokens, and styled wrappers.
 
 ---
 
@@ -75,7 +77,7 @@ const Nav = tasty({
         '': '#text',
         '@own(:hover)': '#primary',
         '@own(:focus-visible)': '#primary',
-        'selected': '#primary',
+        selected: '#primary',
       },
     },
   },
@@ -117,16 +119,16 @@ Style props accept state maps, so responsive values work through the same API:
 
 Tasty exports predefined style prop lists that group properties by role. Use them instead of hand-picking arrays:
 
-| Preset | Properties | Typical use |
-|--------|-----------|-------------|
-| `FLOW_STYLES` | flow, gap, columnGap, rowGap, align, justify, placeItems, placeContent, alignItems, alignContent, justifyItems, justifyContent, gridColumns, gridRows, gridTemplate, gridAreas | Layout containers (`Space`, `Grid`) |
-| `POSITION_STYLES` | gridArea, gridColumn, gridRow, order, placeSelf, alignSelf, justifySelf, zIndex, margin, inset, position | Positioned elements (`Button`, `Badge`) |
-| `DIMENSION_STYLES` | width, height, flexBasis, flexGrow, flexShrink, flex | Sized elements |
-| `COLOR_STYLES` | color, fill, fade, image | Color-customizable elements |
-| `BLOCK_STYLES` | padding, paddingInline, paddingBlock, overflow, scrollbar, textAlign, border, radius, shadow, outline | Block-level containers |
-| `CONTAINER_STYLES` | All of the above combined (+ BASE_STYLES) | Fully flexible containers |
-| `OUTER_STYLES` | POSITION_STYLES + DIMENSION_STYLES + block outer (border, radius, shadow, outline) | Components whose outer shell is customizable |
-| `INNER_STYLES` | BASE_STYLES + COLOR_STYLES + block inner (padding, overflow, scrollbar) + FLOW_STYLES | Components whose inner layout is customizable |
+| Preset             | Properties                                                                                                                                                                     | Typical use                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `FLOW_STYLES`      | flow, gap, columnGap, rowGap, align, justify, placeItems, placeContent, alignItems, alignContent, justifyItems, justifyContent, gridColumns, gridRows, gridTemplate, gridAreas | Layout containers (`Space`, `Grid`)           |
+| `POSITION_STYLES`  | gridArea, gridColumn, gridRow, order, placeSelf, alignSelf, justifySelf, zIndex, margin, inset, position                                                                       | Positioned elements (`Button`, `Badge`)       |
+| `DIMENSION_STYLES` | width, height, flexBasis, flexGrow, flexShrink, flex                                                                                                                           | Sized elements                                |
+| `COLOR_STYLES`     | color, fill, fade, image                                                                                                                                                       | Color-customizable elements                   |
+| `BLOCK_STYLES`     | padding, paddingInline, paddingBlock, overflow, scrollbar, textAlign, border, radius, shadow, outline                                                                          | Block-level containers                        |
+| `CONTAINER_STYLES` | All of the above combined (+ BASE_STYLES)                                                                                                                                      | Fully flexible containers                     |
+| `OUTER_STYLES`     | POSITION_STYLES + DIMENSION_STYLES + block outer (border, radius, shadow, outline)                                                                                             | Components whose outer shell is customizable  |
+| `INNER_STYLES`     | BASE_STYLES + COLOR_STYLES + block inner (padding, overflow, scrollbar) + FLOW_STYLES                                                                                          | Components whose inner layout is customizable |
 
 ```tsx
 import { tasty, FLOW_STYLES, POSITION_STYLES } from '@tenphi/tasty';
@@ -159,7 +161,7 @@ Match the preset to the component's role:
 
 ### The governance trade-off
 
-Exposing every CSS property as a prop defeats the purpose of a design system. The more props a component exposes, the more ways product engineers can deviate from the intended design. A good rule of thumb: expose props that product engineers *need* to adjust for layout and composition, and keep visual identity (colors, borders, typography) controlled through the component definition, variants, or styled wrappers.
+Exposing every CSS property as a prop defeats the purpose of a design system. The more props a component exposes, the more ways product engineers can deviate from the intended design. A good rule of thumb: expose props that product engineers _need_ to adjust for layout and composition, and keep visual identity (colors, borders, typography) controlled through the component definition, variants, or styled wrappers.
 
 ---
 
@@ -180,17 +182,19 @@ const Card = tasty({
 });
 
 // Clean prop API — no mods object needed
-<Card isLoading isSelected>Content</Card>
+<Card isLoading isSelected>
+  Content
+</Card>;
 ```
 
 ### When to use which
 
-| Pattern | Use when |
-|---|---|
-| `modProps` | The component has a fixed set of known boolean/string states that drive styles. Provides TypeScript autocomplete and a cleaner JSX API. |
-| `mods` prop | The component needs arbitrary or dynamic modifiers that aren't known at definition time. |
-| Both | Combine `modProps` for the known states and `mods` for ad-hoc overrides. Mod props take precedence. |
-| `styleProps` | Exposing CSS properties (layout, sizing) for customization — different from modifiers. |
+| Pattern      | Use when                                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `modProps`   | The component has a fixed set of known boolean/string states that drive styles. Provides TypeScript autocomplete and a cleaner JSX API. |
+| `mods` prop  | The component needs arbitrary or dynamic modifiers that aren't known at definition time.                                                |
+| Both         | Combine `modProps` for the known states and `mods` for ad-hoc overrides. Mod props take precedence.                                     |
+| `styleProps` | Exposing CSS properties (layout, sizing) for customization — different from modifiers.                                                  |
 
 ### Typed modProps vs array form
 
@@ -239,20 +243,20 @@ const ProgressBar = tasty({
 });
 
 // Usage: the progress value comes from a prop, not from styles
-<ProgressBar tokens={{ '$progress': `${percent}%` }} />
+<ProgressBar tokens={{ $progress: `${percent}%` }} />;
 ```
 
 The `tokens` prop sets `style="--progress: 75%"` on the DOM element. The `$progress` reference in styles maps to `var(--progress)`, so the bar width updates without regenerating any CSS.
 
 ### When to use tokens vs other mechanisms
 
-| Need | Use |
-|------|-----|
-| Value changes per instance at render time (progress, user color, avatar size) | `tokens` prop (on component) |
-| Value is constant across all instances (card padding, border radius) | `configure({ tokens })` for `:root` CSS custom properties |
-| Value should be inlined at parse time (alias for another token) | `configure({ replaceTokens })` |
-| Value changes based on component state (hover, disabled, breakpoint) | State map in `styles` |
-| Value changes based on a variant (primary, danger, outline) | `variants` option |
+| Need                                                                          | Use                                                       |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Value changes per instance at render time (progress, user color, avatar size) | `tokens` prop (on component)                              |
+| Value is constant across all instances (card padding, border radius)          | `configure({ tokens })` for `:root` CSS custom properties |
+| Value should be inlined at parse time (alias for another token)               | `configure({ replaceTokens })`                            |
+| Value changes based on component state (hover, disabled, breakpoint)          | State map in `styles`                                     |
+| Value changes based on a variant (primary, danger, outline)                   | `variants` option                                         |
 
 Design tokens (via `configure({ tokens })`) are injected as CSS custom properties on `:root`. Replace tokens (via `configure({ replaceTokens })`) are resolved at parse time and baked into the generated CSS. The `tokens` prop on components is resolved at render time via inline CSS custom properties. Use design tokens for design-system constants, replace tokens for value aliases, and the `tokens` prop for truly dynamic per-instance values.
 
@@ -271,7 +275,7 @@ const ProgressBar = tasty({
 });
 
 // Clean prop API — no tokens object needed
-<ProgressBar progress="75%" accentColor="#purple" />
+<ProgressBar progress="75%" accentColor="#purple" />;
 
 // Conversion:
 //   'progress'    → $progress    → --progress
@@ -291,7 +295,7 @@ const Card = tasty({
   styles: { padding: '$card-size', fill: '#card-accent' },
 });
 
-<Card size="4x" color="#purple" />
+<Card size="4x" color="#purple" />;
 ```
 
 #### Merge order
@@ -326,7 +330,7 @@ const LargeCard = tasty(Card, {
   styles: { padding: '6x', Title: { color: '#danger' } },
 });
 
-<LargeCard />
+<LargeCard />;
 ```
 
 Why? Styled wrappers are:
@@ -420,7 +424,9 @@ const Span = tasty({
   styles: { preset: 'strong' },
 });
 
-<Link href="/blog" padding="1x">Blog</Link>;
+<Link href="/blog" padding="1x">
+  Blog
+</Link>;
 ```
 
 The wrapped component only needs to forward `className` (and ideally `style` and `ref`) to its underlying DOM node. Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `isDisabled`, `isHidden`, `isChecked`, and any `styleProps`/`modProps`/`tokenProps` you declared) are consumed by the wrapper and converted to `data-*` attributes or CSS custom properties — they never leak to the DOM.
@@ -593,7 +599,7 @@ Modifiers are compiled into exclusive selectors once. Changing `styles` at runti
 
 ```tsx
 // Bad: bypassing Tasty for custom styling
-<Button style={{ backgroundColor: 'red', padding: '12px 24px' }} />
+<Button style={{ backgroundColor: 'red', padding: '12px 24px' }} />;
 
 // Good: create a styled wrapper
 const DangerButton = tasty(Button, {
@@ -610,7 +616,7 @@ The `style` prop bypasses tokens, units, and state maps. It should only be used 
 <Card>
   <div data-element="Title">Card Title</div>
   <div data-element="Content">Card content</div>
-</Card>
+</Card>;
 
 // Better: declare elements for typed sub-components
 const Card = tasty({
@@ -624,7 +630,7 @@ const Card = tasty({
 <Card>
   <Card.Title>Card Title</Card.Title>
   <Card.Content>Card content</Card.Content>
-</Card>
+</Card>;
 ```
 
 The `elements` prop gives you typed sub-components with automatic `data-element` attributes, `mods` support, and better discoverability.

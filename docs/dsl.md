@@ -1,6 +1,8 @@
 # Style DSL Reference
 
-This is the Tasty style language reference — the value syntax, state mappings, tokens, units, extending semantics, and special declarations that apply to both runtime `tasty()` and build-time `tastyStatic()`.
+This is the language behind Tasty’s predictable state resolution. Every property can use a state map; later branches declare higher priority, and Tasty compiles them so only one generated selector can match.
+
+The same value syntax, state maps, tokens, units, extension semantics, and special declarations apply to runtime `tasty()` and build-time `tastyStatic()`.
 
 For the runtime React API (`tasty()`, hooks, component props), see [React API](react-api.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
 
@@ -18,17 +20,17 @@ fill: { '': '#white', hovered: '#gray.05', 'theme=danger': '#red' }
 
 #### State Key Types
 
-| Syntax | Example | Generated CSS |
-|--------|---------|---------------|
-| Boolean modifier | `hovered` | `[data-hovered]` |
-| Value modifier | `theme=danger` | `[data-theme="danger"]` |
-| Pseudo-class | `:hover` | `:hover` |
-| Class selector | `.active` | `.active` |
-| Attribute selector | `[aria-expanded="true"]` | `[aria-expanded="true"]` |
-| Combined (AND) | `hovered & .active` | `[data-hovered].active` |
-| Combined (OR) | `hovered \| focused` | `[data-hovered], [data-focused]` |
-| Negated (NOT) | `!disabled` | `:not([data-disabled])` |
-| Exclusive (XOR) | `hovered ^ focused` | `[data-hovered]:not([data-focused]), :not([data-hovered])[data-focused]` |
+| Syntax             | Example                  | Generated CSS                                                            |
+| ------------------ | ------------------------ | ------------------------------------------------------------------------ |
+| Boolean modifier   | `hovered`                | `[data-hovered]`                                                         |
+| Value modifier     | `theme=danger`           | `[data-theme="danger"]`                                                  |
+| Pseudo-class       | `:hover`                 | `:hover`                                                                 |
+| Class selector     | `.active`                | `.active`                                                                |
+| Attribute selector | `[aria-expanded="true"]` | `[aria-expanded="true"]`                                                 |
+| Combined (AND)     | `hovered & .active`      | `[data-hovered].active`                                                  |
+| Combined (OR)      | `hovered \| focused`     | `[data-hovered], [data-focused]`                                         |
+| Negated (NOT)      | `!disabled`              | `:not([data-disabled])`                                                  |
+| Exclusive (XOR)    | `hovered ^ focused`      | `[data-hovered]:not([data-focused]), :not([data-hovered])[data-focused]` |
 
 Operator precedence (highest to lowest): `!` (NOT) > `^` (XOR) > `|` (OR) > `&` (AND). Use parentheses to override: `hovered & (pressed ^ focused)`.
 
@@ -53,14 +55,18 @@ color: { '': '#text', hovered: '#accent' }
 color: { hovered: '#accent', '': '#text' }
 ```
 
-The bare `''` default still **receives negation** (it is turned off when a higher-priority state matches). For a value that must always apply as a guaranteed floor — even where a query is *unknown* — use the [`_` fallback floor](#_--fallback-floor) instead. The two can coexist: `''` is the negated default, `_` is the always-on floor. If a map contains only `_` and `''` (no other states), the `''` default is redundant — Tasty keeps the `_` value and drops `''` with a `REDUNDANT_DEFAULT_STATE` warning.
+The bare `''` default still **receives negation** (it is turned off when a higher-priority state matches). For a value that must always apply as a guaranteed floor — even where a query is _unknown_ — use the [`_` fallback floor](#_--fallback-floor) instead. The two can coexist: `''` is the negated default, `_` is the always-on floor. If a map contains only `_` and `''` (no other states), the `''` default is redundant — Tasty keeps the `_` value and drops `''` with a `REDUNDANT_DEFAULT_STATE` warning.
 
 ### Sub-element
 
 Element styled using a capitalized key. Identified by `data-element` attribute:
 
 ```jsx
-styles: { Title: { preset: 'h3' } }
+styles: {
+  Title: {
+    preset: 'h3';
+  }
+}
 // Targets: <div data-element="Title">
 ```
 
@@ -70,19 +76,19 @@ Control how a sub-element selector attaches to the root selector using the `$` p
 
 Examples below assume the sub-element key is **Cell** (i.e. `[data-element="Cell"]` in CSS):
 
-| Pattern | Result | Description |
-|---------|--------|-------------|
-| *(none)* | `[data-element="Cell"]` | Descendant (default) |
-| `>` | `> [data-element="Cell"]` | Direct child |
-| `>Body>` | `> [data-element="Body"] > [data-element="Cell"]` | Chained elements |
-| `> Cell` | `> [data-element="Cell"]` | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
-| `h1` | `h1` | Tag selector (no key injection) |
-| `h1 >` | `h1 > [data-element="Cell"]` | Key is direct child of tag |
-| `h1 *` | `h1 *` | Any descendant of tag |
-| `*` | `*` | All descendants |
-| `&::before` | `::before` | Root pseudo (no key); `&` is required |
-| `@::before` | `[data-element="Cell"]::before` | Pseudo on the sub-element |
-| `>@.active` | `> [data-element="Cell"].active` | Class on the sub-element |
+| Pattern     | Result                                            | Description                                                                                                                                      |
+| ----------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| _(none)_    | `[data-element="Cell"]`                           | Descendant (default)                                                                                                                             |
+| `>`         | `> [data-element="Cell"]`                         | Direct child                                                                                                                                     |
+| `>Body>`    | `> [data-element="Body"] > [data-element="Cell"]` | Chained elements                                                                                                                                 |
+| `> Cell`    | `> [data-element="Cell"]`                         | Self-name shorthand — when the trailing element name matches the sub-element's own key, it acts as the placeholder (same as `@`); no duplication |
+| `h1`        | `h1`                                              | Tag selector (no key injection)                                                                                                                  |
+| `h1 >`      | `h1 > [data-element="Cell"]`                      | Key is direct child of tag                                                                                                                       |
+| `h1 *`      | `h1 *`                                            | Any descendant of tag                                                                                                                            |
+| `*`         | `*`                                               | All descendants                                                                                                                                  |
+| `&::before` | `::before`                                        | Root pseudo (no key); `&` is required                                                                                                            |
+| `@::before` | `[data-element="Cell"]::before`                   | Pseudo on the sub-element                                                                                                                        |
+| `>@.active` | `> [data-element="Cell"].active`                  | Class on the sub-element                                                                                                                         |
 
 Rules for key injection (`[data-element="..."]`):
 
@@ -111,7 +117,7 @@ const List = tasty({
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:
 
 ```jsx
-fill: '#purple.5'  // → oklch(from var(--purple-color) l c h / .5)
+fill: '#purple.5'; // → oklch(from var(--purple-color) l c h / .5)
 ```
 
 ### Modifier
@@ -146,7 +152,7 @@ fill: '#purple.5';
 ```
 
 The channels are copied over and the alpha slot is written, which asks nothing of
-the color beyond *being* a color. That means the suffix works on every one of
+the color beyond _being_ a color. That means the suffix works on every one of
 these:
 
 - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
@@ -171,7 +177,7 @@ that expresses its disabled state once, in `color`, fades everything painted fro
 `#current` below it with no further declarations.
 
 The `color` style also publishes `--current-color` beside every color it sets,
-for anything that needs the inherited color *as a color* rather than as the
+for anything that needs the inherited color _as a color_ rather than as the
 keyword — hand-authored CSS, or a place the keyword will not do. Read it as
 `$current-color`. It is registered with `initial-value: currentcolor`, so where
 nothing published it, it still resolves against each element's own color:
@@ -184,7 +190,7 @@ A color that already reads the color it inherits — `#current`, a `#current` fa
 — is not published into it: resolving such a value a second time at a descendant
 would fade it twice.
 
-One case needs the wider floor to be considered. A token *defined* as `#current`
+One case needs the wider floor to be considered. A token _defined_ as `#current`
 and then faded gives relative color syntax a `currentcolor` origin, which Safari
 supports only from 18:
 
@@ -200,7 +206,7 @@ through `color-mix()`, which works from Safari 16.2 and composes like every othe
 
 ### `#current` composes instead
 
-`#current` is the one exception, and the difference is deliberate. A token *names*
+`#current` is the one exception, and the difference is deliberate. A token _names_
 a color, so fading it sets its alpha. `currentcolor` is the color an element
 **inherits**, which an ancestor may already have faded — `#current.4` means "40%
 of what reaches me":
@@ -266,22 +272,22 @@ configure({
   },
 });
 
-fill: '#solid.5';     // → hsl(220 90% 50% / .5)
-fill: '#adaptive.5';  // → oklch(from light-dark(…) l c h / .5)
+fill: '#solid.5'; // → hsl(220 90% 50% / .5)
+fill: '#adaptive.5'; // → oklch(from light-dark(…) l c h / .5)
 ```
 
 ---
 
 ## Built-in Units
 
-| Unit | Description | Example | CSS Output |
-|------|-------------|---------|------------|
-| `x` | Gap multiplier | `2x` | `calc(var(--gap) * 2)` |
-| `r` | Border radius | `1r` | `var(--radius)` |
-| `cr` | Card border radius | `1cr` | `var(--card-radius)` |
-| `bw` | Border width | `2bw` | `calc(var(--border-width) * 2)` |
-| `ow` | Outline width | `1ow` | `var(--outline-width)` |
-| `sf` | Stable fraction | `1sf` | `minmax(0, 1fr)` |
+| Unit | Description        | Example | CSS Output                      |
+| ---- | ------------------ | ------- | ------------------------------- |
+| `x`  | Gap multiplier     | `2x`    | `calc(var(--gap) * 2)`          |
+| `r`  | Border radius      | `1r`    | `var(--radius)`                 |
+| `cr` | Card border radius | `1cr`   | `var(--card-radius)`            |
+| `bw` | Border width       | `2bw`   | `calc(var(--border-width) * 2)` |
+| `ow` | Outline width      | `1ow`   | `var(--outline-width)`          |
+| `sf` | Stable fraction    | `1sf`   | `minmax(0, 1fr)`                |
 
 You can register additional custom units via [`configure()`](configuration.md#options).
 
@@ -326,7 +332,7 @@ const ElevatedCard = tasty({
 
 **Post-merge recipes (`/` separator):**
 
-Recipes listed after `/` are applied *after* component styles using `mergeStyles`:
+Recipes listed after `/` are applied _after_ component styles using `mergeStyles`:
 
 ```jsx
 const Input = tasty({
@@ -364,8 +370,8 @@ When a style property uses a state map, the merge behavior depends on whether th
 const MyButton = tasty(Button, {
   styles: {
     fill: {
-      'loading': '#yellow',      // append new state
-      'disabled': '#gray.20',    // override existing state in place
+      loading: '#yellow', // append new state
+      disabled: '#gray.20', // override existing state in place
     },
   },
 });
@@ -375,7 +381,7 @@ const MyButton = tasty(Button, {
   styles: {
     fill: {
       '': '#red',
-      'hovered': '#blue',
+      hovered: '#blue',
     },
   },
 });
@@ -400,8 +406,12 @@ fill: {
 Use `null` inside a state map to remove a state, or `false` to block it entirely (tombstone):
 
 ```jsx
-fill: { pressed: null }   // removes pressed from the result
-fill: { disabled: false } // tombstone — no CSS for disabled, blocks recipe too
+fill: {
+  pressed: null;
+} // removes pressed from the result
+fill: {
+  disabled: false;
+} // tombstone — no CSS for disabled, blocks recipe too
 ```
 
 ### Resetting Properties with `null` and `false`
@@ -409,36 +419,36 @@ fill: { disabled: false } // tombstone — no CSS for disabled, blocks recipe to
 ```jsx
 const SimpleButton = tasty(Button, {
   styles: {
-    fill: null,    // discard parent's fill, let recipe fill in
+    fill: null, // discard parent's fill, let recipe fill in
     border: false, // no border at all (tombstone — blocks recipe too)
   },
 });
 ```
 
-| Value | Meaning | Recipe fills in? |
-|-------|---------|-----------------|
-| `undefined` | Not provided — parent preserved | N/A |
-| `null` | Intentional unset — parent discarded | Yes |
-| `false` | Tombstone — blocks everything | No |
+| Value       | Meaning                              | Recipe fills in? |
+| ----------- | ------------------------------------ | ---------------- |
+| `undefined` | Not provided — parent preserved      | N/A              |
+| `null`      | Intentional unset — parent discarded | Yes              |
+| `false`     | Tombstone — blocks everything        | No               |
 
 ---
 
 ## Advanced States (`@` prefix)
 
-| Prefix | Purpose | Example |
-|--------|---------|---------|
-| `@media` | Media queries | `@media(w < 768px)` |
-| `@(...)` | Container queries | `@(panel, w >= 300px)` |
-| `@supports` | Feature/selector support | `@supports(display: grid)` |
-| `@root` | Root element states | `@root(schema=dark)` |
-| `@parent` | Parent/ancestor element states | `@parent(hovered)` |
-| `@own` | Sub-element's own state | `@own(hovered)` |
-| `@starting` | Entry animation | `@starting` |
-| `_` | Fallback floor (always-on, never negated) | `_` |
-| `:is()` | CSS `:is()` structural pseudo-class | `:is(fieldset > label)` |
-| `:has()` | CSS `:has()` relational pseudo-class | `:has(> Icon)` |
-| `:not()` | CSS `:not()` negation (prefer `!:is()`) | `:not(:first-child)` |
-| `:where()` | CSS `:where()` (zero specificity) | `:where(Section)` |
+| Prefix      | Purpose                                   | Example                    |
+| ----------- | ----------------------------------------- | -------------------------- |
+| `@media`    | Media queries                             | `@media(w < 768px)`        |
+| `@(...)`    | Container queries                         | `@(panel, w >= 300px)`     |
+| `@supports` | Feature/selector support                  | `@supports(display: grid)` |
+| `@root`     | Root element states                       | `@root(schema=dark)`       |
+| `@parent`   | Parent/ancestor element states            | `@parent(hovered)`         |
+| `@own`      | Sub-element's own state                   | `@own(hovered)`            |
+| `@starting` | Entry animation                           | `@starting`                |
+| `_`         | Fallback floor (always-on, never negated) | `_`                        |
+| `:is()`     | CSS `:is()` structural pseudo-class       | `:is(fieldset > label)`    |
+| `:has()`    | CSS `:has()` relational pseudo-class      | `:has(> Icon)`             |
+| `:not()`    | CSS `:not()` negation (prefer `!:is()`)   | `:not(:first-child)`       |
+| `:where()`  | CSS `:where()` (zero specificity)         | `:where(Section)`          |
 
 > **Specificity.** All state selectors Tasty generates (modifiers, pseudo-classes,
 > `:is()`/`:not()` groups, and `@root` / `@parent` context) are wrapped in
@@ -454,9 +464,9 @@ const SimpleButton = tasty(Button, {
 Media queries support dimension shorthands and custom unit expansion:
 
 | Shorthand | Expands to |
-|-----------|------------|
-| `w` | `width` |
-| `h` | `height` |
+| --------- | ---------- |
+| `w`       | `width`    |
+| `h`       | `height`   |
 
 ```jsx
 fill: {
@@ -467,14 +477,14 @@ fill: {
 }
 ```
 
-| Tasty syntax | CSS output |
-|--------------|------------|
-| `@media(w < 768px)` | `@media (width < 768px)` |
-| `@media(600px <= w < 1200px)` | `@media (600px <= width < 1200px)` |
-| `@media:print` | `@media print` |
-| `@media:screen` | `@media screen` |
+| Tasty syntax                         | CSS output                            |
+| ------------------------------------ | ------------------------------------- |
+| `@media(w < 768px)`                  | `@media (width < 768px)`              |
+| `@media(600px <= w < 1200px)`        | `@media (600px <= width < 1200px)`    |
+| `@media:print`                       | `@media print`                        |
+| `@media:screen`                      | `@media screen`                       |
 | `@media(prefers-color-scheme: dark)` | `@media (prefers-color-scheme: dark)` |
-| `@media(prefers-reduced-motion)` | `@media (prefers-reduced-motion)` |
+| `@media(prefers-reduced-motion)`     | `@media (prefers-reduced-motion)`     |
 
 Custom units work inside media queries: `@media(w < 40x)` → `@media (width < calc(var(--gap) * 40))`.
 
@@ -484,12 +494,12 @@ In practice, define state aliases via `configure({ states })` and use `@mobile` 
 
 Container queries use the syntax `@(name, condition)` for named containers or `@(condition)` for the nearest ancestor container. Dimension shorthands (`w`, `h`, `is`, `bs`) are expanded the same way as `@media`.
 
-| Shorthand | Expands to |
-|-----------|------------|
-| `w` | `width` |
-| `h` | `height` |
-| `is` | `inline-size` |
-| `bs` | `block-size` |
+| Shorthand | Expands to    |
+| --------- | ------------- |
+| `w`       | `width`       |
+| `h`       | `height`      |
+| `is`      | `inline-size` |
+| `bs`      | `block-size`  |
 
 ```jsx
 const Panel = tasty({
@@ -502,14 +512,14 @@ const Panel = tasty({
 });
 ```
 
-| Tasty syntax | CSS output |
-|--------------|------------|
-| `@(layout, w < 600px)` | `@container layout (width < 600px)` |
-| `@(w < 600px)` | `@container (width < 600px)` |
-| `@(layout, $variant=danger)` | `@container layout style(--variant: "danger")` |
-| `@(layout, $compact)` | `@container layout style(--compact)` |
-| `@(scroll-state(stuck: top))` | `@container scroll-state(stuck: top)` |
-| `@(nav, scroll-state(stuck: top))` | `@container nav scroll-state(stuck: top)` |
+| Tasty syntax                       | CSS output                                     |
+| ---------------------------------- | ---------------------------------------------- |
+| `@(layout, w < 600px)`             | `@container layout (width < 600px)`            |
+| `@(w < 600px)`                     | `@container (width < 600px)`                   |
+| `@(layout, $variant=danger)`       | `@container layout style(--variant: "danger")` |
+| `@(layout, $compact)`              | `@container layout style(--compact)`           |
+| `@(scroll-state(stuck: top))`      | `@container scroll-state(stuck: top)`          |
+| `@(nav, scroll-state(stuck: top))` | `@container nav scroll-state(stuck: top)`      |
 
 Container style queries use `$prop` (boolean) or `$prop=value` syntax, which maps to CSS `style(--prop)` or `style(--prop: "value")`.
 
@@ -517,10 +527,10 @@ Container style queries use `$prop` (boolean) or `$prop=value` syntax, which map
 
 Feature queries test CSS property support. Use `$` as the first argument to test selector support:
 
-| Tasty syntax | CSS output |
-|--------------|------------|
-| `@supports(display: grid)` | `@supports (display: grid)` |
-| `@supports($, :has(*))` | `@supports selector(:has(*))` |
+| Tasty syntax                | CSS output                        |
+| --------------------------- | --------------------------------- |
+| `@supports(display: grid)`  | `@supports (display: grid)`       |
+| `@supports($, :has(*))`     | `@supports selector(:has(*))`     |
 | `!@supports(display: grid)` | `@supports (not (display: grid))` |
 
 ```jsx
@@ -539,7 +549,7 @@ that assumption: `@supports(...)` and `@(...)` queries can be **unknown** (not
 just true/false), and `not(unknown)` is also unknown — so a negated default
 branch silently never applies. The classic case is `scroll-state`: a browser can
 support `container-type: scroll-state` while a specific `scroll-state(...)` query
-is unknown, leaving *no* branch active.
+is unknown, leaving _no_ branch active.
 
 The `_` fallback floor solves this. Use `_` as a **standalone key** and its value
 **always applies** as a guaranteed floor: it never receives negation, and
@@ -554,10 +564,14 @@ inset: {
 ```
 
 ```css
-.t0.t0 { inset: 0 ...; }
+.t0.t0 {
+  inset: 0...;
+}
 @container scroll-state(scrolled: block-end) {
   @supports (container-type: scroll-state) {
-    .t0.t0 { inset: -80px ...; }
+    .t0.t0 {
+      inset: -80px...;
+    }
   }
 }
 ```
@@ -588,13 +602,13 @@ cause is always the same: **`''` is mutually exclusive (turned off by negation),
 while `_` is always on (layered underneath).**
 
 - **Unknown / invalid branches.** If a higher-priority branch sits behind a query
-  that can be *unknown* (`@supports`, container, `scroll-state`) or uses a
+  that can be _unknown_ (`@supports`, container, `scroll-state`) or uses a
   selector the browser drops, the negated `''` default disappears along with it
   (`not(unknown) = unknown`), leaving the property with no rule. The `_` floor
   survives because it is an unconditional bare rule. This is the case `_` exists
   for.
 
-- **Empty / "unset" states.** A state can intentionally produce *no* output (an
+- **Empty / "unset" states.** A state can intentionally produce _no_ output (an
   empty value) to leave a property unset while that state is active. With `''`
   this works — the default is negated away and nothing replaces it, so the
   property unsets. With `_` the floor can never be turned off, so its value keeps
@@ -606,14 +620,14 @@ while `_` is always on (layered underneath).**
   ```
 
 - **States with different output shapes.** Because `_` layers additively, when
-  different states emit *different sets* of declarations, the floor's
+  different states emit _different sets_ of declarations, the floor's
   declarations bleed through wherever the winning state does not override the
   same property — which can produce inconsistent combinations. A `''` default is
   swapped out cleanly by its mutually-exclusive condition.
 
 Rule of thumb: **use `''` for the normal default** (clean mutual exclusivity,
 supports unsetting), and reach for `_` only when a value must survive an
-*unknown* higher-priority branch.
+_unknown_ higher-priority branch.
 
 ### `@root(...)` — Root Element States
 
@@ -629,13 +643,13 @@ color: {
 }
 ```
 
-| Tasty syntax | CSS selector |
-|--------------|-------------|
-| `@root(schema=dark)` | `:root[data-schema="dark"]` |
-| `@root(hovered)` | `:root[data-hovered]` |
-| `@root(.premium-user)` | `:root.premium-user` |
-| `@root([lang="en"])` | `:root[lang="en"]` |
-| `!@root(schema=dark)` | `:root:not([data-schema="dark"])` |
+| Tasty syntax           | CSS selector                      |
+| ---------------------- | --------------------------------- |
+| `@root(schema=dark)`   | `:root[data-schema="dark"]`       |
+| `@root(hovered)`       | `:root[data-hovered]`             |
+| `@root(.premium-user)` | `:root.premium-user`              |
+| `@root([lang="en"])`   | `:root[lang="en"]`                |
+| `!@root(schema=dark)`  | `:root:not([data-schema="dark"])` |
 
 Root conditions are prepended to the component selector: `:root[data-schema="dark"] .t0.t0 { ... }`.
 
@@ -651,7 +665,7 @@ const Nav = tasty({
         '': '#text',
         '@own(:hover)': '#primary',
         '@own(:focus-visible)': '#primary',
-        'selected': '#primary',       // root-level modifier
+        selected: '#primary', // root-level modifier
       },
     },
   },
@@ -659,11 +673,11 @@ const Nav = tasty({
 });
 ```
 
-| Tasty syntax (inside sub-element) | CSS output |
-|-----------------------------------|------------|
-| `@own(:hover)` | `:hover` on the sub-element selector |
-| `@own(hovered)` | `[data-hovered]` on the sub-element selector |
-| `@own(theme=dark)` | `[data-theme="dark"]` on the sub-element selector |
+| Tasty syntax (inside sub-element) | CSS output                                        |
+| --------------------------------- | ------------------------------------------------- |
+| `@own(:hover)`                    | `:hover` on the sub-element selector              |
+| `@own(hovered)`                   | `[data-hovered]` on the sub-element selector      |
+| `@own(theme=dark)`                | `[data-theme="dark"]` on the sub-element selector |
 
 `@own()` is only valid inside sub-element styles. Using it on root styles emits a warning and is treated as a regular modifier.
 
@@ -681,9 +695,9 @@ const FadeIn = tasty({
 });
 ```
 
-| Tasty syntax | CSS output |
-|--------------|------------|
-| `@starting` | `@starting-style { .t0.t0 { ... } }` |
+| Tasty syntax | CSS output                           |
+| ------------ | ------------------------------------ |
+| `@starting`  | `@starting-style { .t0.t0 { ... } }` |
 
 ### `@parent(...)` — Parent Element States
 
@@ -694,22 +708,22 @@ const Highlight = tasty({
   styles: {
     fill: {
       '': '#white',
-      '@parent(hovered)': '#gray.05',         // Any ancestor has [data-hovered]
-      '@parent(theme=dark, >)': '#dark-02',   // Direct parent has [data-theme="dark"]
+      '@parent(hovered)': '#gray.05', // Any ancestor has [data-hovered]
+      '@parent(theme=dark, >)': '#dark-02', // Direct parent has [data-theme="dark"]
     },
   },
 });
 ```
 
-| Syntax | CSS Output |
-|--------|------------|
-| `@parent(hovered)` | `:is([data-hovered] *)` |
-| `!@parent(hovered)` | `:not([data-hovered] *)` |
-| `@parent(hovered, >)` | `:is([data-hovered] > *)` (direct parent) |
-| `@parent(.active)` | `:is(.active *)` |
-| `@parent(hovered & focused)` | `:is([data-hovered][data-focused] *)` (same ancestor) |
+| Syntax                                | CSS Output                                                           |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `@parent(hovered)`                    | `:is([data-hovered] *)`                                              |
+| `!@parent(hovered)`                   | `:not([data-hovered] *)`                                             |
+| `@parent(hovered, >)`                 | `:is([data-hovered] > *)` (direct parent)                            |
+| `@parent(.active)`                    | `:is(.active *)`                                                     |
+| `@parent(hovered & focused)`          | `:is([data-hovered][data-focused] *)` (same ancestor)                |
 | `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
-| `@parent(hovered \| focused)` | `:is([data-hovered] *, [data-focused] *)` (OR inside single wrapper) |
+| `@parent(hovered \| focused)`         | `:is([data-hovered] *, [data-focused] *)` (OR inside single wrapper) |
 
 For sub-elements, the parent check applies to the root element's ancestors:
 
@@ -740,38 +754,38 @@ const Card = tasty({
   styles: {
     display: {
       '': 'block',
-      ':has(> Icon)': 'grid',              // has Icon as direct child
-      ':has(+ Icon)': 'grid',              // immediately followed by an Icon sibling
-      ':has(~ Icon)': 'grid',              // has an Icon sibling somewhere after
-      ':has(Icon +)': 'grid',              // immediately preceded by an Icon sibling (auto-completes to `Icon + *`)
-      ':has(Icon ~)': 'grid',              // has an Icon sibling somewhere before (auto-completes to `Icon ~ *`)
-      ':is(fieldset > label)': 'inline',   // is a label inside a fieldset (HTML tags)
-      '!:has(> Icon)': 'flex',             // negation: no Icon child
+      ':has(> Icon)': 'grid', // has Icon as direct child
+      ':has(+ Icon)': 'grid', // immediately followed by an Icon sibling
+      ':has(~ Icon)': 'grid', // has an Icon sibling somewhere after
+      ':has(Icon +)': 'grid', // immediately preceded by an Icon sibling (auto-completes to `Icon + *`)
+      ':has(Icon ~)': 'grid', // has an Icon sibling somewhere before (auto-completes to `Icon ~ *`)
+      ':is(fieldset > label)': 'inline', // is a label inside a fieldset (HTML tags)
+      '!:has(> Icon)': 'flex', // negation: no Icon child
     },
   },
 });
 ```
 
-| Syntax | CSS Output | Meaning |
-|--------|------------|---------|
-| `:has(> Icon)` | `:has(> [data-element="Icon"])` | Has Icon as direct child |
-| `:has(+ Icon)` | `:has(+ [data-element="Icon"])` | Immediately followed by an Icon sibling |
-| `:has(~ Icon)` | `:has(~ [data-element="Icon"])` | Has an Icon sibling somewhere after |
-| `:has(Icon +)` | `:has([data-element="Icon"] + *)` | Immediately preceded by an Icon sibling |
-| `:has(Icon ~)` | `:has([data-element="Icon"] ~ *)` | Has an Icon sibling somewhere before |
-| `:has(>)` | `:has(> *)` | Has any direct child |
-| `:is(> Field + input)` | `:is(> [data-element="Field"] + input)` | Structural match |
-| `:has(button)` | `:has(button)` | HTML tag (lowercase, unchanged) |
-| `!:has(> Icon)` | `:not(:has(> [data-element="Icon"]))` | Negation (use `!`) |
-| `!:is(Panel)` | `:not([data-element="Panel"])` | Negation (use `!:is`) |
+| Syntax                 | CSS Output                              | Meaning                                 |
+| ---------------------- | --------------------------------------- | --------------------------------------- |
+| `:has(> Icon)`         | `:has(> [data-element="Icon"])`         | Has Icon as direct child                |
+| `:has(+ Icon)`         | `:has(+ [data-element="Icon"])`         | Immediately followed by an Icon sibling |
+| `:has(~ Icon)`         | `:has(~ [data-element="Icon"])`         | Has an Icon sibling somewhere after     |
+| `:has(Icon +)`         | `:has([data-element="Icon"] + *)`       | Immediately preceded by an Icon sibling |
+| `:has(Icon ~)`         | `:has([data-element="Icon"] ~ *)`       | Has an Icon sibling somewhere before    |
+| `:has(>)`              | `:has(> *)`                             | Has any direct child                    |
+| `:is(> Field + input)` | `:is(> [data-element="Field"] + input)` | Structural match                        |
+| `:has(button)`         | `:has(button)`                          | HTML tag (lowercase, unchanged)         |
+| `!:has(> Icon)`        | `:not(:has(> [data-element="Icon"]))`   | Negation (use `!`)                      |
+| `!:is(Panel)`          | `:not([data-element="Panel"])`          | Negation (use `!:is`)                   |
 
 Combine with other states using boolean logic (`&`, `|`, `!`, `^`):
 
 ```jsx
-':has(> Icon) & hovered'                // AND: structural + data attribute
-'@parent(hovered) & :has(> Icon)'       // AND: parent check + structural
-':has(> Icon) | :has(> Button)'         // OR: either sub-element present
-':has(> Icon) ^ :has(> Button)'         // XOR: exactly one present
+':has(> Icon) & hovered'; // AND: structural + data attribute
+'@parent(hovered) & :has(> Icon)'; // AND: parent check + structural
+':has(> Icon) | :has(> Button)'; // OR: either sub-element present
+':has(> Icon) ^ :has(> Button)'; // XOR: exactly one present
 ```
 
 > **Nesting limit:** The state key parser supports up to 2 levels of nested parentheses inside `:is()`, `:has()`, `:not()`, and `:where()` — e.g. `:has(Input:not(:disabled))` works, but 3+ levels like `:has(:is(:not(:hover)))` will not be tokenized correctly. This covers virtually all practical use cases.
@@ -858,20 +872,20 @@ Supply an array to register several variants of the same family:
 
 ### Supported descriptors
 
-| Descriptor | CSS property | Type |
-|---|---|---|
-| `src` (required) | `src` | `string` |
-| `fontWeight` | `font-weight` | `string \| number` |
-| `fontStyle` | `font-style` | `string` |
-| `fontStretch` | `font-stretch` | `string` |
-| `fontDisplay` | `font-display` | `'auto' \| 'block' \| 'swap' \| 'fallback' \| 'optional'` |
-| `unicodeRange` | `unicode-range` | `string` |
-| `ascentOverride` | `ascent-override` | `string` |
-| `descentOverride` | `descent-override` | `string` |
-| `lineGapOverride` | `line-gap-override` | `string` |
-| `sizeAdjust` | `size-adjust` | `string` |
-| `fontFeatureSettings` | `font-feature-settings` | `string` |
-| `fontVariationSettings` | `font-variation-settings` | `string` |
+| Descriptor              | CSS property              | Type                                                      |
+| ----------------------- | ------------------------- | --------------------------------------------------------- |
+| `src` (required)        | `src`                     | `string`                                                  |
+| `fontWeight`            | `font-weight`             | `string \| number`                                        |
+| `fontStyle`             | `font-style`              | `string`                                                  |
+| `fontStretch`           | `font-stretch`            | `string`                                                  |
+| `fontDisplay`           | `font-display`            | `'auto' \| 'block' \| 'swap' \| 'fallback' \| 'optional'` |
+| `unicodeRange`          | `unicode-range`           | `string`                                                  |
+| `ascentOverride`        | `ascent-override`         | `string`                                                  |
+| `descentOverride`       | `descent-override`        | `string`                                                  |
+| `lineGapOverride`       | `line-gap-override`       | `string`                                                  |
+| `sizeAdjust`            | `size-adjust`             | `string`                                                  |
+| `fontFeatureSettings`   | `font-feature-settings`   | `string`                                                  |
+| `fontVariationSettings` | `font-variation-settings` | `string`                                                  |
 
 > Font-face rules are permanent — they are injected once and never cleaned up, matching how browsers handle `@font-face`.
 
@@ -899,18 +913,18 @@ const EmojiList = tasty({
 
 ### Supported descriptors
 
-| Descriptor | CSS property | Type |
-|---|---|---|
-| `system` (required) | `system` | `'cyclic' \| 'numeric' \| 'alphabetic' \| 'symbolic' \| 'additive' \| 'fixed' \| string` |
-| `symbols` | `symbols` | `string` |
-| `additiveSymbols` | `additive-symbols` | `string` |
-| `prefix` | `prefix` | `string` |
-| `suffix` | `suffix` | `string` |
-| `negative` | `negative` | `string` |
-| `range` | `range` | `string` |
-| `pad` | `pad` | `string` |
-| `fallback` | `fallback` | `string` |
-| `speakAs` | `speak-as` | `string` |
+| Descriptor          | CSS property       | Type                                                                                     |
+| ------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| `system` (required) | `system`           | `'cyclic' \| 'numeric' \| 'alphabetic' \| 'symbolic' \| 'additive' \| 'fixed' \| string` |
+| `symbols`           | `symbols`          | `string`                                                                                 |
+| `additiveSymbols`   | `additive-symbols` | `string`                                                                                 |
+| `prefix`            | `prefix`           | `string`                                                                                 |
+| `suffix`            | `suffix`           | `string`                                                                                 |
+| `negative`          | `negative`         | `string`                                                                                 |
+| `range`             | `range`            | `string`                                                                                 |
+| `pad`               | `pad`              | `string`                                                                                 |
+| `fallback`          | `fallback`         | `string`                                                                                 |
+| `speakAs`           | `speak-as`         | `string`                                                                                 |
 
 > Counter-style rules are permanent — they are injected once and never cleaned up, matching how browsers handle `@counter-style`.
 
@@ -932,13 +946,13 @@ const Box = tasty({
   styles: {
     '@function': {
       // simplest: one bare param + result (auto-calc, no explicit calc())
-      '$$negative': { args: ['$value'], result: '(-1 * $value)' },
+      $$negative: { args: ['$value'], result: '(-1 * $value)' },
 
       // typed param + default + return type + local variable
-      '$$shadow': {
+      $$shadow: {
         args: { '$shadow-color': { syntax: '<color>', default: 'inherit' } },
         returns: '<color>',
-        '$offset': '2px', // local variable
+        $offset: '2px', // local variable
         result: '$offset $offset ($shadow-color, black)',
       },
     },
@@ -951,22 +965,27 @@ const Box = tasty({
 Generated CSS:
 
 ```css
-@function --negative(--value) { result: calc(-1 * var(--value)); }
+@function --negative(--value) {
+  result: calc(-1 * var(--value));
+}
 @function --shadow(--shadow-color <color>: inherit) returns <color> {
   --offset: 2px;
   result: var(--offset) var(--offset) var(--shadow-color, black);
 }
-.t0 { margin: --negative(10px) 0 0 0; box-shadow: --shadow(var(--accent-color)); }
+.t0 {
+  margin: --negative(10px) 0 0 0;
+  box-shadow: --shadow(var(--accent-color));
+}
 ```
 
 ### Descriptor shape
 
-| Field | Type | Notes |
-|---|---|---|
-| `result` (required) | `string` | The `result:` value, parsed through the Tasty DSL. |
-| `args` | `string[]` \| `Record<string, FunctionParameter>` | Ordered parameters. Array form lists bare names; object form maps names to type/default. |
-| `returns` | `string` | Optional return type, e.g. `'<color>'`. |
-| `$name` keys | `string \| number` | Any `$name` key declares a local variable `--name` (value parsed). |
+| Field               | Type                                              | Notes                                                                                    |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `result` (required) | `string`                                          | The `result:` value, parsed through the Tasty DSL.                                       |
+| `args`              | `string[]` \| `Record<string, FunctionParameter>` | Ordered parameters. Array form lists bare names; object form maps names to type/default. |
+| `returns`           | `string`                                          | Optional return type, e.g. `'<color>'`.                                                  |
+| `$name` keys        | `string \| number`                                | Any `$name` key declares a local variable `--name` (value parsed).                       |
 
 A `FunctionParameter` is one of: `true` (bare param), a string CSS type shorthand (`'<length>'`), or `{ syntax?: string; default?: string | number }`.
 

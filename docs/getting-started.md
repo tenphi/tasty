@@ -1,6 +1,8 @@
 # Getting Started
 
-This guide walks you from zero to a working Tasty component, then through the optional shared configuration and tooling layers. It is the right starting point when you already want to try Tasty in code. If you are still deciding whether Tasty fits your team, start with [Comparison](comparison.md) and [Adoption Guide](adoption.md) first. For a feature overview, see the [README](../README.md). For the full style language reference, see the [Style DSL](dsl.md). For the React API, see the [React API](react-api.md). For the rest of the docs by role or task, see the [Docs Hub](README.md).
+Build one stateful component first. You will see how Tasty expresses priority as a state map, why overlapping states do not compete, and where shared design-system configuration fits afterward.
+
+This is the right starting point when you are ready to try Tasty in code. If you are still evaluating it, read the [Introduction](../README.md), [Comparison](comparison.md), and [Adoption Guide](adoption.md).
 
 ---
 
@@ -10,7 +12,7 @@ This guide walks you from zero to a working Tasty component, then through the op
 - **React** >= 18 (peer dependency)
 - **Package manager**: pnpm, npm, or yarn
 
-Tasty can be used immediately in a React app, but it is most compelling for teams building reusable components with intersecting states, variants, tokens, and design-system conventions.
+No Tasty configuration is required for the first component.
 
 ---
 
@@ -22,36 +24,55 @@ pnpm add @tenphi/tasty
 
 ---
 
-## Your first component
+## Build a button whose states don’t fight
 
 ```tsx
 import { tasty } from '@tenphi/tasty';
 
-const Card = tasty({
-  as: 'div',
+const Button = tasty({
+  as: 'button',
   styles: {
-    display: 'flex',
-    flow: 'column',
-    padding: '4x',
-    gap: '2x',
-    fill: '#white',
-    border: true,
-    radius: true,
+    padding: '12px 20px',
+    radius: '8px',
+    border: '0',
+    fill: {
+      '': 'royalblue',
+      ':hover': 'blue',
+      ':active': 'navy',
+      '[disabled]': 'lightgray',
+    },
+    color: {
+      '': 'white',
+      '[disabled]': 'dimgray',
+    },
+    cursor: {
+      '': 'pointer',
+      '[disabled]': 'not-allowed',
+    },
   },
 });
 
 export default function App() {
-  return <Card>Hello, Tasty!</Card>;
+  return (
+    <>
+      <Button>Save changes</Button>
+      <Button disabled>Disabled</Button>
+    </>
+  );
 }
 ```
 
-`tasty()` returns a normal React component. Values like `4x`, `#white`, `true`, and `1r` are Tasty DSL — they map to CSS custom properties, shorthand expansions, and design tokens. See [Style Properties](styles.md) for the full reference.
+`tasty()` returns a normal React component. The keys in each state map define priority: later branches win over earlier ones. Because `[disabled]` is last, a disabled button keeps its disabled styles even while the pointer is over it.
+
+Tasty compiles that priority into selectors that exclude one another. The hover, active, and disabled background rules cannot all match and ask the CSS cascade to decide the winner.
+
+The example uses ordinary CSS values so it works without setup. A design system will usually replace them with shared tokens, units, and state aliases in the next step. See the [Style DSL](dsl.md) for the complete state-map syntax and [Style Properties](styles.md) for Tasty’s enhanced CSS properties.
 
 ---
 
-## Optional: add shared configuration
+## Add your design system’s language
 
-Use `configure()` once, before your app renders, when your app or design system needs shared state aliases, tokens, recipes, or parser extensions:
+The first component needs no configuration. Use `configure()` once, before your app renders, when your app or design system is ready to share tokens, state aliases, recipes, units, or parser extensions:
 
 ```tsx
 // src/tasty-config.ts
@@ -91,8 +112,8 @@ configure({
     '#primary': 'oklch(55% 0.25 265)',
     '#surface': '#fff',
     '#text': '#111',
-    '$gap': '8px',
-    '$radius': '4px',
+    $gap: '8px',
+    $radius: '4px',
     '$border-width': '1px',
     '$outline-width': '2px',
   },
@@ -148,23 +169,21 @@ export default [
 
 The `recommended` config enables 18 of the plugin's 27 total rules. It covers the most common issues without turning on the stricter governance rules:
 
-| Category | Rules | Examples |
-|----------|-------|---------|
-| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element` | Flags typos like `pading` or invalid boolean usage |
-| Value validation | `valid-value`, `valid-color-token`, `valid-custom-unit` | Catches `#nonexistent` tokens, bad unit syntax |
-| State validation | `valid-state-key`, `no-nested-state-map`, `require-default-state` | Validates state key syntax, ensures `''` default exists |
-| Structure | `valid-styles-structure`, `no-important`, `no-nested-selector` | Prevents `!important`, invalid nesting |
-| Static mode | `static-no-dynamic-values`, `static-valid-selector` | Enforces build-time constraints in `tastyStatic()` |
-| Style properties | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax |
+| Category            | Rules                                                                                                  | Examples                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element`                                        | Flags typos like `pading` or invalid boolean usage           |
+| Value validation    | `valid-value`, `valid-color-token`, `valid-custom-unit`                                                | Catches `#nonexistent` tokens, bad unit syntax               |
+| State validation    | `valid-state-key`, `no-nested-state-map`, `require-default-state`                                      | Validates state key syntax, ensures `''` default exists      |
+| Structure           | `valid-styles-structure`, `no-important`, `no-nested-selector`                                         | Prevents `!important`, invalid nesting                       |
+| Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`           |
+| Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax |
 
 ### Strict config
 
 For stricter governance, use `tasty.configs.strict`. It adds rules that enforce best practices like preferring shorthand properties, consistent token usage, and flagging direct `styles` prop usage:
 
 ```js
-export default [
-  tasty.configs.strict,
-];
+export default [tasty.configs.strict];
 ```
 
 ---
@@ -181,11 +200,11 @@ export default [
 
 `tasty()` is the default for all React apps. All `tasty()` components and style functions are hook-free and work as React Server Components without `'use client'`. In server-only contexts, they produce zero client JavaScript with the full feature set.
 
-| Approach | Entry point | Best for | Trade-off |
-|------|-------------|----------|-----------|
-| **Runtime (default)** | `tasty()` from `@tenphi/tasty` | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set (styleProps, sub-elements, variants); CSS computed during rendering |
-| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*` | Apps with client-side hydration (Next.js client components, Astro islands) | Adds CSS batching, deduplication, FOUC prevention, and client cache hydration |
-| **Zero-runtime** | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or build-time extraction without React | Requires Babel plugin; no `styleProps` or runtime-only APIs |
+| Approach                      | Entry point                                 | Best for                                                                                 | Trade-off                                                                            |
+| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Runtime (default)**         | `tasty()` from `@tenphi/tasty`              | All React apps — server-rendered by default, zero client JS until you need interactivity | Full feature set (styleProps, sub-elements, variants); CSS computed during rendering |
+| **Runtime + SSR integration** | Add `@tenphi/tasty/ssr/*`                   | Apps with client-side hydration (Next.js client components, Astro islands)               | Adds CSS batching, deduplication, FOUC prevention, and client cache hydration        |
+| **Zero-runtime**              | `tastyStatic()` from `@tenphi/tasty/static` | Non-React frameworks or build-time extraction without React                              | Requires Babel plugin; no `styleProps` or runtime-only APIs                          |
 
 Both `tasty()` and `tastyStatic()` share the same DSL, tokens, units, and state mappings.
 

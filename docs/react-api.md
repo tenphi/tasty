@@ -1,6 +1,8 @@
 # React API
 
-The React-specific `tasty()` component factory, component props, and style functions. All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — are hook-free and compatible with React Server Components. No `'use client'` directive needed. For the shared style language (state maps, tokens, units, extending semantics), see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+Use `tasty()` to turn state-aware style definitions into normal React components, extend existing Tasty components, and expose typed styling APIs to consumers.
+
+All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — are hook-free and compatible with React Server Components. No `'use client'` directive is needed. For state maps, tokens, units, and extension semantics, see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 > **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
@@ -61,7 +63,9 @@ const Span = tasty({
   styles: { preset: 'strong' },
 });
 
-<Link href="/blog" padding="1x">Blog</Link>;
+<Link href="/blog" padding="1x">
+  Blog
+</Link>;
 ```
 
 The wrapped component only needs to forward `className` (and ideally `style`/`ref`). Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `styleProps`, `modProps`, `tokenProps`) are consumed by Tasty and never leak to the DOM.
@@ -84,7 +88,7 @@ const FlexibleBox = tasty({
 
 <FlexibleBox gap="2x" align="center" fill="#surface">
   Content
-</FlexibleBox>
+</FlexibleBox>;
 ```
 
 Style props accept state maps, so responsive values work through the same API:
@@ -113,7 +117,7 @@ import { Element } from '@tenphi/tasty';
 
 <Element as="section" padding="4x" fill="#surface">
   Content
-</Element>
+</Element>;
 ```
 
 > Note: `Element` shadows the global DOM `Element` type when imported from `@tenphi/tasty`. In files that need the DOM type, alias the import: `import { Element as TastyElement } from '@tenphi/tasty'`.
@@ -156,9 +160,9 @@ Map modifier names to type descriptors for precise TypeScript types:
 ```tsx
 const Button = tasty({
   modProps: {
-    isLoading: Boolean,   // isLoading?: boolean
-    isSelected: Boolean,  // isSelected?: boolean
-    size: ['small', 'medium', 'large'] as const,  // size?: 'small' | 'medium' | 'large'
+    isLoading: Boolean, // isLoading?: boolean
+    isSelected: Boolean, // isSelected?: boolean
+    size: ['small', 'medium', 'large'] as const, // size?: 'small' | 'medium' | 'large'
   },
   styles: {
     padding: { '': '2x 4x', 'size=small': '1x 2x', 'size=large': '3x 6x' },
@@ -166,18 +170,20 @@ const Button = tasty({
   },
 });
 
-<Button isLoading size="large">Submit</Button>
+<Button isLoading size="large">
+  Submit
+</Button>;
 // Renders: <button data-is-loading="" data-size="large">Submit</button>
 ```
 
 Available type descriptors:
 
-| Descriptor | TypeScript type | Example |
-|---|---|---|
-| `Boolean` | `boolean` | `isLoading: Boolean` |
-| `String` | `string` | `label: String` |
-| `Number` | `number` | `count: Number` |
-| `['a', 'b'] as const` | `'a' \| 'b'` | `size: ['sm', 'md', 'lg'] as const` |
+| Descriptor            | TypeScript type | Example                             |
+| --------------------- | --------------- | ----------------------------------- |
+| `Boolean`             | `boolean`       | `isLoading: Boolean`                |
+| `String`              | `string`        | `label: String`                     |
+| `Number`              | `number`        | `count: Number`                     |
+| `['a', 'b'] as const` | `'a' \| 'b'`    | `size: ['sm', 'md', 'lg'] as const` |
 
 ### Merge with `mods`
 
@@ -190,11 +196,11 @@ Mod props and the `mods` object can be used together. Mod props take precedence:
 
 ### When to use `modProps` vs `mods`
 
-| Use case | Recommendation |
-|---|---|
+| Use case                                     | Recommendation                                           |
+| -------------------------------------------- | -------------------------------------------------------- |
 | Component has a fixed set of known modifiers | `modProps` — cleaner API, better TypeScript autocomplete |
-| Component needs arbitrary/dynamic modifiers | `mods` — open-ended `Record<string, ModValue>` |
-| Both fixed and dynamic | Combine: `modProps` for known keys, `mods` for ad-hoc |
+| Component needs arbitrary/dynamic modifiers  | `mods` — open-ended `Record<string, ModValue>`           |
+| Both fixed and dynamic                       | Combine: `modProps` for known keys, `mods` for ad-hoc    |
 
 For architecture guidance on when to use modifiers vs `styleProps`, see [Methodology — modProps and mods](methodology.md#modprops-and-mods).
 
@@ -240,7 +246,7 @@ const Card = tasty({
   styles: { padding: '$card-size', fill: '#card-accent' },
 });
 
-<Card size="4x" color="#purple" />
+<Card size="4x" color="#purple" />;
 ```
 
 ### Merge with `tokens`
@@ -259,11 +265,11 @@ const Bar = tasty({
 
 ### When to use `tokenProps` vs `tokens`
 
-| Use case | Recommendation |
-|---|---|
-| Component has a fixed set of known token keys | `tokenProps` — cleaner API, better TypeScript autocomplete |
-| Component needs arbitrary/dynamic token values | `tokens` — open-ended `Record<string, TokenValue>` |
-| Both fixed and dynamic | Combine: `tokenProps` for known keys, `tokens` for ad-hoc |
+| Use case                                       | Recommendation                                             |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| Component has a fixed set of known token keys  | `tokenProps` — cleaner API, better TypeScript autocomplete |
+| Component needs arbitrary/dynamic token values | `tokens` — open-ended `Record<string, TokenValue>`         |
+| Both fixed and dynamic                         | Combine: `tokenProps` for known keys, `tokens` for ad-hoc  |
 
 For architecture guidance, see [Methodology — tokenProps](methodology.md#tokenprops).
 
@@ -286,7 +292,7 @@ const Button = tasty({
   },
 });
 
-<Button variant="danger">Delete</Button>
+<Button variant="danger">Delete</Button>;
 ```
 
 ### Extending Variants with Base State Maps
@@ -342,7 +348,7 @@ const Card = tasty({
 <Card>
   <Card.Title>Card Title</Card.Title>
   <Card.Content>Card content</Card.Content>
-</Card>
+</Card>;
 ```
 
 Each entry in `elements` can be a tag name string or a config object:
@@ -368,7 +374,7 @@ const Card = tasty({
 
 <Card>
   <div data-element="Title">Card Title</div>
-</Card>
+</Card>;
 ```
 
 ### Selector Affix (`$`)
@@ -480,7 +486,7 @@ function Spinner() {
       from: { transform: 'rotate(0deg)' },
       to: { transform: 'rotate(360deg)' },
     },
-    { name: 'spin' }
+    { name: 'spin' },
   );
 
   return <div style={{ animation: `${spin} 1s linear infinite` }} />;
@@ -497,10 +503,14 @@ function Pulse({ scale }: { scale: number }) {
       '100%': { transform: `scale(${scale})` },
     }),
     [scale],
-    { name: 'pulse' }
+    { name: 'pulse' },
   );
 
-  return <div style={{ animation: `${pulse} 500ms ease-in-out alternate infinite` }} />;
+  return (
+    <div
+      style={{ animation: `${pulse} 500ms ease-in-out alternate infinite` }}
+    />
+  );
 }
 ```
 
@@ -556,8 +566,16 @@ For multiple weights/styles, pass an array:
 
 ```tsx
 useFontFace('Brand Sans', [
-  { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
-  { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+  {
+    src: 'url("/fonts/brand-regular.woff2") format("woff2")',
+    fontWeight: 400,
+    fontDisplay: 'swap',
+  },
+  {
+    src: 'url("/fonts/brand-bold.woff2") format("woff2")',
+    fontWeight: 700,
+    fontDisplay: 'swap',
+  },
 ]);
 ```
 
@@ -575,11 +593,14 @@ Inject a `@counter-style` rule and get back the counter style name. Permanent �
 import { useCounterStyle } from '@tenphi/tasty';
 
 function EmojiList() {
-  const styleName = useCounterStyle({
-    system: 'cyclic',
-    symbols: '"👍"',
-    suffix: '" "',
-  }, { name: 'thumbs' });
+  const styleName = useCounterStyle(
+    {
+      system: 'cyclic',
+      symbols: '"👍"',
+      suffix: '" "',
+    },
+    { name: 'thumbs' },
+  );
 
   return (
     <ol style={{ listStyleType: styleName }}>
@@ -621,7 +642,7 @@ Inside a `tasty()` component you call functions with the same `$$name(...)` suga
 ```tsx
 const Box = tasty({
   styles: {
-    '@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } },
+    '@function': { $$negative: { args: ['$value'], result: '(-1 * $value)' } },
     margin: '$$negative(10px) top',
   },
 });

@@ -522,7 +522,7 @@ See the [full SSR guide](docs/ssr.md).
 | Import                           | Description                                                                                             | Platform       |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
 | `@tenphi/tasty`                  | React style engine (`tasty`, style functions, `configure`)                                              | Browser / Node |
-| `@tenphi/tasty/static`           | Build-time extraction authoring API (`tastyStatic`)                                                     | Browser        |
+| `@tenphi/tasty/static`           | Build-time extraction authoring API (`tastyStatic`)                                                     | Build time     |
 | `@tenphi/tasty/static/inject`    | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode                        | Browser        |
 | `@tenphi/tasty/core`             | Lower-level internals (config, parser, pipeline, injector, style handlers) for tooling and advanced use | Browser / Node |
 | `@tenphi/tasty/babel-plugin`     | Babel plugin for build-time CSS extraction                                                              | Node           |

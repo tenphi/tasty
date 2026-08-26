@@ -417,7 +417,7 @@ const Link = tasty({
 
 const Span = tasty({
   as: 'span',
-  styles: { fontWeight: 'bold' },
+  styles: { preset: 'strong' },
 });
 
 <Link href="/blog" padding="1x">Blog</Link>;

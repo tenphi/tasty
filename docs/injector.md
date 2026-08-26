@@ -518,7 +518,7 @@ metrics.cleanupHistory.forEach(cleanup => {
 
 ```typescript
 // ✅ Reuse styles - identical CSS gets deduplicated
-const buttonBase = { padding: '8px 16px', borderRadius: '4px' };
+const buttonBase = 'padding: 8px 16px; border-radius: 4px;';
 
 // ✅ Avoid frequent disposal and re-injection
 // Let the reference counting system handle cleanup

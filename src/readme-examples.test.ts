@@ -14,7 +14,7 @@ describe('README examples', () => {
         '@function': {
           $$negative: { args: ['$value'], result: '(-1 * $value)' },
         },
-        marginTop: '$$negative(2x)',
+        margin: '$$negative(2x) top',
       },
       '.card',
     );

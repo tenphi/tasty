@@ -404,7 +404,7 @@ configure({
 });
 ```
 
-Now any component can use `fontFamily: '"Brand Sans", sans-serif'` and the browser will already have the `@font-face` rules in the stylesheet.
+Now any component can use `font: '"Brand Sans", sans-serif'` and the browser will already have the `@font-face` rules in the stylesheet.
 
 See [Font Face (`@font-face`)](dsl.md#font-face-font-face) for inline usage inside component styles and the full list of supported descriptors.
 
@@ -461,7 +461,7 @@ configure({
 });
 ```
 
-Components then invoke parse functions as `double(...)` and CSS functions with the `$$name(...)` sugar, e.g. `marginTop: '$$negative(10px)'`.
+Components then invoke parse functions as `double(...)` and CSS functions with the `$$name(...)` sugar, e.g. `margin: '$$negative(10px) top'`.
 
 > A key whose prefix doesn't match its value type (an object under a bare key, or a function under a `$$` key) is **ignored with a dev-mode warning**.
 
@@ -511,7 +511,7 @@ configure({
   },
 });
 
-// Now `marginTop: '$$negative(10px)'` renders `margin-top: calc(-1 * 10px)`
+// Now `margin: '$$negative(10px) top'` renders `margin: calc(-1 * 10px) 0 0 0`
 // — no native @function rule is emitted.
 ```
 
@@ -604,7 +604,7 @@ configure({
       color: '#text',
       preset: 't2',
       margin: 0,
-      fontFamily: 'system-ui, sans-serif',
+      font: 'system-ui, sans-serif',
     },
     html: {
       overflow: 'hidden',

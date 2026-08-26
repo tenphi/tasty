@@ -185,7 +185,7 @@ configure({
     'input-reset': {
       border: 'none',
       outline: 'none',
-      fill: 'transparent',
+      fill: '#clear',
       font: true,
       preset: 't3',
     },

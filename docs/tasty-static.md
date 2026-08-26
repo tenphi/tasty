@@ -512,12 +512,12 @@ For dynamic styling needs, combine with regular CSS or CSS variables:
 ```tsx
 const card = tastyStatic({
   padding: '4x',
-  fill: 'var(--card-bg, #white)',
+  fill: '($card-bg, #white)',
 });
 
 <div
   className={card}
-  style={{ '--card-bg': isActive ? '#purple' : '#white' }}
+  style={{ '--card-bg': isActive ? 'var(--purple-color)' : 'var(--white-color)' }}
 />
 ```
 

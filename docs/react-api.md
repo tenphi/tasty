@@ -58,7 +58,7 @@ const Link = tasty({
 
 const Span = tasty({
   as: 'span',
-  styles: { fontWeight: 'bold' },
+  styles: { preset: 'strong' },
 });
 
 <Link href="/blog" padding="1x">Blog</Link>;
@@ -282,7 +282,7 @@ const Button = tasty({
   variants: {
     default: { fill: '#blue', color: '#white' },
     danger: { fill: '#red', color: '#white' },
-    outline: { fill: 'transparent', color: '#blue', border: '1bw solid #blue' },
+    outline: { fill: '#clear', color: '#blue', border: '1bw solid #blue' },
   },
 });
 
@@ -606,7 +606,7 @@ Register a CSS `@function` (custom function). Permanent — no cleanup on unmoun
 ```tsx
 import { tasty, useFunction } from '@tenphi/tasty';
 
-const Box = tasty({ styles: { marginTop: '$$negative(10px)' } });
+const Box = tasty({ styles: { margin: '$$negative(10px) top' } });
 
 function Layout() {
   useFunction('$$negative', { args: ['$value'], result: '(-1 * $value)' });
@@ -622,7 +622,7 @@ Inside a `tasty()` component you call functions with the same `$$name(...)` suga
 const Box = tasty({
   styles: {
     '@function': { '$$negative': { args: ['$value'], result: '(-1 * $value)' } },
-    marginTop: '$$negative(10px)',
+    margin: '$$negative(10px) top',
   },
 });
 ```

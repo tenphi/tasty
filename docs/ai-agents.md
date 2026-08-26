@@ -201,7 +201,7 @@ At-rule keys match the real CSS at-rule names, so they are kebab-case, not camel
 ```jsx
 styles: {
   '@function': { $$negative: { args: ['$value'], result: '(-1 * $value)' } },
-  marginTop: '$$negative(2x)',
+  margin: '$$negative(2x) top',
 }
 ```
 

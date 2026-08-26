@@ -807,7 +807,7 @@ const AnimatedGradient = tasty({
   styles: {
     '$gradient-angle': '0deg',
     '#theme': 'okhst(280 80% 50%)',
-    background: 'linear-gradient($gradient-angle, #theme, transparent)',
+    image: 'linear-gradient($gradient-angle, #theme, #clear)',
     transition: '$$gradient-angle 0.3s, ##theme 0.3s',
   },
 });
@@ -838,7 +838,7 @@ const Heading = tasty({
         fontDisplay: 'swap',
       },
     },
-    fontFamily: '"Brand Sans", sans-serif',
+    font: '"Brand Sans", sans-serif',
   },
 });
 ```
@@ -942,8 +942,8 @@ const Box = tasty({
         result: '$offset $offset ($shadow-color, black)',
       },
     },
-    marginTop: '$$negative(10px)', // → margin-top: --negative(10px)
-    boxShadow: '$$shadow(#accent)', // → box-shadow: --shadow(var(--accent-color))
+    margin: '$$negative(10px) top', // → margin: --negative(10px) 0 0 0
+    shadow: '$$shadow(#accent)', // → box-shadow: --shadow(var(--accent-color))
   },
 });
 ```
@@ -956,7 +956,7 @@ Generated CSS:
   --offset: 2px;
   result: var(--offset) var(--offset) var(--shadow-color, black);
 }
-.t0 { margin-top: --negative(10px); box-shadow: --shadow(var(--accent-color)); }
+.t0 { margin: --negative(10px) 0 0 0; box-shadow: --shadow(var(--accent-color)); }
 ```
 
 ### Descriptor shape

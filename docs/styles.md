@@ -305,7 +305,7 @@ SVG fill color. Same color token syntax as `fill` and `color`. Outputs the nativ
 
 ```jsx
 svgFill="#purple.10"
-svgFill="currentColor"
+svgFill="#current"
 ```
 
 ---

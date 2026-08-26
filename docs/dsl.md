@@ -32,6 +32,17 @@ fill: { '': '#white', hovered: '#gray.05', 'theme=danger': '#red' }
 | Negated (NOT)      | `!disabled`              | `:not([data-disabled])`                                                  |
 | Exclusive (XOR)    | `hovered ^ focused`      | `[data-hovered]:not([data-focused]), :not([data-hovered])[data-focused]` |
 
+#### Automatic Native States
+
+`disabled` and `checked` are built-in automatic states. On a Tasty component, they track the corresponding native prop or attribute, so these pairs express the same component state:
+
+| Concise Tasty state | Explicit attribute selector |
+| ------------------- | --------------------------- |
+| `disabled`          | `[disabled]`                |
+| `checked`           | `[checked]`                 |
+
+Prefer the concise form when authoring Tasty component styles. Explicit attribute selectors remain valid and can be useful when targeting arbitrary attributes or when CSS-shaped syntax makes an introductory example easier to recognize.
+
 Operator precedence (highest to lowest): `!` (NOT) > `^` (XOR) > `|` (OR) > `&` (AND). Use parentheses to override: `hovered & (pressed ^ focused)`.
 
 `^` (XOR) means "exactly one of" — `A ^ B` expands to `(A & !B) | (!A & B)`. This is useful for mutually exclusive states where exactly one should be active:

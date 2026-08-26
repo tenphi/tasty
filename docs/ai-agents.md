@@ -151,6 +151,7 @@ Rules:
 3. **`_` is standalone-only** and always first (with `''` right after it, if present). `_` is a never-negated fallback floor for cases where a higher-priority branch may be *unknown* (`@supports`, container queries). If a map contains only `_` and `''`, drop the `''`.
 4. **No nested maps:** ❌ `{ hovered: { pressed: 'x' } }` → ✅ `{ 'hovered & pressed': 'x' }`
 5. **State keys never sit at the top level** of a styles object — `:hover`, `.active`, `[open]` belong inside a property value.
+6. **Prefer automatic native states:** use `disabled` and `checked` in Tasty component styles instead of `[disabled]` and `[checked]`. The concise states track the corresponding native prop or attribute automatically.
 
 ```jsx
 color: { '': '#text', hovered: '#accent', disabled: '#text.40' }

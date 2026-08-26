@@ -39,15 +39,15 @@ const Button = tasty({
       '': 'royalblue',
       ':hover': 'blue',
       ':active': 'navy',
-      '[disabled]': 'lightgray',
+      disabled: 'lightgray',
     },
     color: {
       '': 'white',
-      '[disabled]': 'dimgray',
+      disabled: 'dimgray',
     },
     cursor: {
       '': 'pointer',
-      '[disabled]': 'not-allowed',
+      disabled: 'not-allowed',
     },
   },
 });
@@ -62,7 +62,9 @@ export default function App() {
 }
 ```
 
-`tasty()` returns a normal React component. The keys in each state map define priority: later branches win over earlier ones. Because `[disabled]` is last, a disabled button keeps its disabled styles even while the pointer is over it.
+`tasty()` returns a normal React component. The keys in each state map define priority: later branches win over earlier ones. Because `disabled` is last, a disabled button keeps its disabled styles even while the pointer is over it.
+
+`disabled` and `checked` are built-in automatic states. Tasty activates them from the corresponding native prop or attribute, so `disabled` is the concise Tasty form of `[disabled]`, and `checked` is the concise form of `[checked]`.
 
 Tasty compiles that priority into selectors that exclude one another. The hover, active, and disabled background rules cannot all match and ask the CSS cascade to decide the winner.
 

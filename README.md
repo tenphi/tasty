@@ -141,22 +141,22 @@ const Button = tasty({
       '': '#primary',
       ':hover': '#primary-hover',
       ':active': '#primary-pressed',
-      '[disabled]': '#surface',
+      disabled: '#surface',
     },
     color: {
       '': '#on-primary',
-      '[disabled]': '#text.40',
+      disabled: '#text.40',
     },
     cursor: {
       '': 'pointer',
-      '[disabled]': 'not-allowed',
+      disabled: 'not-allowed',
     },
     transition: 'theme',
   },
 });
 ```
 
-State keys support pseudo-classes first (`:hover`, `:active`), then modifiers (`theme=danger`), attributes (`[disabled]`), media/container queries, root states, and more. Tasty compiles them into exclusive selectors automatically.
+State keys support pseudo-classes (`:hover`, `:active`), modifiers (`theme=danger`), attributes, media/container queries, root states, and more. The built-in `disabled` and `checked` states automatically track their corresponding native props or attributes; `disabled` is the concise Tasty form of `[disabled]`. Tasty compiles state maps into exclusive selectors automatically.
 
 ### Extend any component
 

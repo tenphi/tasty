@@ -1,6 +1,8 @@
-# Zero Runtime Mode (tastyStatic)
+# Build-Time Extraction (`tastyStatic`)
 
-`tastyStatic` is a build-time utility for generating CSS with zero runtime overhead. It's designed for static sites, no-JS websites, and performance-critical applications where you want to eliminate all runtime styling code. For the broader docs map, see the [Docs Hub](README.md).
+`tastyStatic` is Tasty's framework-agnostic build-time utility for extracting CSS before rendering. It produces no client styling runtime in file mode, but it is not the only way to achieve zero-runtime delivery: server-only `tasty()` also ships no Tasty runtime to the browser while retaining the full React component API. Astro's `tastyIntegration({ islands: false })` is the clearest example; the same architecture applies to server-only Next.js RSC.
+
+Choose `tastyStatic` specifically when styles must be generated during the build, when the consumer is not React, or when you want static class-name objects instead of components. For the broader docs map, see the [Docs Hub](README.md).
 
 ---
 
@@ -8,19 +10,19 @@
 
 - **Static site generation (SSG)** — Pre-render all styles at build time
 - **No-JavaScript websites** — CSS works without any JS runtime
-- **Performance-critical pages** — Zero runtime overhead for styling
+- **Performance-critical pages** — CSS extracted before the application renders
 - **Landing pages** — Minimal bundle size with pre-generated CSS
 
 ## Requirements
 
-The zero-runtime mode is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
+Build-time extraction is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
 
-| Dependency | Version | Required for |
-|---|---|---|
-| `@babel/core` | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`) |
-| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin |
-| `@babel/types` | >= 7.24 | Babel plugin |
-| `jiti` | >= 2.6 | Next.js wrapper (`@tenphi/tasty/zero/next`) when using `configFile` option |
+| Dependency                   | Version | Required for                                                               |
+| ---------------------------- | ------- | -------------------------------------------------------------------------- |
+| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)                                |
+| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                                               |
+| `@babel/types`               | >= 7.24 | Babel plugin                                                               |
+| `jiti`                       | >= 2.6  | Next.js wrapper (`@tenphi/tasty/zero/next`) when using `configFile` option |
 
 All of these are declared as optional peer dependencies of `@tenphi/tasty`. Install only what your setup requires:
 
@@ -107,11 +109,11 @@ tastyStatic('body', {
 
 ## StaticStyle Object
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `className` | `string` | Space-separated class names for use in JSX |
-| `styles` | `Styles` | The original (or merged) styles object |
-| `toString()` | `() => string` | Returns `className` for string coercion |
+| Property     | Type           | Description                                |
+| ------------ | -------------- | ------------------------------------------ |
+| `className`  | `string`       | Space-separated class names for use in JSX |
+| `styles`     | `Styles`       | The original (or merged) styles object     |
+| `toString()` | `() => string` | Returns `className` for string coercion    |
 
 ---
 
@@ -123,67 +125,73 @@ tastyStatic('body', {
 // babel.config.js
 module.exports = {
   plugins: [
-    ['@tenphi/tasty/babel-plugin', {
-      output: 'public/tasty.css',
-    }]
-  ]
+    [
+      '@tenphi/tasty/babel-plugin',
+      {
+        output: 'public/tasty.css',
+      },
+    ],
+  ],
 };
 ```
 
-These examples use `data-schema="dark"` as the root-state convention. If your app already uses a different root attribute such as `data-theme`, keep the same alias pattern and swap the attribute name consistently in your zero-runtime config.
+These examples use `data-schema="dark"` as the root-state convention. If your app already uses a different root attribute such as `data-theme`, keep the same alias pattern and swap the attribute name consistently in your build-time config.
 
 ### With Configuration
 
 ```javascript
 module.exports = {
   plugins: [
-    ['@tenphi/tasty/babel-plugin', {
-      output: 'public/tasty.css',
-      config: {
-        states: {
-          '@mobile': '@media(w < 768px)',
-          '@tablet': '@media(w < 1024px)',
-          '@dark': '@root(schema=dark)',
+    [
+      '@tenphi/tasty/babel-plugin',
+      {
+        output: 'public/tasty.css',
+        config: {
+          states: {
+            '@mobile': '@media(w < 768px)',
+            '@tablet': '@media(w < 1024px)',
+            '@dark': '@root(schema=dark)',
+          },
+          devMode: true,
         },
-        devMode: true,
       },
-    }]
-  ]
+    ],
+  ],
 };
 ```
 
 ### Plugin Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `output` | `string` | `'tasty.css'` | Path for generated CSS file |
-| `mode` | `'file' \| 'inject'` | `'file'` | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS (see [Inject Mode](#inject-mode)) |
-| `configFile` | `string` | — | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack. |
-| `config` | `TastyZeroConfig \| () => TastyZeroConfig` | `{}` | Inline config object or factory function. Takes precedence over `configFile`. |
-| `configDeps` | `string[]` | `[]` | Absolute file paths that affect config (for cache invalidation) |
-| `injectImport` | `boolean` | `true` | Replace `@tenphi/tasty/static` imports with an import of the generated CSS file. Set to `false` to manage CSS imports manually. |
-| `config.states` | `Record<string, string>` | `{}` | Predefined state aliases (e.g. `{ '@mobile': '@media(w < 768px)' }`) |
-| `config.devMode` | `boolean` | `false` | Add source comments to CSS |
-| `config.tokens` | `ConfigTokens` | — | Design tokens injected as CSS custom properties on `:root`. Values are parsed through the Tasty DSL. Supports state maps for responsive/themed tokens. |
-| `config.replaceTokens` | `Record<string, string \| number>` | — | Parse-time token substitution. Keys use `$name` for custom properties and `#name` for color tokens. |
-| `config.recipes` | `Record<string, RecipeStyles>` | `{}` | Predefined style recipes |
-| `config.keyframes` | `Record<string, KeyframesSteps>` | — | Global `@keyframes` definitions available to all `tastyStatic` calls |
-| `config.fontFaces` | `Record<string, FontFaceInput>` | — | Global `@font-face` definitions |
-| `config.counterStyles` | `Record<string, CounterStyleDescriptors>` | — | Global `@counter-style` definitions |
-| `config.units` | `Record<string, string \| UnitHandler>` | — | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }` |
-| `config.functions` | `Record<string, FunctionDefinition \| Function>` | — | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
-| `config.polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time |
-| `config.plugins` | `TastyPlugin[]` | — | Plugins that extend tasty with custom functions, units, states, and handlers |
-| `config.handlers` | `Record<string, StyleHandlerDefinition>` | — | Custom style handlers that transform style properties into CSS declarations |
-| `config.presets` | `Record<string, TypographyPreset>` | — | Typography presets — shorthand for `generateTypographyTokens()`. Generated tokens merge under explicit `tokens`. |
-| `config.globalStyles` | `Record<string, Styles>` | — | Global Tasty styles keyed by CSS selector. Supports the full style syntax. |
-| `config.autoPropertyTypes` | `boolean` | `true` | Automatically infer and register CSS `@property` declarations from values |
-| `config.parserCacheSize` | `number` | `1000` | Parser LRU cache size. Larger values improve performance for builds with many unique style values |
-| `config.namePrefix` | `string` | `'ts'` | Prefix prepended to every generated identifier. Defaults to `'ts'` so static classes never collide with runtime (`'t'`) classes. See [Configuration: Name prefix](configuration.md#name-prefix). |
+| Option                     | Type                                             | Default       | Description                                                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `output`                   | `string`                                         | `'tasty.css'` | Path for generated CSS file                                                                                                                                                                      |
+| `mode`                     | `'file' \| 'inject'`                             | `'file'`      | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS (see [Inject Mode](#inject-mode))                                                                                                |
+| `configFile`               | `string`                                         | —             | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack.                                             |
+| `config`                   | `TastyZeroConfig \| () => TastyZeroConfig`       | `{}`          | Inline config object or factory function. Takes precedence over `configFile`.                                                                                                                    |
+| `configDeps`               | `string[]`                                       | `[]`          | Absolute file paths that affect config (for cache invalidation)                                                                                                                                  |
+| `injectImport`             | `boolean`                                        | `true`        | Replace `@tenphi/tasty/static` imports with an import of the generated CSS file. Set to `false` to manage CSS imports manually.                                                                  |
+| `config.states`            | `Record<string, string>`                         | `{}`          | Predefined state aliases (e.g. `{ '@mobile': '@media(w < 768px)' }`)                                                                                                                             |
+| `config.devMode`           | `boolean`                                        | `false`       | Add source comments to CSS                                                                                                                                                                       |
+| `config.tokens`            | `ConfigTokens`                                   | —             | Design tokens injected as CSS custom properties on `:root`. Values are parsed through the Tasty DSL. Supports state maps for responsive/themed tokens.                                           |
+| `config.replaceTokens`     | `Record<string, string \| number>`               | —             | Parse-time token substitution. Keys use `$name` for custom properties and `#name` for color tokens.                                                                                              |
+| `config.recipes`           | `Record<string, RecipeStyles>`                   | `{}`          | Predefined style recipes                                                                                                                                                                         |
+| `config.keyframes`         | `Record<string, KeyframesSteps>`                 | —             | Global `@keyframes` definitions available to all `tastyStatic` calls                                                                                                                             |
+| `config.fontFaces`         | `Record<string, FontFaceInput>`                  | —             | Global `@font-face` definitions                                                                                                                                                                  |
+| `config.counterStyles`     | `Record<string, CounterStyleDescriptors>`        | —             | Global `@counter-style` definitions                                                                                                                                                              |
+| `config.units`             | `Record<string, string \| UnitHandler>`          | —             | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }`                                                                                                         |
+| `config.functions`         | `Record<string, FunctionDefinition \| Function>` | —             | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions                                                                                  |
+| `config.polyfills`         | `{ functions?: boolean }`                        | `{}`          | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time                                                                                                       |
+| `config.plugins`           | `TastyPlugin[]`                                  | —             | Plugins that extend tasty with custom functions, units, states, and handlers                                                                                                                     |
+| `config.handlers`          | `Record<string, StyleHandlerDefinition>`         | —             | Custom style handlers that transform style properties into CSS declarations                                                                                                                      |
+| `config.presets`           | `Record<string, TypographyPreset>`               | —             | Typography presets — shorthand for `generateTypographyTokens()`. Generated tokens merge under explicit `tokens`.                                                                                 |
+| `config.globalStyles`      | `Record<string, Styles>`                         | —             | Global Tasty styles keyed by CSS selector. Supports the full style syntax.                                                                                                                       |
+| `config.autoPropertyTypes` | `boolean`                                        | `true`        | Automatically infer and register CSS `@property` declarations from values                                                                                                                        |
+| `config.parserCacheSize`   | `number`                                         | `1000`        | Parser LRU cache size. Larger values improve performance for builds with many unique style values                                                                                                |
+| `config.namePrefix`        | `string`                                         | `'ts'`        | Prefix prepended to every generated identifier. Defaults to `'ts'` so static classes never collide with runtime (`'t'`) classes. See [Configuration: Name prefix](configuration.md#name-prefix). |
 
-### Coexisting with runtime tasty
+### Coexisting with `tasty()`
 
-When a page mixes `tastyStatic` with runtime `tasty`, both must use **different** `namePrefix` values. The defaults handle this automatically (`'t'` for runtime, `'ts'` for zero-runtime). If you customize one, customize the other:
+When a page mixes `tastyStatic` with `tasty`, both must use **different** `namePrefix` values. The defaults handle this automatically (`'t'` for React rendering, `'ts'` for build-time extraction). If you customize one, customize the other:
 
 ```ts
 // tasty-zero.config.ts (Babel plugin)
@@ -191,7 +199,7 @@ export default { namePrefix: 'mbs' };
 ```
 
 ```ts
-// app entry (runtime configure)
+// app entry (`tasty()` configure)
 configure({ namePrefix: 'mb' });
 ```
 
@@ -205,16 +213,24 @@ Recipes work with `tastyStatic` the same way as with runtime `tasty`:
 // babel.config.js
 module.exports = {
   plugins: [
-    ['@tenphi/tasty/babel-plugin', {
-      output: 'public/tasty.css',
-      config: {
-        recipes: {
-          card: { padding: '4x', fill: '#surface', radius: '1r', border: true },
-          elevated: { shadow: '2x 2x 4x #shadow' },
+    [
+      '@tenphi/tasty/babel-plugin',
+      {
+        output: 'public/tasty.css',
+        config: {
+          recipes: {
+            card: {
+              padding: '4x',
+              fill: '#surface',
+              radius: '1r',
+              border: true,
+            },
+            elevated: { shadow: '2x 2x 4x #shadow' },
+          },
         },
       },
-    }]
-  ]
+    ],
+  ],
 };
 ```
 
@@ -226,7 +242,7 @@ const card = tastyStatic({
   color: '#text',
 });
 
-<div className={card}>Styled card</div>
+<div className={card}>Styled card</div>;
 ```
 
 ---
@@ -250,14 +266,14 @@ export default withTastyZero({
 
 ### `withTastyZero` Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `output` | `string` | `'public/tasty.css'` | Output path for CSS relative to project root |
-| `mode` | `'file' \| 'inject'` | `'file'` | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS |
-| `enabled` | `boolean` | `true` | Enable/disable the plugin |
-| `configFile` | `string` | — | Path to a TS/JS module that default-exports `TastyZeroConfig`. Recommended for Turbopack compatibility. |
-| `config` | `TastyZeroConfig` | — | Inline config object. For static configs that don't change during dev. |
-| `configDeps` | `string[]` | `[]` | Extra files the config depends on (for cache invalidation) |
+| Option       | Type                 | Default              | Description                                                                                             |
+| ------------ | -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `output`     | `string`             | `'public/tasty.css'` | Output path for CSS relative to project root                                                            |
+| `mode`       | `'file' \| 'inject'` | `'file'`             | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS                                         |
+| `enabled`    | `boolean`            | `true`               | Enable/disable the plugin                                                                               |
+| `configFile` | `string`             | —                    | Path to a TS/JS module that default-exports `TastyZeroConfig`. Recommended for Turbopack compatibility. |
+| `config`     | `TastyZeroConfig`    | —                    | Inline config object. For static configs that don't change during dev.                                  |
+| `configDeps` | `string[]`           | `[]`                 | Extra files the config depends on (for cache invalidation)                                              |
 
 ### Turbopack Support
 
@@ -295,12 +311,15 @@ export default defineConfig({
     react({
       babel: {
         plugins: [
-          ['@tenphi/tasty/babel-plugin', {
-            output: 'public/tasty.css',
-            config: {
-              states: { '@mobile': '@media(w < 768px)' },
+          [
+            '@tenphi/tasty/babel-plugin',
+            {
+              output: 'public/tasty.css',
+              config: {
+                states: { '@mobile': '@media(w < 768px)' },
+              },
             },
-          }],
+          ],
         ],
       },
     }),
@@ -334,7 +353,9 @@ export const Button = () => <button className={button}>Click</button>;
 const button = {
   className: 'ts3f2a1b ts8c4d2e',
   styles: { padding: '2x 4x', fill: '#purple', color: '#white' },
-  toString() { return this.className; }
+  toString() {
+    return this.className;
+  },
 };
 
 export const Button = () => <button className={button}>Click</button>;
@@ -382,13 +403,16 @@ This is ideal for **reusable components**, **extensions**, and **libraries** whe
 // babel.config.js
 module.exports = {
   plugins: [
-    ['@tenphi/tasty/babel-plugin', {
-      mode: 'inject',
-      config: {
-        states: { '@mobile': '@media(w < 768px)' },
+    [
+      '@tenphi/tasty/babel-plugin',
+      {
+        mode: 'inject',
+        config: {
+          states: { '@mobile': '@media(w < 768px)' },
+        },
       },
-    }]
-  ]
+    ],
+  ],
 };
 ```
 
@@ -428,13 +452,20 @@ tastyStatic('.heading', { preset: 'h1' });
 ```tsx
 import { injectCSS as _$i } from '@tenphi/tasty/static/inject';
 
-const button = (_$i("ts3f2a1b ts8c4d2e", ".ts3f2a1b.ts3f2a1b{padding:16px 32px}\n.ts8c4d2e.ts8c4d2e{background:#9370db}"), {
-  className: 'ts3f2a1b ts8c4d2e',
-  styles: { padding: '2x 4x', fill: '#purple' },
-  toString() { return this.className; }
-});
+const button =
+  (_$i(
+    'ts3f2a1b ts8c4d2e',
+    '.ts3f2a1b.ts3f2a1b{padding:16px 32px}\n.ts8c4d2e.ts8c4d2e{background:#9370db}',
+  ),
+  {
+    className: 'ts3f2a1b ts8c4d2e',
+    styles: { padding: '2x 4x', fill: '#purple' },
+    toString() {
+      return this.className;
+    },
+  });
 
-_$i(".heading", ".heading{font-size:2.5rem;font-weight:700;line-height:1.2}");
+_$i('.heading', '.heading{font-size:2.5rem;font-weight:700;line-height:1.2}');
 ```
 
 ### Dev Mode / HMR
@@ -443,7 +474,7 @@ Class names are content-hashed (`ts` + MD5). When styles change, a new hash prod
 
 ### Limitations (inject mode)
 
-- **Client-side only** — Styles are injected via the DOM, so they are not available during SSR. For server-rendered apps, use `mode: 'file'` or the runtime `tasty()`.
+- **Client-side only** — Styles are injected via the DOM, so they are not available during SSR. For server-rendered apps, use `mode: 'file'` or React `tasty()`.
 - **Larger JS bundle** — CSS is embedded in JavaScript, increasing bundle size. Best suited for components and extensions, not full-app styling.
 
 ---
@@ -517,8 +548,10 @@ const card = tastyStatic({
 
 <div
   className={card}
-  style={{ '--card-bg': isActive ? 'var(--purple-color)' : 'var(--white-color)' }}
-/>
+  style={{
+    '--card-bg': isActive ? 'var(--purple-color)' : 'var(--white-color)',
+  }}
+/>;
 ```
 
 ---
@@ -535,15 +568,15 @@ const card = tastyStatic({
 ## Common Issues
 
 - No CSS file is generated: make sure the Babel plugin actually runs for files importing `@tenphi/tasty/static`, and verify the `output` path is writable.
-- Styles stay dynamic by mistake: `tastyStatic()` only supports build-time-known values. Move runtime values to CSS variables or switch that component to runtime `tasty()`.
+- Styles stay dynamic by mistake: `tastyStatic()` only supports build-time-known values. Move dynamic values to CSS variables or switch that component to React `tasty()`.
 - Turbopack config behaves inconsistently: prefer `configFile` over inline functions so the setup stays JSON-serializable.
 
 ---
 
 ## Related
 
-- [Docs Hub](README.md) — Choose the right guide by task or rendering mode
+- [Docs Hub](README.md) — Choose the right guide by task or CSS delivery model
 - [Style DSL](dsl.md) — State maps, tokens, units, extending semantics (shared by runtime and static)
-- [React API](react-api.md) — Runtime styling: `tasty()` factory, component props, variants, sub-elements, style functions
+- [React API](react-api.md) — Client or server rendering with `tasty()`: component props, variants, sub-elements, and style functions
 - [Configuration](configuration.md) — Global configuration: tokens, recipes, custom units, and style handlers
 - [Plugins & Extension Points](plugins.md) — Which extension points work at build time (`functions`, `units`, `states`, `handlers`, `recipes`) and which do not (`propHandlers` — `tastyStatic()` takes styles objects, not props)

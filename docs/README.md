@@ -1,25 +1,29 @@
 # Tasty Docs
 
-Tasty is a styling engine for design systems that turns component state into deterministic CSS by compiling state maps into mutually exclusive selectors. Use this hub to choose the right guide once you know whether you are evaluating the model, adopting it in a design system, or implementing reusable, stateful components day to day.
+Tasty is CSS-in-JS for React design systems. You describe hover, disabled, variants, themes, responsive behavior, and other conditions as state maps; Tasty compiles them so one branch wins without specificity fights or source-order surprises.
+
+Use this hub to move from the core idea to a working component, then into design-system patterns or API reference as needed.
 
 ## Start Here
 
-- **New to Tasty**: [Getting Started](getting-started.md) for installation, the first component, optional shared `configure()`, ESLint, editor tooling, and rendering mode selection.
-- **Learning the component model**: [Methodology](methodology.md) for root + sub-elements, `styleProps`, tokens, extension, and recommended boundaries between `styles`, `style`, and wrappers.
-- **Evaluating the selector model**: [Style rendering pipeline](pipeline.md) for how mutually exclusive selectors make stateful styling deterministic.
-- **Evaluating fit**: [Comparison](comparison.md) for tool-selection context, then [Adoption Guide](adoption.md) for audience fit and rollout strategy inside a design system.
+- **Understand why**: [Introduction](../README.md) for the problem, the state-map model, and the product overview.
+- **Try it**: [Getting Started](getting-started.md) to build a stateful component, add shared configuration, and choose a rendering mode.
+- **Build a component system**: [Methodology](methodology.md) for root + sub-elements, typed public APIs, tokens, and extension patterns; then [Building a Design System](design-system.md).
+- **Evaluate or adopt it**: [Comparison](comparison.md) for tool-selection context and [Adoption Guide](adoption.md) for an incremental rollout.
+- **Understand the compiler**: [Style rendering pipeline](pipeline.md) for how state maps become mutually exclusive selectors.
 
 ## By Role
 
 - **Application developer using an existing design system**: [Getting Started](getting-started.md), then [React API](react-api.md).
 - **Design-system author**: [Methodology](methodology.md), [Building a Design System](design-system.md), [Configuration](configuration.md), and [Adoption Guide](adoption.md).
-- **Platform or tooling engineer**: [Configuration](configuration.md), [Zero Runtime (tastyStatic)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
+- **Platform or tooling engineer**: [Configuration](configuration.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
 
 ## By Styling Approach
 
 - **React components**: [React API](react-api.md)
-- **Zero-runtime / build-time extraction**: [Zero Runtime (tastyStatic)](tasty-static.md)
-- **Runtime `tasty()` with server collection and hydration**: [Server-Side Rendering](ssr.md)
+- **Zero-client-runtime React with `tasty()`**: [Server-Side Rendering](ssr.md), especially the static Astro integration
+- **Build-time extraction with `tastyStatic()`**: [Build-Time Extraction](tasty-static.md)
+- **Hydrated `tasty()` with server collection**: [Server-Side Rendering](ssr.md)
 - **Upgrading from v2**: [Migration Guide (v2 → v3)](migration-v3.md)
 
 ## By Task

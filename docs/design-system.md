@@ -1,8 +1,8 @@
 # Building a Design System
 
-This guide walks through building a design-system styling layer on top of Tasty — defining tokens, state aliases, recipes, primitive components, and compound components with sub-elements.
+This guide shows how to build shared React components whose styles stay predictable as states, variants, themes, and responsive rules accumulate. You will define tokens, state aliases, recipes, primitive APIs, and compound components with sub-elements.
 
-It assumes you have already decided to adopt Tasty. The goal is not just to centralize tokens, but to define a styling language whose component states resolve deterministically across variants, responsive rules, and sub-elements. For evaluation criteria, audience fit, and incremental adoption phases, see the [Adoption Guide](adoption.md). For the recommended component patterns and mental model, see [Methodology](methodology.md).
+It assumes you have already decided to adopt Tasty. The goal is not only to centralize values, but to give your design system one state model and a governed component-facing styling API. For evaluation criteria and incremental rollout, see the [Adoption Guide](adoption.md). For the recommended component architecture, see [Methodology](methodology.md).
 
 ---
 
@@ -43,8 +43,8 @@ configure({
     '#border': '#e0e0e0',
 
     // Unit values
-    '$gap': '8px',
-    '$radius': '4px',
+    $gap: '8px',
+    $radius: '4px',
     '$border-width': '1px',
     '$outline-width': '2px',
   },
@@ -91,8 +91,18 @@ import { configure } from '@tenphi/tasty';
 
 configure({
   presets: {
-    h1: { fontSize: '2rem', lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: 700 },
-    t2: { fontSize: '0.875rem', lineHeight: '1.5', letterSpacing: 'normal', fontWeight: 400 },
+    h1: {
+      fontSize: '2rem',
+      lineHeight: '1.2',
+      letterSpacing: '-0.02em',
+      fontWeight: 700,
+    },
+    t2: {
+      fontSize: '0.875rem',
+      lineHeight: '1.5',
+      letterSpacing: 'normal',
+      fontWeight: 400,
+    },
   },
 });
 ```
@@ -123,8 +133,16 @@ Register your design system's custom fonts via `configure({ fontFaces })` so eve
 configure({
   fontFaces: {
     'Brand Sans': [
-      { src: 'url("/fonts/brand-regular.woff2") format("woff2")', fontWeight: 400, fontDisplay: 'swap' },
-      { src: 'url("/fonts/brand-bold.woff2") format("woff2")', fontWeight: 700, fontDisplay: 'swap' },
+      {
+        src: 'url("/fonts/brand-regular.woff2") format("woff2")',
+        fontWeight: 400,
+        fontDisplay: 'swap',
+      },
+      {
+        src: 'url("/fonts/brand-bold.woff2") format("woff2")',
+        fontWeight: 700,
+        fontDisplay: 'swap',
+      },
     ],
   },
 });
@@ -144,7 +162,8 @@ configure({
     '@mobile': '@media(w < 768px)',
     '@tablet': '@media(768px <= w < 1024px)',
     '@desktop': '@media(w >= 1024px)',
-    '@dark': '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
+    '@dark':
+      '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
     '@reduced-motion': '@media(prefers-reduced-motion: reduce)',
   },
 });
@@ -211,7 +230,7 @@ const ProfileCard = tasty({
 });
 ```
 
-Use the `/` separator when a recipe should be applied *after* local styles (post-merge), so recipe states take priority:
+Use the `/` separator when a recipe should be applied _after_ local styles (post-merge), so recipe states take priority:
 
 ```tsx
 const Input = tasty({
@@ -283,12 +302,12 @@ Product engineers use these to compose layouts without writing CSS:
 
 Match the prop set to the component's role:
 
-| Component category | Recommended styleProps |
-|--------------------|----------------------|
-| Layout containers (`Space`, `Box`, `Grid`) | `FLOW_STYLES` — flow, gap, align, justify, padding, fill |
-| Positioned elements (`Button`, `Badge`) | `POSITION_STYLES` — placeSelf, gridArea, order |
-| Text elements | `['preset', 'color']` or a custom subset |
-| Compound components | Typically none — styling happens via sub-elements and wrapping |
+| Component category                         | Recommended styleProps                                         |
+| ------------------------------------------ | -------------------------------------------------------------- |
+| Layout containers (`Space`, `Box`, `Grid`) | `FLOW_STYLES` — flow, gap, align, justify, padding, fill       |
+| Positioned elements (`Button`, `Badge`)    | `POSITION_STYLES` — placeSelf, gridArea, order                 |
+| Text elements                              | `['preset', 'color']` or a custom subset                       |
+| Compound components                        | Typically none — styling happens via sub-elements and wrapping |
 
 Exposing too many props weakens the design system's constraints. See [Methodology — styleProps as the public API](methodology.md#styleprops-as-the-public-api) for the rationale.
 
@@ -335,9 +354,7 @@ Usage:
 ```tsx
 <Card>
   <Card.Title>Monthly Revenue</Card.Title>
-  <Card.Content>
-    $1.2M — up 12% from last month.
-  </Card.Content>
+  <Card.Content>$1.2M — up 12% from last month.</Card.Content>
   <Card.Footer>
     <Button>Details</Button>
   </Card.Footer>
@@ -365,13 +382,15 @@ A design system works best when the rules for customization are explicit. Tasty 
 2. **Use modProps** — control component states through typed props instead of `mods`:
 
 ```tsx
-<Button isLoading size="large">Submit</Button>
+<Button isLoading size="large">
+  Submit
+</Button>
 ```
 
 3. **Pass tokens** — inject runtime values through the `tokens` prop for per-instance customization:
 
 ```tsx
-<ProgressBar tokens={{ '$progress': `${percent}%` }} />
+<ProgressBar tokens={{ $progress: `${percent}%` }} />
 ```
 
 4. **Create styled wrappers** — extend a component's styles with `tasty(Base, { styles })`:

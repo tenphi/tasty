@@ -43,23 +43,23 @@ configure({ plugins: [spacingPlugin()] });
 
 ## Choosing an extension point
 
-| You want to add | Use | Runs | Zero-runtime |
-|---|---|---|---|
-| New value syntax — `okhsl(…)`, `double(2x)` | `functions` (bare key) | parse time, per value | ✅ |
-| A reusable CSS `@function` | `functions` (`$$name` key) | injected once, globally | ✅ |
-| A new unit — `2gu` | `units` | parse time, per value | ✅ |
-| A new state alias — `@mobile` | `states` | state-key parse | ✅ |
-| A style property → **CSS declarations** | `handlers` | pipeline, per state snapshot | ✅ |
-| A style property on every component | `baseStyleProps` | prop harvest | ✅ (styles only) |
-| A **component prop** → anything | `propHandlers` | render, per component | ❌ (no props to run on) |
-| A named bundle of styles | `recipes` | before chunking | ✅ |
-| Typography scale tokens | `presets` | inject time | ✅ |
-| `:root` variables | `tokens`, `replaceTokens` | inject time | ✅ |
-| Global selector styles | `globalStyles` | inject time | ✅ |
+| You want to add                             | Use                        | Runs                         | Build-time extraction   |
+| ------------------------------------------- | -------------------------- | ---------------------------- | ----------------------- |
+| New value syntax — `okhsl(…)`, `double(2x)` | `functions` (bare key)     | parse time, per value        | ✅                      |
+| A reusable CSS `@function`                  | `functions` (`$$name` key) | injected once, globally      | ✅                      |
+| A new unit — `2gu`                          | `units`                    | parse time, per value        | ✅                      |
+| A new state alias — `@mobile`               | `states`                   | state-key parse              | ✅                      |
+| A style property → **CSS declarations**     | `handlers`                 | pipeline, per state snapshot | ✅                      |
+| A style property on every component         | `baseStyleProps`           | prop harvest                 | ✅ (styles only)        |
+| A **component prop** → anything             | `propHandlers`             | render, per component        | ❌ (no props to run on) |
+| A named bundle of styles                    | `recipes`                  | before chunking              | ✅                      |
+| Typography scale tokens                     | `presets`                  | inject time                  | ✅                      |
+| `:root` variables                           | `tokens`, `replaceTokens`  | inject time                  | ✅                      |
+| Global selector styles                      | `globalStyles`             | inject time                  | ✅                      |
 
 Two distinctions do most of the work:
 
-- **`handlers` vs `propHandlers`.** A handler turns a *style property* into CSS declarations and knows nothing about components. A prop handler turns a *component prop* into other props — including `styles`, which then flow through the normal handlers. Reach for `propHandlers` when the input isn't a style value (an options object, a domain concept) or when it should affect more than styles.
+- **`handlers` vs `propHandlers`.** A handler turns a _style property_ into CSS declarations and knows nothing about components. A prop handler turns a _component prop_ into other props — including `styles`, which then flow through the normal handlers. Reach for `propHandlers` when the input isn't a style value (an options object, a domain concept) or when it should affect more than styles.
 - **`recipes` vs `propHandlers`.** A recipe is a static named bundle. A prop handler computes its styles from a value.
 
 ---
@@ -123,12 +123,12 @@ configure({
 
 **The key is the trigger.** By default a handler runs only when a prop matching its key is present, so an absent prop costs one property check rather than a call. Override that with a tuple:
 
-| Definition | Runs when |
-|---|---|
-| `fn` | a prop named after the key is present |
-| `['glaze', fn]` | `glaze` is present |
-| `[['glaze', 'tint'], fn]` | either is present |
-| `['*', fn]` | always |
+| Definition                | Runs when                             |
+| ------------------------- | ------------------------------------- |
+| `fn`                      | a prop named after the key is present |
+| `['glaze', fn]`           | `glaze` is present                    |
+| `[['glaze', 'tint'], fn]` | either is present                     |
+| `['*', fn]`               | always                                |
 
 **Chaining.** Handlers run in registration order — plugins first, then direct `configure()` — and each receives the previous one's output. Registering the same key twice replaces the handler in place, keeping its position.
 
@@ -136,16 +136,16 @@ configure({
 
 ### Rules
 
-- **Be pure. Never mutate the input.** Style values are cached by object identity, so mutating a value object in place yields a stale class name *and* stale CSS. Return fresh objects.
+- **Be pure. Never mutate the input.** Style values are cached by object identity, so mutating a value object in place yields a stale class name _and_ stale CSS. Return fresh objects.
 - **Memoize the styles you build, per input value.** A reference-stable (ideally frozen) styles object lets the cache key reuse its serialization instead of recomputing it on every render. This is the single highest-leverage thing you can do for performance.
 - **Precedence is fixed** and not adjustable from a handler. Styles are merged as `factory defaults → styles → harvested style props`, and injected styles occupy the `styles` slot: they beat a component's own default styles and lose to a style prop passed at the call site. This matches how `recipe` already behaves.
-- **Prefer returning `styles` over bare style props.** Returning `{ fill: '#red' }` only works if `fill` is harvestable on *that* component (in its `styleProps`, or promoted via `baseStyleProps`); otherwise it leaks to the DOM.
+- **Prefer returning `styles` over bare style props.** Returning `{ fill: '#red' }` only works if `fill` is harvestable on _that_ component (in its `styleProps`, or promoted via `baseStyleProps`); otherwise it leaks to the DOM.
 
 ### What it cannot do
 
 - **`ref`** — `forwardRef` separates it from props, so it is out of reach.
 - **Sub-elements** (`Card.Title`) — they have no `styles` prop and no style-prop harvest, so middleware does not run on them.
-- **Zero-runtime mode** — see [Rendering modes](#rendering-modes-and-caveats).
+- **Build-time extraction** — see [Rendering modes](#rendering-modes-and-caveats).
 
 ---
 
@@ -161,7 +161,7 @@ configure({ baseStyleProps: ['radius', 'shadow'] });
 
 Names must be real style properties, must start with a lowercase letter, and must not collide with a prop `tasty()` consumes itself (`as`, `styles`, `variant`, `mods`, `tokens`, …); invalid entries are dropped with a development warning.
 
-`configure()` may run *after* your components are defined — each factory resolves its prop list lazily and refreshes when the registry changes.
+`configure()` may run _after_ your components are defined — each factory resolves its prop list lazily and refreshes when the registry changes.
 
 **Costs and caveats.** Each name adds one property check per render of every component, forever, so keep the list short. The effect is app-global and cannot be scoped to a subtree — use a factory's own `styleProps` for that. Be wary of names that collide with real DOM or component props (`width`, `size`, `color`): promoting one means every component swallows it as a style, including when rendering `as={SomeThirdPartyComponent}`.
 
@@ -211,7 +211,7 @@ export default {
 };
 ```
 
-`propHandlers` keys are JSX props rather than style keys, so they need no entry — but any *style* name or token a handler expands into does.
+`propHandlers` keys are JSX props rather than style keys, so they need no entry — but any _style_ name or token a handler expands into does.
 
 ---
 
@@ -274,7 +274,11 @@ export const glazePlugin: TastyPluginFactory = () => ({
 
   // Typed so `#glaze-bg` animates smoothly instead of snapping.
   properties: {
-    '#glaze-bg': { syntax: '<color>', inherits: false, initialValue: 'transparent' },
+    '#glaze-bg': {
+      syntax: '<color>',
+      inherits: false,
+      initialValue: 'transparent',
+    },
   },
 });
 ```
@@ -302,19 +306,19 @@ declare module '@tenphi/tasty' {
 }
 ```
 
-The object value is unambiguous here precisely because `glaze` is a **prop**. A style *value* of the same shape would be indistinguishable from a state map (`{ tone: … }` looks exactly like `{ hovered: … }`), which is why this belongs in `propHandlers` rather than `handlers`.
+The object value is unambiguous here precisely because `glaze` is a **prop**. A style _value_ of the same shape would be indistinguishable from a state map (`{ tone: … }` looks exactly like `{ hovered: … }`), which is why this belongs in `propHandlers` rather than `handlers`.
 
 ---
 
 ## Rendering modes and caveats
 
-| Mode | `functions` / `units` / `states` / `handlers` / `recipes` / `tokens` | `propHandlers` |
-|---|---|---|
-| Client | ✅ | ✅ |
-| SSR / RSC | ✅ | ✅ |
-| Zero-runtime (`tastyStatic`) | ✅ at build time | not applicable |
+| Mode                       | `functions` / `units` / `states` / `handlers` / `recipes` / `tokens` | `propHandlers` |
+| -------------------------- | -------------------------------------------------------------------- | -------------- |
+| Client                     | ✅                                                                   | ✅             |
+| SSR / RSC                  | ✅                                                                   | ✅             |
+| Build-time (`tastyStatic`) | ✅ at build time                                                     | not applicable |
 
-**Zero-runtime.** The Babel plugin transforms `tastyStatic()` calls, which take styles objects — there are no props in that pipeline, so there is nothing for props middleware to run on. Components you render through `tasty()` are untouched by the plugin and keep the runtime injector, so `propHandlers` work there exactly as in any client app; their CSS simply comes from the injector rather than the extracted stylesheet. Everything else runs at build time, which is why handlers, functions, and units must be pure functions of their input.
+**Build-time extraction.** The Babel plugin transforms `tastyStatic()` calls, which take styles objects — there are no props in that pipeline, so there is nothing for props middleware to run on. Components rendered through `tasty()` are untouched by the plugin; `propHandlers` work whether those components render on the server or in the browser. Everything in the `tastyStatic()` path runs at build time, which is why handlers, functions, and units must be pure functions of their input.
 
 **Server and client must configure identically.** Class names are derived from resolved styles, so a handler or promoted prop registered on one side and not the other produces a hydration mismatch. This is the same requirement as `namePrefix` — see [SSR → Hydration mismatch warnings](ssr.md#hydration-mismatch-warnings).
 

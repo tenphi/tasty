@@ -2,9 +2,9 @@
 
 Use this guide when you are deciding whether Tasty is the right tool. If you have already decided to adopt it and need rollout guidance, use the [Adoption Guide](adoption.md) instead.
 
-Tasty is best understood not as a general-purpose CSS framework, but as a **styling engine for design systems and shared component APIs**.
+Tasty is CSS-in-JS for React design systems. It is built for the point where reusable components have enough intersecting states, variants, themes, and extension rules that ordinary selector competition becomes hard to reason about.
 
-It targets a different layer: helping design-system teams define a **house styling language** on top of CSS.
+Its distinctive guarantee is narrow and concrete: each property’s state map compiles into selectors that cannot compete, so one declared branch wins regardless of CSS source order.
 
 That does not require a big upfront configuration step. Tasty's built-in units and normal CSS color values work out of the box, and `okhsl(...)` is available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
 
@@ -16,7 +16,7 @@ Most styling tools focus on one of these layers:
 - utility composition
 - atomic CSS generation
 
-Tasty's house styling language can include tokens, state semantics, style props, recipes, custom units, and sub-element rules. In other words, it is a governed styling model, not just another syntax for writing CSS.
+For design-system teams, that state model can sit alongside tokens, typed style props, recipes, custom units, and sub-element rules. Tasty can therefore define the styling language exposed by shared components, not just another syntax for writing CSS.
 
 That is why syntax-level comparisons are often shallow. The more meaningful comparison is about:
 
@@ -29,14 +29,14 @@ That is why syntax-level comparisons are often shallow. The more meaningful comp
 
 ## High-level positioning
 
-| System | Best described as | Main authoring model | Conflict model | RSC / zero-JS SSG | Best fit |
-|---|---|---|---|---|---|
-| **Tasty** | Design-system styling engine | Custom DSL with tokens, state maps, recipes, style props, sub-elements, custom units | **Mutually exclusive selector resolution** for stateful styles | Yes — hook-free, server components by default | Teams building shared component APIs or a house styling language |
-| **Tailwind CSS** | Utility-first styling framework | Utility classes in markup | Utility composition, variants, and framework-controlled ordering | Yes — no JS runtime | Product teams optimizing for speed and direct authoring |
-| **Panda CSS** | Typed styling engine with atomic output | Typed style objects, recipes, generated primitives, style props | Atomic CSS with static analysis | Yes — build-time extraction | Teams wanting a DS-friendly engine with typed primitives |
-| **vanilla-extract** | Zero-runtime TS-native stylesheet system | `.css.ts` files, theme contracts, style composition | Standard CSS semantics | Yes — build-time extraction | Teams wanting static CSS and low-level control |
-| **StyleX** | Compiler-based atomic styling system | JS authoring with compiler-generated atomic CSS | Compiler-controlled atomic composition | Yes — compiler-extracted | Large app teams wanting optimized, predictable atomic styling |
-| **Stitches** (deprecated) **/ Emotion** | Component-first CSS-in-JS | Styled components, `css()` APIs, object/string styles | Composition within CSS-in-JS rules | No — requires `'use client'` | Teams optimizing for component DX and flexible styling |
+| System                                  | Best described as                        | Main authoring model                                                             | Conflict model                                                   | RSC / zero-JS SSG                             | Best fit                                                      |
+| --------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
+| **Tasty**                               | CSS-in-JS for React design systems       | CSS-like objects with state maps, tokens, recipes, style props, and sub-elements | **Mutually exclusive selector resolution** for stateful styles   | Yes — hook-free, server components by default | Teams building long-lived shared component APIs               |
+| **Tailwind CSS**                        | Utility-first styling framework          | Utility classes in markup                                                        | Utility composition, variants, and framework-controlled ordering | Yes — no JS runtime                           | Product teams optimizing for speed and direct authoring       |
+| **Panda CSS**                           | Typed styling engine with atomic output  | Typed style objects, recipes, generated primitives, style props                  | Atomic CSS with static analysis                                  | Yes — build-time extraction                   | Teams wanting a DS-friendly engine with typed primitives      |
+| **vanilla-extract**                     | Zero-runtime TS-native stylesheet system | `.css.ts` files, theme contracts, style composition                              | Standard CSS semantics                                           | Yes — build-time extraction                   | Teams wanting static CSS and low-level control                |
+| **StyleX**                              | Compiler-based atomic styling system     | JS authoring with compiler-generated atomic CSS                                  | Compiler-controlled atomic composition                           | Yes — compiler-extracted                      | Large app teams wanting optimized, predictable atomic styling |
+| **Stitches** (deprecated) **/ Emotion** | Component-first CSS-in-JS                | Styled components, `css()` APIs, object/string styles                            | Composition within CSS-in-JS rules                               | No — requires `'use client'`                  | Teams optimizing for component DX and flexible styling        |
 
 ---
 
@@ -69,8 +69,12 @@ This is especially relevant for components with intersecting states such as:
 Here is a minimal example. Two CSS rules for a button's background — one for `:hover`, one for `[disabled]`:
 
 ```css
-.btn:hover    { background: dodgerblue; }
-.btn[disabled] { background: gray; }
+.btn:hover {
+  background: dodgerblue;
+}
+.btn[disabled] {
+  background: gray;
+}
 ```
 
 When the button is both hovered **and** disabled, both selectors match with equal specificity. The last rule in source order wins. Swap the two lines and the visual behavior silently reverses — a hovered disabled button turns blue instead of gray.
@@ -81,11 +85,11 @@ In Tasty, the same intent is declared as a state map:
 fill: {
   '': '#primary',
   ':hover': '#primary-hover',
-  'disabled': '#surface',
+  '[disabled]': '#surface',
 }
 ```
 
-Tasty compiles this into selectors where `disabled` is guarded by `:not(:hover)` negations (and vice versa), so exactly one rule matches regardless of source order. The outcome is defined by the state map, not by which line comes last.
+Because `[disabled]` is declared later, it has higher priority. Tasty excludes disabled buttons from the hover selector, so exactly one background rule matches. The outcome is defined by the state map, not by which CSS rule comes last.
 
 That makes Tasty less of a "better way to write CSS objects" and more of a **state-aware style compiler for design systems**.
 
@@ -131,16 +135,36 @@ To make this concrete, consider a button with `hover`, `disabled`, and `theme=da
 **Plain CSS** — you need a selector for every intersection, and equal-specificity rules depend on source order:
 
 ```css
-.btn { background: var(--primary); color: white; cursor: pointer; }
-.btn:hover { background: var(--primary-hover); }
-.btn:active { background: var(--primary-pressed); }
-.btn[disabled] { background: var(--surface); color: var(--text-40); cursor: not-allowed; }
+.btn {
+  background: var(--primary);
+  color: white;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--primary-hover);
+}
+.btn:active {
+  background: var(--primary-pressed);
+}
+.btn[disabled] {
+  background: var(--surface);
+  color: var(--text-40);
+  cursor: not-allowed;
+}
 
 /* theme=danger overrides — must repeat disabled/hover/active */
-.btn[data-theme="danger"] { background: var(--danger); }
-.btn[data-theme="danger"]:hover { background: var(--danger-hover); }
-.btn[data-theme="danger"]:active { background: var(--danger-pressed); }
-.btn[data-theme="danger"][disabled] { background: var(--surface); }
+.btn[data-theme='danger'] {
+  background: var(--danger);
+}
+.btn[data-theme='danger']:hover {
+  background: var(--danger-hover);
+}
+.btn[data-theme='danger']:active {
+  background: var(--danger-pressed);
+}
+.btn[data-theme='danger'][disabled] {
+  background: var(--surface);
+}
 
 /* Bug: .btn:hover and .btn[disabled] have the same specificity.
    A hovered disabled button gets :hover styles — unless source order saves you. */
@@ -172,18 +196,18 @@ const Button = tasty({
       '': '#primary',
       ':hover': '#primary-hover',
       ':active': '#primary-pressed',
-      'disabled': '#surface',
+      disabled: '#surface',
       'theme=danger': '#danger',
       'theme=danger & :hover': '#danger-hover',
       'theme=danger & :active': '#danger-pressed',
     },
     color: {
       '': '#on-primary',
-      'disabled': '#text.40',
+      disabled: '#text.40',
     },
     cursor: {
       '': 'pointer',
-      'disabled': 'not-allowed',
+      disabled: 'not-allowed',
     },
   },
 });
@@ -235,12 +259,12 @@ Tasty is more opinionated.
 
 It behaves less like "TypeScript that outputs CSS" and more like a **state-aware style compiler**. It is designed to encode higher-level styling semantics rather than only expose CSS primitives in typed form.
 
-This also makes Tasty's rendering model notable:
+This also makes Tasty's delivery model notable:
 
-- `tasty()` components are hook-free and work as React Server Components. In server-only contexts (Next.js RSC, Astro without islands), they produce static HTML + CSS with zero client JavaScript — the full feature set is available without sacrificing server rendering
-- `tastyStatic()` with the Babel plugin produces static class name strings via build-time extraction, with no React dependency at runtime — the output works with any JavaScript framework
+- `tasty()` components are hook-free and work as React Server Components. In server-only contexts, they produce HTML + CSS with zero Tasty styling runtime in the browser while retaining the full React feature set. Astro without islands is the concrete integration; server-only Next.js RSC uses the same architecture.
+- `tastyStatic()` with the Babel plugin produces static class-name objects via build-time extraction, with no React dependency — the output works with any JavaScript framework.
 
-Runtime features like `styleProps`, sub-element components, and dynamic variants are available in the `tasty()` path. The `tastyStatic()` path is framework-agnostic but limited to the DSL, tokens, and state logic.
+React component features like `styleProps`, sub-element components, and dynamic variants are available in the `tasty()` path whether it renders on the server or in the browser. The `tastyStatic()` path is framework-agnostic but limited to the DSL, tokens, and state logic.
 
 So the tradeoff is roughly:
 
@@ -298,32 +322,32 @@ It is less focused on "how do I style this component ergonomically right now?" a
 - what should be allowed or constrained?
 - how do we keep style behavior deterministic as the system grows?
 
-So while Stitches and Emotion are strong tools for building components, Tasty is more naturally positioned as a **styling substrate for the design system itself**.
+So while Stitches and Emotion are strong tools for building components, Tasty is more naturally positioned as the **styling engine underneath a design system’s component API**.
 
 That makes it narrower in audience, but deeper in architectural ambition.
 
-There is also a fundamental architectural difference: Emotion and styled-components rely on React context and hooks internally, which means they require `'use client'` in modern React and cannot run as React Server Components. Tasty's style functions and `tasty()` components are hook-free, so they work as server components by default and produce zero client JavaScript in server-only contexts. This is not a minor compatibility detail — it means Tasty-based components stay as server components until *your* code needs interactivity, while Emotion and styled-components force the client boundary at the styling layer.
+There is also a fundamental architectural difference: Emotion and styled-components rely on React context and hooks internally, which means they require `'use client'` in modern React and cannot run as React Server Components. Tasty's style functions and `tasty()` components are hook-free, so they work as server components by default and ship no Tasty styling runtime in server-only contexts. This is not a minor compatibility detail — it means Tasty-based components stay as server components until _your_ code needs interactivity, while Emotion and styled-components force the client boundary at the styling layer.
 
 For teams evaluating runtime styling at scale, Tasty also documents its runtime benchmarks and caching model in the main [README](../README.md#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
 
 ---
 
-## Build-time vs runtime
+## Where styles are computed
 
 Tasty is not limited to one execution model.
 
-The term "runtime" in `tasty()` refers to *when* style computation happens — during React rendering — not to where that rendering occurs. In server-only contexts (Next.js RSC without `'use client'`, Astro without `client:*` directives, SSG), `tasty()` components render on the server, produce static HTML + CSS, and ship **zero client JavaScript**. The full feature set — `styleProps`, sub-elements, variants, state maps — is available. The result is the same as what `tastyStatic()` produces, but without giving up any runtime capabilities.
+Zero-runtime delivery is an outcome, not a synonym for `tastyStatic()`. `tasty()` computes styles during React rendering, but that rendering can happen only on the server. In that case it produces HTML + CSS and ships **zero Tasty styling runtime** to the browser. The full feature set — `styleProps`, sub-elements, variants, state maps — remains available. Astro's `tastyIntegration({ islands: false })` is the explicit setup for this path. Server-only Next.js RSC follows the same architecture; verify the generated output for the target deployment.
 
 Client JavaScript only enters the picture when a component needs React interactivity (state, effects, event handlers) — and that is the consuming component's decision, never Tasty's. Tasty never forces the `'use client'` boundary.
 
-`tastyStatic()` with the Babel plugin is for a different scenario: when you want build-time CSS extraction **without React at runtime**. The output is framework-agnostic — any JavaScript framework can consume the resulting class names and CSS. This makes Tasty usable as the compiler layer underneath a design-system implementation, even outside the React ecosystem.
+`tastyStatic()` with the Babel plugin reaches zero-runtime delivery differently: CSS is extracted **during the build**, without React. The output is framework-agnostic — any JavaScript framework can consume the resulting class names and CSS. This makes Tasty usable as the compiler layer underneath a design-system implementation, even outside the React ecosystem.
 
 The tradeoff is that some capabilities — `styleProps`, sub-element components (`<Card.Title>`), dynamic variants — are tied to the `tasty()` path. The `tastyStatic()` path is best understood as extraction and compilation of the DSL, tokens, and state logic without a React dependency.
 
-This flexibility is one of Tasty's more unusual strengths:
+This gives Tasty two zero-runtime paths:
 
-- `tasty()` as the default for all React setups — zero client JS in server-only contexts, full feature set, SSR integration available when client hydration is needed
-- `tastyStatic()` as a static compiler whose output works with any framework, including non-React ones
+- server-only `tasty()` for the full React component API, with CSS generated during server or static rendering
+- `tastyStatic()` as a build-time compiler whose output works with any framework, including non-React ones
 
 ---
 
@@ -332,22 +356,27 @@ This flexibility is one of Tasty's more unusual strengths:
 Another useful way to think about the ecosystem is by abstraction level.
 
 ### Direct styling tools
+
 These are optimized for styling product code directly.
 
 Examples:
+
 - Tailwind CSS
 - Emotion (requires `'use client'` — not RSC-compatible)
 - Stitches (deprecated, requires `'use client'`)
 
 ### Typed styling engines
+
 These are optimized for generating CSS with stronger structure and tooling.
 
 Examples:
+
 - Panda CSS
 - vanilla-extract
 - StyleX
 
 ### Design-system language engines
+
 These are optimized for helping a team define its own styling grammar and semantics.
 
 Tasty belongs most naturally here.
@@ -364,7 +393,7 @@ Tasty makes the most sense when:
 - a shared component API is emerging even if the design system is still lightweight
 - styling should be governed through a central platform team
 - component state logic is complex
-- the team wants a house styling language instead of raw CSS-shaped authoring
+- the team wants a design-system-owned styling language instead of raw CSS-shaped authoring
 - tokens, recipes, and sub-elements should be first-class
 - deterministic state resolution matters more than minimum abstraction overhead
 - the styling engine may need to work as either a runtime tool or a build-time compiler
@@ -414,6 +443,6 @@ Tasty is most compelling when the problem is not just "how do we write styles," 
 - [React API](react-api.md) — `tasty()` factory, component props, variants, sub-elements, style functions
 - [Style Properties](styles.md) — complete reference for all enhanced style properties
 - [Configuration](configuration.md) — tokens, recipes, custom units, style handlers, and TypeScript extensions
-- [Zero Runtime (tastyStatic)](tasty-static.md) — build-time static styling with Babel plugin
+- [Build-Time Extraction (`tastyStatic`)](tasty-static.md) — static styling with the Babel plugin
 - [Adoption Guide](adoption.md) — where Tasty sits in the stack, incremental adoption, and what changes for product engineers
 - [Server-Side Rendering](ssr.md) — SSR setup for Next.js, Astro, and generic frameworks

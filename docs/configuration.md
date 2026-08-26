@@ -1,6 +1,8 @@
 # Configuration
 
-Configure the Tasty style system before your app renders using the `configure()` function. Configuration must be done **before any styles are generated** (before first render). For a higher-level docs map, see the [Docs Hub](README.md).
+Tasty works without upfront configuration. Use `configure()` when your app or design system is ready to define shared tokens, state aliases, units, recipes, presets, or extension points.
+
+Call it **before any styles are generated** (before first render). For a guided setup, see [Getting Started](getting-started.md). For the higher-level docs map, see the [Docs Hub](README.md).
 
 ```jsx
 import { configure } from '@tenphi/tasty';
@@ -45,35 +47,35 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `nonce` | `string` | - | CSP nonce for style elements |
-| `maxRulesPerSheet` | `number` | `8192` | Maximum rules per injected stylesheet |
-| `forceTextInjection` | `boolean` | auto (`true` in test envs) | Force text-node CSS injection instead of constructable stylesheets |
-| `devMode` | `boolean` | auto | Enable development-mode features: performance metrics and debug info |
-| `states` | `Record<string, string>` | - | Global state aliases for advanced state mapping |
-| `parserCacheSize` | `number` | `1000` | Parser LRU cache size |
-| `units` | `Record<string, string \| UnitHandler>` | Built-in | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units) |
-| `functions` | `Record<string, FunctionDefinition \| Function>` | - | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions |
-| `handlers` | `Record<string, StyleHandlerDefinition>` | Built-in | Custom style handlers (replace built-in). See [Custom Style Handlers](#custom-style-handlers) |
-| `propHandlers` | `Record<string, PropHandlerDefinition>` | - | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware) |
-| `baseStyleProps` | `readonly string[]` | - | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props) |
-| `tokens` | `Record<string, value \| stateMap>` | - | Design tokens injected as `:root` CSS custom properties |
-| `replaceTokens` | `Record<string, string \| number \| boolean>` | - | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens |
-| `keyframes` | `Record<string, KeyframesSteps>` | - | Global keyframes for animations |
-| `properties` | `Record<string, PropertyDefinition>` | - | Global CSS @property definitions |
-| `fontFaces` | `Record<string, FontFaceInput>` | - | Global @font-face definitions |
-| `counterStyles` | `Record<string, CounterStyleDescriptors>` | - | Global @counter-style definitions |
-| `polyfills` | `{ functions?: boolean }` | `{}` | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time |
-| `autoPropertyTypes` | `boolean` | `true` | Auto-infer and register `@property` types from values |
-| `recipes` | `Record<string, RecipeStyles>` | - | Predefined style recipes (named style bundles) |
-| `presets` | `Record<string, TypographyPreset>` | - | Typography presets — shorthand for `generateTypographyTokens()` |
-| `globalStyles` | `Record<string, Styles>` | - | Global Tasty styles keyed by CSS selector |
-| `plugins` | `TastyPlugin[]` | - | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
-| `gc` | `GCConfig` | - | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`) |
-| `batchInjection` | `boolean \| 'always'` | `false` | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection) |
-| `colorSpace` | `'rgb' \| 'hsl' \| 'oklch'` | - | **Deprecated** — no longer has any effect. See [Color space](#color-space) |
-| `namePrefix` | `string` | `'t'` (runtime) / `'ts'` (zero-runtime) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
+| Option               | Type                                             | Default                               | Description                                                                                                                                                          |
+| -------------------- | ------------------------------------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nonce`              | `string`                                         | -                                     | CSP nonce for style elements                                                                                                                                         |
+| `maxRulesPerSheet`   | `number`                                         | `8192`                                | Maximum rules per injected stylesheet                                                                                                                                |
+| `forceTextInjection` | `boolean`                                        | auto (`true` in test envs)            | Force text-node CSS injection instead of constructable stylesheets                                                                                                   |
+| `devMode`            | `boolean`                                        | auto                                  | Enable development-mode features: performance metrics and debug info                                                                                                 |
+| `states`             | `Record<string, string>`                         | -                                     | Global state aliases for advanced state mapping                                                                                                                      |
+| `parserCacheSize`    | `number`                                         | `1000`                                | Parser LRU cache size                                                                                                                                                |
+| `units`              | `Record<string, string \| UnitHandler>`          | Built-in                              | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units)                                                                                     |
+| `functions`          | `Record<string, FunctionDefinition \| Function>` | -                                     | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions                                                      |
+| `handlers`           | `Record<string, StyleHandlerDefinition>`         | Built-in                              | Custom style handlers (replace built-in). See [Custom Style Handlers](#custom-style-handlers)                                                                        |
+| `propHandlers`       | `Record<string, PropHandlerDefinition>`          | -                                     | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware)                                                                |
+| `baseStyleProps`     | `readonly string[]`                              | -                                     | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props)                                                                       |
+| `tokens`             | `Record<string, value \| stateMap>`              | -                                     | Design tokens injected as `:root` CSS custom properties                                                                                                              |
+| `replaceTokens`      | `Record<string, string \| number \| boolean>`    | -                                     | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens                                                                        |
+| `keyframes`          | `Record<string, KeyframesSteps>`                 | -                                     | Global keyframes for animations                                                                                                                                      |
+| `properties`         | `Record<string, PropertyDefinition>`             | -                                     | Global CSS @property definitions                                                                                                                                     |
+| `fontFaces`          | `Record<string, FontFaceInput>`                  | -                                     | Global @font-face definitions                                                                                                                                        |
+| `counterStyles`      | `Record<string, CounterStyleDescriptors>`        | -                                     | Global @counter-style definitions                                                                                                                                    |
+| `polyfills`          | `{ functions?: boolean }`                        | `{}`                                  | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time                                             |
+| `autoPropertyTypes`  | `boolean`                                        | `true`                                | Auto-infer and register `@property` types from values                                                                                                                |
+| `recipes`            | `Record<string, RecipeStyles>`                   | -                                     | Predefined style recipes (named style bundles)                                                                                                                       |
+| `presets`            | `Record<string, TypographyPreset>`               | -                                     | Typography presets — shorthand for `generateTypographyTokens()`                                                                                                      |
+| `globalStyles`       | `Record<string, Styles>`                         | -                                     | Global Tasty styles keyed by CSS selector                                                                                                                            |
+| `plugins`            | `TastyPlugin[]`                                  | -                                     | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md)                        |
+| `gc`                 | `GCConfig`                                       | -                                     | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`)                                                                                          |
+| `batchInjection`     | `boolean \| 'always'`                            | `false`                               | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection)                                                                     |
+| `colorSpace`         | `'rgb' \| 'hsl' \| 'oklch'`                      | -                                     | **Deprecated** — no longer has any effect. See [Color space](#color-space)                                                                                           |
+| `namePrefix`         | `string`                                         | `'t'` (`tasty`) / `'ts'` (build-time) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
 
 ---
 
@@ -107,10 +109,10 @@ createRoot(el).render(
 ### Why the provider is required
 
 Deferring a write past React's layout phase would let a `useLayoutEffect`
-measure an element whose rules are not in the sheet yet and read its *unstyled*
+measure an element whose rules are not in the sheet yet and read its _unstyled_
 box — a wrong number, not a stale one, so it never self-corrects.
 
-`TastyBatchProvider` closes that hole. It opens a *batch window* during its
+`TastyBatchProvider` closes that hole. It opens a _batch window_ during its
 render and closes it — flushing — in `useInsertionEffect`, which React runs in
 the mutation phase, before any layout effect:
 
@@ -135,11 +137,11 @@ commits it takes part in.
 
 ### Modes
 
-| Value | Behaviour |
-|-------|-----------|
-| `false` (default) | One `insertRule()` per component, synchronously. |
-| `true` | Batch inside a provider window only. Cannot affect measurement. Without the provider nothing is batched, and dev mode says so once. |
-| `'always'` | Batch every injection, flushing on a microtask when no window is open. Covers more commits; a `useLayoutEffect` measuring a freshly mounted element can read its unstyled box. Paint is unaffected — microtasks always drain before the browser paints. |
+| Value             | Behaviour                                                                                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `false` (default) | One `insertRule()` per component, synchronously.                                                                                                                                                                                                        |
+| `true`            | Batch inside a provider window only. Cannot affect measurement. Without the provider nothing is batched, and dev mode says so once.                                                                                                                     |
+| `'always'`        | Batch every injection, flushing on a microtask when no window is open. Covers more commits; a `useLayoutEffect` measuring a freshly mounted element can read its unstyled box. Paint is unaffected — microtasks always drain before the browser paints. |
 
 ### Ordering
 
@@ -148,7 +150,7 @@ All writes share one FIFO queue — component rules, global rules, raw CSS,
 Draining it in insertion order keeps the sheet byte-identical to unbatched
 output, which matters because equal-specificity rules resolve by document order.
 
-### SSR, RSC and zero-runtime
+### Client rendering, server rendering, and build-time extraction
 
 **Server render — nothing to batch, safe to leave enabled.** SSR and RSC collect
 CSS as text through `ServerStyleCollector`; the runtime injector never runs
@@ -173,12 +175,12 @@ tasty components to be worth it. `'always'` needs no provider and covers every
 island, at the cost of the measurement hazard above. Either way, an island that
 only re-hydrates server-rendered classes has nothing to batch.
 
-**Zero-runtime (`tastyStatic`) — unaffected.** Build-time extraction never
+**Build-time extraction (`tastyStatic`) — unaffected.** The Babel plugin never
 touches the injector: the babel plugin emits either a CSS file import or an
 `injectCSS()` call from `@tenphi/tasty/static/inject`, which appends text to a
 single `<style data-tasty-static>` element. `batchInjection` only defers CSSOM
-writes made by the runtime injector, so extracted styles are unchanged. In an app
-that mixes both, it still applies to the runtime half.
+writes made by the browser injector, so extracted styles are unchanged. In an app
+that mixes both, it still applies to the `tasty()` half.
 
 ### `flushStyles()`
 
@@ -282,7 +284,7 @@ color syntax works on every `<color>`, including a `color-mix()`, a
 
 ## Name Prefix
 
-Every identifier Tasty generates — class names, keyframe names, counter-style names — starts with a configurable prefix. The runtime, SSR, and RSC paths default to `'t'`; the zero-runtime build path (`tastyStatic` via the Babel plugin) defaults to `'ts'` so static-extracted classes can never collide with runtime classes when both are loaded on the same page.
+Every identifier Tasty generates — class names, keyframe names, counter-style names — starts with a configurable prefix. The `tasty()` client, SSR, and RSC paths default to `'t'`; the build-time extraction path (`tastyStatic` via the Babel plugin) defaults to `'ts'` so extracted classes can never collide with `tasty()` classes when both are loaded on the same page.
 
 ```jsx
 configure({
@@ -292,12 +294,12 @@ configure({
 
 The prefix is prepended verbatim to the hash, so include any separator inside the prefix string itself:
 
-| Setting | Class | Keyframe | Counter-style |
-|---|---|---|---|
-| `'t'` (runtime default) | `t1a2b3` | `tk1a2b3` | `tc1a2b3` |
-| `'ts'` (zero-runtime default) | `ts1a2b3` | `tsk1a2b3` | `tsc1a2b3` |
-| `'mb'` | `mb1a2b3` | `mbk1a2b3` | `mbc1a2b3` |
-| `'myapp-'` | `myapp-1a2b3` | `myapp-k1a2b3` | `myapp-c1a2b3` |
+| Setting                     | Class         | Keyframe       | Counter-style  |
+| --------------------------- | ------------- | -------------- | -------------- |
+| `'t'` (`tasty` default)     | `t1a2b3`      | `tk1a2b3`      | `tc1a2b3`      |
+| `'ts'` (build-time default) | `ts1a2b3`     | `tsk1a2b3`     | `tsc1a2b3`     |
+| `'mb'`                      | `mb1a2b3`     | `mbk1a2b3`     | `mbc1a2b3`     |
+| `'myapp-'`                  | `myapp-1a2b3` | `myapp-k1a2b3` | `myapp-c1a2b3` |
 
 The single-letter discriminators (`k` for keyframes, `c` for counter-styles) keep the three kinds visually distinct in devtools — they are not required for correctness because CSS keeps these in separate namespaces.
 
@@ -307,12 +309,12 @@ The single-letter discriminators (`k` for keyframes, `c` for counter-styles) kee
 - Validated at `configure()` time; an invalid prefix throws synchronously rather than silently producing broken hydration.
 - Locked once styles have been generated, like all other config.
 
-### Coexistence with the zero-runtime build
+### Coexistence with build-time extraction
 
-The runtime and zero-runtime builds **must use different prefixes** when both are loaded on the same page. Defaults already guarantee this; if you customize one, customize the other accordingly:
+The `tasty()` and `tastyStatic()` paths **must use different prefixes** when both are loaded on the same page. Defaults already guarantee this; if you customize one, customize the other accordingly:
 
 ```jsx
-// app config (runtime / SSR / RSC)
+// app config (client / SSR / RSC)
 configure({ namePrefix: 'mb' });
 
 // tasty-zero.config.ts (Babel plugin)
@@ -332,8 +334,8 @@ Tokens support state maps for responsive or theme-aware values:
 ```jsx
 configure({
   tokens: {
-    '$gap': '4px',
-    '$radius': '6px',
+    $gap: '4px',
+    $radius: '6px',
     '#primary': {
       '': '#purple',
       '@dark': '#light-purple',
@@ -350,7 +352,7 @@ configure({
 - `#name` keys become `--name-color` custom properties
 - Names keep their case, since CSS custom properties are case-sensitive: `$myVar` is `--myVar` and is referenced as `$myVar`. A leading capital is not supported and folds — `$Foo` and `#Purple` become `--foo` and `--purple-color` — so start names lowercase. Kebab-case (`$my-var`) remains the convention.
 
-Tokens are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin).
+Tokens are automatically emitted in all delivery modes: client rendering, server rendering, and build-time extraction with the Babel plugin.
 
 ---
 
@@ -615,7 +617,7 @@ configure({
 
 Each key is a CSS selector, and each value is a Tasty `Styles` object supporting the full style syntax including style properties, tokens, state maps, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). Global styles are injected alongside `:root` tokens when the first style is rendered.
 
-Global styles are automatically emitted in all rendering modes: runtime (client), SSR, and zero-runtime (Babel plugin). Plugins can also provide `globalStyles`; they are merged per selector with config global styles (config wins on conflict).
+Global styles are automatically emitted in all delivery modes: client rendering, server rendering, and build-time extraction with the Babel plugin. Plugins can also provide `globalStyles`; they are merged per selector with config global styles (config wins on conflict).
 
 ---
 
@@ -623,18 +625,18 @@ Global styles are automatically emitted in all rendering modes: runtime (client)
 
 CSS cannot transition or animate custom properties unless their type is declared via [`@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property). Tasty handles this automatically — when a custom property is assigned a concrete value (e.g. `'$scale': 1`, `'$gap': '10px'`, `'#accent': 'purple'`), the type is inferred and a `@property` rule is registered.
 
-This works across all declaration contexts: component styles, `@keyframes`, global config, and the zero-runtime Babel plugin. It also resolves `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
+This works across all declaration contexts: component styles, `@keyframes`, global config, and build-time extraction with the Babel plugin. It also resolves `var()` chains — if `$a` references `var(--b)`, the type propagates once `--b` is resolved.
 
 Supported types:
 
-| Detection | Inferred syntax |
-|-----------|-----------------|
-| `1`, `0.5`, `-3` (bare numbers) | `<number>` |
-| `10px`, `2rem`, `100vw` (length units) | `<length>` |
-| `50%` | `<percentage>` |
-| `45deg`, `0.5turn` (angle units) | `<angle>` |
-| `300ms`, `1s` (time units) | `<time>` |
-| `#name` tokens (by naming convention) | `<color>` |
+| Detection                              | Inferred syntax |
+| -------------------------------------- | --------------- |
+| `1`, `0.5`, `-3` (bare numbers)        | `<number>`      |
+| `10px`, `2rem`, `100vw` (length units) | `<length>`      |
+| `50%`                                  | `<percentage>`  |
+| `45deg`, `0.5turn` (angle units)       | `<angle>`       |
+| `300ms`, `1s` (time units)             | `<time>`        |
+| `#name` tokens (by naming convention)  | `<color>`       |
 
 Auto-inferred properties use `inherits: true` (the CSS default). Use explicit `@property` when you need different settings:
 
@@ -666,11 +668,11 @@ configure({ autoPropertyTypes: false });
 
 Override or extend the built-in style property handlers. A handler definition can take three forms:
 
-| Form | Syntax | Description |
-|------|--------|-------------|
-| Function only | `handler` | Triggered by its key name; receives only that property |
-| Single dep | `['styleName', handler]` | Triggered by the specified style property |
-| Multi dep | `[['dep1', 'dep2', ...], handler]` | Triggered by any of the listed properties; receives all of them |
+| Form          | Syntax                             | Description                                                     |
+| ------------- | ---------------------------------- | --------------------------------------------------------------- |
+| Function only | `handler`                          | Triggered by its key name; receives only that property          |
+| Single dep    | `['styleName', handler]`           | Triggered by the specified style property                       |
+| Multi dep     | `[['dep1', 'dep2', ...], handler]` | Triggered by any of the listed properties; receives all of them |
 
 The multi-dep form is useful when output depends on several style properties together (e.g., `gap` needs to know `display` and `flow` to decide the CSS strategy). Use `defineHandler` for it and the dependency types are inferred from the dependency list, so a typo in the destructure is a type error instead of a silent `undefined`.
 
@@ -692,11 +694,19 @@ configure({
     // them all through, or the ones you leave out stop working (see below).
     fill: defineHandler(
       [
-        'fill', 'backgroundColor', 'image', 'backgroundImage',
-        'backgroundPosition', 'backgroundSize', 'backgroundRepeat',
+        'fill',
+        'backgroundColor',
+        'image',
+        'backgroundImage',
+        'backgroundPosition',
+        'backgroundSize',
+        'backgroundRepeat',
       ],
       (props) => {
-        if (typeof props.fill === 'string' && props.fill.startsWith('gradient:')) {
+        if (
+          typeof props.fill === 'string' &&
+          props.fill.startsWith('gradient:')
+        ) {
           return { background: props.fill.slice(9) };
         }
         return styleHandlers.fill(props);
@@ -730,18 +740,18 @@ Built-in handlers are shared across several style names. Registering a handler f
 
 The shared groups worth knowing:
 
-| Registering a handler for | Also takes over |
-|---|---|
-| `fill` | `backgroundColor`, `image`, `backgroundImage`, `backgroundPosition`, `backgroundSize`, `backgroundRepeat` |
-| `display` | `hide`, `overflow`, `whiteSpace`, `textOverflow`, `flow`, `gap` |
-| `preset` | `font`, `fontSize`, `fontWeight`, `fontStyle`, `lineHeight`, `letterSpacing`, `textTransform` |
-| `padding` / `margin` / `inset` | their `*Top`/`*Right`/`*Bottom`/`*Left`/`*Block`/`*Inline` longhands |
+| Registering a handler for      | Also takes over                                                                                           |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `fill`                         | `backgroundColor`, `image`, `backgroundImage`, `backgroundPosition`, `backgroundSize`, `backgroundRepeat` |
+| `display`                      | `hide`, `overflow`, `whiteSpace`, `textOverflow`, `flow`, `gap`                                           |
+| `preset`                       | `font`, `fontSize`, `fontWeight`, `fontStyle`, `lineHeight`, `letterSpacing`, `textTransform`             |
+| `padding` / `margin` / `inset` | their `*Top`/`*Right`/`*Bottom`/`*Left`/`*Block`/`*Inline` longhands                                      |
 
 Either declare the whole group and delegate the rest to `styleHandlers.*`, or pick a name that isn't shared.
 
 ### Chunk membership
 
-Tasty renders and caches CSS in independent chunks, and a chunk's cache key covers only its own style values. All of a handler's dependencies must therefore live in one chunk. Custom style names are pulled into their handler's chunk automatically at registration; a handler whose dependencies span two *built-in* chunks (say `fill` and `padding`) warns, because it would be invoked once per chunk with a subset of its inputs.
+Tasty renders and caches CSS in independent chunks, and a chunk's cache key covers only its own style values. All of a handler's dependencies must therefore live in one chunk. Custom style names are pulled into their handler's chunk automatically at registration; a handler whose dependencies span two _built-in_ chunks (say `fill` and `padding`) warns, because it would be invoked once per chunk with a subset of its inputs.
 
 `configure({ handlers })` must run before the first render, like every other config option.
 
@@ -749,7 +759,7 @@ Tasty renders and caches CSS in independent chunks, and a chunk's cache key cove
 
 ## Props Middleware
 
-`propHandlers` are middleware over a component's props — props in, props out. Where a style *handler* turns a style property into CSS declarations, a prop handler turns a **component prop** into other props, including `styles`. It is the extension point for props whose value isn't a style value.
+`propHandlers` are middleware over a component's props — props in, props out. Where a style _handler_ turns a style property into CSS declarations, a prop handler turns a **component prop** into other props, including `styles`. It is the extension point for props whose value isn't a style value.
 
 ```jsx
 import { configure, mergeStyles } from '@tenphi/tasty';
@@ -765,7 +775,7 @@ configure({
   },
 });
 
-<Element glaze="purple" />
+<Element glaze="purple" />;
 ```
 
 The map key is the handler's name and, by default, the prop that triggers it, so an absent prop costs one property check rather than a call. A tuple overrides that: `['glaze', fn]`, `[['glaze', 'tint'], fn]`, or `['*', fn]` for unconditional.
@@ -774,7 +784,7 @@ Handlers run at the very top of every component's render, before any prop is des
 
 Handlers must be **pure** and must not mutate their input, and should memoize the styles they build per input value: style values are cached by object identity, so mutating one in place yields stale CSS, and a reference-stable object avoids re-serializing on every render.
 
-Injected styles occupy the `styles` slot, so they beat a component's own default styles and lose to a style prop at the call site. Prop handlers do not apply to sub-elements or to zero-runtime `tastyStatic()`, which has no props.
+Injected styles occupy the `styles` slot, so they beat a component's own default styles and lose to a style prop at the call site. Prop handlers do not apply to sub-elements or to build-time `tastyStatic()`, which has no props.
 
 See [Plugins → Props middleware](plugins.md#props-middleware) for the full contract and a worked example.
 
@@ -787,7 +797,7 @@ See [Plugins → Props middleware](plugins.md#props-middleware) for the full con
 ```jsx
 configure({ baseStyleProps: ['radius', 'shadow'] });
 
-<Card radius="1r" shadow />
+<Card radius="1r" shadow />;
 ```
 
 `configure()` may run after your components are defined — each factory resolves its prop list lazily.

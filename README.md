@@ -641,7 +641,7 @@ Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Hi
 
 ### [tasty.style](https://tasty.style) ([source](https://github.com/tenphi/tasty.style))
 
-The official Tasty documentation and landing page — itself built entirely with `tasty()`. A showcase for server-rendered Tasty with Next.js and OKHSL color theming with Glaze.
+The official Tasty documentation and landing page — itself built entirely with `tasty()`. A showcase for server-rendered Tasty with Next.js and OKHST color theming with Glaze.
 
 ### [Cube Cloud](https://cube.dev/)
 

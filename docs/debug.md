@@ -241,8 +241,8 @@ tastyDebug.cache();
 
 ### `cleanup(opts?): void`
 
-Removes every injected style that is neither carried by an element nor held by
-an outstanding `inject()` reference — the same set `summary()` reports as unused.
+Removes every injected style that is neither carried by an element nor pinned by
+an outstanding `inject()` handle — the same set `summary()` reports as unused.
 Equivalent to `gc({ force: true })`.
 
 ```typescript

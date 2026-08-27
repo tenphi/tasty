@@ -141,7 +141,7 @@ export class SheetManager {
 
       registry = {
         sheets: [],
-        refCounts: new Map(),
+        pinCounts: new Map(),
         rules: new Map(),
         cacheKeyToClassName: new Map(),
         ruleTextSet: new Set<string>(),
@@ -959,10 +959,9 @@ export class SheetManager {
       rulesInSheet.sort((a, b) => b.ruleInfo.ruleIndex - a.ruleInfo.ruleIndex);
 
       for (const { className, ruleInfo } of rulesInSheet) {
-        // SAFETY 1: Never delete a class someone holds a reference to
-        const currentRefCount = registry.refCounts.get(className) || 0;
-        if (currentRefCount > 0) {
-          // Class was re-injected with a handle; do not delete
+        // SAFETY 1: Never delete a class someone pinned
+        if ((registry.pinCounts.get(className) ?? 0) > 0) {
+          // Class was pinned again between collection and deletion
           continue;
         }
 
@@ -1006,7 +1005,7 @@ export class SheetManager {
         // All safety checks passed - proceed with deletion
         this.deleteRule(registry, ruleInfo);
         registry.rules.delete(className);
-        registry.refCounts.delete(className);
+        registry.pinCounts.delete(className);
         registry.usageMap.delete(className);
         deleted.add(className);
         cleanedUpCount++;

@@ -62,7 +62,7 @@ import type {
   StyleRule,
 } from './types';
 
-/** Dispose handle handed back for injections that took no reference. */
+/** Dispose handle handed back for injections that took no pin. */
 const noop = () => {
   /* nothing to release */
 };
@@ -144,7 +144,7 @@ function registerHydratedClass(
     ruleIndex: HYDRATED_RULE_INDEX,
     sheetIndex: HYDRATED_RULE_INDEX,
   });
-  registry.refCounts.set(className, 0);
+  registry.pinCounts.set(className, 0);
 }
 
 export class StyleInjector {
@@ -328,9 +328,9 @@ export class StyleInjector {
   inject(rules: StyleResult[], options?: InjectOptions): InjectResult {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    // `track: false` injects without taking a reference: the caller keeps no
-    // handle and lets the DOM decide when the class is done (see `gc()`).
-    const track = options?.track ?? true;
+    // `pin: false` injects without holding the class: the caller keeps no handle
+    // and lets the DOM decide when the class is done (see `gc()`).
+    const pin = options?.pin ?? true;
 
     if (rules.length === 0) {
       return {
@@ -352,13 +352,13 @@ export class StyleInjector {
       className = registry.cacheKeyToClassName.get(cacheKey)!;
       const existingRuleInfo = registry.rules.get(className)!;
 
-      // Rules are already queued for a batched write. Bump the refCount and let
+      // Rules are already queued for a batched write. Record the pin and let
       // the queued write land — injecting again would duplicate every rule.
       if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
-        if (track) {
-          registry.refCounts.set(
+        if (pin) {
+          registry.pinCounts.set(
             className,
-            (registry.refCounts.get(className) || 0) + 1,
+            (registry.pinCounts.get(className) || 0) + 1,
           );
         }
 
@@ -368,7 +368,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: track ? () => this.dispose(className, registry) : noop,
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
 
@@ -381,9 +381,9 @@ export class StyleInjector {
 
       if (!isPreAllocated) {
         // Already injected — nothing to write, only the reference to record.
-        if (track) {
-          const currentRefCount = registry.refCounts.get(className) || 0;
-          registry.refCounts.set(className, currentRefCount + 1);
+        if (pin) {
+          const pins = registry.pinCounts.get(className) || 0;
+          registry.pinCounts.set(className, pins + 1);
         }
 
         // Update metrics
@@ -393,7 +393,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: track ? () => this.dispose(className, registry) : noop,
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
     } else if (cacheKey) {
@@ -402,10 +402,10 @@ export class StyleInjector {
 
       // Check if this className was hydrated from server-rendered styles
       if (this.tryHydratedHit(registry, cacheKey, className)) {
-        if (track) {
-          registry.refCounts.set(
+        if (pin) {
+          registry.pinCounts.set(
             className,
-            (registry.refCounts.get(className) || 0) + 1,
+            (registry.pinCounts.get(className) || 0) + 1,
           );
         }
 
@@ -415,7 +415,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: track ? () => this.dispose(className, registry) : noop,
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
     } else {
@@ -526,8 +526,8 @@ export class StyleInjector {
       if (cacheKey) {
         registry.cacheKeyToClassName.set(cacheKey, className);
       }
-      if (track) {
-        registry.refCounts.set(className, 1);
+      if (pin) {
+        registry.pinCounts.set(className, 1);
       }
       this.markUsage(registry, className);
 
@@ -544,13 +544,13 @@ export class StyleInjector {
 
       return {
         className,
-        dispose: track
+        dispose: pin
           ? () => {
               // Still queued and this was the only owner: drop the write and the
               // reservation rather than leaving an orphan rule for GC to find.
               if (
                 !queued.done &&
-                registry.refCounts.get(className) === 1 &&
+                registry.pinCounts.get(className) === 1 &&
                 registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
               ) {
                 queued.cancelled = true;
@@ -558,11 +558,11 @@ export class StyleInjector {
                 if (cacheKey) {
                   registry.cacheKeyToClassName.delete(cacheKey);
                 }
-                registry.refCounts.set(className, 0);
+                registry.pinCounts.set(className, 0);
                 registry.usageMap.delete(className);
                 return;
               }
-              this.dispose(className, registry);
+              this.unpin(className, registry);
             }
           : noop,
       };
@@ -577,14 +577,14 @@ export class StyleInjector {
       };
     }
 
-    if (track) {
-      registry.refCounts.set(className, 1);
+    if (pin) {
+      registry.pinCounts.set(className, 1);
     }
     this.markUsage(registry, className);
 
     return {
       className,
-      dispose: track ? () => this.dispose(className, registry) : noop,
+      dispose: pin ? () => this.unpin(className, registry) : noop,
     };
   }
 
@@ -722,10 +722,9 @@ export class StyleInjector {
   }
 
   /**
-   * Increment refCount for an already-injected cacheKey and return a dispose.
-   * Used by useStyles on cache hits (hydration or runtime reuse) where
-   * the pipeline was skipped but refCount tracking is still needed.
-   * Returns null if the cacheKey is not found.
+   * Pin an already-injected cacheKey and return the handle that releases it.
+   * For callers that skipped the pipeline on a cache hit but still need the
+   * class held. Returns null if the cacheKey is not found.
    */
   trackRef(
     cacheKey: string,
@@ -737,8 +736,8 @@ export class StyleInjector {
     if (!registry.cacheKeyToClassName.has(cacheKey)) return null;
 
     const className = registry.cacheKeyToClassName.get(cacheKey)!;
-    const currentRefCount = registry.refCounts.get(className) || 0;
-    registry.refCounts.set(className, currentRefCount + 1);
+    const pins = registry.pinCounts.get(className) || 0;
+    registry.pinCounts.set(className, pins + 1);
 
     if (registry.metrics) {
       registry.metrics.hits++;
@@ -746,7 +745,7 @@ export class StyleInjector {
 
     return {
       className,
-      dispose: () => this.dispose(className, registry),
+      dispose: () => this.unpin(className, registry),
     };
   }
 
@@ -769,18 +768,19 @@ export class StyleInjector {
   }
 
   /**
-   * Dispose of a className (decrements refCount only).
+   * Release one pin on a className. At zero pins the class is not deleted — it
+   * stays cached and collectible, and `gc()` decides when it actually goes.
    */
-  private dispose(className: string, registry: RootRegistry): void {
-    const currentRefCount = registry.refCounts.get(className);
-    if (currentRefCount == null || currentRefCount <= 0) {
+  private unpin(className: string, registry: RootRegistry): void {
+    const pins = registry.pinCounts.get(className);
+    if (pins == null || pins <= 0) {
       return;
     }
 
-    const newRefCount = currentRefCount - 1;
-    registry.refCounts.set(className, newRefCount);
+    const remaining = pins - 1;
+    registry.pinCounts.set(className, remaining);
 
-    if (newRefCount === 0 && registry.metrics) {
+    if (remaining === 0 && registry.metrics) {
       registry.metrics.totalUnused++;
     }
   }
@@ -860,7 +860,7 @@ export class StyleInjector {
     const metrics = this.sheetManager.getMetrics(registry);
 
     if (metrics && typeof document !== 'undefined') {
-      metrics.unusedHits = this.collectEvictable(registry, root).length;
+      metrics.unusedHits = this.collectUnused(registry, root).length;
     }
 
     return metrics;
@@ -1413,14 +1413,15 @@ export class StyleInjector {
   }
 
   /**
-   * Collect the classes `gc()` is allowed to evict from `root`.
+   * The one definition of "unused": this injector owns the class's rules, no
+   * element in `root` carries it, and nobody pinned it.
    *
-   * A class is evictable when this injector owns its rules, no element carries
-   * it, and no caller holds an `inject()` reference to it. Entries are stamped
-   * with their last `touch()` so the caller can evict oldest-first; a class
-   * that was never touched sorts as oldest.
+   * `gc()` evicts from this set, `getMetrics()` counts it, and `tastyDebug`
+   * reports it — all through here, so the three can never disagree about what
+   * "unused" means. Entries carry their last `touch()` so callers can drop the
+   * oldest first; a class that was never touched sorts as oldest.
    */
-  private collectEvictable(
+  private collectUnused(
     registry: RootRegistry,
     root: Document | ShadowRoot,
   ): { className: string; lastTouchedAt: number }[] {
@@ -1434,7 +1435,7 @@ export class StyleInjector {
       }
     }
 
-    const evictable: { className: string; lastTouchedAt: number }[] = [];
+    const unused: { className: string; lastTouchedAt: number }[] = [];
 
     for (const [className, ruleInfo] of registry.rules) {
       // A negative sheet index marks a rule this injector does not own — server
@@ -1442,15 +1443,29 @@ export class StyleInjector {
       if (ruleInfo.sheetIndex < 0) continue;
       if (liveClasses.has(className)) continue;
       // Someone still holds the dispose handle `inject()` returned.
-      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
+      if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
 
-      evictable.push({
+      unused.push({
         className,
         lastTouchedAt: registry.usageMap.get(className)?.lastTouchedAt ?? 0,
       });
     }
 
-    return evictable;
+    return unused;
+  }
+
+  /**
+   * Class names this injector holds CSS for that nothing renders and nobody
+   * pinned — exactly what `gc({ force: true })` would delete. Unordered.
+   */
+  getUnusedClasses(options?: { root?: Document | ShadowRoot }): string[] {
+    flushStyles();
+    if (typeof document === 'undefined') return [];
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    return this.collectUnused(registry, root).map((entry) => entry.className);
   }
 
   /**
@@ -1459,7 +1474,7 @@ export class StyleInjector {
    * 1. Quick upper-bound check: skip if the registry is smaller than capacity.
    * 2. Scans the DOM for live tasty classNames — the DOM, not a ref count, is
    *    what says a class rendered by a component is still in use.
-   * 3. With `force: true`: deletes every evictable class.
+   * 3. With `force: true`: deletes every unused class.
    *    Without `force`: keeps the `capacity` most recently touched and deletes
    *    the rest, oldest first.
    *
@@ -1484,16 +1499,16 @@ export class StyleInjector {
     // capacity, so skip the DOM scan.
     if (!force && registry.rules.size <= capacity) return 0;
 
-    const evictable = this.collectEvictable(registry, root);
+    const unused = this.collectUnused(registry, root);
 
     let doomed: string[];
 
     if (force) {
-      doomed = evictable.map((entry) => entry.className);
-    } else if (evictable.length > capacity) {
-      evictable.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
-      doomed = evictable
-        .slice(0, evictable.length - capacity)
+      doomed = unused.map((entry) => entry.className);
+    } else if (unused.length > capacity) {
+      unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
+      doomed = unused
+        .slice(0, unused.length - capacity)
         .map((entry) => entry.className);
     } else {
       return 0;

@@ -79,7 +79,7 @@ export interface GCConfig {
   /**
    * Maximum number of unused styles to retain.
    * GC evicts the oldest unused styles when this limit is exceeded.
-   * Actively referenced styles (refCount > 0) and DOM-live styles
+   * Pinned styles and DOM-live styles
    * do not count against this limit.
    * @default 1000
    */
@@ -94,12 +94,13 @@ export interface InjectOptions {
   /** Reuse the class already injected for this key instead of writing again. */
   cacheKey?: string;
   /**
-   * Take a reference on the injected class (default `true`). While a reference
-   * is outstanding `gc()` never evicts the class, and the returned `dispose()`
-   * releases it. Pass `false` when the caller keeps no handle and the DOM is
-   * the only record of the class being in use — the render path does this.
+   * Pin the injected class (default `true`). A pinned class is never evicted by
+   * `gc()`, and the returned `dispose()` releases the pin. Pass `false` when the
+   * caller keeps no handle and the DOM is the only record that the class is in
+   * use — the render path does this, because a hook-free render has no unmount
+   * signal to dispose on.
    */
-  track?: boolean;
+  pin?: boolean;
 }
 
 /**
@@ -181,7 +182,7 @@ export interface CacheMetrics {
 export interface RootRegistry {
   sheets: SheetInfo[];
   /** className -> outstanding `inject()` references; 0 means nobody holds a handle */
-  refCounts: Map<string, number>;
+  pinCounts: Map<string, number>;
   rules: Map<string, RuleInfo>; // className -> rule info (includes both active and unused)
   /** Cache key to className mapping to avoid dual storage of RuleInfo objects */
   cacheKeyToClassName: Map<string, string>; // cacheKey -> className

@@ -31,9 +31,9 @@ describe('SheetManager', () => {
 
       expect(registry).toBeDefined();
       expect(registry.sheets).toEqual([]);
-      expect(registry.refCounts).toBeInstanceOf(Map);
+      expect(registry.pinCounts).toBeInstanceOf(Map);
       expect(registry.rules).toBeInstanceOf(Map);
-      expect(registry.refCounts).toBeInstanceOf(Map);
+      expect(registry.pinCounts).toBeInstanceOf(Map);
     });
 
     it('should return same registry for same root', () => {
@@ -508,8 +508,8 @@ describe('SheetManager', () => {
     });
   });
 
-  describe('unused tracking and bulk cleanup', () => {
-    it('should track unused rules via refCount = 0', () => {
+  describe('pin tracking', () => {
+    it('should keep a rule that has no pins', () => {
       const registry = sheetManager.getRegistry(document);
 
       const rules = [createStyleRule('.test', 'color: red;')];
@@ -522,15 +522,15 @@ describe('SheetManager', () => {
       const className = 'test-class';
 
       registry.rules.set(className, ruleInfo!);
-      registry.refCounts.set(className, 1);
+      registry.pinCounts.set(className, 1);
 
-      registry.refCounts.set(className, 0);
+      registry.pinCounts.set(className, 0);
 
       expect(registry.rules.has(className)).toBe(true);
-      expect(registry.refCounts.get(className)).toBe(0);
+      expect(registry.pinCounts.get(className)).toBe(0);
     });
 
-    it('should reuse unused rules by setting refCount > 0', () => {
+    it('should let an unpinned rule be pinned again', () => {
       const registry = sheetManager.getRegistry(document);
 
       const rules = [createStyleRule('.test', 'color: red;')];
@@ -543,13 +543,13 @@ describe('SheetManager', () => {
       const className = 'test-class';
 
       registry.rules.set(className, ruleInfo!);
-      registry.refCounts.set(className, 1);
+      registry.pinCounts.set(className, 1);
 
-      registry.refCounts.set(className, 0);
+      registry.pinCounts.set(className, 0);
 
-      registry.refCounts.set(className, 1);
+      registry.pinCounts.set(className, 1);
 
-      expect(registry.refCounts.get(className)).toBe(1);
+      expect(registry.pinCounts.get(className)).toBe(1);
       expect(registry.rules.has(className)).toBe(true);
     });
   });

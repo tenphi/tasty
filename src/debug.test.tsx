@@ -30,8 +30,7 @@ describe('tastyDebug', () => {
       expect(summary.unusedClasses).toEqual([]);
     });
 
-    // The render path drops the `dispose` handle `inject()` returns, so
-    // refCounts never fall back to 0 — unused has to be derived from the DOM.
+    // The render path pins nothing, so only the DOM can say a class is used.
     it('reports classes that left the DOM but stayed in the registry', () => {
       const { rerender } = render(
         <>

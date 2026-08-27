@@ -209,10 +209,10 @@ describe('GC: touch / gc', () => {
       expect(swept).toBe(0);
     });
 
-    it('should not count active refs against capacity', () => {
+    it('should not count pinned styles against capacity', () => {
       const classNames: string[] = [];
 
-      // Create 5 styles, all actively referenced (refCount > 0)
+      // Create 5 styles, all pinned
       for (let i = 0; i < 5; i++) {
         const { className } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
@@ -221,7 +221,7 @@ describe('GC: touch / gc', () => {
         injector.touch(className);
       }
 
-      // capacity=3, but all 5 are active (refCount > 0) → 0 unused → skip
+      // capacity=3, but all 5 are pinned → 0 unused → skip
       const swept = injector.gc();
       expect(swept).toBe(0);
     });
@@ -285,8 +285,8 @@ describe('GC: touch / gc', () => {
       expect(swept).toBe(0);
     });
 
-    it('should never evict styles with refCount > 0', () => {
-      // Create 5 styles, all with refCount > 0 (not disposed)
+    it('should never evict pinned styles', () => {
+      // Create 5 styles, all pinned (not disposed)
       for (let i = 0; i < 5; i++) {
         const { className } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
@@ -343,7 +343,7 @@ describe('GC: touch / gc', () => {
       expect(registry.usageMap.size).toBe(0);
     });
 
-    it('should still protect DOM-live and refCount>0 styles', () => {
+    it('should still protect DOM-live and pinned styles', () => {
       const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
       const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
       const { className: c3, dispose: d3 } = injector.inject([
@@ -354,7 +354,7 @@ describe('GC: touch / gc', () => {
       injector.touch(r2.className);
       injector.touch(c3);
 
-      // r1: refCount > 0 (not disposed)
+      // r1: pinned (not disposed)
       // r2: in DOM
       r2.dispose();
       const el = document.createElement('div');

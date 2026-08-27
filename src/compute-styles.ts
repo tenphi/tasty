@@ -353,12 +353,12 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
-  // `track: false` — the render path keeps no dispose handle; the DOM is the
+  // `pin: false` — the render path keeps no dispose handle; the DOM is the
   // record of use, and `gc()` reclaims the class once no element carries it.
   const { className } = inject(renderResult.rules, {
     cacheKey,
     root,
-    track: false,
+    pin: false,
   });
 
   return { name: chunkName, styleKeys, cacheKey, renderResult, className };
@@ -403,7 +403,7 @@ function injectChunkRulesSync(
           }))
         : chunk.renderResult.rules;
 
-      inject(rulesToInject, { cacheKey: chunk.cacheKey, root, track: false });
+      inject(rulesToInject, { cacheKey: chunk.cacheKey, root, pin: false });
     }
   }
 }

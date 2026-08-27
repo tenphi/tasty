@@ -210,6 +210,10 @@ describe('public API surface', () => {
   // Cross-check the two entry points that are safe to evaluate. The compiler
   // pass above cannot tell a value that was accidentally turned into a
   // type-only export from one that still exists at runtime.
+  //
+  // The generous timeout is for the dynamic import: it transforms the whole
+  // entry point, which overruns the 5s default whenever the browser project is
+  // competing for the same cores.
   describe.each([
     ['@tenphi/tasty', () => import('./index')],
     ['@tenphi/tasty/core', () => import('./core/index')],
@@ -223,6 +227,6 @@ describe('public API surface', () => {
       const actual = Object.keys(await load()).sort();
 
       expect(actual).toEqual(expected);
-    });
+    }, 30_000);
   });
 });

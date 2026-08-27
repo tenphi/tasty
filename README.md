@@ -559,31 +559,11 @@ Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 
 ### Runtime Benchmarks
 
-When styles are computed during React rendering, performance is usually a non-issue in practice. The numbers below show single-call throughput for the core pipeline stages, measured with `pnpm bench` on an Apple M1 Max (Node 22).
-
-| Operation                                                   |              ops/sec | Latency (mean) |
-| ----------------------------------------------------------- | -------------------: | -------------: |
-| `renderStyles` — 5 flat properties (cold)                   |              ~60,000 |         ~17 us |
-| `renderStyles` — state map with media/hover/modifier (cold) |              ~18,500 |         ~54 us |
-| `renderStyles` — same styles (cached)                       |           ~5,800,000 |       ~0.17 us |
-| `parseStateKey` — simple key like `:hover` (cold)           |             ~790,000 |        ~1.3 us |
-| `parseStateKey` — complex OR/AND/NOT key (cold)             |             ~140,000 |          ~7 us |
-| `parseStateKey` — any key (cached)                          | ~3,400,000–8,300,000 |    ~0.1–0.3 us |
-| `parseStyle` — value tokens like `2x 4x` (cold)             |             ~344,000 |        ~2.9 us |
-| `parseStyle` — color tokens (cold)                          |             ~567,000 |        ~1.8 us |
-| `parseStyle` — any value (cached)                           |          ~15,250,000 |       ~0.07 us |
-
-"Cold" benchmarks use unique inputs to bypass all caches. Cached benchmarks reuse a single input and measure the LRU hot path. Expect roughly ±10% between runs on an otherwise idle machine.
-
-Run `pnpm bench` to reproduce. `pnpm bench:browser` runs the component-render benchmarks separately, in headless Chromium — those are useful for comparing variants against each other (a plain element vs. one with sub-elements), but the browser's 0.1 ms timer resolution makes their absolute values too coarse to quote. The two suites are deliberately separate commands: running them together lets the browser compete with Node for CPU and depresses both.
-
-#### What This Means in Practice
-
-- **Cached path dominates production.** After a component's first render, subsequent renders with stable styles skip the pipeline entirely (React `useMemo` + LRU cache hits at every level). All cached operations are sub-microsecond — effectively free.
-- **Cold path is fast enough.** The heaviest cold operation — a complex state map with media queries, hover, and modifiers — takes ~54 us. Even a page with 100 unique styled components adds only ~5 ms of total style computation on first render, negligible next to React reconciliation and DOM work.
-- **Cache multipliers are 10x–300x.** The parser sees ~30x, state-key parsing ~10x–25x, and the full pipeline ~100x on flat styles and ~300x on complex state maps — the deeper the work, the more the cache saves. This confirms the multi-level LRU architecture (parser, state-key, simplify, condition, pipeline) is delivering real value.
-- **Comparable to lighter systems.** Emotion's `css()` is typically 5–20 us for simple styles; Tasty's cold `renderStyles` at ~17 us for 5 properties is in the same range despite doing significantly more work (state maps, design tokens, sub-elements, chunking).
-- **On slower devices.** The benchmarks above are from an M1 Max (Geekbench 6 SC ~2,400). A mid-range consumer laptop (~1,800 SC) is roughly 1.3x slower; a mid-range phone (~1,200 SC) is roughly 2x slower; a budget phone (~700 SC) is roughly 3–4x slower. Even at 4x, the heaviest cold operation stays under 250 us and 100 unique components under 25 ms — still well within a single frame budget. The cached path remains sub-microsecond on all devices.
+Reproducible benchmarks cover the core style pipeline, the React overhead of an
+empty `tasty({})` wrapper, and cold browser generation plus rule injection
+against equivalent CSS already present on the page. See
+[Runtime Benchmarks](docs/runtime-benchmarks.md) for the methodology, exact
+results, limitations, and commands.
 
 ### How It Stays Fast
 
@@ -593,7 +573,7 @@ Run `pnpm bench` to reproduce. `pnpm bench:browser` runs the component-render be
 - Style normalization guarantees equivalent style input resolves to the same chunks, improving deduplication hit rates.
 - A style garbage collector removes unused styles/chunks over time.
 - A dedicated style injector minimizes DOM/style-tag overhead.
-- Optional [batched injection](docs/configuration.md#batched-injection) collapses many `insertRule()` calls into one style invalidation per commit, which matters when components measure layout during render.
+- Optional [batched injection](docs/configuration.md#batched-injection) keeps stylesheet writes together before layout reads, allowing the browser to resolve their effects together instead of between individual insertions.
 - This approach is validated in enterprise-scale apps where runtime styling overhead is not noticeable in normal UI flows.
 
 ## Ecosystem

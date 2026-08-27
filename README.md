@@ -560,8 +560,9 @@ Run `pnpm size` to reproduce (outputs may shift slightly with releases).
 ### Runtime Benchmarks
 
 Reproducible benchmarks cover the core style pipeline, the React overhead of an
-empty `tasty({})` wrapper, and cold browser generation plus rule injection
-against equivalent CSS already present on the page. See
+empty `tasty({})` wrapper, cold browser generation plus rule injection against
+equivalent CSS already present on the page, and a representative 1,000-element
+React update with shared styles. See
 [Runtime Benchmarks](docs/runtime-benchmarks.md) for the methodology, exact
 results, limitations, and commands.
 

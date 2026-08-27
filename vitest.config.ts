@@ -67,6 +67,7 @@ export default defineConfig({
               'src/tasty.bench.tsx',
               'src/tasty-injection.bench.ts',
               'src/tasty-overhead.bench.tsx',
+              'src/tasty-tree.bench.tsx',
             ],
           },
         },

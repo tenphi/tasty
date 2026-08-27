@@ -13,7 +13,11 @@ export default defineConfig({
   test: {
     globals: true,
     benchmark: {
-      include: ['src/tasty-injection.bench.ts', 'src/tasty-overhead.bench.tsx'],
+      include: [
+        'src/tasty-injection.bench.ts',
+        'src/tasty-overhead.bench.tsx',
+        'src/tasty-tree.bench.tsx',
+      ],
     },
     browser: {
       enabled: true,

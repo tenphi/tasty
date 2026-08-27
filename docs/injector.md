@@ -388,12 +388,17 @@ cleanup();
 // Every `touchInterval` touches, GC is scheduled via requestIdleCallback
 // (with a timeout, so a page that never goes idle is still swept).
 //
-// That scheduled sweep spares everything injected or rendered since the
-// previous one. Rendering is not commit-aware: a concurrent render can yield
-// between the inject() that creates a class and the commit that puts it in the
-// DOM, and "no element carries this class" would otherwise read as "dead"
-// rather than "not there yet". A class detached now is collected by the sweep
-// after next. An explicit gc() or cleanup() collects straight away.
+// That scheduled sweep only collects a class it has previously seen on an
+// element. Rendering is not commit-aware: a concurrent render can yield between
+// the inject() that creates a class and the commit that attaches it, for any
+// number of turns, so "no element carries this class" is evidence that the
+// class is finished only once the DOM is known to have held it. Injection and
+// every render clear that sighting again.
+//
+// The trade-off: a class that mounts and unmounts between two sweeps is never
+// seen, so it is not collected automatically. It stays cached and reusable, and
+// an explicit gc() or cleanup() takes it — those collect everything unused
+// straight away.
 
 // Benefits:
 // - Activity-proportional: busy apps trigger GC more often

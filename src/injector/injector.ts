@@ -62,12 +62,6 @@ import type {
   StyleRule,
 } from './types';
 
-/**
- * How long a scheduled sweep waits for idle time before running anyway.
- * Collection is never urgent, but it must not be starved outright.
- */
-const GC_IDLE_TIMEOUT = 1000;
-
 /** Dispose handle handed back for injections that took no pin. */
 const noop = () => {
   /* nothing to release */
@@ -756,11 +750,12 @@ export class StyleInjector {
   }
 
   /**
-   * Seed the LRU stamp and the sweep generation for a newly injected class.
+   * Record a freshly injected class as claimed-but-not-yet-seen.
    *
-   * Without it a class injected during a render but not yet touched would carry
-   * no timestamp at all and sort as the oldest candidate, so `gc()` could evict
-   * the very rule the current render just wrote.
+   * Without it a class injected during a render would carry no usage entry at
+   * all: it would sort as the oldest eviction candidate, and the scheduled
+   * sweep would have nothing telling it the class is still on its way into the
+   * DOM. Both would let `gc()` evict the rule the current render just wrote.
    */
   private markUsage(registry: RootRegistry, className: string): void {
     const now = Date.now();
@@ -768,12 +763,9 @@ export class StyleInjector {
 
     if (entry) {
       entry.lastTouchedAt = now;
-      entry.generation = registry.sweepGeneration;
+      entry.observed = false;
     } else {
-      registry.usageMap.set(className, {
-        lastTouchedAt: now,
-        generation: registry.sweepGeneration,
-      });
+      registry.usageMap.set(className, { lastTouchedAt: now, observed: false });
     }
   }
 
@@ -1381,12 +1373,10 @@ export class StyleInjector {
       const entry = registry.usageMap.get(cls);
       if (entry) {
         entry.lastTouchedAt = now;
-        entry.generation = registry.sweepGeneration;
+        // Claimed by a render that may not have committed yet.
+        entry.observed = false;
       } else {
-        registry.usageMap.set(cls, {
-          lastTouchedAt: now,
-          generation: registry.sweepGeneration,
-        });
+        registry.usageMap.set(cls, { lastTouchedAt: now, observed: false });
       }
       registry.touchCount++;
     }
@@ -1416,13 +1406,11 @@ export class StyleInjector {
       for (const root of this.sheetManager.getActiveRoots()) {
         this.sweep(root, false, true);
 
-        // Advance even when the sweep collected nothing — including when the
-        // capacity check skipped it — or the current generation would never
-        // age out and nothing would ever become collectible again.
         const registry = this.sheetManager.getRegistry(root);
-        registry.sweepGeneration++;
-        // Force the next touch to re-stamp rather than take the
-        // same-millisecond shortcut past the generation it now needs.
+        registry.sweepCount++;
+        // The sweep just marked live classes observed. Drop the
+        // same-millisecond touch shortcut so the next render definitely gets to
+        // clear that flag again rather than being skipped as a repeat.
         registry.touchedTick.clear();
       }
     };
@@ -1430,9 +1418,7 @@ export class StyleInjector {
     if (typeof requestIdleCallback !== 'undefined') {
       // With no `timeout` an idle callback can be starved indefinitely — a page
       // that never goes idle is exactly the one accumulating styles fastest.
-      const handle = requestIdleCallback(() => runGC(), {
-        timeout: GC_IDLE_TIMEOUT,
-      });
+      const handle = requestIdleCallback(() => runGC());
       this.cancelPendingGC = () => cancelIdleCallback(handle);
     } else {
       const handle = setTimeout(runGC, 0);
@@ -1452,19 +1438,23 @@ export class StyleInjector {
   private collectUnused(
     registry: RootRegistry,
     root: Document | ShadowRoot,
-    spareCurrentGeneration = false,
-  ): { className: string; lastTouchedAt: number }[] {
-    // Scan DOM for live classes (classList handles SVG elements too)
+    spareUnobserved?: boolean,
+  ): string[] {
+    // Scan DOM for live classes (classList handles SVG elements too). This is
+    // the only commit signal available to a hook-free render path, so every
+    // scan doubles as the observation that makes a class collectible later.
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
       for (const token of el.classList) {
         if (this.classRegex.test(token)) {
           liveClasses.add(token);
+          const usage = registry.usageMap.get(token);
+          if (usage) usage.observed = true;
         }
       }
     }
 
-    const unused: { className: string; lastTouchedAt: number }[] = [];
+    const unused: string[] = [];
 
     for (const [className, ruleInfo] of registry.rules) {
       // A negative sheet index marks a rule this injector does not own — server
@@ -1474,24 +1464,15 @@ export class StyleInjector {
       // Someone still holds the dispose handle `inject()` returned.
       if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
 
-      const usage = registry.usageMap.get(className);
-
-      // Rendering is not commit-aware: a render can yield between the
-      // `inject()` that produced this class and the commit that puts it in the
-      // DOM, and the scheduled sweep can land in that gap. "Not in the DOM"
-      // then means "not there *yet*", so the scheduled sweep leaves the
-      // current generation alone and reconsiders it next time round.
-      if (
-        spareCurrentGeneration &&
-        usage?.generation === registry.sweepGeneration
-      ) {
+      // No sweep has seen this class on an element since a render asked for
+      // it, so "not in the DOM" may well mean "not there yet": a concurrent
+      // render can stay pending for any number of turns. Only a caller who
+      // asked for collection explicitly gets to make that call.
+      if (spareUnobserved && !registry.usageMap.get(className)?.observed) {
         continue;
       }
 
-      unused.push({
-        className,
-        lastTouchedAt: usage?.lastTouchedAt ?? 0,
-      });
+      unused.push(className);
     }
 
     return unused;
@@ -1508,7 +1489,7 @@ export class StyleInjector {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
 
-    return this.collectUnused(registry, root).map((entry) => entry.className);
+    return this.collectUnused(registry, root);
   }
 
   /**
@@ -1524,21 +1505,21 @@ export class StyleInjector {
    * @returns Number of styles evicted.
    */
   gc(options?: GCOptions): number {
-    return this.sweep(options?.root, options?.force ?? false, false);
+    return this.sweep(options?.root, options?.force);
   }
 
   /**
    * One sweep of one root.
    *
-   * `spareCurrentGeneration` is set only for the scheduled sweep, which fires
-   * on its own schedule and can therefore collide with a render in flight. An
-   * explicit `gc()` or `cleanup()` is a decision the caller just made, so it
-   * collects everything unused right away.
+   * `spareUnobserved` is set only for the scheduled sweep, which fires on its
+   * own schedule and can therefore collide with a render in flight. An explicit
+   * `gc()` or `cleanup()` is a decision the caller just made, so it collects
+   * everything unused right away.
    */
   private sweep(
     root: Document | ShadowRoot | undefined,
-    force: boolean,
-    spareCurrentGeneration: boolean,
+    force?: boolean,
+    spareUnobserved?: boolean,
   ): number {
     // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
     // those would corrupt sheet indices, so land every write first.
@@ -1557,21 +1538,20 @@ export class StyleInjector {
     // capacity, so skip the DOM scan.
     if (!force && registry.rules.size <= capacity) return 0;
 
-    const unused = this.collectUnused(
-      registry,
-      targetRoot,
-      spareCurrentGeneration,
-    );
+    const unused = this.collectUnused(registry, targetRoot, spareUnobserved);
 
     let doomed: string[];
 
     if (force) {
-      doomed = unused.map((entry) => entry.className);
+      doomed = unused;
     } else if (unused.length > capacity) {
-      unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
-      doomed = unused
-        .slice(0, unused.length - capacity)
-        .map((entry) => entry.className);
+      // Oldest first. A class that was never touched has no stamp and sorts
+      // oldest, which is what we want: nothing has rendered it since injection.
+      const age = (cls: string) =>
+        registry.usageMap.get(cls)?.lastTouchedAt ?? 0;
+
+      unused.sort((a, b) => age(a) - age(b));
+      doomed = unused.slice(0, unused.length - capacity);
     } else {
       return 0;
     }

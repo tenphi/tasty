@@ -143,7 +143,7 @@ describe('GC: touch / gc', () => {
 
     it('should increment touchCount and schedule GC at touchInterval', async () => {
       const registry = injector['sheetManager'].getRegistry(document);
-      const generation = registry.sweepGeneration;
+      const sweeps = registry.sweepCount;
 
       // Remove requestIdleCallback to exercise the timeout fallback
       const origRIC = globalThis.requestIdleCallback;
@@ -160,12 +160,12 @@ describe('GC: touch / gc', () => {
 
       // touchInterval is 5, and we touched 5 class tokens — but a scheduled
       // sweep must never run inline, or it would judge the render in progress.
-      expect(registry.sweepGeneration).toBe(generation);
+      expect(registry.sweepCount).toBe(sweeps);
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // The sweep advances the generation whether or not it collected anything.
-      expect(registry.sweepGeneration).toBeGreaterThan(generation);
+      // The sweep is counted whether or not it collected anything.
+      expect(registry.sweepCount).toBeGreaterThan(sweeps);
 
       (globalThis as any).requestIdleCallback = origRIC;
     });

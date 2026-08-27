@@ -62,11 +62,19 @@ export interface StyleInjectorConfig {
 export interface StyleUsage {
   lastTouchedAt: number;
   /**
-   * `RootRegistry.sweepGeneration` at the last touch or injection. The
-   * scheduled sweep spares the current generation, so a class the render
-   * in progress has claimed cannot be collected before it is committed.
+   * Whether a sweep has seen this class on an element since the last render
+   * claimed it. Injection and `touch()` clear it — a render has claimed the
+   * class but may not have committed yet — and the sweep's DOM scan sets it
+   * when it finds the class live.
+   *
+   * The scheduled sweep collects only observed classes. Rendering is not
+   * commit-aware: a concurrent render can yield between the `inject()` that
+   * creates a class and the commit that attaches it, for an unbounded number
+   * of event-loop turns. "Not in the DOM" is only evidence that a class is
+   * finished if the DOM is known to have held it at some point after the last
+   * render asked for it.
    */
-  generation: number;
+  observed: boolean;
 }
 
 /**
@@ -224,13 +232,8 @@ export interface RootRegistry {
   propertyTypeResolver: PropertyTypeResolver;
   /** Per-className usage tracking for GC */
   usageMap: Map<string, StyleUsage>;
-  /**
-   * Advances once per scheduled sweep. Classes stamped with the current value
-   * were touched or injected since the last sweep and are therefore spared by
-   * the next one: rendering is not commit-aware, so a class whose element has
-   * not landed in the DOM yet is indistinguishable from a dead one.
-   */
-  sweepGeneration: number;
+  /** Sweeps run against this root, for diagnostics and tests. */
+  sweepCount: number;
   /** Touch counter for scheduling GC (per-root) */
   touchCount: number;
   /**

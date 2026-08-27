@@ -156,7 +156,7 @@ export class SheetManager {
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
         usageMap: new Map(),
-        sweepGeneration: 0,
+        sweepCount: 0,
         touchCount: 0,
         touchTick: -1,
         touchedTick: new Set<string>(),

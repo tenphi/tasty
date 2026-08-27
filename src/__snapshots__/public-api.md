@@ -112,6 +112,7 @@ value      hslToRgbValues
 value      inject
 value      injectGlobal
 type       InjectionMode
+type       InjectOptions
 value      injector
 value      injectRawCSS
 type       InjectResult
@@ -388,6 +389,7 @@ value      hslToRgbValues
 value      inject
 value      injectGlobal
 type       InjectionMode
+type       InjectOptions
 value      injector
 value      injectRawCSS
 type       InjectResult

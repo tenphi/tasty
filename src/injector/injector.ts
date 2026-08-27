@@ -48,6 +48,7 @@ import type {
   FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
+  InjectOptions,
   InjectResult,
   KeyframesCacheEntry,
   KeyframesInfo,
@@ -60,6 +61,11 @@ import type {
   StyleInjectorConfig,
   StyleRule,
 } from './types';
+
+/** Dispose handle handed back for injections that took no reference. */
+const noop = () => {
+  /* nothing to release */
+};
 
 /**
  * Placeholder `KeyframesInfo` for a cache entry reserved by a batched write and
@@ -145,7 +151,8 @@ export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
+  /** Cancels the scheduled GC, whatever scheduled it. Null when none is pending. */
+  private cancelPendingGC: (() => void) | null = null;
   private namePrefix: string;
   private classRegex: RegExp;
   private rscClassRegex: RegExp;
@@ -318,12 +325,12 @@ export class StyleInjector {
   /**
    * Inject styles from StyleResult objects
    */
-  inject(
-    rules: StyleResult[],
-    options?: { root?: Document | ShadowRoot; cacheKey?: string },
-  ): InjectResult {
+  inject(rules: StyleResult[], options?: InjectOptions): InjectResult {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
+    // `track: false` injects without taking a reference: the caller keeps no
+    // handle and lets the DOM decide when the class is done (see `gc()`).
+    const track = options?.track ?? true;
 
     if (rules.length === 0) {
       return {
@@ -348,10 +355,12 @@ export class StyleInjector {
       // Rules are already queued for a batched write. Bump the refCount and let
       // the queued write land — injecting again would duplicate every rule.
       if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
-        registry.refCounts.set(
-          className,
-          (registry.refCounts.get(className) || 0) + 1,
-        );
+        if (track) {
+          registry.refCounts.set(
+            className,
+            (registry.refCounts.get(className) || 0) + 1,
+          );
+        }
 
         if (registry.metrics) {
           registry.metrics.hits++;
@@ -359,7 +368,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: track ? () => this.dispose(className, registry) : noop,
         };
       }
 
@@ -371,9 +380,11 @@ export class StyleInjector {
         existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
       if (!isPreAllocated) {
-        // Already injected - just increment refCount
-        const currentRefCount = registry.refCounts.get(className) || 0;
-        registry.refCounts.set(className, currentRefCount + 1);
+        // Already injected — nothing to write, only the reference to record.
+        if (track) {
+          const currentRefCount = registry.refCounts.get(className) || 0;
+          registry.refCounts.set(className, currentRefCount + 1);
+        }
 
         // Update metrics
         if (registry.metrics) {
@@ -382,7 +393,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: track ? () => this.dispose(className, registry) : noop,
         };
       }
     } else if (cacheKey) {
@@ -391,10 +402,12 @@ export class StyleInjector {
 
       // Check if this className was hydrated from server-rendered styles
       if (this.tryHydratedHit(registry, cacheKey, className)) {
-        registry.refCounts.set(
-          className,
-          (registry.refCounts.get(className) || 0) + 1,
-        );
+        if (track) {
+          registry.refCounts.set(
+            className,
+            (registry.refCounts.get(className) || 0) + 1,
+          );
+        }
 
         if (registry.metrics) {
           registry.metrics.hits++;
@@ -402,7 +415,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: track ? () => this.dispose(className, registry) : noop,
         };
       }
     } else {
@@ -513,7 +526,10 @@ export class StyleInjector {
       if (cacheKey) {
         registry.cacheKeyToClassName.set(cacheKey, className);
       }
-      registry.refCounts.set(className, 1);
+      if (track) {
+        registry.refCounts.set(className, 1);
+      }
+      this.markUsage(registry, className);
 
       const queued = enqueueStyleWrite(() => {
         if (applySheetWrite()) return;
@@ -528,24 +544,27 @@ export class StyleInjector {
 
       return {
         className,
-        dispose: () => {
-          // Still queued and this was the only owner: drop the write and the
-          // reservation rather than leaving an orphan rule for GC to find.
-          if (
-            !queued.done &&
-            registry.refCounts.get(className) === 1 &&
-            registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
-          ) {
-            queued.cancelled = true;
-            registry.rules.delete(className);
-            if (cacheKey) {
-              registry.cacheKeyToClassName.delete(cacheKey);
+        dispose: track
+          ? () => {
+              // Still queued and this was the only owner: drop the write and the
+              // reservation rather than leaving an orphan rule for GC to find.
+              if (
+                !queued.done &&
+                registry.refCounts.get(className) === 1 &&
+                registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
+              ) {
+                queued.cancelled = true;
+                registry.rules.delete(className);
+                if (cacheKey) {
+                  registry.cacheKeyToClassName.delete(cacheKey);
+                }
+                registry.refCounts.set(className, 0);
+                registry.usageMap.delete(className);
+                return;
+              }
+              this.dispose(className, registry);
             }
-            registry.refCounts.set(className, 0);
-            return;
-          }
-          this.dispose(className, registry);
-        },
+          : noop,
       };
     }
 
@@ -558,11 +577,14 @@ export class StyleInjector {
       };
     }
 
-    registry.refCounts.set(className, 1);
+    if (track) {
+      registry.refCounts.set(className, 1);
+    }
+    this.markUsage(registry, className);
 
     return {
       className,
-      dispose: () => this.dispose(className, registry),
+      dispose: track ? () => this.dispose(className, registry) : noop,
     };
   }
 
@@ -729,6 +751,24 @@ export class StyleInjector {
   }
 
   /**
+   * Seed the LRU stamp for a newly injected class.
+   *
+   * Without it a class injected during a render but not yet touched would carry
+   * no timestamp at all and sort as the oldest candidate, so `gc()` could evict
+   * the very rule the current render just wrote.
+   */
+  private markUsage(registry: RootRegistry, className: string): void {
+    const now = Date.now();
+    const entry = registry.usageMap.get(className);
+
+    if (entry) {
+      entry.lastTouchedAt = now;
+    } else {
+      registry.usageMap.set(className, { lastTouchedAt: now });
+    }
+  }
+
+  /**
    * Dispose of a className (decrements refCount only).
    */
   private dispose(className: string, registry: RootRegistry): void {
@@ -746,13 +786,11 @@ export class StyleInjector {
   }
 
   /**
-   * Force bulk cleanup of unused styles
+   * Remove every style that is neither in the DOM nor referenced by an
+   * outstanding `inject()` handle, ignoring the GC capacity threshold.
    */
   cleanup(root?: Document | ShadowRoot): void {
-    flushStyles();
-    const registry = this.sheetManager.getRegistry(root || document);
-    // Clean up ALL unused rules regardless of batch ratio
-    this.sheetManager.forceCleanup(registry);
+    this.gc({ root, force: true });
   }
 
   /**
@@ -819,7 +857,13 @@ export class StyleInjector {
     flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    return this.sheetManager.getMetrics(registry);
+    const metrics = this.sheetManager.getMetrics(registry);
+
+    if (metrics && typeof document !== 'undefined') {
+      metrics.unusedHits = this.collectEvictable(registry, root).length;
+    }
+
+    return metrics;
   }
 
   /**
@@ -1341,14 +1385,18 @@ export class StyleInjector {
   }
 
   /**
-   * Schedule a GC via `requestIdleCallback` (or synchronously as fallback).
-   * Runs GC on all active roots. Avoids double-scheduling via `pendingGCHandle`.
+   * Schedule a GC via `requestIdleCallback`, falling back to a timeout.
+   * Runs GC on all active roots. Avoids double-scheduling.
+   *
+   * The fallback is deliberately asynchronous: `touch()` runs during React's
+   * render phase, when a class is already injected but its element has not been
+   * committed yet, and a GC there would judge it unused.
    */
   private scheduleGC(): void {
-    if (this.pendingGCHandle != null) return;
+    if (this.cancelPendingGC) return;
 
     const runGC = () => {
-      this.pendingGCHandle = null;
+      this.cancelPendingGC = null;
       this.sheetManager.pruneDisconnectedRoots();
       for (const root of this.sheetManager.getActiveRoots()) {
         this.gc({ root });
@@ -1356,54 +1404,26 @@ export class StyleInjector {
     };
 
     if (typeof requestIdleCallback !== 'undefined') {
-      this.pendingGCHandle = requestIdleCallback(() => runGC());
+      const handle = requestIdleCallback(() => runGC());
+      this.cancelPendingGC = () => cancelIdleCallback(handle);
     } else {
-      runGC();
+      const handle = setTimeout(runGC, 0);
+      this.cancelPendingGC = () => clearTimeout(handle);
     }
   }
 
   /**
-   * Synchronous garbage collection.
+   * Collect the classes `gc()` is allowed to evict from `root`.
    *
-   * 1. Quick upper-bound check: skip if unused count can't exceed capacity.
-   * 2. Scans the DOM for live tasty classNames (safety guard).
-   * 3. With `force: true`: deletes all unused entries inline.
-   *    Without `force`: collects unused, sorts oldest-first, evicts over capacity.
-   *
-   * @returns Number of styles evicted.
+   * A class is evictable when this injector owns its rules, no element carries
+   * it, and no caller holds an `inject()` reference to it. Entries are stamped
+   * with their last `touch()` so the caller can evict oldest-first; a class
+   * that was never touched sorts as oldest.
    */
-  gc(options?: GCOptions): number {
-    // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
-    // those would corrupt sheet indices, so land every write first.
-    flushStyles();
-    if (typeof document === 'undefined') return 0;
-
-    // Cancel any pending idle-scheduled GC to prevent double runs
-    if (this.pendingGCHandle != null) {
-      if (typeof cancelIdleCallback !== 'undefined') {
-        cancelIdleCallback(this.pendingGCHandle);
-      }
-      this.pendingGCHandle = null;
-    }
-
-    const root = options?.root || document;
-    const force = options?.force ?? false;
-    const registry = this.sheetManager.getRegistry(root);
-    const capacity = this.config.gc?.capacity ?? 1000;
-
-    // Quick upper-bound check: count active refs to see if there could
-    // possibly be enough unused entries to exceed capacity.
-    // This avoids the expensive DOM scan when most styles are active.
-    if (!force) {
-      let activeCount = 0;
-      for (const refCount of registry.refCounts.values()) {
-        if (refCount > 0) activeCount++;
-      }
-      if (registry.usageMap.size - activeCount <= capacity) {
-        return 0;
-      }
-    }
-
+  private collectEvictable(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+  ): { className: string; lastTouchedAt: number }[] {
     // Scan DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
@@ -1414,38 +1434,74 @@ export class StyleInjector {
       }
     }
 
-    let swept = 0;
+    const evictable: { className: string; lastTouchedAt: number }[] = [];
+
+    for (const [className, ruleInfo] of registry.rules) {
+      // A negative sheet index marks a rule this injector does not own — server
+      // rendered (hydrated), pre-allocated, or still queued. Never ours to delete.
+      if (ruleInfo.sheetIndex < 0) continue;
+      if (liveClasses.has(className)) continue;
+      // Someone still holds the dispose handle `inject()` returned.
+      if ((registry.refCounts.get(className) ?? 0) > 0) continue;
+
+      evictable.push({
+        className,
+        lastTouchedAt: registry.usageMap.get(className)?.lastTouchedAt ?? 0,
+      });
+    }
+
+    return evictable;
+  }
+
+  /**
+   * Synchronous garbage collection.
+   *
+   * 1. Quick upper-bound check: skip if the registry is smaller than capacity.
+   * 2. Scans the DOM for live tasty classNames — the DOM, not a ref count, is
+   *    what says a class rendered by a component is still in use.
+   * 3. With `force: true`: deletes every evictable class.
+   *    Without `force`: keeps the `capacity` most recently touched and deletes
+   *    the rest, oldest first.
+   *
+   * @returns Number of styles evicted.
+   */
+  gc(options?: GCOptions): number {
+    // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
+    // those would corrupt sheet indices, so land every write first.
+    flushStyles();
+    if (typeof document === 'undefined') return 0;
+
+    // Cancel any pending scheduled GC to prevent double runs
+    this.cancelPendingGC?.();
+    this.cancelPendingGC = null;
+
+    const root = options?.root || document;
+    const force = options?.force ?? false;
+    const registry = this.sheetManager.getRegistry(root);
+    const capacity = this.config.gc?.capacity ?? 1000;
+
+    // Quick upper-bound check: not even every class being unused would exceed
+    // capacity, so skip the DOM scan.
+    if (!force && registry.rules.size <= capacity) return 0;
+
+    const evictable = this.collectEvictable(registry, root);
+
+    let doomed: string[];
 
     if (force) {
-      for (const [className] of registry.usageMap) {
-        if (liveClasses.has(className)) continue;
-        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-        registry.usageMap.delete(className);
-        swept++;
-      }
+      doomed = evictable.map((entry) => entry.className);
+    } else if (evictable.length > capacity) {
+      evictable.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
+      doomed = evictable
+        .slice(0, evictable.length - capacity)
+        .map((entry) => entry.className);
     } else {
-      const unused: { className: string; lastTouchedAt: number }[] = [];
-      for (const [className, usage] of registry.usageMap) {
-        if (liveClasses.has(className)) continue;
-        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-        unused.push({ className, lastTouchedAt: usage.lastTouchedAt });
-      }
-
-      if (unused.length > capacity) {
-        unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
-        const toEvict = unused.length - capacity;
-        for (let i = 0; i < toEvict; i++) {
-          registry.usageMap.delete(unused[i].className);
-          swept++;
-        }
-      }
+      return 0;
     }
 
-    if (swept > 0) {
-      this.sheetManager.forceCleanup(registry);
-    }
+    if (doomed.length === 0) return 0;
 
-    return swept;
+    return this.sheetManager.deleteClasses(registry, doomed);
   }
 
   /**
@@ -1457,11 +1513,9 @@ export class StyleInjector {
     this.sheetManager.cleanup(targetRoot);
 
     // Clear pending GC when no active roots remain
-    if (this.pendingGCHandle != null && !this.sheetManager.hasActiveRoots()) {
-      if (typeof cancelIdleCallback !== 'undefined') {
-        cancelIdleCallback(this.pendingGCHandle);
-      }
-      this.pendingGCHandle = null;
+    if (this.cancelPendingGC && !this.sheetManager.hasActiveRoots()) {
+      this.cancelPendingGC();
+      this.cancelPendingGC = null;
     }
   }
 }

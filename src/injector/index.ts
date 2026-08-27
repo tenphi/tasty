@@ -15,6 +15,7 @@ import type {
   FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
+  InjectOptions,
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
@@ -27,7 +28,7 @@ import type {
  */
 export function inject(
   rules: StyleResult[],
-  options?: { root?: Document | ShadowRoot; cacheKey?: string },
+  options?: InjectOptions,
 ): InjectResult {
   const injector = getGlobalInjector();
 
@@ -226,7 +227,8 @@ export function getCSSTextForNode(
 }
 
 /**
- * Force cleanup of unused rules
+ * Remove every injected rule that is neither in the DOM nor held by an
+ * outstanding `inject()` handle. Equivalent to `gc({ force: true })`.
  */
 export function cleanup(root?: Document | ShadowRoot): void {
   return getGlobalInjector().cleanup(root);
@@ -246,9 +248,9 @@ export function touch(
 }
 
 /**
- * Synchronous garbage collection of unused styles.
- * Evicts the oldest unused styles when usageMap exceeds capacity.
- * With `{ force: true }`, removes ALL unused styles regardless of capacity.
+ * Synchronous garbage collection of unused styles — those no element carries
+ * and no `inject()` handle references. Evicts the oldest ones once they exceed
+ * capacity. With `{ force: true }`, removes all of them regardless of capacity.
  *
  * @returns Number of styles evicted.
  */
@@ -294,6 +296,7 @@ export function createInjector(
 export type {
   StyleInjectorConfig,
   InjectionMode,
+  InjectOptions,
   InjectResult,
   DisposeFunction,
   RuleInfo,

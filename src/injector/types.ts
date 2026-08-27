@@ -87,6 +87,22 @@ export interface GCConfig {
 }
 
 /**
+ * Per-call options for inject().
+ */
+export interface InjectOptions {
+  root?: Document | ShadowRoot;
+  /** Reuse the class already injected for this key instead of writing again. */
+  cacheKey?: string;
+  /**
+   * Take a reference on the injected class (default `true`). While a reference
+   * is outstanding `gc()` never evicts the class, and the returned `dispose()`
+   * releases it. Pass `false` when the caller keeps no handle and the DOM is
+   * the only record of the class being in use — the render path does this.
+   */
+  track?: boolean;
+}
+
+/**
  * Per-call options for gc().
  */
 export interface GCOptions {
@@ -159,12 +175,13 @@ export interface CacheMetrics {
   startTime: number;
 
   // Calculated getters
-  unusedHits?: number; // calculated as current unused styles count (refCount = 0)
+  unusedHits?: number; // calculated as classes eligible for eviction (see gc())
 }
 
 export interface RootRegistry {
   sheets: SheetInfo[];
-  refCounts: Map<string, number>; // className -> refCount (0 means unused)
+  /** className -> outstanding `inject()` references; 0 means nobody holds a handle */
+  refCounts: Map<string, number>;
   rules: Map<string, RuleInfo>; // className -> rule info (includes both active and unused)
   /** Cache key to className mapping to avoid dual storage of RuleInfo objects */
   cacheKeyToClassName: Map<string, string>; // cacheKey -> className

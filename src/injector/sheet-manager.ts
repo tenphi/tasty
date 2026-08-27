@@ -898,36 +898,31 @@ export class SheetManager {
   }
 
   /**
-   * Force cleanup of unused styles
+   * Delete the given classes: their rules leave the sheets and every registry
+   * entry pointing at them is dropped.
+   *
+   * Deciding *what* is unused belongs to `StyleInjector.gc()`, which owns the
+   * DOM scan and the capacity policy. This only re-checks that each class is
+   * still safe to delete, and reports how many were.
+   *
+   * @returns Number of classes actually deleted.
    */
-  public forceCleanup(registry: RootRegistry): void {
-    this.performBulkCleanup(registry);
-  }
-
-  /**
-   * Perform bulk cleanup of all unused styles (refCount = 0).
-   */
-  private performBulkCleanup(registry: RootRegistry): void {
+  public deleteClasses(
+    registry: RootRegistry,
+    classNames: Iterable<string>,
+  ): number {
     const cleanupStartTime = Date.now();
 
-    // Calculate unused rules dynamically: rules that have refCount = 0
-    // and are not tracked in usageMap (GC-kept styles must survive)
-    const unusedClassNames = Array.from(registry.refCounts.entries())
-      .filter(
-        ([className, refCount]) =>
-          refCount === 0 && !registry.usageMap.has(className),
-      )
-      .map(([className]) => className);
-
-    if (unusedClassNames.length === 0) return;
-
-    const selected = unusedClassNames
+    const selected = Array.from(classNames)
       .map((className) => {
         const ruleInfo = registry.rules.get(className);
         return ruleInfo ? { className, ruleInfo } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
+    if (selected.length === 0) return 0;
+
+    const deleted = new Set<string>();
     let cleanedUpCount = 0;
     let totalCssSize = 0;
     let totalRulesDeleted = 0;
@@ -964,10 +959,10 @@ export class SheetManager {
       rulesInSheet.sort((a, b) => b.ruleInfo.ruleIndex - a.ruleInfo.ruleIndex);
 
       for (const { className, ruleInfo } of rulesInSheet) {
-        // SAFETY 1: Double-check refCount is still 0
+        // SAFETY 1: Never delete a class someone holds a reference to
         const currentRefCount = registry.refCounts.get(className) || 0;
         if (currentRefCount > 0) {
-          // Class became active again; do not delete
+          // Class was re-injected with a handle; do not delete
           continue;
         }
 
@@ -1012,21 +1007,20 @@ export class SheetManager {
         this.deleteRule(registry, ruleInfo);
         registry.rules.delete(className);
         registry.refCounts.delete(className);
+        registry.usageMap.delete(className);
+        deleted.add(className);
+        cleanedUpCount++;
+      }
+    }
 
-        // Clean up cache key mappings that point to this className
-        const keysToDelete: string[] = [];
-        for (const [
-          key,
-          mappedClassName,
-        ] of registry.cacheKeyToClassName.entries()) {
-          if (mappedClassName === className) {
-            keysToDelete.push(key);
-          }
-        }
-        for (const key of keysToDelete) {
+    // Cache keys are indexed by key, not by className, so finding the ones that
+    // point at a deleted class means scanning the map — once for the whole
+    // batch rather than once per class.
+    if (deleted.size > 0) {
+      for (const [key, mappedClassName] of registry.cacheKeyToClassName) {
+        if (deleted.has(mappedClassName)) {
           registry.cacheKeyToClassName.delete(key);
         }
-        cleanedUpCount++;
       }
     }
 
@@ -1043,6 +1037,8 @@ export class SheetManager {
         rulesDeleted: totalRulesDeleted,
       });
     }
+
+    return cleanedUpCount;
   }
 
   /**
@@ -1089,14 +1085,11 @@ export class SheetManager {
   getMetrics(registry: RootRegistry): CacheMetrics | null {
     if (!registry.metrics) return null;
 
-    // Calculate unusedHits on demand - only count CSS rules since keyframes are disposed immediately
-    const unusedRulesCount = Array.from(registry.refCounts.values()).filter(
-      (count) => count === 0,
-    ).length;
-
+    // `unusedHits` needs a DOM scan to be meaningful, so `StyleInjector.getMetrics()`
+    // fills it in; a registry on its own cannot tell which classes are still rendered.
     return {
       ...registry.metrics,
-      unusedHits: unusedRulesCount,
+      unusedHits: 0,
     };
   }
 

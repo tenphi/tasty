@@ -120,16 +120,6 @@ function getRegistry(
   return injector.instance._sheetManager?.getRegistry(root);
 }
 
-function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
-  const registry = getRegistry(root);
-  if (!registry) return [];
-  const result: string[] = [];
-  for (const [cls, rc] of registry.refCounts as Map<string, number>) {
-    if (rc === 0) result.push(cls);
-  }
-  return sortTastyClasses(result);
-}
-
 function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
   const classes = new Set<string>();
   const elements = (root as Document).querySelectorAll?.('[class]') || [];
@@ -143,6 +133,34 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
     }
   });
   return sortTastyClasses(classes);
+}
+
+/**
+ * Injected classes whose rules are in a sheet but which no element carries —
+ * exactly what `gc()` would collect.
+ *
+ * The render path keeps no `dispose` handle, so the DOM is the only record that
+ * a class is in use. Pass `activeClasses` when the caller already scanned it.
+ */
+function getUnusedClasses(
+  root: Document | ShadowRoot = document,
+  activeClasses?: string[],
+): string[] {
+  const registry = getRegistry(root);
+  if (!registry) return [];
+
+  const live = new Set(activeClasses ?? findDomTastyClasses(root));
+  const result: string[] = [];
+  for (const [cls, info] of registry.rules) {
+    if (live.has(cls)) continue;
+    // A negative sheet index marks a class whose CSS this injector does not
+    // hold: server-rendered, pre-allocated, or queued. Nothing to report.
+    if (info.sheetIndex < 0) continue;
+    // A caller still holds the dispose handle `inject()` returned.
+    if ((registry.refCounts.get(cls) ?? 0) > 0) continue;
+    result.push(cls);
+  }
+  return sortTastyClasses(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -567,7 +585,7 @@ export const tastyDebug = {
     const { root = document, raw = false } = opts || {};
 
     const activeClasses = findDomTastyClasses(root);
-    const unusedClasses = getUnusedClasses(root);
+    const unusedClasses = getUnusedClasses(root, activeClasses);
     const totalStyledClasses = [...activeClasses, ...unusedClasses];
 
     const activeCSS = injector.instance.getCSSTextForClasses(activeClasses, {
@@ -717,7 +735,7 @@ export const tastyDebug = {
   cache(opts?: DebugOptions): CacheStatus {
     const { root = document, raw = false } = opts || {};
     const active = findDomTastyClasses(root);
-    const unused = getUnusedClasses(root);
+    const unused = getUnusedClasses(root, active);
     const metrics = injector.instance.getMetrics({ root });
 
     const status: CacheStatus = {

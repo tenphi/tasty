@@ -141,10 +141,10 @@ describe('GC: touch / gc', () => {
       vi.restoreAllMocks();
     });
 
-    it('should increment touchCount and schedule GC at touchInterval', () => {
+    it('should increment touchCount and schedule GC at touchInterval', async () => {
       const gcSpy = vi.spyOn(injector, 'gc');
 
-      // Remove requestIdleCallback so GC runs synchronously
+      // Remove requestIdleCallback to exercise the timeout fallback
       const origRIC = globalThis.requestIdleCallback;
       delete (globalThis as any).requestIdleCallback;
 
@@ -157,7 +157,12 @@ describe('GC: touch / gc', () => {
         dispose();
       }
 
-      // touchInterval is 5, and we touched 5 class tokens
+      // touchInterval is 5, and we touched 5 class tokens — but a scheduled GC
+      // must never run inline, or it would judge the render in progress.
+      expect(gcSpy).not.toHaveBeenCalled();
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(gcSpy).toHaveBeenCalled();
 
       (globalThis as any).requestIdleCallback = origRIC;
@@ -375,19 +380,28 @@ describe('GC: touch / gc', () => {
   describe('destroy', () => {
     it('should cancel pending GC on full destroy', () => {
       let cancelledId: number | null = null;
+      const origRIC = globalThis.requestIdleCallback;
       const origCIC = globalThis.cancelIdleCallback;
+      (globalThis as any).requestIdleCallback = () => 42;
       (globalThis as any).cancelIdleCallback = (id: number) => {
         cancelledId = id;
       };
 
-      // Force a pending GC handle
-      injector['pendingGCHandle'] = 42;
+      // Reach the touch interval so a GC is pending
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.destroy-${i}`, `order: ${i}`),
+        ]);
+        injector.touch(className);
+        dispose();
+      }
 
       injector.destroy();
 
       expect(cancelledId).toBe(42);
-      expect(injector['pendingGCHandle']).toBeNull();
+      expect(injector['cancelPendingGC']).toBeNull();
 
+      (globalThis as any).requestIdleCallback = origRIC;
       (globalThis as any).cancelIdleCallback = origCIC;
     });
   });

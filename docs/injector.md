@@ -9,7 +9,7 @@ A high-performance CSS-in-JS solution that powers the Tasty design system with e
 The Style Injector is the core engine behind Tasty's styling system, providing:
 
 - **Hash-based deduplication** - Identical CSS gets the same className
-- **Reference counting** - Automatic cleanup when components unmount (refCount = 0)
+- **DOM-driven lifetime** - Styles are collected once nothing renders them
 - **CSS nesting flattening** - Handles `&`, `.Class`, `SubElement` patterns
 - **At-rule injection** - First-class `@keyframes`, `@property`, `@font-face`, `@counter-style`, and `@function` support
 - **Smart cleanup** - CSS rules batched cleanup, keyframes disposed immediately
@@ -63,9 +63,16 @@ const result = inject([{
 
 console.log(result.className); // 't-abc123'
 
-// Cleanup when component unmounts (refCount decremented)
+// Release the reference; the class becomes collectible once nothing renders it
 result.dispose();
 ```
+
+`inject()` takes a reference on the class it returns, and `gc()` never evicts a
+class while a reference is outstanding — that is what `dispose()` releases. Pass
+`{ track: false }` when the caller keeps no handle and the DOM is the only record
+that the class is in use; `dispose()` is then a no-op. The render path
+(`tasty()` / `computeStyles()`) injects this way, because a hook-free render has
+no unmount signal to dispose on.
 
 ### `injectGlobal(rules, options?): { dispose: () => void }`
 
@@ -246,7 +253,7 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of touch events between GC cycles. Each style render counts as a touch. When the counter reaches this value, GC is scheduled via `requestIdleCallback`.
-- `gc.capacity`: Maximum number of unused styles (refCount = 0, not in DOM) to retain. When exceeded, the oldest are evicted first. Actively referenced styles don't count against this limit.
+- `gc.capacity`: Maximum number of unused styles (not in the DOM, no outstanding `inject()` reference) to retain. When exceeded, the least recently used are evicted first. Rendered and referenced styles don't count against this limit.
 
 ---
 
@@ -332,19 +339,24 @@ console.log(button1.className === button2.className); // true
 ### Reference Counting
 
 ```typescript
-// Multiple components using the same styles
+// Multiple callers using the same styles
 const comp1 = inject([commonStyle]);
 const comp2 = inject([commonStyle]);
 const comp3 = inject([commonStyle]);
 
-// Style is kept alive while any component uses it
+// Style is pinned while any caller holds a handle
 comp1.dispose(); // refCount: 3 → 2
 comp2.dispose(); // refCount: 2 → 1
-comp3.dispose(); // refCount: 1 → 0, eligible for bulk cleanup
+comp3.dispose(); // refCount: 1 → 0, now up to the DOM and gc()
 
-// Rule exists but refCount = 0 means unused
-// Next inject() with same styles will increment refCount and reuse immediately
+// A rule with refCount = 0 is not deleted on the spot: it stays cached and is
+// reused instantly by the next inject(). gc() decides when it actually goes.
 ```
+
+Reference counting covers callers that hold a handle. Styles that come from
+rendering are not ref-counted at all — see `{ track: false }` under
+[`inject()`](#injectrules-options-injectresult) — so what keeps them alive is
+being in the DOM, and nothing else.
 
 ### Garbage Collection
 
@@ -353,6 +365,9 @@ import { configure, gc } from '@tenphi/tasty';
 
 // Keyframes: Disposed immediately when refCount = 0 (safer for global scope)
 // CSS rules: Tracked by touch count and cleaned up via gc()
+//
+// A CSS rule is collectible when no element carries its class AND no caller
+// holds an inject() reference to it.
 
 configure({
   gc: {
@@ -367,6 +382,9 @@ gc();
 // Force-remove ALL unused styles (e.g. on route change or test teardown):
 gc({ force: true });
 
+// cleanup() is the same thing:
+cleanup();
+
 // GC is also triggered automatically by touch count during rendering.
 // Every `touchInterval` touches, GC is scheduled via requestIdleCallback.
 
@@ -375,7 +393,7 @@ gc({ force: true });
 // - DOM-safe: styles currently in the DOM are never evicted
 // - Oldest-first: least recently used styles are evicted first
 // - Keyframes: Immediate cleanup prevents global namespace pollution
-// - Unused styles can be instantly reactivated (just increment refCount)
+// - Unused styles stay cached until evicted, so re-rendering them is a cache hit
 ```
 
 ### Shadow DOM Support
@@ -470,11 +488,11 @@ const metrics = injector.instance.getMetrics();
 console.log({
   cacheHits: metrics.hits,           // Successful cache hits  
   cacheMisses: metrics.misses,       // New styles injected
-  unusedHits: metrics.unusedHits,    // Current unused styles (calculated on demand)
+  unusedHits: metrics.unusedHits,    // Styles currently eligible for eviction (scans the DOM)
   bulkCleanups: metrics.bulkCleanups, // Number of bulk cleanup operations
   stylesCleanedUp: metrics.stylesCleanedUp, // Total styles removed in bulk cleanups
   totalInsertions: metrics.totalInsertions, // Lifetime insertions
-  totalUnused: metrics.totalUnused,  // Total styles marked as unused (refCount = 0)
+  totalUnused: metrics.totalUnused,  // Times a tracked style lost its last reference
   startTime: metrics.startTime,      // Metrics collection start timestamp
   cleanupHistory: metrics.cleanupHistory, // Detailed cleanup operation history
 });
@@ -547,13 +565,13 @@ configure({
 // The injector automatically manages memory through:
 
 // 1. Hash-based deduplication - same CSS = same className
-// 2. Reference counting - styles stay alive while in use (refCount > 0)
-// 3. Immediate keyframes cleanup - disposed instantly when refCount = 0
-// 4. Touch-count GC - unused CSS rules are evicted oldest-first when over capacity
-// 5. DOM safety guard - styles visible in the DOM are never evicted
+// 2. DOM-driven lifetime - a rendered class is never evicted
+// 3. Reference counting - inject() callers pin their classes until they dispose
+// 4. Immediate keyframes cleanup - disposed instantly when refCount = 0
+// 5. Touch-count GC - unused CSS rules are evicted oldest-first when over capacity
 
 // Manual cleanup is rarely needed but available:
-cleanup(); // Force immediate cleanup of all unused CSS rules (refCount = 0)
+cleanup(); // Remove every rule that is neither rendered nor referenced
 destroy(); // Nuclear option: remove all stylesheets and reset
 ```
 
@@ -575,9 +593,9 @@ const StyledButton = tasty({
 
 // Internally uses the injector:
 // 1. Styles are parsed into StyleResult objects
-// 2. inject() is called with the parsed results
+// 2. inject() is called with the parsed results, untracked
 // 3. Component gets the returned className
-// 4. dispose() is called when component unmounts
+// 4. gc() reclaims the class once no element carries it
 ```
 
 For most development, you'll use the [React API](./react-api.md) rather than the injector directly. The injector provides the high-performance foundation that makes Tasty's declarative styling possible.

@@ -108,6 +108,7 @@
     "bench:browser": "vitest bench --project browser",
     "bench:overhead": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-overhead.bench.tsx",
     "bench:injection": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-injection.bench.ts",
+    "bench:tree": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-tree.bench.tsx",
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "version": "changeset version",

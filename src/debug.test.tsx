@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/react';
 
 import { tastyDebug } from './debug';
+import { configure, resetConfig } from './config';
 import { destroy } from './injector';
 import { tasty } from './tasty';
 
@@ -18,9 +19,15 @@ function Box(props: { color: string }) {
 }
 
 describe('tastyDebug', () => {
+  beforeEach(() => {
+    // Collection is opt-in, and only collectible classes count as unused.
+    configure({ gc: {} });
+  });
+
   afterEach(() => {
     cleanup();
     destroy();
+    resetConfig();
   });
 
   describe('unused classes', () => {

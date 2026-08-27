@@ -46,6 +46,34 @@ import { getStyleEpoch } from './config';
  */
 const CAN_COMMIT = typeof document !== 'undefined';
 
+let commitManagedMemo = false;
+let commitManagedEpoch = -1;
+
+/**
+ * Whether styles should be held through the commit rather than written during
+ * render.
+ *
+ * Only applications that asked for collection pay for it. Without `gc`
+ * configured there is nothing to collect, so components take the synchronous
+ * path and no insertion effect at all — no hook slot, no dependency array, no
+ * setup closure per render.
+ *
+ * Memoized because it decides whether a hook is taken: it must not change
+ * between renders of one component. `configure()` locks once the first styles
+ * are generated, so this settles on the first render and only a whole new
+ * injector — a new style epoch — can move it.
+ */
+function commitManaged(): boolean {
+  const epoch = getStyleEpoch();
+
+  if (commitManagedEpoch !== epoch) {
+    commitManagedEpoch = epoch;
+    commitManagedMemo = CAN_COMMIT && getConfig().gc != null;
+  }
+
+  return commitManagedMemo;
+}
+
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
 /**
@@ -761,6 +789,7 @@ function tastyElement<
   // answers every render after the first, so memoizing chunk keys during that
   // first render would write entries nothing ever reads back. Hoisted so the
   // hot path does not allocate it.
+  const STABLE_STYLES: ComputeStylesOptions = { stableStyles: true };
   const STABLE_STYLES_MANAGED: ComputeStylesOptions = {
     stableStyles: true,
     managed: true,
@@ -879,6 +908,7 @@ function tastyElement<
     // On the server the cache must be skipped: both the SSR collector and
     // the RSC inline-style paths are per-request, so every request must
     // call computeStyles() to ensure CSS is actually collected/emitted.
+    const managed = commitManaged();
     const useFactoryCache = typeof document !== 'undefined';
     const cached =
       useFactoryCache && allStyles === baseStyles
@@ -896,8 +926,12 @@ function tastyElement<
       stylesResult = computeStyles(
         allStyles,
         !useFactoryCache && allStyles === baseStyles
-          ? STABLE_STYLES_MANAGED
-          : MANAGED,
+          ? managed
+            ? STABLE_STYLES_MANAGED
+            : STABLE_STYLES
+          : managed
+            ? MANAGED
+            : undefined,
       );
       if (useFactoryCache && allStyles === baseStyles) {
         classNameCache.set(allStyles, [
@@ -910,12 +944,13 @@ function tastyElement<
     // Rendering resolved the class names; this is what puts them in the sheet
     // and holds them for as long as this component is mounted.
     //
-    // Conditional on a constant, which is the point: a server render — SSR or
-    // a React Server Component — never commits, and hooks are not available to
-    // a server component at all. Taking the hook only where there is a
-    // document is what keeps `tasty()` usable in both places. The branch cannot
-    // change within an environment, so hook order never varies for an instance.
-    if (CAN_COMMIT) {
+    // Conditional, and deliberately so. A server render — SSR or a React Server
+    // Component — never commits, and hooks are not available to a server
+    // component at all; an application that never configured `gc` has nothing
+    // to collect and should not pay for a lifecycle it does not use. Both
+    // inputs are settled before the first render and memoized, so hook order
+    // never varies for a component instance.
+    if (managed) {
       useStyleCommit(stylesResult.className);
     }
 

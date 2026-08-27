@@ -77,6 +77,12 @@ function styleRule(selector: string, declarations: string): StyleRule {
 }
 
 describe('style lifetime', () => {
+  beforeEach(() => {
+    // Collection is opt-in: without `gc` a component keeps the synchronous path
+    // and pins its classes, so there is no lifetime to test.
+    configure({ gc: {} });
+  });
+
   afterEach(() => {
     unmountAll();
     destroy();
@@ -251,6 +257,12 @@ describe('style lifetime', () => {
 // ---------------------------------------------------------------------------
 
 describe('a render still in flight', () => {
+  beforeEach(() => {
+    // Collection is opt-in: without `gc` a component keeps the synchronous path
+    // and pins its classes, so there is no lifetime to test.
+    configure({ gc: {} });
+  });
+
   afterEach(() => {
     unmountAll();
     destroy();
@@ -297,6 +309,12 @@ describe('a render still in flight', () => {
 // ---------------------------------------------------------------------------
 
 describe('every reporter agrees on what is unused', () => {
+  beforeEach(() => {
+    // Collection is opt-in: without `gc` a component keeps the synchronous path
+    // and pins its classes, so there is no lifetime to test.
+    configure({ gc: {} });
+  });
+
   afterEach(() => {
     unmountAll();
     destroy();
@@ -358,7 +376,7 @@ describe('every reporter agrees on what is unused', () => {
   });
 
   it('counts the same classes in metrics as it lists in the summary', () => {
-    configure({ devMode: true });
+    configure({ devMode: true, gc: {} });
     renderThenDetachSome();
 
     const summary = tastyDebug.summary({ raw: true });

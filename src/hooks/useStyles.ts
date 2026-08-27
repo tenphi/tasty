@@ -1,6 +1,7 @@
 import { useContext, useInsertionEffect } from 'react';
 
 import { computeStyles } from '../compute-styles';
+import { getConfig, getStyleEpoch } from '../config';
 import { acquireStyles, releaseStyles } from '../injector';
 import { getTastySSRContext } from '../ssr/context';
 import type { Styles } from '../styles/types';
@@ -39,15 +40,39 @@ export function useStyles(
   options?: { root?: Document | ShadowRoot },
 ): UseStylesResult {
   const root = options?.root;
+  const managed = commitManaged();
   const result = computeStyles(styles, {
     ssrCollector: useContext(getTastySSRContext()),
     root,
-    managed: true,
+    managed,
   });
 
-  useStyleCommit(result.className, root);
+  if (managed) {
+    useStyleCommit(result.className, root);
+  }
 
   return result;
+}
+
+const CAN_COMMIT = typeof document !== 'undefined';
+
+let commitManagedMemo = false;
+let commitManagedEpoch = -1;
+
+/**
+ * Whether styles should be held through the commit rather than written during
+ * render — see the same gate in `tasty()`. Only applications that configured
+ * `gc` take the insertion effect; everything else keeps the synchronous path.
+ */
+function commitManaged(): boolean {
+  const epoch = getStyleEpoch();
+
+  if (commitManagedEpoch !== epoch) {
+    commitManagedEpoch = epoch;
+    commitManagedMemo = CAN_COMMIT && getConfig().gc != null;
+  }
+
+  return commitManagedMemo;
 }
 
 /**

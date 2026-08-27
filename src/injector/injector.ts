@@ -43,6 +43,7 @@ import {
 } from './types';
 import type {
   CacheMetrics,
+  StyleRecipe,
   CounterStyleDescriptors,
   FontFaceDescriptors,
   FunctionDefinition,
@@ -151,8 +152,12 @@ export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  /** Cancels the scheduled sweep, whichever timer scheduled it. */
+  /** Cancels the scheduled collection pass, whichever timer scheduled it. */
   private cancelPendingGC: (() => void) | null = null;
+  /** className -> the CSS it stands for, so a collected class can come back. */
+  private recipes = new Map<string, StyleRecipe>();
+  /** Releases since the last scheduled pass. */
+  private releaseCount = 0;
   private namePrefix: string;
   private classRegex: RegExp;
   private rscClassRegex: RegExp;
@@ -529,7 +534,6 @@ export class StyleInjector {
       if (pin) {
         registry.pinCounts.set(className, 1);
       }
-      this.markUsage(registry, className);
 
       const queued = enqueueStyleWrite(() => {
         if (applySheetWrite()) return;
@@ -559,7 +563,6 @@ export class StyleInjector {
                   registry.cacheKeyToClassName.delete(cacheKey);
                 }
                 registry.pinCounts.set(className, 0);
-                registry.usageMap.delete(className);
                 return;
               }
               this.unpin(className, registry);
@@ -580,7 +583,6 @@ export class StyleInjector {
     if (pin) {
       registry.pinCounts.set(className, 1);
     }
-    this.markUsage(registry, className);
 
     return {
       className,
@@ -750,21 +752,6 @@ export class StyleInjector {
   }
 
   /**
-   * Seed the LRU stamp for a newly injected class, so it sorts as the newest
-   * rather than the oldest eviction candidate.
-   */
-  private markUsage(registry: RootRegistry, className: string): void {
-    const now = Date.now();
-    const entry = registry.usageMap.get(className);
-
-    if (entry) {
-      entry.lastTouchedAt = now;
-    } else {
-      registry.usageMap.set(className, { lastTouchedAt: now });
-    }
-  }
-
-  /**
    * Release one pin on a className. At zero pins the class is not deleted — it
    * stays cached and collectible, and `gc()` decides when it actually goes.
    */
@@ -857,7 +844,7 @@ export class StyleInjector {
     const metrics = this.sheetManager.getMetrics(registry);
 
     if (metrics && typeof document !== 'undefined') {
-      metrics.unusedHits = this.collectUnused(registry, root).length;
+      metrics.unusedHits = this.collectUnused(registry).length;
     }
 
     return metrics;
@@ -1325,77 +1312,124 @@ export class StyleInjector {
   }
 
   // =========================================================================
-  // GC: touch-count-driven garbage collection with DOM safety guard
+  // Commit lifecycle: what a mounted component holds
   // =========================================================================
 
   /**
-   * Record a render-time usage hit for one or more classNames.
-   * Handles space-separated multi-chunk classNames.
-   * When the global touch counter reaches `touchInterval`, schedules a GC
-   * via `requestIdleCallback`.
-   * No-op on the server.
+   * The class name a cache key resolves to. Pure: no allocation, no reservation,
+   * nothing written — safe to call during render, and stable across renders
+   * because the name is a hash of the key.
    */
-  touch(className: string, options?: { root?: Document | ShadowRoot }): void {
-    if (typeof document === 'undefined') return;
-    if (!this.config.gc) return;
+  resolveClassName(cacheKey: string): string {
+    return this.generateClassName(cacheKey);
+  }
 
-    const root = options?.root || document;
-    const registry = this.sheetManager.getRegistry(root);
-    const now = Date.now();
+  /** Whether this class has already been described, so its CSS need not be re-rendered. */
+  hasRecipe(className: string): boolean {
+    return this.recipes.has(className);
+  }
 
-    // `touch()` runs on every render of every tasty component — on a fully
-    // cached render it is the only work left — and a page typically renders
-    // hundreds of components sharing a handful of class names. Everything below
-    // stamps `lastTouchedAt` with the millisecond we are already in, so
-    // re-touching the same class-name string inside that millisecond writes the
-    // value it already holds. Skip it: one Set lookup instead of a split, a
-    // regex test and two Map operations per chunk.
-    if (registry.touchTick !== now) {
-      registry.touchTick = now;
-      registry.touchedTick.clear();
-    } else if (registry.touchedTick.has(className)) {
-      return;
-    }
-    registry.touchedTick.add(className);
-
-    const parts =
-      className.indexOf(' ') === -1 ? [className] : className.split(' ');
-
-    for (const cls of parts) {
-      if (!this.classRegex.test(cls)) continue;
-      if (!registry.rules.has(cls)) continue;
-
-      const entry = registry.usageMap.get(cls);
-      if (entry) {
-        entry.lastTouchedAt = now;
-      } else {
-        registry.usageMap.set(cls, { lastTouchedAt: now });
-      }
-      registry.touchCount++;
-    }
-
-    const touchInterval = this.config.gc.touchInterval ?? 1000;
-    if (registry.touchCount >= touchInterval) {
-      registry.touchCount = 0;
-      this.scheduleGC();
+  /**
+   * Record the CSS a class name stands for without writing it to a sheet.
+   *
+   * Called during render. Nothing is inserted yet: the component that will
+   * carry the class inserts it from here when it commits, so a render that is
+   * discarded leaves no rule behind, and a rule collected between render and
+   * commit comes back.
+   */
+  defineRecipe(className: string, recipe: StyleRecipe): void {
+    if (!this.recipes.has(className)) {
+      this.recipes.set(className, recipe);
     }
   }
 
   /**
-   * Schedule a GC in idle time. Runs GC on all active roots, and avoids
+   * Take up a class on commit: insert its rules if they are not in the sheet,
+   * and count one more mounted holder.
+   *
+   * `className` may be several space-separated chunk classes; they are acquired
+   * together, which is what lets a component pay one insertion effect.
+   */
+  acquire(className: string, options?: { root?: Document | ShadowRoot }): void {
+    if (!className) return;
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const parts =
+      className.indexOf(' ') === -1 ? [className] : className.split(' ');
+
+    for (const cls of parts) {
+      const held = registry.committed.get(cls) ?? 0;
+      registry.committed.set(cls, held + 1);
+      registry.candidates.delete(cls);
+
+      if (held > 0) continue;
+
+      // First holder: the rules may never have been written, or may have been
+      // collected while this render was still pending.
+      const existing = registry.rules.get(cls);
+      if (existing && existing.sheetIndex !== PLACEHOLDER_RULE_INDEX) continue;
+
+      const recipe = this.recipes.get(cls);
+      if (recipe) {
+        this.inject(recipe.rules, {
+          root,
+          cacheKey: recipe.cacheKey,
+          pin: false,
+        });
+      }
+    }
+  }
+
+  /**
+   * Give up a class on unmount. At zero holders it becomes a candidate, but is
+   * not deleted here: insertion-effect cleanups and setups interleave component
+   * by component, so a sibling mounting the same class must get to say so
+   * first. The scheduled pass re-checks before deleting anything.
+   */
+  release(className: string, options?: { root?: Document | ShadowRoot }): void {
+    if (!className) return;
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const parts =
+      className.indexOf(' ') === -1 ? [className] : className.split(' ');
+    const now = Date.now();
+
+    for (const cls of parts) {
+      const held = registry.committed.get(cls) ?? 0;
+      if (held <= 1) {
+        registry.committed.delete(cls);
+        registry.candidates.set(cls, now);
+        this.releaseCount++;
+      } else {
+        registry.committed.set(cls, held - 1);
+      }
+    }
+
+    if (!this.config.gc) return;
+
+    const releaseInterval = this.config.gc.releaseInterval ?? 1000;
+    if (this.releaseCount >= releaseInterval) {
+      this.releaseCount = 0;
+      this.scheduleGC();
+    }
+  }
+
+  // =========================================================================
+  // GC: commit-driven collection
+  // =========================================================================
+
+  /**
+   * Schedule a collection pass. Runs on all active roots, and avoids
    * double-scheduling.
    *
-   * Requires `gc.unsafeAutoCollect`. A sweep judges a class finished by not
-   * finding it in the DOM, which a render that has injected but not yet
-   * committed cannot be told apart from — so sweeping on a schedule nobody
-   * asked for can delete rules an in-flight render is about to attach.
-   *
-   * Without `requestIdleCallback` there is no automatic collection either
-   * unless `gc.timeoutFallback` opts into a timeout: running the sweep inline
-   * here would put it inside the render that touched the class.
+   * Deliberately deferred rather than run inside `release()`: insertion-effect
+   * cleanups and setups interleave component by component, so a class one
+   * component just dropped may be picked straight back up by the next one.
+   * Deleting on the way past would race that; the pass re-checks instead.
    */
   private scheduleGC(): void {
-    if (!this.config.gc?.unsafeAutoCollect) return;
     if (this.cancelPendingGC) return;
 
     const runGC = () => {
@@ -1409,44 +1443,33 @@ export class StyleInjector {
     if (typeof requestIdleCallback !== 'undefined') {
       const handle = requestIdleCallback(() => runGC());
       this.cancelPendingGC = () => cancelIdleCallback(handle);
-    } else if (this.config.gc?.timeoutFallback) {
+    } else {
       const handle = setTimeout(runGC, 0);
       this.cancelPendingGC = () => clearTimeout(handle);
     }
   }
 
   /**
-   * The one definition of "unused": this injector owns the class's rules, no
-   * element in `root` carries it, and nobody pinned it.
+   * The one definition of "unused": a class that mounted components released
+   * and nobody pinned. `gc()` deletes from this set, `getMetrics()` counts it,
+   * and `tastyDebug` reports it — all through here, so the three can never
+   * disagree about what "unused" means.
    *
-   * `gc()` evicts from this set, `getMetrics()` counts it, and `tastyDebug`
-   * reports it — all through here, so the three can never disagree about what
-   * "unused" means. Entries carry their last `touch()` so callers can drop the
-   * oldest first; a class that was never touched sorts as oldest.
+   * Only a class that was committed and then released can be here. A class
+   * that was never mounted — a bare `computeStyles()` call, a pinned
+   * `inject()` — is never collectible, because nothing would re-create it.
    */
-  private collectUnused(
-    registry: RootRegistry,
-    root: Document | ShadowRoot,
-  ): string[] {
-    // Scan DOM for live classes (classList handles SVG elements too)
-    const liveClasses = new Set<string>();
-    for (const el of root.querySelectorAll('[class]')) {
-      for (const token of el.classList) {
-        if (this.classRegex.test(token)) {
-          liveClasses.add(token);
-        }
-      }
-    }
-
+  private collectUnused(registry: RootRegistry): string[] {
     const unused: string[] = [];
 
-    for (const [className, ruleInfo] of registry.rules) {
+    for (const className of registry.candidates.keys()) {
+      if ((registry.committed.get(className) ?? 0) > 0) continue;
+      if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
+
+      const ruleInfo = registry.rules.get(className);
       // A negative sheet index marks a rule this injector does not own — server
       // rendered (hydrated), pre-allocated, or still queued. Never ours to delete.
-      if (ruleInfo.sheetIndex < 0) continue;
-      if (liveClasses.has(className)) continue;
-      // Someone still holds the dispose handle `inject()` returned.
-      if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
+      if (!ruleInfo || ruleInfo.sheetIndex < 0) continue;
 
       unused.push(className);
     }
@@ -1462,10 +1485,9 @@ export class StyleInjector {
     flushStyles();
     if (typeof document === 'undefined') return [];
 
-    const root = options?.root || document;
-    const registry = this.sheetManager.getRegistry(root);
+    const registry = this.sheetManager.getRegistry(options?.root || document);
 
-    return this.collectUnused(registry, root);
+    return this.collectUnused(registry);
   }
 
   /**
@@ -1495,23 +1517,20 @@ export class StyleInjector {
     const registry = this.sheetManager.getRegistry(root);
     const capacity = this.config.gc?.capacity ?? 1000;
 
-    // Quick upper-bound check: not even every class being unused would exceed
-    // capacity, so skip the DOM scan.
-    if (!force && registry.rules.size <= capacity) return 0;
+    // Cheap upper bound: nothing has been released, so nothing can go.
+    if (!force && registry.candidates.size <= capacity) return 0;
 
-    const unused = this.collectUnused(registry, root);
+    const unused = this.collectUnused(registry);
 
     let doomed: string[];
 
     if (force) {
       doomed = unused;
     } else if (unused.length > capacity) {
-      // Oldest first. A class that was never touched has no stamp and sorts
-      // oldest, which is what we want: nothing has rendered it since injection.
-      const age = (cls: string) =>
-        registry.usageMap.get(cls)?.lastTouchedAt ?? 0;
+      // Least recently released first.
+      const releasedAt = (cls: string) => registry.candidates.get(cls) ?? 0;
 
-      unused.sort((a, b) => age(a) - age(b));
+      unused.sort((a, b) => releasedAt(a) - releasedAt(b));
       doomed = unused.slice(0, unused.length - capacity);
     } else {
       return 0;

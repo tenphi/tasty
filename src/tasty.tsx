@@ -37,7 +37,14 @@ import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
 import { getConfig } from './config';
-import { touch } from './injector';
+import { useStyleCommit } from './hooks/useStyles';
+import { hasRecipe } from './injector';
+
+/**
+ * Whether this environment ever commits. Server renders (SSR and RSC) resolve
+ * class names and hand them to a collector; only a browser mounts them.
+ */
+const CAN_COMMIT = typeof document !== 'undefined';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
@@ -754,7 +761,13 @@ function tastyElement<
   // answers every render after the first, so memoizing chunk keys during that
   // first render would write entries nothing ever reads back. Hoisted so the
   // hot path does not allocate it.
-  const STABLE_STYLES: ComputeStylesOptions = { stableStyles: true };
+  const STABLE_STYLES_MANAGED: ComputeStylesOptions = {
+    stableStyles: true,
+    managed: true,
+  };
+  // `managed`: rendering only names the classes, and `useStyleCommit()` below
+  // puts them in the sheet when this component commits.
+  const MANAGED: ComputeStylesOptions = { managed: true };
 
   const _TastyComponent = forwardRef<
     unknown,
@@ -867,24 +880,39 @@ function tastyElement<
     // the RSC inline-style paths are per-request, so every request must
     // call computeStyles() to ensure CSS is actually collected/emitted.
     const useFactoryCache = typeof document !== 'undefined';
+    const cachedClassName =
+      useFactoryCache && allStyles === baseStyles
+        ? classNameCache.get(allStyles)
+        : undefined;
     let stylesResult: ComputeStylesResult;
-    if (
-      useFactoryCache &&
-      allStyles === baseStyles &&
-      classNameCache.has(allStyles)
-    ) {
-      stylesResult = { className: classNameCache.get(allStyles)! };
-      touch(stylesResult.className);
+    // The cached name is only good while the injector still knows what it
+    // stands for. It outlives the injector when one is thrown away —
+    // `resetConfig()`, a test teardown — and a name whose recipe went with it
+    // would commit to nothing.
+    if (cachedClassName && hasRecipe(cachedClassName)) {
+      stylesResult = { className: cachedClassName };
     } else {
       stylesResult = computeStyles(
         allStyles,
         !useFactoryCache && allStyles === baseStyles
-          ? STABLE_STYLES
-          : undefined,
+          ? STABLE_STYLES_MANAGED
+          : MANAGED,
       );
       if (useFactoryCache && allStyles === baseStyles) {
         classNameCache.set(allStyles, stylesResult.className);
       }
+    }
+
+    // Rendering resolved the class names; this is what puts them in the sheet
+    // and holds them for as long as this component is mounted.
+    //
+    // Conditional on a constant, which is the point: a server render — SSR or
+    // a React Server Component — never commits, and hooks are not available to
+    // a server component at all. Taking the hook only where there is a
+    // document is what keeps `tasty()` usable in both places. The branch cannot
+    // change within an environment, so hook order never varies for an instance.
+    if (CAN_COMMIT) {
+      useStyleCommit(stylesResult.className);
     }
 
     // Merge tokens: default -> instance -> tokenProps

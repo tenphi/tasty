@@ -59,60 +59,39 @@ export interface StyleInjectorConfig {
 /**
  * Per-className usage tracking for GC.
  */
-export interface StyleUsage {
-  lastTouchedAt: number;
+/**
+ * The CSS a class name stands for, kept so the class can be re-created.
+ *
+ * This is what makes collection safe: a render hands a class name to a
+ * component before the commit that mounts it, and collection can run in
+ * between. The component's insertion effect re-inserts from the recipe when it
+ * finally commits, so deleting a rule early costs a re-insert, never a
+ * missing style.
+ */
+export interface StyleRecipe {
+  rules: StyleResult[];
+  cacheKey?: string;
 }
 
 /**
  * Configuration for the style garbage collector.
  *
- * GC is triggered by touch count rather than timers: every `touchInterval`
- * touches, an idle callback is scheduled to evict unused styles above
- * `capacity`, oldest first.
+ * Collection is driven by React commits, not by timers or DOM scans: a styled
+ * component acquires its classes in `useInsertionEffect` and releases them when
+ * it unmounts. Every `releaseInterval` releases, a pass is scheduled to delete
+ * whatever is still at zero, keeping the `capacity` most recently released.
  */
 export interface GCConfig {
   /**
-   * Sweep automatically as rendering goes, instead of only when `gc()` or
-   * `cleanup()` is called (default `false`).
-   *
-   * **Unsafe, by name and in fact.** A sweep decides what is finished by
-   * scanning the DOM, and rendering is not commit-aware: a concurrent render
-   * can yield between the `inject()` that creates a class and the commit that
-   * attaches it. A sweep landing in that window sees no element carrying the
-   * class and deletes rules the pending render is about to use, so the element
-   * commits unstyled until something re-renders it. A pending render is
-   * indistinguishable from one that already committed and unmounted — React
-   * reports neither commit nor discard for a class name handed out during
-   * render — so no heuristic closes this; only a real commit signal would.
-   *
-   * Prefer `gc()` or `cleanup()` at a moment of your choosing: a route change,
-   * an idle callback of your own, test teardown.
-   */
-  unsafeAutoCollect?: boolean;
-
-  /**
-   * With `unsafeAutoCollect`, schedule the sweep with a timeout where
-   * `requestIdleCallback` is missing (default `false`).
-   *
-   * Collection is a background chore, so it otherwise only ever runs in idle
-   * time: where the engine cannot offer idle time, nothing is collected
-   * automatically at all. Opt in to give those engines automatic collection
-   * anyway, at the cost of a sweep that competes with whatever else the page is
-   * doing.
-   */
-  timeoutFallback?: boolean;
-
-  /**
-   * Number of touch events between automatic GC cycles.
-   * Only used with `unsafeAutoCollect`.
+   * Number of releases between automatic collection passes. A component
+   * unmounting releases one entry per chunk it carried.
    * @default 1000
    */
-  touchInterval?: number;
+  releaseInterval?: number;
   /**
-   * Maximum number of unused styles to retain.
-   * GC evicts the oldest unused styles when this limit is exceeded.
-   * Pinned styles and DOM-live styles
-   * do not count against this limit.
+   * Maximum number of collectible styles to retain. Collection evicts the
+   * least recently released first once this is exceeded. Mounted styles and
+   * pinned styles do not count against it.
    * @default 1000
    */
   capacity?: number;
@@ -248,18 +227,10 @@ export interface RootRegistry {
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
-  /** Per-className usage tracking for GC */
-  usageMap: Map<string, StyleUsage>;
-  /** Touch counter for scheduling GC (per-root) */
-  touchCount: number;
-  /**
-   * Millisecond that `touchedTick` refers to. `touch()` only ever stamps
-   * `lastTouchedAt` with the current millisecond, so a repeat touch of the same
-   * class name inside one millisecond is a no-op worth skipping.
-   */
-  touchTick: number;
-  /** Class-name strings already touched during `touchTick`. */
-  touchedTick: Set<string>;
+  /** className -> how many mounted components hold it (0 means collectible) */
+  committed: Map<string, number>;
+  /** className -> when it last dropped to zero, for least-recently-released order */
+  candidates: Map<string, number>;
   /** How many entries from `window.__TASTY__` have been synced into this registry */
   serverClassSyncIndex: number;
   /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */

@@ -1110,28 +1110,30 @@ describe('StyleInjector namePrefix', () => {
     rb.dispose();
   });
 
-  it('GC touch only matches classes starting with the configured prefix', () => {
+  it('collects classes generated under the configured prefix', () => {
     const gcInjector = new StyleInjector({
       forceTextInjection: true,
       namePrefix: 'mb',
-      gc: { touchInterval: 100, capacity: 100 },
+      gc: { capacity: 0 },
     });
-    const { className } = gcInjector.inject(
-      cssToStyleResults('&{ color: red; }'),
-      { cacheKey: 'gc-prefix-test' },
-    );
+    const cacheKey = 'gc-prefix-test';
+    const className = gcInjector.resolveClassName(cacheKey);
 
     expect(className).toMatch(/^mb[a-z0-9]+$/);
 
-    gcInjector.touch(className);
-    // Default-prefix tasty classes must not be picked up by an `mb`-injector
-    gcInjector.touch('t999');
-    // Random tokens must not be picked up either
-    gcInjector.touch('mb-not-a-tasty-class');
+    gcInjector.defineRecipe(className, {
+      rules: cssToStyleResults('&{ color: red; }'),
+      cacheKey,
+    });
+    gcInjector.acquire(className);
 
-    const registry = gcInjector['sheetManager'].getRegistry(document);
-    expect(registry.usageMap.has(className)).toBe(true);
-    expect(registry.usageMap.size).toBe(1);
+    expect(gcInjector.getCSSText()).toContain('color: red');
+    expect(gcInjector.gc({ force: true })).toBe(0);
+
+    gcInjector.release(className);
+
+    expect(gcInjector.gc({ force: true })).toBe(1);
+    expect(gcInjector.getCSSText()).not.toContain('color: red');
 
     gcInjector.destroy();
   });

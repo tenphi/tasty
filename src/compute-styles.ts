@@ -24,12 +24,14 @@ import {
 } from './config';
 import {
   counterStyle,
+  defineRecipe,
   fontFace,
   func,
+  hasRecipe,
   inject,
   keyframes,
   property,
-  touch,
+  resolveClassName,
 } from './injector';
 import type { FontFaceDescriptors, KeyframesSteps } from './injector/types';
 import {
@@ -93,6 +95,21 @@ export interface ComputeStylesOptions {
    * bookkeeping only when there is a next render to spend it on.
    */
   stableStyles?: boolean;
+  /**
+   * Set when the caller will acquire the returned classes in a
+   * `useInsertionEffect` — `useStyles()` and `tasty()` components do.
+   *
+   * Managed rendering writes nothing to a sheet: it resolves the class names
+   * and records what they stand for, and the commit inserts them. A render
+   * that is discarded therefore leaves no rule behind, and collection can
+   * never strip a render that has not committed yet, because the effect puts
+   * the rule back.
+   *
+   * Unmanaged is the default, and injects during the call as before: a bare
+   * `computeStyles()` has no commit to hook, so its classes are pinned and
+   * never collected.
+   */
+  managed?: boolean;
 }
 
 interface ProcessedChunk {
@@ -327,8 +344,8 @@ function processChunkSSR(
 }
 
 /**
- * Process a chunk on the client: render, allocate className, and inject
- * CSS synchronously. The injector's cache makes this idempotent.
+ * Process a chunk on the client: render, resolve the className, and — unless
+ * the caller manages the class through a commit — inject it now.
  */
 function processChunkSync(
   styles: Styles,
@@ -336,6 +353,7 @@ function processChunkSync(
   styleKeys: string[],
   stableStyles: boolean,
   root?: Document | ShadowRoot,
+  managed?: boolean,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
@@ -345,6 +363,33 @@ function processChunkSync(
     styleKeys,
     stableStyles,
   );
+
+  if (managed) {
+    // Nothing is written here: the name is a pure hash of the cache key, and
+    // the CSS is only rendered the first time this class is described.
+    const className = resolveClassName(cacheKey);
+
+    if (hasRecipe(className)) {
+      return {
+        name: chunkName,
+        styleKeys,
+        cacheKey,
+        renderResult: { rules: [] },
+        className,
+      };
+    }
+
+    const renderResult = renderStylesForChunk(
+      styles,
+      chunkName,
+      styleKeys,
+      cacheKey,
+    );
+    if (renderResult.rules.length === 0) return null;
+
+    return { name: chunkName, styleKeys, cacheKey, renderResult, className };
+  }
+
   const renderResult = renderStylesForChunk(
     styles,
     chunkName,
@@ -353,13 +398,9 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
-  // `pin: false` — the render path keeps no dispose handle; the DOM is the
-  // record of use, and `gc()` reclaims the class once no element carries it.
-  const { className } = inject(renderResult.rules, {
-    cacheKey,
-    root,
-    pin: false,
-  });
+  // A bare computeStyles() has no commit to re-create the class from, so it is
+  // pinned: injected once and never collected.
+  const { className } = inject(renderResult.rules, { cacheKey, root });
 
   return { name: chunkName, styleKeys, cacheKey, renderResult, className };
 }
@@ -384,6 +425,29 @@ function injectKeyframesSync(
   }
 
   return nameMap;
+}
+
+/**
+ * Record what each freshly described chunk class stands for, so the commit that
+ * mounts it can insert the rules — and so a later commit can put them back if
+ * they were collected in between.
+ */
+function recordChunkRecipes(
+  chunks: ProcessedChunk[],
+  nameMap: Map<string, string> | null,
+): void {
+  for (const chunk of chunks) {
+    if (chunk.renderResult.rules.length === 0) continue;
+
+    const rules: StyleResult[] = nameMap
+      ? chunk.renderResult.rules.map((rule) => ({
+          ...rule,
+          declarations: replaceAnimationNames(rule.declarations, nameMap),
+        }))
+      : chunk.renderResult.rules;
+
+    defineRecipe(chunk.className, { rules, cacheKey: chunk.cacheKey });
+  }
 }
 
 /**
@@ -594,6 +658,7 @@ export function computeStyles(
     return computeStylesRSC(resolved, chunkMap, stableStyles);
   } else {
     const root = options?.root;
+    const managed = options?.managed;
 
     injectAncillarySync(resolved, root);
 
@@ -607,16 +672,15 @@ export function computeStyles(
         chunkStyleKeys,
         stableStyles,
         root,
+        managed,
       );
       if (chunk) chunks.push(chunk);
     }
 
-    if (nameMap) {
+    if (managed) {
+      recordChunkRecipes(chunks, nameMap);
+    } else if (nameMap) {
       injectChunkRulesSync(chunks, nameMap, root);
-    }
-
-    for (const chunk of chunks) {
-      touch(chunk.className, { root });
     }
   }
 

@@ -1,12 +1,20 @@
 import { cleanup, render } from '@testing-library/react';
 
-import { computeStyles } from './compute-styles';
 import { tastyDebug } from './debug';
 import { destroy } from './injector';
+import { tasty } from './tasty';
+
+// A real styled component: its classes are held by the commit and released on
+// unmount, which is what makes them collectible. A bare `computeStyles()` call
+// has no commit to put its rules back, so it is pinned and never unused.
+const BOXES: Record<string, ReturnType<typeof tasty>> = {};
 
 function Box(props: { color: string }) {
-  const { className } = computeStyles({ color: props.color, padding: '2x' });
-  return <div className={className} />;
+  const Styled = (BOXES[props.color] ??= tasty({
+    styles: { color: props.color, padding: '2x' },
+  }));
+
+  return <Styled />;
 }
 
 describe('tastyDebug', () => {
@@ -30,7 +38,6 @@ describe('tastyDebug', () => {
       expect(summary.unusedClasses).toEqual([]);
     });
 
-    // The render path pins nothing, so only the DOM can say a class is used.
     it('reports classes that left the DOM but stayed in the registry', () => {
       const { rerender } = render(
         <>

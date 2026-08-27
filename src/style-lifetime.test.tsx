@@ -3,47 +3,55 @@ import { cleanup as unmountAll, render } from '@testing-library/react';
 import { computeStyles } from './compute-styles';
 import { configure, resetConfig } from './config';
 import { tastyDebug } from './debug';
-import { cleanup, destroy, gc, getCSSText, inject, injector } from './injector';
+import {
+  acquireStyles,
+  cleanup,
+  destroy,
+  gc,
+  getCSSText,
+  inject,
+  injector,
+  releaseStyles,
+} from './injector';
 import { HYDRATED_RULE_INDEX } from './injector/types';
 import type { RootRegistry, StyleRule } from './injector/types';
 import { hydrateTastyClasses } from './ssr/hydrate';
+import { tasty } from './tasty';
 
 /**
  * How long an injected style lives, and who gets to say so.
  *
- * The render path keeps no dispose handle — a hook-free render has no unmount
- * signal — so the DOM is the only record that a class is in use, and a pin from
- * `inject()` overrides that. Three consumers read this: `gc()` evicts on it,
- * `getMetrics()` counts it, `tastyDebug` reports it.
+ * Rendering resolves class names and records what they stand for; the commit
+ * puts them in the sheet, through one `useInsertionEffect` per styled
+ * component, and the unmount gives them back. Only a class that was held and
+ * then fully released can be collected — and because the effect re-inserts
+ * whatever is missing, collecting one early costs a re-insert rather than a
+ * missing style.
  *
- * They all went quietly dead once, when the render path stopped disposing and
- * every one of them kept reading "unused" off the pin counts. Nothing failed —
- * GC swept zero, `cleanup()` deleted nothing, and `tastyDebug` printed
+ * This all went quietly dead once, when the render path stopped disposing and
+ * `gc()`, `cleanup()`, `getMetrics()` and `tastyDebug` all kept reading "unused"
+ * off pin counts nothing maintained: GC swept zero and `tastyDebug` printed
  * `Unused: 0 classes` on a page holding hundreds of stale rules. The suites
- * below are written to fail loudly if any part of that contract slips again:
- * the "every reporter agrees" block in particular exists so the three can never
- * drift apart in silence.
+ * below fail loudly if any part of that contract slips again.
  */
 
 const RICH_STYLES = {
   display: 'flex',
   padding: '2x',
-  fill: {
-    '': '#white',
-    hovered: '#purple.10',
-  },
+  fill: { '': '#white', hovered: '#purple.10' },
   color: '#dark',
   radius: '1r',
   border: '#border',
-  Content: {
-    color: '#purple',
-  },
+  Content: { color: '#purple' },
 } as const;
 
 function Box(props: { color: string }) {
-  const { className } = computeStyles({ color: props.color });
-  return <div className={className} />;
+  const Styled =
+    BOXES[props.color] ??
+    (BOXES[props.color] = tasty({ styles: { color: props.color } }));
+  return <Styled />;
 }
+const BOXES: Record<string, ReturnType<typeof tasty>> = {};
 
 function getRegistry(root: Document | ShadowRoot = document): RootRegistry {
   return injector.instance._sheetManager.getRegistry(root);
@@ -51,9 +59,7 @@ function getRegistry(root: Document | ShadowRoot = document): RootRegistry {
 
 /** Class names the injector holds CSS for in `root`. */
 function ownedClasses(root: Document | ShadowRoot = document): string[] {
-  const registry = getRegistry(root);
-
-  return [...registry.rules]
+  return [...getRegistry(root).rules]
     .filter(([, info]) => info.sheetIndex >= 0)
     .map(([className]) => className)
     .sort();
@@ -77,52 +83,82 @@ describe('style lifetime', () => {
     resetConfig();
   });
 
-  it('pins nothing when styles come from the render path', () => {
-    render(<Box color="#red" />);
+  it('writes nothing to the sheet until a component commits', () => {
+    // Managed rendering only names the class and records what it stands for, so
+    // a render that never commits leaves no rule behind.
+    const { className } = computeStyles({ color: '#red' }, { managed: true });
 
-    const registry = getRegistry();
+    expect(getCSSText()).not.toContain(className);
 
-    expect(registry.rules.size).toBeGreaterThan(0);
-    expect(registry.pinCounts.size).toBe(0);
+    acquireStyles(className);
+
+    expect(getCSSText()).toContain(className);
   });
 
-  it('never evicts a class that is still rendered', () => {
+  it('keeps a mounted class', () => {
     const { container } = render(<Box color="#red" />);
-    const className = container.firstElementChild!.className;
+    const className = domClasses(container)[0];
 
     expect(gc({ force: true })).toBe(0);
     expect(getCSSText()).toContain(className);
   });
 
-  it('evicts a class once it leaves the DOM', () => {
+  it('collects a class once the last holder unmounts', () => {
     const { container, rerender } = render(<Box color="#red" />);
-    const className = container.firstElementChild!.className;
+    const className = domClasses(container)[0];
 
     rerender(<div />);
 
     expect(gc({ force: true })).toBe(1);
-
-    const registry = getRegistry();
-    expect(registry.rules.has(className)).toBe(false);
-    expect(registry.usageMap.has(className)).toBe(false);
+    expect(getRegistry().rules.has(className)).toBe(false);
     expect(getCSSText()).not.toContain(className);
   });
 
-  it('drops the cache key so the class can be re-injected later', () => {
+  it('keeps a class a second component still holds', () => {
+    const { rerender } = render(
+      <>
+        <Box color="#red" />
+        <Box color="#red" />
+      </>,
+    );
+
+    rerender(<Box color="#red" />);
+
+    expect(gc({ force: true })).toBe(0);
+  });
+
+  it('re-injects a collected class when a later render mounts it', () => {
     const { container, rerender } = render(<Box color="#red" />);
-    const className = container.firstElementChild!.className;
+    const className = domClasses(container)[0];
 
     rerender(<div />);
     gc({ force: true });
 
     const second = render(<Box color="#red" />);
 
-    expect(second.container.firstElementChild!.className).toBe(className);
+    expect(domClasses(second.container)[0]).toBe(className);
     expect(getCSSText()).toContain(className);
   });
 
-  it('keeps the most recently used classes within capacity', () => {
-    configure({ gc: { touchInterval: 1_000_000, capacity: 1 } });
+  it('collects everything a rich style object produced', () => {
+    const Rich = tasty({ styles: RICH_STYLES });
+    const { container, rerender } = render(<Rich />);
+    const rendered = domClasses(container);
+
+    // Several chunks, or this proves less than it looks.
+    expect(rendered.length).toBeGreaterThan(1);
+
+    rerender(<div />);
+    gc({ force: true });
+
+    for (const className of rendered) {
+      expect(getRegistry().rules.has(className)).toBe(false);
+      expect(getCSSText()).not.toContain(className);
+    }
+  });
+
+  it('keeps the most recently released classes within capacity', () => {
+    configure({ gc: { capacity: 1 } });
 
     const { rerender } = render(
       <>
@@ -132,19 +168,17 @@ describe('style lifetime', () => {
       </>,
     );
 
-    const registry = getRegistry();
-    const injected = registry.rules.size;
-    expect(injected).toBe(3);
+    expect(getRegistry().rules.size).toBe(3);
 
     rerender(<div />);
 
-    expect(gc()).toBe(injected - 1);
-    expect(registry.rules.size).toBe(1);
+    expect(gc()).toBe(2);
+    expect(getRegistry().rules.size).toBe(1);
   });
 
-  it('cleanup() removes detached render-path styles', () => {
+  it('cleanup() removes released styles', () => {
     const { container, rerender } = render(<Box color="#red" />);
-    const className = container.firstElementChild!.className;
+    const className = domClasses(container)[0];
 
     rerender(<div />);
     cleanup();
@@ -152,121 +186,35 @@ describe('style lifetime', () => {
     expect(getCSSText()).not.toContain(className);
   });
 
-  it('keeps styles an inject() caller pinned', () => {
-    const { className } = inject([styleRule('.pinned.pinned', 'color: red')]);
+  it('never collects a class no component ever held', () => {
+    // A bare computeStyles() has no commit to put it back.
+    const { className } = computeStyles({ color: '#red' });
 
+    expect(getCSSText()).toContain(className);
     expect(gc({ force: true })).toBe(0);
-    expect(getRegistry().rules.has(className)).toBe(true);
-  });
-
-  it('never reports a pinned class as unused', () => {
-    const { className } = inject([styleRule('.held.held', 'color: red')]);
-
-    // Not merely undeleted — a pinned class must not be *counted* as unused
-    // either, or it eats into the GC capacity and shows up in debug output.
     expect(injector.instance.getUnusedClasses()).not.toContain(className);
-    expect(tastyDebug.summary({ raw: true }).unusedClasses).not.toContain(
-      className,
-    );
   });
 
-  it('collects an unpinned inject() once nothing renders it', () => {
-    const { className } = inject([styleRule('.loose.loose', 'color: red')], {
-      pin: false,
+  it('keeps styles an inject() caller pinned', () => {
+    const { className } = inject([styleRule('.pinned.pinned', 'color: red')], {
+      cacheKey: 'pinned',
     });
 
-    expect(getRegistry().pinCounts.has(className)).toBe(false);
-    expect(gc({ force: true })).toBe(1);
-    expect(getRegistry().rules.has(className)).toBe(false);
+    acquireStyles(className);
+    releaseStyles(className);
+
+    expect(gc({ force: true })).toBe(0);
+    expect(injector.instance.getUnusedClasses()).not.toContain(className);
   });
 
   it('never evicts server-rendered classes it does not own', () => {
     hydrateTastyClasses(['t-hydrated']);
 
-    const registry = getRegistry();
-    expect(registry.rules.get('t-hydrated')?.sheetIndex).toBe(
+    expect(getRegistry().rules.get('t-hydrated')?.sheetIndex).toBe(
       HYDRATED_RULE_INDEX,
     );
-
     expect(gc({ force: true })).toBe(0);
-    expect(registry.rules.has('t-hydrated')).toBe(true);
-    // And not merely undeleted: the CSS lives in the server's <style> tag, so
-    // this injector must not claim it as unused either.
     expect(injector.instance.getUnusedClasses()).not.toContain('t-hydrated');
-  });
-
-  it('never sweeps on its own unless asked to', async () => {
-    configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-    const { container, rerender } = render(<Box color="#blue" />);
-    const detached = domClasses(container)[0];
-
-    rerender(<Box color="#red" />);
-
-    // A sweep cannot tell a detached class from one a concurrent render has
-    // injected and not yet committed, so `gc` config alone must not schedule.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(getRegistry().rules.has(detached)).toBe(true);
-
-    cleanup();
-    expect(getRegistry().rules.has(detached)).toBe(false);
-  });
-
-  it('collects on its own once opted in', async () => {
-    configure({
-      gc: { touchInterval: 1, capacity: 0, unsafeAutoCollect: true },
-    });
-
-    const { container, rerender } = render(<Box color="#blue" />);
-    const detached = domClasses(container)[0];
-
-    // No manual gc() call: rendering alone has to get the sweep scheduled. The
-    // rerender swaps in a colour the registry has not seen, so it is a fresh
-    // class name and a guaranteed touch — `touch()` skips repeats of the same
-    // name inside one millisecond, which would make this timing-bound.
-    rerender(<Box color="#red" />);
-
-    await vi.waitFor(
-      () => expect(getRegistry().rules.has(detached)).toBe(false),
-      { timeout: 5000 },
-    );
-  });
-
-  it('collects everything a rich style object produced', () => {
-    function Rich() {
-      const { className } = computeStyles(RICH_STYLES);
-      return <div className={className} />;
-    }
-
-    const { container, rerender } = render(<Rich />);
-    const rendered = domClasses(container);
-
-    // Several chunks, or this proves less than it looks.
-    expect(rendered.length).toBeGreaterThan(1);
-    expect(ownedClasses()).toEqual(rendered);
-
-    rerender(<div />);
-    gc({ force: true });
-
-    expect(ownedClasses()).toEqual([]);
-    for (const className of rendered) {
-      expect(getCSSText()).not.toContain(className);
-    }
-  });
-
-  it('honours a custom namePrefix when scanning the DOM', () => {
-    configure({ namePrefix: 'zz' });
-
-    const { container, rerender } = render(<Box color="#red" />);
-    const rendered = domClasses(container);
-
-    expect(rendered[0]).toMatch(/^zz/);
-    // A DOM scan that still looked for the default prefix would collect these.
-    expect(gc({ force: true })).toBe(0);
-
-    rerender(<div />);
-
-    expect(gc({ force: true })).toBe(rendered.length);
   });
 
   it('scopes collection to the root it was given', () => {
@@ -274,24 +222,72 @@ describe('style lifetime', () => {
     document.body.appendChild(host);
     const shadowRoot = host.attachShadow({ mode: 'open' });
 
-    const shadow = computeStyles({ color: '#red' }, { root: shadowRoot });
-    const shadowEl = document.createElement('div');
-    shadowEl.className = shadow.className;
-    shadowRoot.appendChild(shadowEl);
+    const shadow = computeStyles(
+      { color: '#red' },
+      { root: shadowRoot, managed: true },
+    );
+    acquireStyles(shadow.className, { root: shadowRoot });
 
     render(<Box color="#blue" />);
 
-    // Each root only ever judges its own classes.
     expect(gc({ root: shadowRoot, force: true })).toBe(0);
     expect(gc({ force: true })).toBe(0);
 
-    shadowEl.remove();
+    releaseStyles(shadow.className, { root: shadowRoot });
 
     expect(gc({ force: true })).toBe(0);
     expect(gc({ root: shadowRoot, force: true })).toBe(1);
-    expect(ownedClasses(shadowRoot)).toEqual([]);
 
     host.remove();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rendering is not commit-aware: a concurrent render can yield between the
+// render that names a class and the commit that mounts it, for any number of
+// turns. Collection cannot tell that apart from a class that is finished, so
+// the contract is not that collection avoids it — it is that the commit puts
+// the rule back.
+// ---------------------------------------------------------------------------
+
+describe('a render still in flight', () => {
+  afterEach(() => {
+    unmountAll();
+    destroy();
+    resetConfig();
+  });
+
+  it('commits styled even if its class was collected while pending', () => {
+    // The render phase resolves a class and yields.
+    const { className } = computeStyles({ color: '#red' }, { managed: true });
+
+    // Everything is collected while that render is still pending.
+    cleanup();
+    expect(getCSSText()).not.toContain(className);
+
+    // The commit finally lands, and puts back what it needs.
+    acquireStyles(className);
+
+    expect(getCSSText()).toContain(className);
+  });
+
+  it('survives an older element being collected out from under a reuse', () => {
+    // Reported in review: a class already mounted, reused by a pending render,
+    // then dropped by the older element before that render commits.
+    const older = render(<Box color="#red" />);
+    const className = domClasses(older.container)[0];
+
+    const pending = computeStyles({ color: '#red' }, { managed: true });
+    expect(pending.className).toBe(className);
+
+    older.rerender(<div />);
+    cleanup();
+
+    expect(getRegistry().rules.has(className)).toBe(false);
+
+    acquireStyles(className);
+
+    expect(getCSSText()).toContain(className);
   });
 });
 
@@ -336,14 +332,12 @@ describe('every reporter agrees on what is unused', () => {
 
     const before = tastyDebug.summary({ raw: true });
 
-    // Guard the assertion below against passing on two empty lists.
     expect(before.unusedClasses.length).toBeGreaterThan(0);
     expect(gc({ force: true })).toBe(before.unusedClasses.length);
 
     const after = tastyDebug.summary({ raw: true });
 
     expect(after.unusedClasses).toEqual([]);
-    // Collection must not disturb what is still on screen.
     expect(after.activeClasses).toEqual(before.activeClasses);
   });
 
@@ -373,7 +367,7 @@ describe('every reporter agrees on what is unused', () => {
     expect(summary.metrics?.unusedHits).toBe(summary.unusedClasses.length);
   });
 
-  it('reports nothing unused once everything is detached and collected', () => {
+  it('reports nothing unused once everything is unmounted and collected', () => {
     const { rerender } = renderThenDetachSome();
 
     rerender(<div />);
@@ -383,7 +377,6 @@ describe('every reporter agrees on what is unused', () => {
 
     expect(summary.activeClasses).toEqual([]);
     expect(summary.unusedClasses).toEqual([]);
-    expect(summary.totalStyledClasses).toEqual([]);
     expect(ownedClasses()).toEqual([]);
   });
 });

@@ -155,10 +155,8 @@ export class SheetManager {
         injectedFunctions: new Map<string, boolean>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
-        usageMap: new Map(),
-        touchCount: 0,
-        touchTick: -1,
-        touchedTick: new Set<string>(),
+        committed: new Map(),
+        candidates: new Map(),
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
         injectionMode: this.detectInjectionMode(root),
@@ -1006,7 +1004,7 @@ export class SheetManager {
         this.deleteRule(registry, ruleInfo);
         registry.rules.delete(className);
         registry.pinCounts.delete(className);
-        registry.usageMap.delete(className);
+        registry.candidates.delete(className);
         deleted.add(className);
         cleanedUpCount++;
       }

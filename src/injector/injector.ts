@@ -62,6 +62,12 @@ import type {
   StyleRule,
 } from './types';
 
+/**
+ * How long a scheduled sweep waits for idle time before running anyway.
+ * Collection is never urgent, but it must not be starved outright.
+ */
+const GC_IDLE_TIMEOUT = 1000;
+
 /** Dispose handle handed back for injections that took no pin. */
 const noop = () => {
   /* nothing to release */
@@ -750,7 +756,7 @@ export class StyleInjector {
   }
 
   /**
-   * Seed the LRU stamp for a newly injected class.
+   * Seed the LRU stamp and the sweep generation for a newly injected class.
    *
    * Without it a class injected during a render but not yet touched would carry
    * no timestamp at all and sort as the oldest candidate, so `gc()` could evict
@@ -762,8 +768,12 @@ export class StyleInjector {
 
     if (entry) {
       entry.lastTouchedAt = now;
+      entry.generation = registry.sweepGeneration;
     } else {
-      registry.usageMap.set(className, { lastTouchedAt: now });
+      registry.usageMap.set(className, {
+        lastTouchedAt: now,
+        generation: registry.sweepGeneration,
+      });
     }
   }
 
@@ -1371,8 +1381,12 @@ export class StyleInjector {
       const entry = registry.usageMap.get(cls);
       if (entry) {
         entry.lastTouchedAt = now;
+        entry.generation = registry.sweepGeneration;
       } else {
-        registry.usageMap.set(cls, { lastTouchedAt: now });
+        registry.usageMap.set(cls, {
+          lastTouchedAt: now,
+          generation: registry.sweepGeneration,
+        });
       }
       registry.touchCount++;
     }
@@ -1398,13 +1412,27 @@ export class StyleInjector {
     const runGC = () => {
       this.cancelPendingGC = null;
       this.sheetManager.pruneDisconnectedRoots();
+
       for (const root of this.sheetManager.getActiveRoots()) {
-        this.gc({ root });
+        this.sweep(root, false, true);
+
+        // Advance even when the sweep collected nothing — including when the
+        // capacity check skipped it — or the current generation would never
+        // age out and nothing would ever become collectible again.
+        const registry = this.sheetManager.getRegistry(root);
+        registry.sweepGeneration++;
+        // Force the next touch to re-stamp rather than take the
+        // same-millisecond shortcut past the generation it now needs.
+        registry.touchedTick.clear();
       }
     };
 
     if (typeof requestIdleCallback !== 'undefined') {
-      const handle = requestIdleCallback(() => runGC());
+      // With no `timeout` an idle callback can be starved indefinitely — a page
+      // that never goes idle is exactly the one accumulating styles fastest.
+      const handle = requestIdleCallback(() => runGC(), {
+        timeout: GC_IDLE_TIMEOUT,
+      });
       this.cancelPendingGC = () => cancelIdleCallback(handle);
     } else {
       const handle = setTimeout(runGC, 0);
@@ -1424,6 +1452,7 @@ export class StyleInjector {
   private collectUnused(
     registry: RootRegistry,
     root: Document | ShadowRoot,
+    spareCurrentGeneration = false,
   ): { className: string; lastTouchedAt: number }[] {
     // Scan DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
@@ -1445,9 +1474,23 @@ export class StyleInjector {
       // Someone still holds the dispose handle `inject()` returned.
       if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
 
+      const usage = registry.usageMap.get(className);
+
+      // Rendering is not commit-aware: a render can yield between the
+      // `inject()` that produced this class and the commit that puts it in the
+      // DOM, and the scheduled sweep can land in that gap. "Not in the DOM"
+      // then means "not there *yet*", so the scheduled sweep leaves the
+      // current generation alone and reconsiders it next time round.
+      if (
+        spareCurrentGeneration &&
+        usage?.generation === registry.sweepGeneration
+      ) {
+        continue;
+      }
+
       unused.push({
         className,
-        lastTouchedAt: registry.usageMap.get(className)?.lastTouchedAt ?? 0,
+        lastTouchedAt: usage?.lastTouchedAt ?? 0,
       });
     }
 
@@ -1481,6 +1524,22 @@ export class StyleInjector {
    * @returns Number of styles evicted.
    */
   gc(options?: GCOptions): number {
+    return this.sweep(options?.root, options?.force ?? false, false);
+  }
+
+  /**
+   * One sweep of one root.
+   *
+   * `spareCurrentGeneration` is set only for the scheduled sweep, which fires
+   * on its own schedule and can therefore collide with a render in flight. An
+   * explicit `gc()` or `cleanup()` is a decision the caller just made, so it
+   * collects everything unused right away.
+   */
+  private sweep(
+    root: Document | ShadowRoot | undefined,
+    force: boolean,
+    spareCurrentGeneration: boolean,
+  ): number {
     // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
     // those would corrupt sheet indices, so land every write first.
     flushStyles();
@@ -1490,16 +1549,19 @@ export class StyleInjector {
     this.cancelPendingGC?.();
     this.cancelPendingGC = null;
 
-    const root = options?.root || document;
-    const force = options?.force ?? false;
-    const registry = this.sheetManager.getRegistry(root);
+    const targetRoot = root || document;
+    const registry = this.sheetManager.getRegistry(targetRoot);
     const capacity = this.config.gc?.capacity ?? 1000;
 
     // Quick upper-bound check: not even every class being unused would exceed
     // capacity, so skip the DOM scan.
     if (!force && registry.rules.size <= capacity) return 0;
 
-    const unused = this.collectUnused(registry, root);
+    const unused = this.collectUnused(
+      registry,
+      targetRoot,
+      spareCurrentGeneration,
+    );
 
     let doomed: string[];
 

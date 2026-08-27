@@ -142,7 +142,8 @@ describe('GC: touch / gc', () => {
     });
 
     it('should increment touchCount and schedule GC at touchInterval', async () => {
-      const gcSpy = vi.spyOn(injector, 'gc');
+      const registry = injector['sheetManager'].getRegistry(document);
+      const generation = registry.sweepGeneration;
 
       // Remove requestIdleCallback to exercise the timeout fallback
       const origRIC = globalThis.requestIdleCallback;
@@ -157,13 +158,14 @@ describe('GC: touch / gc', () => {
         dispose();
       }
 
-      // touchInterval is 5, and we touched 5 class tokens — but a scheduled GC
-      // must never run inline, or it would judge the render in progress.
-      expect(gcSpy).not.toHaveBeenCalled();
+      // touchInterval is 5, and we touched 5 class tokens — but a scheduled
+      // sweep must never run inline, or it would judge the render in progress.
+      expect(registry.sweepGeneration).toBe(generation);
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(gcSpy).toHaveBeenCalled();
+      // The sweep advances the generation whether or not it collected anything.
+      expect(registry.sweepGeneration).toBeGreaterThan(generation);
 
       (globalThis as any).requestIdleCallback = origRIC;
     });

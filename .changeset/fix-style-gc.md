@@ -7,3 +7,5 @@ Fix garbage collection of rendered styles. Since the render path became hook-fre
 A style's lifetime is now decided by the DOM: `gc()` collects classes that no element carries, keeping the `capacity` most recently used, and a class **pinned** by an outstanding `inject()` handle is held on top of that. `inject()` accepts `{ pin: false }` for callers that keep no handle — what the render path now uses — and the scheduled GC never runs inline during a render.
 
 Renamed to match: `RootRegistry.refCounts` is now `RootRegistry.pinCounts`. Only code reaching into the injector's internal registry is affected.
+
+The scheduled sweep spares anything injected or rendered since the previous one, so a concurrent render that yields between `inject()` and commit cannot lose the rules it is about to attach, and it now schedules its idle callback with a timeout so a page that never goes idle is still collected.

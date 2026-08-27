@@ -61,6 +61,12 @@ export interface StyleInjectorConfig {
  */
 export interface StyleUsage {
   lastTouchedAt: number;
+  /**
+   * `RootRegistry.sweepGeneration` at the last touch or injection. The
+   * scheduled sweep spares the current generation, so a class the render
+   * in progress has claimed cannot be collected before it is committed.
+   */
+  generation: number;
 }
 
 /**
@@ -218,6 +224,13 @@ export interface RootRegistry {
   propertyTypeResolver: PropertyTypeResolver;
   /** Per-className usage tracking for GC */
   usageMap: Map<string, StyleUsage>;
+  /**
+   * Advances once per scheduled sweep. Classes stamped with the current value
+   * were touched or injected since the last sweep and are therefore spared by
+   * the next one: rendering is not commit-aware, so a class whose element has
+   * not landed in the DOM yet is indistinguishable from a dead one.
+   */
+  sweepGeneration: number;
   /** Touch counter for scheduling GC (per-root) */
   touchCount: number;
   /**

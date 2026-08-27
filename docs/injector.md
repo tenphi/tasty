@@ -385,7 +385,15 @@ gc({ force: true });
 cleanup();
 
 // GC is also triggered automatically by touch count during rendering.
-// Every `touchInterval` touches, GC is scheduled via requestIdleCallback.
+// Every `touchInterval` touches, GC is scheduled via requestIdleCallback
+// (with a timeout, so a page that never goes idle is still swept).
+//
+// That scheduled sweep spares everything injected or rendered since the
+// previous one. Rendering is not commit-aware: a concurrent render can yield
+// between the inject() that creates a class and the commit that puts it in the
+// DOM, and "no element carries this class" would otherwise read as "dead"
+// rather than "not there yet". A class detached now is collected by the sweep
+// after next. An explicit gc() or cleanup() collects straight away.
 
 // Benefits:
 // - Activity-proportional: busy apps trigger GC more often

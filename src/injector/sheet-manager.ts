@@ -156,6 +156,7 @@ export class SheetManager {
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
         committed: new Map(),
+        keyframeHandles: new Map(),
         candidates: new Map(),
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
@@ -1002,6 +1003,14 @@ export class SheetManager {
 
         // All safety checks passed - proceed with deletion
         this.deleteRule(registry, ruleInfo);
+
+        // The @keyframes came in with these rules; nothing animates them now.
+        const keyframeHandles = registry.keyframeHandles.get(className);
+        if (keyframeHandles) {
+          for (const dispose of keyframeHandles) dispose();
+          registry.keyframeHandles.delete(className);
+        }
+
         registry.rules.delete(className);
         registry.pinCounts.delete(className);
         registry.candidates.delete(className);

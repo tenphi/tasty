@@ -15,6 +15,7 @@ import {
 } from './injector';
 import { HYDRATED_RULE_INDEX } from './injector/types';
 import type { RootRegistry, StyleRule } from './injector/types';
+import type { Styles } from './styles/types';
 import { hydrateTastyClasses } from './ssr/hydrate';
 import { tasty } from './tasty';
 
@@ -245,6 +246,96 @@ describe('style lifetime', () => {
     expect(gc({ root: shadowRoot, force: true })).toBe(1);
 
     host.remove();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Local @keyframes belong to the class that animates them: recorded during
+// render, injected when the class is, disposed when it goes. Injecting them
+// during render instead would leave CSS behind from a render that never
+// committed, and take a reference on every rerender that nobody gives back.
+// ---------------------------------------------------------------------------
+
+describe('local keyframes', () => {
+  const FADE_STYLES = {
+    animation: 'fade 1s',
+    '@keyframes': { fade: { from: { opacity: 0 }, to: { opacity: 1 } } },
+  } as Styles;
+
+  function keyframesInSheet(): number {
+    return (getCSSText().match(/@keyframes/g) ?? []).length;
+  }
+
+  beforeEach(() => {
+    configure({ gc: {} });
+  });
+
+  afterEach(() => {
+    unmountAll();
+    destroy();
+    resetConfig();
+  });
+
+  it('writes none for a render that never commits', () => {
+    computeStyles(FADE_STYLES, { managed: true });
+
+    expect(keyframesInSheet()).toBe(0);
+  });
+
+  it('injects them with the class that animates them', () => {
+    const Fading = tasty({ styles: FADE_STYLES });
+    const { container } = render(<Fading />);
+
+    expect(keyframesInSheet()).toBe(1);
+    expect(getCSSText()).toContain('animation');
+    expect(domClasses(container).length).toBeGreaterThan(0);
+  });
+
+  it('takes no further reference across rerenders', () => {
+    const Fading = tasty({});
+    const { rerender } = render(<Fading styles={FADE_STYLES} />);
+
+    // Instance styles bypass the factory cache, so every rerender runs the
+    // whole managed path again.
+    for (let i = 0; i < 5; i++) {
+      rerender(<Fading styles={{ ...FADE_STYLES }} />);
+    }
+
+    expect(keyframesInSheet()).toBe(1);
+
+    rerender(<div />);
+    cleanup();
+
+    // One holder went in, one came out: nothing is left keeping it alive.
+    expect(keyframesInSheet()).toBe(0);
+  });
+
+  it('disposes them when the class is collected', () => {
+    const Fading = tasty({ styles: FADE_STYLES });
+    const { rerender } = render(<Fading />);
+
+    expect(keyframesInSheet()).toBe(1);
+
+    rerender(<div />);
+    cleanup();
+
+    expect(keyframesInSheet()).toBe(0);
+  });
+
+  it('brings them back when a later commit re-mounts the class', () => {
+    const Fading = tasty({ styles: FADE_STYLES });
+    const first = render(<Fading />);
+    const className = domClasses(first.container)[0];
+
+    first.rerender(<div />);
+    cleanup();
+    expect(keyframesInSheet()).toBe(0);
+
+    const second = render(<Fading />);
+
+    expect(domClasses(second.container)[0]).toBe(className);
+    expect(keyframesInSheet()).toBe(1);
+    expect(getCSSText()).toContain('animation');
   });
 });
 

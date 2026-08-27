@@ -433,19 +433,20 @@ function injectKeyframesSync(
  */
 function recordChunkRecipes(
   chunks: ProcessedChunk[],
-  nameMap: Map<string, string> | null,
+  usedKeyframes: Record<string, KeyframesSteps> | null,
 ): void {
   for (const chunk of chunks) {
     if (chunk.renderResult.rules.length === 0) continue;
 
-    const rules: StyleResult[] = nameMap
-      ? chunk.renderResult.rules.map((rule) => ({
-          ...rule,
-          declarations: replaceAnimationNames(rule.declarations, nameMap),
-        }))
-      : chunk.renderResult.rules;
-
-    defineRecipe(chunk.className, { rules, cacheKey: chunk.cacheKey });
+    defineRecipe(chunk.className, {
+      rules: chunk.renderResult.rules,
+      cacheKey: chunk.cacheKey,
+      // Recorded, not injected: the commit puts them in alongside the rules
+      // that animate them, and rewrites the declarations against the names it
+      // gets. Injecting here would leave CSS behind from a discarded render and
+      // take a reference on every rerender that nobody ever gives back.
+      keyframes: usedKeyframes ?? undefined,
+    });
   }
 }
 
@@ -662,7 +663,8 @@ export function computeStyles(
     injectAncillarySync(resolved, root);
 
     const usedKf = getUsedKeyframes(resolved);
-    const nameMap = usedKf ? injectKeyframesSync(usedKf, root) : null;
+    const nameMap =
+      usedKf && !managed ? injectKeyframesSync(usedKf, root) : null;
 
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
       const chunk = processChunkSync(
@@ -677,7 +679,7 @@ export function computeStyles(
     }
 
     if (managed) {
-      recordChunkRecipes(chunks, nameMap);
+      recordChunkRecipes(chunks, usedKf);
     } else if (nameMap) {
       injectChunkRulesSync(chunks, nameMap, root);
     }

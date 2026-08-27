@@ -30,6 +30,7 @@ import {
 import type { QueuedWrite } from './batch';
 import { SheetManager } from './sheet-manager';
 import { fontFaceContentHash, formatFontFaceDeclarations } from '../font-face';
+import { replaceAnimationNames } from '../keyframes';
 import { formatCounterStyleDeclarations } from '../counter-style';
 import {
   formatFunctionDeclarations,
@@ -1398,13 +1399,40 @@ export class StyleInjector {
       if (existing && existing.sheetIndex !== PLACEHOLDER_RULE_INDEX) continue;
 
       const recipe = this.recipes.get(cls);
-      if (recipe) {
-        this.inject(recipe.rules, {
-          root,
-          cacheKey: recipe.cacheKey,
-          pin: false,
-        });
+      if (!recipe) continue;
+
+      let rules = recipe.rules;
+
+      // The @keyframes go in with the rules that animate them, and come out
+      // with them. The injected name can differ from the authored one — a
+      // collision, or a name already taken — so the declarations are rewritten
+      // against whatever names this injection actually got.
+      if (recipe.keyframes) {
+        const handles: (() => void)[] = [];
+        let nameMap: Map<string, string> | null = null;
+
+        for (const [name, steps] of Object.entries(recipe.keyframes)) {
+          const injected = this.keyframes(steps, { name, root });
+          handles.push(injected.dispose);
+
+          const injectedName = injected.toString();
+          if (injectedName !== name) {
+            if (!nameMap) nameMap = new Map();
+            nameMap.set(name, injectedName);
+          }
+        }
+
+        registry.keyframeHandles.set(cls, handles);
+
+        if (nameMap) {
+          rules = rules.map((rule) => ({
+            ...rule,
+            declarations: replaceAnimationNames(rule.declarations, nameMap),
+          }));
+        }
       }
+
+      this.inject(rules, { root, cacheKey: recipe.cacheKey, pin: false });
     }
   }
 

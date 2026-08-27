@@ -71,6 +71,16 @@ export interface StyleInjectorConfig {
 export interface StyleRecipe {
   rules: StyleResult[];
   cacheKey?: string;
+  /**
+   * `@keyframes` these rules animate, by the name they were authored under.
+   *
+   * Kept here rather than injected during render for the same reason as the
+   * rules themselves: a render that is discarded must leave nothing behind.
+   * They are injected when the class is, and disposed when it is deleted —
+   * the injected name can differ from the authored one, so the animation
+   * declarations are rewritten at that point.
+   */
+  keyframes?: Record<string, KeyframesSteps>;
 }
 
 /**
@@ -229,6 +239,8 @@ export interface RootRegistry {
   propertyTypeResolver: PropertyTypeResolver;
   /** className -> how many mounted components hold it (0 means collectible) */
   committed: Map<string, number>;
+  /** className -> disposers for the @keyframes its rules animate */
+  keyframeHandles: Map<string, (() => void)[]>;
   /** className -> when it last dropped to zero, for least-recently-released order */
   candidates: Map<string, number>;
   /** How many entries from `window.__TASTY__` have been synced into this registry */

@@ -151,7 +151,7 @@ export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  /** Cancels the scheduled GC, whatever scheduled it. Null when none is pending. */
+  /** Cancels the scheduled sweep, whichever timer scheduled it. */
   private cancelPendingGC: (() => void) | null = null;
   private namePrefix: string;
   private classRegex: RegExp;
@@ -750,12 +750,8 @@ export class StyleInjector {
   }
 
   /**
-   * Record a freshly injected class as claimed-but-not-yet-seen.
-   *
-   * Without it a class injected during a render would carry no usage entry at
-   * all: it would sort as the oldest eviction candidate, and the scheduled
-   * sweep would have nothing telling it the class is still on its way into the
-   * DOM. Both would let `gc()` evict the rule the current render just wrote.
+   * Seed the LRU stamp for a newly injected class, so it sorts as the newest
+   * rather than the oldest eviction candidate.
    */
   private markUsage(registry: RootRegistry, className: string): void {
     const now = Date.now();
@@ -763,9 +759,8 @@ export class StyleInjector {
 
     if (entry) {
       entry.lastTouchedAt = now;
-      entry.observed = false;
     } else {
-      registry.usageMap.set(className, { lastTouchedAt: now, observed: false });
+      registry.usageMap.set(className, { lastTouchedAt: now });
     }
   }
 
@@ -1373,10 +1368,8 @@ export class StyleInjector {
       const entry = registry.usageMap.get(cls);
       if (entry) {
         entry.lastTouchedAt = now;
-        // Claimed by a render that may not have committed yet.
-        entry.observed = false;
       } else {
-        registry.usageMap.set(cls, { lastTouchedAt: now, observed: false });
+        registry.usageMap.set(cls, { lastTouchedAt: now });
       }
       registry.touchCount++;
     }
@@ -1389,12 +1382,12 @@ export class StyleInjector {
   }
 
   /**
-   * Schedule a GC via `requestIdleCallback`, falling back to a timeout.
-   * Runs GC on all active roots. Avoids double-scheduling.
+   * Schedule a GC in idle time. Runs GC on all active roots, and avoids
+   * double-scheduling.
    *
-   * The fallback is deliberately asynchronous: `touch()` runs during React's
-   * render phase, when a class is already injected but its element has not been
-   * committed yet, and a GC there would judge it unused.
+   * Without `requestIdleCallback` there is no automatic collection unless
+   * `gc.timeoutFallback` opts into a timeout: running the sweep inline here
+   * would put it inside the render that touched the class.
    */
   private scheduleGC(): void {
     if (this.cancelPendingGC) return;
@@ -1402,25 +1395,15 @@ export class StyleInjector {
     const runGC = () => {
       this.cancelPendingGC = null;
       this.sheetManager.pruneDisconnectedRoots();
-
       for (const root of this.sheetManager.getActiveRoots()) {
-        this.sweep(root, false, true);
-
-        const registry = this.sheetManager.getRegistry(root);
-        registry.sweepCount++;
-        // The sweep just marked live classes observed. Drop the
-        // same-millisecond touch shortcut so the next render definitely gets to
-        // clear that flag again rather than being skipped as a repeat.
-        registry.touchedTick.clear();
+        this.gc({ root });
       }
     };
 
     if (typeof requestIdleCallback !== 'undefined') {
-      // With no `timeout` an idle callback can be starved indefinitely — a page
-      // that never goes idle is exactly the one accumulating styles fastest.
       const handle = requestIdleCallback(() => runGC());
       this.cancelPendingGC = () => cancelIdleCallback(handle);
-    } else {
+    } else if (this.config.gc?.timeoutFallback) {
       const handle = setTimeout(runGC, 0);
       this.cancelPendingGC = () => clearTimeout(handle);
     }
@@ -1438,18 +1421,13 @@ export class StyleInjector {
   private collectUnused(
     registry: RootRegistry,
     root: Document | ShadowRoot,
-    spareUnobserved?: boolean,
   ): string[] {
-    // Scan DOM for live classes (classList handles SVG elements too). This is
-    // the only commit signal available to a hook-free render path, so every
-    // scan doubles as the observation that makes a class collectible later.
+    // Scan DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
       for (const token of el.classList) {
         if (this.classRegex.test(token)) {
           liveClasses.add(token);
-          const usage = registry.usageMap.get(token);
-          if (usage) usage.observed = true;
         }
       }
     }
@@ -1463,14 +1441,6 @@ export class StyleInjector {
       if (liveClasses.has(className)) continue;
       // Someone still holds the dispose handle `inject()` returned.
       if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
-
-      // No sweep has seen this class on an element since a render asked for
-      // it, so "not in the DOM" may well mean "not there yet": a concurrent
-      // render can stay pending for any number of turns. Only a caller who
-      // asked for collection explicitly gets to make that call.
-      if (spareUnobserved && !registry.usageMap.get(className)?.observed) {
-        continue;
-      }
 
       unused.push(className);
     }
@@ -1505,22 +1475,6 @@ export class StyleInjector {
    * @returns Number of styles evicted.
    */
   gc(options?: GCOptions): number {
-    return this.sweep(options?.root, options?.force);
-  }
-
-  /**
-   * One sweep of one root.
-   *
-   * `spareUnobserved` is set only for the scheduled sweep, which fires on its
-   * own schedule and can therefore collide with a render in flight. An explicit
-   * `gc()` or `cleanup()` is a decision the caller just made, so it collects
-   * everything unused right away.
-   */
-  private sweep(
-    root: Document | ShadowRoot | undefined,
-    force?: boolean,
-    spareUnobserved?: boolean,
-  ): number {
     // Pending writes still carry PENDING sentinels in `registry.rules`; sweeping
     // those would corrupt sheet indices, so land every write first.
     flushStyles();
@@ -1530,15 +1484,16 @@ export class StyleInjector {
     this.cancelPendingGC?.();
     this.cancelPendingGC = null;
 
-    const targetRoot = root || document;
-    const registry = this.sheetManager.getRegistry(targetRoot);
+    const root = options?.root || document;
+    const force = options?.force;
+    const registry = this.sheetManager.getRegistry(root);
     const capacity = this.config.gc?.capacity ?? 1000;
 
     // Quick upper-bound check: not even every class being unused would exceed
     // capacity, so skip the DOM scan.
     if (!force && registry.rules.size <= capacity) return 0;
 
-    const unused = this.collectUnused(registry, targetRoot, spareUnobserved);
+    const unused = this.collectUnused(registry, root);
 
     let doomed: string[];
 

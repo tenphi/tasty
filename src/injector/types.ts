@@ -61,20 +61,6 @@ export interface StyleInjectorConfig {
  */
 export interface StyleUsage {
   lastTouchedAt: number;
-  /**
-   * Whether a sweep has seen this class on an element since the last render
-   * claimed it. Injection and `touch()` clear it — a render has claimed the
-   * class but may not have committed yet — and the sweep's DOM scan sets it
-   * when it finds the class live.
-   *
-   * The scheduled sweep collects only observed classes. Rendering is not
-   * commit-aware: a concurrent render can yield between the `inject()` that
-   * creates a class and the commit that attaches it, for an unbounded number
-   * of event-loop turns. "Not in the DOM" is only evidence that a class is
-   * finished if the DOM is known to have held it at some point after the last
-   * render asked for it.
-   */
-  observed: boolean;
 }
 
 /**
@@ -85,6 +71,18 @@ export interface StyleUsage {
  * `capacity`, oldest first.
  */
 export interface GCConfig {
+  /**
+   * Schedule the sweep with a timeout when `requestIdleCallback` is missing
+   * (default `false`).
+   *
+   * Collection is a background chore, so by default it only ever runs in idle
+   * time: where the engine cannot offer idle time, nothing is collected
+   * automatically at all and `gc()` remains available on demand. Opt in to give
+   * those engines automatic collection anyway, at the cost of a sweep that
+   * competes with whatever else the page is doing.
+   */
+  timeoutFallback?: boolean;
+
   /**
    * Number of touch events between GC cycles.
    * @default 1000
@@ -232,8 +230,6 @@ export interface RootRegistry {
   propertyTypeResolver: PropertyTypeResolver;
   /** Per-className usage tracking for GC */
   usageMap: Map<string, StyleUsage>;
-  /** Sweeps run against this root, for diagnostics and tests. */
-  sweepCount: number;
   /** Touch counter for scheduling GC (per-root) */
   touchCount: number;
   /**

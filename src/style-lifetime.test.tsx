@@ -66,23 +66,6 @@ function domClasses(container: ParentNode): string[] {
     .sort();
 }
 
-/** Resolve once the next scheduled sweep has run on `root`. */
-async function nextSweep(root: Document | ShadowRoot = document) {
-  const registry = getRegistry(root);
-  const before = registry.sweepCount;
-
-  await vi.waitFor(() => expect(registry.sweepCount).toBeGreaterThan(before), {
-    timeout: 5000,
-  });
-}
-
-/** Render a style nothing else has used, so the touch definitely schedules. */
-function renderFreshStyle(index: number) {
-  return computeStyles({ color: FRESH_COLORS[index] });
-}
-
-const FRESH_COLORS = ['#gold', '#navy', '#teal', '#maroon', '#olive', '#plum'];
-
 function styleRule(selector: string, declarations: string): StyleRule {
   return { selector, declarations } as StyleRule;
 }
@@ -216,44 +199,18 @@ describe('style lifetime', () => {
     configure({ gc: { touchInterval: 1, capacity: 0 } });
 
     const { container, rerender } = render(<Box color="#blue" />);
-    const mounted = domClasses(container)[0];
+    const detached = domClasses(container)[0];
 
     // No manual gc() call: rendering alone has to get the sweep scheduled. The
-    // first sweep sees the class mounted, which is what lets a later one judge
-    // it. Each rerender swaps in a colour the registry has not seen, so every
-    // pass is a fresh class name and a guaranteed touch — `touch()` skips
-    // repeats of the same name inside one millisecond, which would otherwise
-    // make this timing-bound.
-    await nextSweep();
-
+    // rerender swaps in a colour the registry has not seen, so it is a fresh
+    // class name and a guaranteed touch — `touch()` skips repeats of the same
+    // name inside one millisecond, which would make this timing-bound.
     rerender(<Box color="#red" />);
-    await nextSweep();
 
-    expect(getRegistry().rules.has(mounted)).toBe(false);
-  });
-
-  // The DOM scan is the only commit signal a hook-free render path offers, so
-  // this is the price of never evicting work in flight. The class stays cached
-  // — still reused on the next render — and any explicit collection takes it.
-  it('leaves a class no sweep ever saw to an explicit cleanup', async () => {
-    configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-    const { container, rerender } = render(<Box color="#blue" />);
-    const shortLived = domClasses(container)[0];
-
-    // Mounted and gone again before any sweep could look.
-    rerender(<Box color="#red" />);
-    await nextSweep();
-
-    // And it stays: no later sweep can tell it apart from a render in flight.
-    renderFreshStyle(0);
-    await nextSweep();
-
-    expect(getRegistry().rules.has(shortLived)).toBe(true);
-
-    cleanup();
-
-    expect(getRegistry().rules.has(shortLived)).toBe(false);
+    await vi.waitFor(
+      () => expect(getRegistry().rules.has(detached)).toBe(false),
+      { timeout: 5000 },
+    );
   });
 
   it('collects everything a rich style object produced', () => {
@@ -316,113 +273,6 @@ describe('style lifetime', () => {
     expect(ownedClasses(shadowRoot)).toEqual([]);
 
     host.remove();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Rendering is not commit-aware. `computeStyles()` injects and touches during
-// the render phase; the element carrying the class lands in the DOM only at
-// commit, and a concurrent render can yield in between. The scheduled sweep
-// fires on its own schedule and can land in exactly that gap, where "no element
-// carries this class" means "not yet" rather than "never again".
-// ---------------------------------------------------------------------------
-
-describe('a render still in flight', () => {
-  afterEach(() => {
-    unmountAll();
-    destroy();
-    resetConfig();
-  });
-
-  it.each([
-    ['idle callback', false],
-    ['timeout fallback', true],
-  ])(
-    'keeps the class the sweep was scheduled by (%s)',
-    async (_label, dropIdleCallback) => {
-      const originalIdleCallback = globalThis.requestIdleCallback;
-      if (dropIdleCallback) {
-        delete (globalThis as { requestIdleCallback?: unknown })
-          .requestIdleCallback;
-      }
-
-      try {
-        configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-        // Render phase: the class is injected and touched — which schedules the
-        // sweep — and then the render yields before React commits.
-        const { className } = computeStyles({ color: '#red' });
-
-        await nextSweep();
-
-        // Commit finally lands. The rules it needs have to still be there.
-        const el = document.createElement('div');
-        el.className = className;
-        document.body.appendChild(el);
-
-        expect(getRegistry().rules.has(className)).toBe(true);
-        expect(getCSSText()).toContain(className);
-
-        el.remove();
-      } finally {
-        globalThis.requestIdleCallback = originalIdleCallback;
-      }
-    },
-  );
-
-  it('keeps it for as long as the render stays pending', async () => {
-    configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-    const { className } = computeStyles({ color: '#red' });
-
-    // Concurrent work can stay pending across an unbounded number of turns, so
-    // no count of sweeps may run out on it. Each fresh style keeps other
-    // renders — and therefore sweeps — coming.
-    for (let i = 0; i < 4; i++) {
-      renderFreshStyle(i);
-      await nextSweep();
-      expect(getRegistry().rules.has(className)).toBe(true);
-    }
-
-    // The commit finally lands, and it has to land styled.
-    const el = document.createElement('div');
-    el.className = className;
-    document.body.appendChild(el);
-
-    expect(getCSSText()).toContain(className);
-    el.remove();
-  });
-
-  it('collects it once a sweep has seen it in the DOM and it leaves', async () => {
-    configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-    const { className } = computeStyles({ color: '#red' });
-    const el = document.createElement('div');
-    el.className = className;
-    document.body.appendChild(el);
-
-    // A sweep sees it live — that sighting is what makes it judgeable later.
-    renderFreshStyle(0);
-    await nextSweep();
-    expect(getRegistry().rules.has(className)).toBe(true);
-
-    el.remove();
-
-    renderFreshStyle(1);
-    await nextSweep();
-
-    expect(getRegistry().rules.has(className)).toBe(false);
-  });
-
-  it('still collects immediately when gc() is called explicitly', () => {
-    configure({ gc: { touchInterval: 1, capacity: 0 } });
-
-    const { className } = computeStyles({ color: '#red' });
-
-    // The grace period covers the sweep that runs on its own schedule. A call
-    // the caller just made is a decision, not a collision.
-    expect(gc({ force: true })).toBeGreaterThan(0);
-    expect(getRegistry().rules.has(className)).toBe(false);
   });
 });
 

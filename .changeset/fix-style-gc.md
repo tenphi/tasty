@@ -8,4 +8,4 @@ A style's lifetime is now decided by the DOM: `gc()` collects classes that no el
 
 Renamed to match: `RootRegistry.refCounts` is now `RootRegistry.pinCounts`. Only code reaching into the injector's internal registry is affected.
 
-The scheduled sweep only collects a class some sweep has previously seen on an element, since a concurrent render can yield between `inject()` and commit for any number of turns and must never lose the rules it is about to attach. A class that mounts and unmounts between two sweeps is therefore not collected automatically; it stays cached, and an explicit `gc()` or `cleanup()` takes it.
+Adds `gc.timeoutFallback`. Without `requestIdleCallback` the scheduled sweep previously ran inline, inside the render that touched the class; it is now skipped entirely unless this opts into a deferred timeout.

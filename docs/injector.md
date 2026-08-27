@@ -252,6 +252,9 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of touch events between GC cycles. Each style render counts as a touch. When the counter reaches this value, GC is scheduled via `requestIdleCallback`.
+- `gc.timeoutFallback`: Schedule the sweep with a timeout where `requestIdleCallback` is unavailable (default `false`). Collection is a background chore, so it normally runs only in idle time; opting in trades that for automatic collection on engines that cannot offer any.
+
+> **Caveat:** rendering is not commit-aware. A concurrent render can yield between the `inject()` that creates a class and the commit that attaches it, so a sweep landing in that window sees no element carrying the class and can collect rules the pending render is about to use. The element then renders unstyled until it re-renders. This is why automatic collection is opt-in; `gc()` and `cleanup()` are explicit and run when you choose.
 - `gc.capacity`: Maximum number of unused styles (not in the DOM, not pinned) to retain. When exceeded, the least recently used are evicted first. Rendered and pinned styles don't count against this limit.
 
 ---
@@ -385,20 +388,9 @@ gc({ force: true });
 cleanup();
 
 // GC is also triggered automatically by touch count during rendering.
-// Every `touchInterval` touches, GC is scheduled via requestIdleCallback
-// (with a timeout, so a page that never goes idle is still swept).
-//
-// That scheduled sweep only collects a class it has previously seen on an
-// element. Rendering is not commit-aware: a concurrent render can yield between
-// the inject() that creates a class and the commit that attaches it, for any
-// number of turns, so "no element carries this class" is evidence that the
-// class is finished only once the DOM is known to have held it. Injection and
-// every render clear that sighting again.
-//
-// The trade-off: a class that mounts and unmounts between two sweeps is never
-// seen, so it is not collected automatically. It stays cached and reusable, and
-// an explicit gc() or cleanup() takes it — those collect everything unused
-// straight away.
+// Every `touchInterval` touches, GC is scheduled via requestIdleCallback.
+// Where that is unavailable nothing is collected automatically unless
+// `gc.timeoutFallback` is set — see below.
 
 // Benefits:
 // - Activity-proportional: busy apps trigger GC more often

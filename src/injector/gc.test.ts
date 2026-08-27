@@ -141,15 +141,12 @@ describe('GC: touch / gc', () => {
       vi.restoreAllMocks();
     });
 
-    it('should increment touchCount and schedule GC at touchInterval', async () => {
-      const registry = injector['sheetManager'].getRegistry(document);
-      const sweeps = registry.sweepCount;
-
-      // Remove requestIdleCallback to exercise the timeout fallback
+    it('should increment touchCount and schedule GC at touchInterval', () => {
+      let scheduled = 0;
       const origRIC = globalThis.requestIdleCallback;
-      delete (globalThis as any).requestIdleCallback;
+      (globalThis as any).requestIdleCallback = () => ++scheduled;
 
-      // Inject enough styles to exceed capacity
+      // touchInterval is 5, so 5 touched class tokens reach it
       for (let i = 0; i < 5; i++) {
         const { className, dispose } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
@@ -158,19 +155,61 @@ describe('GC: touch / gc', () => {
         dispose();
       }
 
-      // touchInterval is 5, and we touched 5 class tokens — but a scheduled
-      // sweep must never run inline, or it would judge the render in progress.
-      expect(registry.sweepCount).toBe(sweeps);
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // The sweep is counted whether or not it collected anything.
-      expect(registry.sweepCount).toBeGreaterThan(sweeps);
+      expect(scheduled).toBe(1);
 
       (globalThis as any).requestIdleCallback = origRIC;
     });
 
-    it('should not double-schedule GC when pendingGCHandle exists', () => {
+    it('should not schedule GC without requestIdleCallback', async () => {
+      const gcSpy = vi.spyOn(injector, 'gc');
+      const origRIC = globalThis.requestIdleCallback;
+      delete (globalThis as any).requestIdleCallback;
+
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.idleless-${i}`, `order: ${i}`),
+        ]);
+        injector.touch(className);
+        dispose();
+      }
+
+      // Collection is an idle-time chore, and running it inline would put it
+      // inside the render that touched the class.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(gcSpy).not.toHaveBeenCalled();
+
+      (globalThis as any).requestIdleCallback = origRIC;
+    });
+
+    it('should schedule GC on a timeout when opted in', async () => {
+      const timeoutInjector = new StyleInjector({
+        forceTextInjection: true,
+        gc: { touchInterval: 5, capacity: 3, timeoutFallback: true },
+      });
+      const gcSpy = vi.spyOn(timeoutInjector, 'gc');
+      const origRIC = globalThis.requestIdleCallback;
+      delete (globalThis as any).requestIdleCallback;
+
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = timeoutInjector.inject([
+          createStyleRule(`.fallback-${i}`, `order: ${i}`),
+        ]);
+        timeoutInjector.touch(className);
+        dispose();
+      }
+
+      // Deferred, never inline.
+      expect(gcSpy).not.toHaveBeenCalled();
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(gcSpy).toHaveBeenCalled();
+
+      (globalThis as any).requestIdleCallback = origRIC;
+      timeoutInjector.destroy();
+    });
+
+    it('should not double-schedule GC when a sweep is already pending', () => {
       let callbackCount = 0;
       const origRIC = globalThis.requestIdleCallback;
       (globalThis as any).requestIdleCallback = (_cb: () => void) => {

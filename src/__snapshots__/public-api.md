@@ -176,7 +176,7 @@ value      renderStyles
 value      resetConfig
 value      resetStyleBatch
 type       ResolveAsProps
-value      resolveClassName
+value      resolveChunk
 type       ResolvedStyleValue
 value      resolveFunctionColor
 type       ResolveModPropDef
@@ -455,7 +455,7 @@ type       RenderResult
 value      renderStyles
 value      resetConfig
 value      resetStyleBatch
-value      resolveClassName
+value      resolveChunk
 type       ResolvedStyleValue
 value      resolveFunctionColor
 value      resolveRecipes

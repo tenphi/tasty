@@ -27,11 +27,10 @@ import {
   defineRecipe,
   fontFace,
   func,
-  hasRecipe,
   inject,
   keyframes,
   property,
-  resolveClassName,
+  resolveChunk,
 } from './injector';
 import type { FontFaceDescriptors, KeyframesSteps } from './injector/types';
 import {
@@ -367,9 +366,9 @@ function processChunkSync(
   if (managed) {
     // Nothing is written here: the name is a pure hash of the cache key, and
     // the CSS is only rendered the first time this class is described.
-    const className = resolveClassName(cacheKey);
+    const { name: className, described } = resolveChunk(cacheKey);
 
-    if (hasRecipe(className)) {
+    if (described) {
       return {
         name: chunkName,
         styleKeys,

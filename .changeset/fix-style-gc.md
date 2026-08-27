@@ -2,12 +2,12 @@
 '@tenphi/tasty': minor
 ---
 
-Fix garbage collection of rendered styles. Since the render path became hook-free it no longer disposes the classes it injects, so their counts never fell back to `0` — and `gc()`, `cleanup()` and `tastyDebug.cleanup()` all treated a non-zero count as "still in use". Nothing was ever evicted, and injected CSS grew for the lifetime of the page.
+Style lifetime now follows React commits. A styled component takes up the classes its render resolved in a `useInsertionEffect` and gives them back when it unmounts; only a class that was held and then fully released is ever collected.
 
-A style's lifetime is now decided by the DOM: `gc()` collects classes that no element carries, keeping the `capacity` most recently used, and a class **pinned** by an outstanding `inject()` handle is held on top of that. `inject()` accepts `{ pin: false }` for callers that keep no handle — what the render path now uses — and the scheduled GC never runs inline during a render.
+This replaces a model that could not work. Collection previously decided a class was finished by not finding it in the DOM, which is indistinguishable from a concurrent render that has resolved a class and not committed it yet — so a sweep could delete rules a pending render was about to attach. The new model does not try to tell those apart: a managed render writes nothing to a sheet, and the commit inserts from a recorded recipe, re-creating anything collected in between. Collecting early costs a re-insert, never a missing style.
 
-Renamed to match: `RootRegistry.refCounts` is now `RootRegistry.pinCounts`. Only code reaching into the injector's internal registry is affected.
-
-Automatic sweeping is now opt-in, behind `gc.unsafeAutoCollect`. A sweep judges a class finished by not finding it in the DOM, which it cannot tell apart from a concurrent render that has injected a class and not yet committed it — so a scheduled sweep can delete rules a pending render is about to attach. Since the broken counts meant `configure({ gc: ... })` collected nothing before, making collection work would otherwise have switched those apps straight onto that path. `gc()` and `cleanup()` are unaffected and run when you call them.
-
-Also adds `gc.timeoutFallback`. With automatic sweeping enabled but no `requestIdleCallback`, the sweep previously ran inline, inside the render that touched the class; it is now skipped unless this opts into a deferred timeout.
+- `gc()` and `cleanup()` collect on demand; automatic collection is driven by unmounts, via the new `gc.releaseInterval`.
+- No `querySelectorAll('[class]')` anywhere — collection is map operations over what was released.
+- A bare `computeStyles()` has no commit to restore it, so it injects during the call and pins the class. SSR and RSC are unaffected: the commit hook is taken only where there is a document, so `tasty()` still works as a server component.
+- `touch()` is a deprecated no-op, `gc.touchInterval` gives way to `gc.releaseInterval`, and `StyleUsage` is replaced by `StyleRecipe`.
+- New: `acquireStyles`, `releaseStyles`, `defineRecipe`, `resolveChunk`, `hasRecipe`.

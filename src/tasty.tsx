@@ -38,7 +38,7 @@ import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
 import { getConfig } from './config';
 import { useStyleCommit } from './hooks/useStyles';
-import { hasRecipe } from './injector';
+import { getStyleEpoch } from './config';
 
 /**
  * Whether this environment ever commits. Server renders (SSR and RSC) resolve
@@ -753,7 +753,7 @@ function tastyElement<
 
   // Factory-level cache: maps stable style references to computed classNames.
   // For the common case (no instance overrides), this avoids recomputation.
-  const classNameCache = new Map<Styles | undefined, string>();
+  const classNameCache = new Map<Styles | undefined, [string, number]>();
 
   // Passed when the styles object handed to computeStyles() is the factory's
   // own AND computeStyles() will see it again — which is only true where
@@ -880,17 +880,18 @@ function tastyElement<
     // the RSC inline-style paths are per-request, so every request must
     // call computeStyles() to ensure CSS is actually collected/emitted.
     const useFactoryCache = typeof document !== 'undefined';
-    const cachedClassName =
+    const cached =
       useFactoryCache && allStyles === baseStyles
         ? classNameCache.get(allStyles)
         : undefined;
     let stylesResult: ComputeStylesResult;
-    // The cached name is only good while the injector still knows what it
-    // stands for. It outlives the injector when one is thrown away —
-    // `resetConfig()`, a test teardown — and a name whose recipe went with it
-    // would commit to nothing.
-    if (cachedClassName && hasRecipe(cachedClassName)) {
-      stylesResult = { className: cachedClassName };
+    // The cached name is only good while the injector that knows what it stands
+    // for is still the current one. It outlives that injector when one is
+    // thrown away — `resetConfig()`, a test teardown — and a name whose recipe
+    // went with it would commit to nothing. Comparing the epoch keeps the
+    // check to one integer read on the hottest path there is.
+    if (cached && cached[1] === getStyleEpoch()) {
+      stylesResult = { className: cached[0] };
     } else {
       stylesResult = computeStyles(
         allStyles,
@@ -899,7 +900,10 @@ function tastyElement<
           : MANAGED,
       );
       if (useFactoryCache && allStyles === baseStyles) {
-        classNameCache.set(allStyles, stylesResult.className);
+        classNameCache.set(allStyles, [
+          stylesResult.className,
+          getStyleEpoch(),
+        ]);
       }
     }
 

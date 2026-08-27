@@ -35,7 +35,7 @@ describe('GC: acquire / release / gc', () => {
   /** Describe a class the way a managed render does, without writing it. */
   function describeClass(name: string, declarations = 'color: red') {
     const cacheKey = `key:${name}`;
-    const className = injector.resolveClassName(cacheKey);
+    const className = injector.resolveChunk(cacheKey).name;
     injector.defineRecipe(className, {
       rules: [createStyleRule(`.${name}.${name}`, declarations)],
       cacheKey,
@@ -209,7 +209,7 @@ describe('GC: acquire / release / gc', () => {
 
     it('should clean up registry entries after eviction', () => {
       const cacheKey = 'key:i';
-      const className = injector.resolveClassName(cacheKey);
+      const className = injector.resolveChunk(cacheKey).name;
       injector.defineRecipe(className, {
         rules: [createStyleRule('.i.i', 'color: red')],
         cacheKey,

@@ -228,10 +228,14 @@ export function getCSSTextForNode(
 }
 
 /**
- * The class name a cache key resolves to. Pure — safe during render.
+ * The class name a cache key resolves to, and whether its CSS is described
+ * already. Pure — safe during render.
  */
-export function resolveClassName(cacheKey: string): string {
-  return getGlobalInjector().resolveClassName(cacheKey);
+export function resolveChunk(cacheKey: string): {
+  name: string;
+  described: boolean;
+} {
+  return getGlobalInjector().resolveChunk(cacheKey);
 }
 
 /** Whether this class has already been described, so its CSS need not be re-rendered. */

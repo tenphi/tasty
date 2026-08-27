@@ -1117,7 +1117,7 @@ describe('StyleInjector namePrefix', () => {
       gc: { capacity: 0 },
     });
     const cacheKey = 'gc-prefix-test';
-    const className = gcInjector.resolveClassName(cacheKey);
+    const className = gcInjector.resolveChunk(cacheKey).name;
 
     expect(className).toMatch(/^mb[a-z0-9]+$/);
 

@@ -156,6 +156,13 @@ export class StyleInjector {
   private cancelPendingGC: (() => void) | null = null;
   /** className -> the CSS it stands for, so a collected class can come back. */
   private recipes = new Map<string, StyleRecipe>();
+  /**
+   * cacheKey -> the class name it resolves to, and whether its CSS has been
+   * described yet. A managed render is then one lookup rather than a hash plus
+   * a second lookup, which matters because it runs for every chunk of every
+   * component on every render.
+   */
+  private classNames = new Map<string, { name: string; described: boolean }>();
   /** Releases since the last scheduled pass. */
   private releaseCount = 0;
   private namePrefix: string;
@@ -1320,8 +1327,23 @@ export class StyleInjector {
    * nothing written — safe to call during render, and stable across renders
    * because the name is a hash of the key.
    */
-  resolveClassName(cacheKey: string): string {
-    return this.generateClassName(cacheKey);
+  /**
+   * The class name a cache key resolves to, and whether its CSS is already
+   * described. Pure: no allocation beyond the memo, nothing written — safe
+   * during render, and stable because the name is a hash of the key.
+   */
+  resolveChunk(cacheKey: string): { name: string; described: boolean } {
+    let entry = this.classNames.get(cacheKey);
+
+    if (entry === undefined) {
+      entry = {
+        name: this.generateClassName(cacheKey),
+        described: false,
+      };
+      this.classNames.set(cacheKey, entry);
+    }
+
+    return entry;
   }
 
   /** Whether this class has already been described, so its CSS need not be re-rendered. */
@@ -1338,8 +1360,13 @@ export class StyleInjector {
    * commit comes back.
    */
   defineRecipe(className: string, recipe: StyleRecipe): void {
-    if (!this.recipes.has(className)) {
-      this.recipes.set(className, recipe);
+    if (this.recipes.has(className)) return;
+
+    this.recipes.set(className, recipe);
+
+    if (recipe.cacheKey) {
+      const entry = this.classNames.get(recipe.cacheKey);
+      if (entry) entry.described = true;
     }
   }
 

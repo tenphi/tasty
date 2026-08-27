@@ -36,3 +36,4 @@ Use this hub to move from the core idea to a working component, then into design
 - **Debug generated CSS or cache behavior**: [Debug Utilities](debug.md)
 - **Understand how selector generation works internally**: [Style rendering pipeline](pipeline.md)
 - **Understand runtime injection internals**: [Style Injector](injector.md)
+- **Reproduce and interpret performance measurements**: [Runtime Benchmarks](runtime-benchmarks.md)

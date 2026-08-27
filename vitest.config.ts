@@ -47,7 +47,8 @@ const BROWSER_TESTS = [
  * Benchmarks are split along the same line, but run them one project at a time
  * — `pnpm bench` and `pnpm bench:browser`. A bare `vitest bench` runs both
  * concurrently, and the browser competing for CPU depresses the Node pipeline
- * numbers by roughly 2x, which is what the README quotes.
+ * numbers. The focused production-browser benchmarks use a separate config so
+ * they can load production React without changing the browser test environment.
  */
 export default defineConfig({
   test: {
@@ -61,7 +62,12 @@ export default defineConfig({
           exclude: [...defaultExclude, ...BROWSER_TESTS],
           benchmark: {
             include: ['src/**/*.bench.{ts,tsx}'],
-            exclude: [...defaultExclude, 'src/tasty.bench.tsx'],
+            exclude: [
+              ...defaultExclude,
+              'src/tasty.bench.tsx',
+              'src/tasty-injection.bench.ts',
+              'src/tasty-overhead.bench.tsx',
+            ],
           },
         },
       },

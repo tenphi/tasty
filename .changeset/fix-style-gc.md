@@ -12,4 +12,5 @@ This replaces a model that could not work. Collection previously decided a class
 - `touch()` is a deprecated no-op, `gc.touchInterval` gives way to `gc.releaseInterval`, and `StyleUsage` is replaced by `StyleRecipe`.
 - New: `acquireStyles`, `releaseStyles`, `defineRecipe`, `resolveChunk`, `hasRecipe`.
 - Collection is opt-in: without `gc` configured, components keep the synchronous path and pay nothing for a lifecycle they do not use.
+- Bundle limits move with the new code: main 56.6 -> 57.1 kB, core 53.65 -> 53.95 kB, babel-plugin 49.35 -> 49.8 kB.
 - Local `@keyframes` are part of what a class stands for. They go into the sheet when the class does and are disposed when it is collected, instead of being injected during render and never released.

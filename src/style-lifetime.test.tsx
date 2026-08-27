@@ -195,8 +195,27 @@ describe('style lifetime', () => {
     expect(injector.instance.getUnusedClasses()).not.toContain('t-hydrated');
   });
 
-  it('collects on its own once the touch interval is reached', async () => {
+  it('never sweeps on its own unless asked to', async () => {
     configure({ gc: { touchInterval: 1, capacity: 0 } });
+
+    const { container, rerender } = render(<Box color="#blue" />);
+    const detached = domClasses(container)[0];
+
+    rerender(<Box color="#red" />);
+
+    // A sweep cannot tell a detached class from one a concurrent render has
+    // injected and not yet committed, so `gc` config alone must not schedule.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(getRegistry().rules.has(detached)).toBe(true);
+
+    cleanup();
+    expect(getRegistry().rules.has(detached)).toBe(false);
+  });
+
+  it('collects on its own once opted in', async () => {
+    configure({
+      gc: { touchInterval: 1, capacity: 0, unsafeAutoCollect: true },
+    });
 
     const { container, rerender } = render(<Box color="#blue" />);
     const detached = domClasses(container)[0];

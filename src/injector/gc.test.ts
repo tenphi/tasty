@@ -13,7 +13,7 @@ describe('GC: touch / gc', () => {
     document.body.innerHTML = '';
     injector = new StyleInjector({
       forceTextInjection: true,
-      gc: { touchInterval: 5, capacity: 3 },
+      gc: { touchInterval: 5, capacity: 3, unsafeAutoCollect: true },
     });
   });
 
@@ -160,6 +160,32 @@ describe('GC: touch / gc', () => {
       (globalThis as any).requestIdleCallback = origRIC;
     });
 
+    it('should not schedule GC without unsafeAutoCollect', async () => {
+      const manualInjector = new StyleInjector({
+        forceTextInjection: true,
+        gc: { touchInterval: 1, capacity: 0 },
+      });
+      const gcSpy = vi.spyOn(manualInjector, 'gc');
+
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = manualInjector.inject([
+          createStyleRule(`.manual-${i}`, `order: ${i}`),
+        ]);
+        manualInjector.touch(className);
+        dispose();
+      }
+
+      // Sweeping on a schedule can collect a render that has not committed, so
+      // configuring `gc` alone must not start doing it.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(gcSpy).not.toHaveBeenCalled();
+
+      // Explicit collection still works.
+      expect(manualInjector.gc({ force: true })).toBeGreaterThan(0);
+
+      manualInjector.destroy();
+    });
+
     it('should not schedule GC without requestIdleCallback', async () => {
       const gcSpy = vi.spyOn(injector, 'gc');
       const origRIC = globalThis.requestIdleCallback;
@@ -184,7 +210,12 @@ describe('GC: touch / gc', () => {
     it('should schedule GC on a timeout when opted in', async () => {
       const timeoutInjector = new StyleInjector({
         forceTextInjection: true,
-        gc: { touchInterval: 5, capacity: 3, timeoutFallback: true },
+        gc: {
+          touchInterval: 5,
+          capacity: 3,
+          unsafeAutoCollect: true,
+          timeoutFallback: true,
+        },
       });
       const gcSpy = vi.spyOn(timeoutInjector, 'gc');
       const origRIC = globalThis.requestIdleCallback;

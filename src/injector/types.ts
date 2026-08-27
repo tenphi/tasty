@@ -72,19 +72,39 @@ export interface StyleUsage {
  */
 export interface GCConfig {
   /**
-   * Schedule the sweep with a timeout when `requestIdleCallback` is missing
-   * (default `false`).
+   * Sweep automatically as rendering goes, instead of only when `gc()` or
+   * `cleanup()` is called (default `false`).
    *
-   * Collection is a background chore, so by default it only ever runs in idle
+   * **Unsafe, by name and in fact.** A sweep decides what is finished by
+   * scanning the DOM, and rendering is not commit-aware: a concurrent render
+   * can yield between the `inject()` that creates a class and the commit that
+   * attaches it. A sweep landing in that window sees no element carrying the
+   * class and deletes rules the pending render is about to use, so the element
+   * commits unstyled until something re-renders it. A pending render is
+   * indistinguishable from one that already committed and unmounted — React
+   * reports neither commit nor discard for a class name handed out during
+   * render — so no heuristic closes this; only a real commit signal would.
+   *
+   * Prefer `gc()` or `cleanup()` at a moment of your choosing: a route change,
+   * an idle callback of your own, test teardown.
+   */
+  unsafeAutoCollect?: boolean;
+
+  /**
+   * With `unsafeAutoCollect`, schedule the sweep with a timeout where
+   * `requestIdleCallback` is missing (default `false`).
+   *
+   * Collection is a background chore, so it otherwise only ever runs in idle
    * time: where the engine cannot offer idle time, nothing is collected
-   * automatically at all and `gc()` remains available on demand. Opt in to give
-   * those engines automatic collection anyway, at the cost of a sweep that
-   * competes with whatever else the page is doing.
+   * automatically at all. Opt in to give those engines automatic collection
+   * anyway, at the cost of a sweep that competes with whatever else the page is
+   * doing.
    */
   timeoutFallback?: boolean;
 
   /**
-   * Number of touch events between GC cycles.
+   * Number of touch events between automatic GC cycles.
+   * Only used with `unsafeAutoCollect`.
    * @default 1000
    */
   touchInterval?: number;

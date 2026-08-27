@@ -1385,11 +1385,17 @@ export class StyleInjector {
    * Schedule a GC in idle time. Runs GC on all active roots, and avoids
    * double-scheduling.
    *
-   * Without `requestIdleCallback` there is no automatic collection unless
-   * `gc.timeoutFallback` opts into a timeout: running the sweep inline here
-   * would put it inside the render that touched the class.
+   * Requires `gc.unsafeAutoCollect`. A sweep judges a class finished by not
+   * finding it in the DOM, which a render that has injected but not yet
+   * committed cannot be told apart from — so sweeping on a schedule nobody
+   * asked for can delete rules an in-flight render is about to attach.
+   *
+   * Without `requestIdleCallback` there is no automatic collection either
+   * unless `gc.timeoutFallback` opts into a timeout: running the sweep inline
+   * here would put it inside the render that touched the class.
    */
   private scheduleGC(): void {
+    if (!this.config.gc?.unsafeAutoCollect) return;
     if (this.cancelPendingGC) return;
 
     const runGC = () => {

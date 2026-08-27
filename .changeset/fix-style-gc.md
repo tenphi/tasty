@@ -8,4 +8,6 @@ A style's lifetime is now decided by the DOM: `gc()` collects classes that no el
 
 Renamed to match: `RootRegistry.refCounts` is now `RootRegistry.pinCounts`. Only code reaching into the injector's internal registry is affected.
 
-Adds `gc.timeoutFallback`. Without `requestIdleCallback` the scheduled sweep previously ran inline, inside the render that touched the class; it is now skipped entirely unless this opts into a deferred timeout.
+Automatic sweeping is now opt-in, behind `gc.unsafeAutoCollect`. A sweep judges a class finished by not finding it in the DOM, which it cannot tell apart from a concurrent render that has injected a class and not yet committed it — so a scheduled sweep can delete rules a pending render is about to attach. Since the broken counts meant `configure({ gc: ... })` collected nothing before, making collection work would otherwise have switched those apps straight onto that path. `gc()` and `cleanup()` are unaffected and run when you call them.
+
+Also adds `gc.timeoutFallback`. With automatic sweeping enabled but no `requestIdleCallback`, the sweep previously ran inline, inside the render that touched the class; it is now skipped unless this opts into a deferred timeout.

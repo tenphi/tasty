@@ -3,10 +3,13 @@
   "entry": [
     "src/**/*.test.{ts,tsx}",
     "src/**/*.bench.{ts,tsx}",
+    "src/ssr/fixtures/**/astro.config.mjs",
+    "src/ssr/fixtures/**/*.astro",
     "scripts/**/*.mjs"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
+    "src/ssr/fixtures/**/*.{astro,mjs}",
     "scripts/**/*.mjs"
   ],
   "ignoreExportsUsedInFile": true

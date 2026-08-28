@@ -330,6 +330,39 @@ describe('Global Style Injector API', () => {
       // Clean up the SSR style element
       ssrStyle.remove();
     });
+
+    it('should skip global CSS injection when extracted SSR styles are present', () => {
+      const ssrLink = document.createElement('link');
+      ssrLink.rel = 'stylesheet';
+      ssrLink.href = '/tasty.css';
+      ssrLink.setAttribute('data-tasty-ssr', '');
+      document.head.appendChild(ssrLink);
+
+      configure({
+        forceTextInjection: true,
+        tokens: {
+          '$my-token': '8px',
+        },
+        globalStyles: {
+          body: {
+            margin: '0',
+          },
+        },
+      });
+
+      inject(cssToStyleResults('&{ color: red; }'));
+
+      const tastyElements = document.head.querySelectorAll('[data-tasty]');
+      const allCssText = Array.from(tastyElements)
+        .map((el) => el.textContent || '')
+        .join('');
+
+      expect(allCssText).not.toContain('--my-token');
+      expect(allCssText).not.toContain('margin');
+      expect(allCssText).toContain('color: red');
+
+      ssrLink.remove();
+    });
   });
 
   describe('inject', () => {

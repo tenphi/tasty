@@ -86,6 +86,92 @@ export default function RootLayout({
 
 That's it. All `tasty()` components inside the tree automatically get SSR support. No per-component changes needed.
 
+### Optional shared globals stylesheet
+
+By default, configured global CSS is included in the streamed Tasty style tag
+for every route. `withTastyNext()` can move that stable CSS into one
+content-hashed stylesheet shared by all routes while leaving component and hook
+styles in the normal streaming path.
+
+Keep the Tasty config in a side-effect-free module:
+
+```ts
+// app/tasty.config.ts
+import type { TastyConfig } from '@tenphi/tasty';
+
+const config: TastyConfig = {
+  tokens: { $gap: '8px', '#brand': 'rebeccapurple' },
+  globalStyles: { body: { margin: '0', color: '#brand' } },
+  fontFaces: {
+    Brand: { src: 'url("/fonts/brand.woff2") format("woff2")' },
+  },
+};
+
+export default config;
+```
+
+Use it from the Next config:
+
+```ts
+// next.config.ts
+import { withTastyNext } from '@tenphi/tasty/ssr/next-config';
+import config from './app/tasty.config';
+
+export default withTastyNext({
+  config,
+})({
+  // your Next.js config
+});
+```
+
+The runtime must receive the same config. Import and configure it before the
+registry renders:
+
+```tsx
+// app/tasty-registry.tsx
+'use client';
+
+import { configure } from '@tenphi/tasty';
+import { TastyRegistry } from '@tenphi/tasty/ssr/next';
+import config from './tasty.config';
+
+configure(config);
+
+export default function TastyStyleRegistry({ children }) {
+  return <TastyRegistry>{children}</TastyRegistry>;
+}
+```
+
+The generated file contains eager configuration artifacts: built-in and custom
+`@property` rules, tokens and presets, `@font-face`, `@counter-style`, native
+CSS `@function` definitions, and `globalStyles`. Route-dependent component
+rules and calls to `useGlobalStyles`, `useRawCSS`, `useKeyframes`,
+`useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction` remain
+route-specific. Configured keyframes also remain lazy and are streamed only
+when a route references them.
+
+The default output directory is `public/_tasty`. The wrapper adds the generated
+URL to `TastyRegistry`, respects `basePath`, preserves existing `env` and
+`headers` config, and serves the content-hashed file with an immutable one-year
+cache header on Next server deployments. Static exports keep the content-hashed
+URL and leave cache headers to the hosting provider. Older hashes are not
+deleted automatically, so rolling deployments cannot break pages from the
+previous build; clean the generated directory as part of a clean deployment if
+needed. Page-relative CSS resources such as
+`url(../fonts/brand.woff2)` are rejected because moving them would change their
+meaning; use root-relative, absolute, or data URLs.
+
+`withTastyNext()` options:
+
+| Option       | Type          | Default                   | Description                                                            |
+| ------------ | ------------- | ------------------------- | ---------------------------------------------------------------------- |
+| `config`     | `TastyConfig` | —                         | Config object; takes precedence over `configFile`                      |
+| `configFile` | `string`      | —                         | Project-relative config module path; requires the optional `jiti` peer |
+| `rootDir`    | `string`      | current directory         | Next app root when the build runs from a monorepo root                 |
+| `outputDir`  | `string`      | `public/_tasty`           | Filesystem output directory                                            |
+| `publicPath` | `string`      | inferred from `outputDir` | Root-relative URL; required when output is outside `public`            |
+| `enabled`    | `boolean`     | `true`                    | Disable generation without changing wrapper composition                |
+
 ### How it works
 
 - `TastyRegistry` is a `'use client'` component, but Next.js still server-renders it on initial page load. The `'use client'` boundary is required solely to access `useServerInsertedHTML` — **not** because `tasty()` components need the client.
@@ -130,13 +216,13 @@ The nonce is automatically applied to all `<style>` and `<script>` tags injected
 
 Tasty offers several levels of Astro integration. Choose the one that matches your needs:
 
-| Setup                                                     | Config needed | Deduplication                 | Hooks work             | Client JS      |
-| --------------------------------------------------------- | ------------- | ----------------------------- | ---------------------- | -------------- |
-| Zero setup                                                | None          | Per render tree               | Yes (within each tree) | None           |
-| `tastyIntegration({ islands: false })`                    | One line      | Cross-tree                    | Yes                    | None           |
-| `tastyIntegration()`                                      | One line      | Cross-tree                    | Yes                    | Auto-hydration |
-| `tastyIntegration({ css: { mode: 'extract' } })`          | One line      | Cross-tree and cross-page     | Yes                    | Auto-hydration |
-| `tastyIntegration({ islands: false, css: { mode: 'extract' } })` | One line | Cross-tree and cross-page | Yes                    | None           |
+| Setup                                                            | Config needed | Deduplication             | Hooks work             | Client JS      |
+| ---------------------------------------------------------------- | ------------- | ------------------------- | ---------------------- | -------------- |
+| Zero setup                                                       | None          | Per render tree           | Yes (within each tree) | None           |
+| `tastyIntegration({ islands: false })`                           | One line      | Cross-tree                | Yes                    | None           |
+| `tastyIntegration()`                                             | One line      | Cross-tree                | Yes                    | Auto-hydration |
+| `tastyIntegration({ css: { mode: 'extract' } })`                 | One line      | Cross-tree and cross-page | Yes                    | Auto-hydration |
+| `tastyIntegration({ islands: false, css: { mode: 'extract' } })` | One line      | Cross-tree and cross-page | Yes                    | None           |
 
 ### Zero setup (static pages)
 
@@ -413,12 +499,13 @@ const stream = await runWithCollector(collector, () =>
 
 ### Entry points
 
-| Import path                                                                         | Description                                                                                                                                                                                                     |
-| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@tenphi/tasty/ssr`                                                                 | Core SSR API: `ServerStyleCollector`, `createServerStyleCollector`, `runWithCollector`, `hydrateTastyClasses`                                                                                                   |
-| `@tenphi/tasty/ssr/next`                                                            | Next.js App Router: `TastyRegistry` component                                                                                                                                                                   |
-| `@tenphi/tasty/ssr/astro`                                                           | Astro: `tastyIntegration`, `tastyMiddleware`                                                                                                                                                                    |
-| `@tenphi/tasty/ssr/astro-client`                                                    | Astro: client-side cache hydration (auto-injected by integration, or import manually)                                                                                                                           |
+| Import path                                                                                                                                                                                | Description                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@tenphi/tasty/ssr`                                                                                                                                                                        | Core SSR API: `ServerStyleCollector`, `createServerStyleCollector`, `runWithCollector`, `hydrateTastyClasses`                                                                                                   |
+| `@tenphi/tasty/ssr/next`                                                                                                                                                                   | Next.js App Router: `TastyRegistry` component                                                                                                                                                                   |
+| `@tenphi/tasty/ssr/next-config`                                                                                                                                                            | Next.js config wrapper: shared, content-hashed global stylesheet                                                                                                                                                |
+| `@tenphi/tasty/ssr/astro`                                                                                                                                                                  | Astro: `tastyIntegration`, `tastyMiddleware`                                                                                                                                                                    |
+| `@tenphi/tasty/ssr/astro-client`                                                                                                                                                           | Astro: client-side cache hydration (auto-injected by integration, or import manually)                                                                                                                           |
 | `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static`<br>`@tenphi/tasty/ssr/astro-middleware-extract`<br>`@tenphi/tasty/ssr/astro-middleware-extract-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`. |
 
 ### `ServerStyleCollector`
@@ -439,7 +526,7 @@ Constructor: `new ServerStyleCollector(namePrefix?)`, or use the `createServerSt
 | `allocateCounterStyleName(providedName?)`  | Allocate a counter-style name. Returns `providedName` if given, otherwise generates one using `${namePrefix}c${counter}` (e.g. `tc0`, `tc1`, ...).                                                                                                                         |
 | `collectGlobalStyles(key, css)`            | Record global styles (from `useGlobalStyles`). Deduplicated by key.                                                                                                                                                                                                        |
 | `collectRawCSS(key, css)`                  | Record raw CSS text (from `useRawCSS`). Deduplicated by key.                                                                                                                                                                                                               |
-| `collectInternals()`                       | Collect internal `@property` rules, `:root` token defaults, `@font-face`, and `@counter-style` rules from the global config. Called automatically on first chunk collection; idempotent.                                                                                   |
+| `collectInternals()`                       | Collect eager configured globals: `@property`, `:root` tokens and presets, `@font-face`, `@counter-style`, `@function`, and `globalStyles`. Called automatically on first chunk collection; idempotent.                                                                    |
 | `getCSS()`                                 | Get all collected CSS as a single string. For non-streaming SSR.                                                                                                                                                                                                           |
 | `flushCSS()`                               | Get only CSS collected since the last flush. For streaming SSR.                                                                                                                                                                                                            |
 | `getRenderedClassNames()`                  | Get the list of class names rendered so far. Serialized to `window.__TASTY__` for client hydration via `hydrateTastyClasses()`.                                                                                                                                            |
@@ -448,10 +535,18 @@ Constructor: `new ServerStyleCollector(namePrefix?)`, or use the `createServerSt
 
 Next.js App Router component. Props:
 
-| Prop            | Type        | Default  | Description                                      |
-| --------------- | ----------- | -------- | ------------------------------------------------ |
-| `children`      | `ReactNode` | required | Application tree                                 |
-| `transferCache` | `boolean`   | `true`   | Embed cache state script for zero-cost hydration |
+| Prop               | Type              | Default   | Description                                                               |
+| ------------------ | ----------------- | --------- | ------------------------------------------------------------------------- |
+| `children`         | `ReactNode`       | required  | Application tree                                                          |
+| `transferCache`    | `boolean`         | `true`    | Embed cache state script for zero-cost hydration                          |
+| `sharedStylesheet` | `string \| false` | generated | Override the shared URL, or disable generated shared CSS for the registry |
+
+### `withTastyNext(options)`
+
+Next.js configuration wrapper exported from
+`@tenphi/tasty/ssr/next-config`. It generates a shared stylesheet from eager
+Tasty configuration artifacts and wires its URL and immutable cache header
+into the Next config. Route-specific CSS continues through `TastyRegistry`.
 
 ### `tastyIntegration(options?)`
 

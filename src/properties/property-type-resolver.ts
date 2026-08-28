@@ -7,7 +7,14 @@
 
 import { inferSyntaxFromValue } from './index';
 
-const CUSTOM_PROP_DECL = /^\s*(--[a-z0-9_-]+)\s*:\s*(.+?)\s*$/i;
+/**
+ * One `--name: value` declaration, with the surrounding whitespace dropped.
+ *
+ * The value is anchored on `\S` at both ends so no two quantifiers can claim
+ * the same character. A lazy `(.+?)\s*$` is quadratic on a value of nothing
+ * but spaces — every split point gets tried (CodeQL `js/polynomial-redos`).
+ */
+const CUSTOM_PROP_DECL = /^\s*(--[a-z0-9_-]+)\s*:\s*(\S|\S.*\S)\s*$/i;
 const SINGLE_VAR_REF = /^var\((--[a-z0-9_-]+)\)$/i;
 
 export class PropertyTypeResolver {

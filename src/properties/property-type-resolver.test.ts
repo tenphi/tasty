@@ -325,4 +325,39 @@ describe('PropertyTypeResolver', () => {
       });
     });
   });
+
+  describe('declaration parsing', () => {
+    it('should read a value that whitespace surrounds', () => {
+      // A block written without a trailing semicolon leaves the newline on the
+      // last declaration, and indentation leaves it on every other one.
+      resolver.scanDeclarations(
+        '\n  --gap: 10px\n',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.get('--gap')).toEqual({
+        syntax: '<length-percentage>',
+        initialValue: '0px',
+      });
+    });
+
+    it('should not read a value across a line break', () => {
+      resolver.scanDeclarations(
+        '--gap: 10px\nnonsense',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.has('--gap')).toBe(false);
+    });
+
+    it('should skip a declaration with no value', () => {
+      // An empty custom property is not a colour, whatever its name says.
+      resolver.scanDeclarations(
+        '--brand-color:   ',
+        isPropertyDefined,
+        registerProperty,
+      );
+      expect(registered.has('--brand-color')).toBe(false);
+    });
+  });
 });

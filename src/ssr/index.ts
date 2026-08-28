@@ -9,6 +9,7 @@
 
 // Core collector
 export { ServerStyleCollector, createServerStyleCollector } from './collector';
+export type { ServerStyleArtifact, ServerStyleArtifactKind } from './collector';
 
 // AsyncLocalStorage integration for Astro / generic frameworks
 export { runWithCollector, getSSRCollector } from './async-storage';

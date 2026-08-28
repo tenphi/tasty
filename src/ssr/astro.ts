@@ -10,6 +10,8 @@
 
 import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
+import { createExtractionMetadata, extractAstroCSS } from './astro-extraction';
+import type { AstroCSSStrategy } from './astro-extraction';
 import { ServerStyleCollector } from './collector';
 import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
 
@@ -27,6 +29,10 @@ export interface TastyMiddlewareOptions {
    * in server-rendered `<style>` tags. Default: true.
    */
   transferCache?: boolean;
+}
+
+interface InternalTastyMiddlewareOptions extends TastyMiddlewareOptions {
+  extractionMetadata?: boolean;
 }
 
 /**
@@ -56,11 +62,15 @@ export interface TastyMiddlewareOptions {
  * ```
  */
 export function tastyMiddleware(options?: TastyMiddlewareOptions) {
+  const internalOptions = options as InternalTastyMiddlewareOptions | undefined;
   return async (
-    _context: unknown,
+    context: { isPrerendered?: boolean },
     next: () => Promise<Response>,
   ): Promise<Response> => {
     const transferCache = options?.transferCache ?? true;
+    const extractionMetadata =
+      internalOptions?.extractionMetadata === true &&
+      context.isPrerendered === true;
     const collector = new ServerStyleCollector();
 
     // Run the entire request — including body stream consumption — inside
@@ -126,6 +136,9 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
     const nonce = getConfig().nonce;
     const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
     const styleTag = `<style data-tasty-ssr${nonceAttr}>${css}</style>`;
+    const metadataTag = extractionMetadata
+      ? createExtractionMetadata(collector.getArtifacts())
+      : '';
 
     let cacheTag = '';
     if (transferCache) {
@@ -136,7 +149,7 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
       }
     }
 
-    const injection = styleTag + cacheTag;
+    const injection = styleTag + metadataTag + cacheTag;
     const idx = html.indexOf('</head>');
     if (idx !== -1) {
       html = html.slice(0, idx) + injection + html.slice(idx);
@@ -170,7 +183,7 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
  * by the consumer through our `exports` map, so it never depends on the
  * chunk layout.
  *
- * There are two entrypoints instead of one parameterised entrypoint because
+ * There are separate entrypoints instead of one parameterised entrypoint because
  * `addMiddleware()` cannot pass options: the integration runs when the Astro
  * config is loaded, while the middleware module is evaluated in the server
  * runtime — a different process for built output — so module-level state set
@@ -179,6 +192,20 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
 const MIDDLEWARE_ENTRYPOINT = '@tenphi/tasty/ssr/astro-middleware';
 const MIDDLEWARE_ENTRYPOINT_STATIC =
   '@tenphi/tasty/ssr/astro-middleware-static';
+const MIDDLEWARE_ENTRYPOINT_EXTRACT =
+  '@tenphi/tasty/ssr/astro-middleware-extract';
+const MIDDLEWARE_ENTRYPOINT_EXTRACT_STATIC =
+  '@tenphi/tasty/ssr/astro-middleware-extract-static';
+
+export interface TastyIntegrationCSSOptions {
+  /** CSS delivery mode. Extraction only applies to prerendered builds. */
+  mode?: 'inline' | 'extract';
+  /**
+   * `shared` extracts the largest common cascade-safe block. `single` emits
+   * the safe union of generated component classes. Default: `shared`.
+   */
+  strategy?: AstroCSSStrategy;
+}
 
 export interface TastyIntegrationOptions {
   /**
@@ -193,6 +220,8 @@ export interface TastyIntegrationOptions {
    * directives.
    */
   islands?: boolean;
+  /** Configure inline or build-wide extracted CSS delivery. */
+  css?: TastyIntegrationCSSOptions;
 }
 
 /**
@@ -221,11 +250,12 @@ export interface TastyIntegrationOptions {
  * });
  * ```
  */
-export function tastyIntegration(options?: TastyIntegrationOptions): {
-  name: string;
-  hooks: Record<string, (...args: never[]) => void>;
-} {
+export function tastyIntegration(options?: TastyIntegrationOptions) {
   const { islands = true } = options ?? {};
+  const cssMode = options?.css?.mode ?? 'inline';
+  const cssStrategy = options?.css?.strategy ?? 'shared';
+  let base = '/';
+  let assets = '_astro';
 
   return {
     name: '@tenphi/tasty',
@@ -244,9 +274,14 @@ export function tastyIntegration(options?: TastyIntegrationOptions): {
         ) => void;
       }) => {
         addMiddleware({
-          entrypoint: islands
-            ? MIDDLEWARE_ENTRYPOINT
-            : MIDDLEWARE_ENTRYPOINT_STATIC,
+          entrypoint:
+            cssMode === 'extract'
+              ? islands
+                ? MIDDLEWARE_ENTRYPOINT_EXTRACT
+                : MIDDLEWARE_ENTRYPOINT_EXTRACT_STATIC
+              : islands
+                ? MIDDLEWARE_ENTRYPOINT
+                : MIDDLEWARE_ENTRYPOINT_STATIC,
           order: 'pre',
         });
 
@@ -256,6 +291,18 @@ export function tastyIntegration(options?: TastyIntegrationOptions): {
             `import "@tenphi/tasty/ssr/astro-client";`,
           );
         }
+      },
+      'astro:config:done': ({
+        config,
+      }: {
+        config: { base?: string; build?: { assets?: string } };
+      }) => {
+        base = config.base ?? '/';
+        assets = config.build?.assets ?? '_astro';
+      },
+      'astro:build:done': async ({ dir }: { dir: URL }) => {
+        if (cssMode !== 'extract') return;
+        await extractAstroCSS({ dir, base, assets, strategy: cssStrategy });
       },
     },
   };

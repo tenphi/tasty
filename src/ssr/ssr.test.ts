@@ -229,6 +229,33 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain('display: flex');
   });
 
+  it('exposes stable artifact boundaries in cascade order', () => {
+    const first = new ServerStyleCollector();
+    const second = new ServerStyleCollector();
+
+    for (const collector of [first, second]) {
+      collector.collectProperty('color', '@property --color {}');
+      collector.collectRawCSS('raw', '.raw {\n  color: red;\n}');
+      const { className } = collector.allocateClassName('shared');
+      collector.collectChunk('shared', className, [
+        { selector: '', declarations: 'display: flex', needsClassName: true },
+      ]);
+    }
+
+    const artifacts = first.getArtifacts();
+    expect(artifacts.map(({ kind }) => kind)).toEqual([
+      'property',
+      'raw',
+      'chunk',
+    ]);
+    expect(artifacts.map(({ order }) => order)).toEqual([0, 1, 2]);
+    expect(artifacts[1].css).toBe('.raw {\n  color: red;\n}');
+    expect(second.getArtifacts()).toEqual(artifacts);
+
+    second.collectRawCSS('raw', '.raw { color: blue; }', true);
+    expect(second.getArtifacts()[1].id).not.toBe(artifacts[1].id);
+  });
+
   it('deduplicates chunks by cacheKey', () => {
     const collector = new ServerStyleCollector();
     const { className } = collector.allocateClassName('ck1');

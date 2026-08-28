@@ -36,6 +36,30 @@ import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
 import { formatRules } from './format-rules';
 
+export type ServerStyleArtifactKind =
+  | 'property'
+  | 'font-face'
+  | 'counter-style'
+  | 'function'
+  | 'raw'
+  | 'global'
+  | 'chunk'
+  | 'keyframes';
+
+export interface ServerStyleArtifact {
+  /** Stable identifier derived from the artifact kind, logical key, and CSS. */
+  id: string;
+  kind: ServerStyleArtifactKind;
+  css: string;
+  /** Zero-based position in the collector's final cascade order. */
+  order: number;
+}
+
+function artifactId(kind: ServerStyleArtifactKind, key: string, css: string) {
+  const content = `${kind}\0${key}\0${css}`;
+  return `${kind}:${hashString(content)}:${content.length.toString(36)}`;
+}
+
 export class ServerStyleCollector {
   private chunks = new Map<string, string>();
   private cacheKeyToClassName = new Map<string, string>();
@@ -305,46 +329,51 @@ export class ServerStyleCollector {
   }
 
   /**
+   * Return the collected CSS as structured, ordered artifacts.
+   *
+   * Artifact boundaries are part of the collector output so build tools never
+   * need to split or parse CSS text. IDs include the logical collection key
+   * and content, making them stable across equivalent page renders while a CSS
+   * change always produces a different ID.
+   */
+  getArtifacts(): ServerStyleArtifact[] {
+    const artifacts: ServerStyleArtifact[] = [];
+
+    const append = (
+      kind: ServerStyleArtifactKind,
+      entries: Iterable<[string, string]>,
+    ) => {
+      for (const [key, css] of entries) {
+        artifacts.push({
+          id: artifactId(kind, key, css),
+          kind,
+          css,
+          order: artifacts.length,
+        });
+      }
+    };
+
+    append('property', this.propertyRules);
+    append('font-face', this.fontFaceRules);
+    append('counter-style', this.counterStyleRules);
+    append('function', this.functionRules);
+    append('raw', this.rawCSS);
+    append('global', this.globalStyles);
+    append('chunk', this.chunks);
+    append('keyframes', this.keyframeRules);
+
+    return artifacts;
+  }
+
+  /**
    * Extract all CSS collected so far as a single string.
    * Includes @property and @keyframes rules.
    * Used for non-streaming SSR (renderToString).
    */
   getCSS(): string {
-    const parts: string[] = [];
-
-    for (const css of this.propertyRules.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.fontFaceRules.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.counterStyleRules.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.functionRules.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.rawCSS.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.globalStyles.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.chunks.values()) {
-      parts.push(css);
-    }
-
-    for (const css of this.keyframeRules.values()) {
-      parts.push(css);
-    }
-
-    return parts.join('\n');
+    return this.getArtifacts()
+      .map(({ css }) => css)
+      .join('\n');
   }
 
   /**

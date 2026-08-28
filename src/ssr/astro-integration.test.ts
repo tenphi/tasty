@@ -27,7 +27,9 @@ interface Registered {
 }
 
 /** Run `astro:config:setup` against a stub and record what it registered. */
-function runConfigSetup(options?: { islands?: boolean }): Registered {
+function runConfigSetup(
+  options?: Parameters<typeof tastyIntegration>[0],
+): Registered {
   const registered: Registered = { middleware: [], scripts: [] };
 
   const hook = tastyIntegration(options).hooks['astro:config:setup'] as unknown;
@@ -86,6 +88,25 @@ describe('tastyIntegration', () => {
     );
   });
 
+  it.each([
+    {
+      islands: true,
+      entrypoint: '@tenphi/tasty/ssr/astro-middleware-extract',
+    },
+    {
+      islands: false,
+      entrypoint: '@tenphi/tasty/ssr/astro-middleware-extract-static',
+    },
+  ])(
+    'uses the extraction entrypoint (islands: $islands)',
+    ({ islands, entrypoint }) => {
+      expect(
+        runConfigSetup({ islands, css: { mode: 'extract' } }).middleware[0]
+          .entrypoint,
+      ).toBe(entrypoint);
+    },
+  );
+
   it('injects the hydration script only when islands are enabled', () => {
     expect(runConfigSetup().scripts).toEqual([
       {
@@ -96,8 +117,13 @@ describe('tastyIntegration', () => {
     expect(runConfigSetup({ islands: false }).scripts).toEqual([]);
   });
 
-  it.each([{ islands: true }, { islands: false }])(
-    'registers an entrypoint that is exported and built (islands: $islands)',
+  it.each([
+    { islands: true },
+    { islands: false },
+    { islands: true, css: { mode: 'extract' as const } },
+    { islands: false, css: { mode: 'extract' as const } },
+  ])(
+    'registers an entrypoint that is exported and built ($options)',
     (options) => {
       const entrypoint = runConfigSetup(options).middleware[0]
         .entrypoint as string;
@@ -133,7 +159,7 @@ describe('astro middleware entrypoints', () => {
    */
   async function render(
     onRequest: (
-      context: unknown,
+      context: { isPrerendered?: boolean },
       next: () => Promise<Response>,
     ) => Promise<Response>,
   ): Promise<string> {
@@ -174,5 +200,26 @@ describe('astro middleware entrypoints', () => {
     expect(html).toContain('<style data-tasty-ssr>');
     expect(html).not.toContain('<script');
     expect(html).not.toContain('window.__TASTY__');
+  });
+
+  it('emits extraction metadata only while prerendering', async () => {
+    const { onRequest } = await import('./astro-middleware-extract-static');
+
+    const renderWithContext = async (isPrerendered: boolean) => {
+      const next = async () => {
+        const collector = getSSRCollector();
+        const { className } = collector!.allocateClassName('extract');
+        collector!.collectChunk('extract', className, [
+          { $: '', declarations: { color: 'red' } },
+        ] as never);
+        return new Response('<html><head></head><body></body></html>', {
+          headers: { 'content-type': 'text/html' },
+        });
+      };
+      return (await onRequest({ isPrerendered } as never, next)).text();
+    };
+
+    expect(await renderWithContext(true)).toContain('data-tasty-extract');
+    expect(await renderWithContext(false)).not.toContain('data-tasty-extract');
   });
 });

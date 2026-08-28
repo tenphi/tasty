@@ -68,7 +68,7 @@ Retrieves CSS text for a given target. Logs the result with rule count and size.
 |---|---|
 | `'all'` | All tasty CSS (component + global + raw) |
 | `'active'` | CSS for classes currently in the DOM |
-| `'unused'` | CSS with refCount = 0 (cached but not used) |
+| `'unused'` | CSS for injected classes no element carries (cached but not rendered) |
 | `'global'` | Only global CSS (from `injectGlobal`) |
 | `'page'` | All CSS on the page (including non-tasty) |
 | `'t3a5f'` | CSS for a specific tasty class (class names are `t` + base36 hash) |
@@ -241,7 +241,9 @@ tastyDebug.cache();
 
 ### `cleanup(opts?): void`
 
-Forces immediate cleanup of all unused styles (those with `refCount = 0`).
+Removes every injected style that is neither carried by an element nor pinned by
+an outstanding `inject()` handle — the same set `summary()` reports as unused.
+Equivalent to `gc({ force: true })`.
 
 ```typescript
 tastyDebug.cleanup();

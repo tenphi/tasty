@@ -15,6 +15,7 @@ import type {
   FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
+  InjectOptions,
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
@@ -27,7 +28,7 @@ import type {
  */
 export function inject(
   rules: StyleResult[],
-  options?: { root?: Document | ShadowRoot; cacheKey?: string },
+  options?: InjectOptions,
 ): InjectResult {
   const injector = getGlobalInjector();
 
@@ -226,16 +227,45 @@ export function getCSSTextForNode(
 }
 
 /**
- * Force cleanup of unused rules
+ * Take a reference on local `@keyframes` under the deterministic names the
+ * caller resolved, and report which entry holds each. Pair with
+ * `ownKeyframes()` once the rules exist to inspect.
+ */
+export function holdKeyframes(
+  steps: Record<string, KeyframesSteps>,
+  names: Map<string, string>,
+  options?: { root?: Document | ShadowRoot },
+): Map<string, string> {
+  return getGlobalInjector().holdKeyframes(steps, names, options);
+}
+
+/**
+ * Record that a class animates these keyframes, so the reference is released
+ * when the last such class is collected.
+ */
+export function ownKeyframes(
+  key: string,
+  className: string,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  getGlobalInjector().ownKeyframes(key, className, options);
+}
+
+/**
+ * Remove every injected rule that is neither in the DOM nor held by an
+ * outstanding `inject()` handle. Equivalent to `gc({ force: true })`.
  */
 export function cleanup(root?: Document | ShadowRoot): void {
   return getGlobalInjector().cleanup(root);
 }
 
 /**
- * Record a render-time usage hit for one or more classNames.
- * Used internally by computeStyles and tasty() to track usage for GC.
- * When the global touch counter reaches `touchInterval`, schedules GC.
+ * Count a render, so that a collection pass is scheduled every
+ * `gc.touchInterval` of them. Used internally by computeStyles and tasty().
+ *
+ * @deprecated The class name is ignored — collection asks the DOM what is
+ * rendered rather than recording usage per class. The argument is kept so
+ * existing calls still compile.
  */
 export function touch(
   className: string,
@@ -246,9 +276,9 @@ export function touch(
 }
 
 /**
- * Synchronous garbage collection of unused styles.
- * Evicts the oldest unused styles when usageMap exceeds capacity.
- * With `{ force: true }`, removes ALL unused styles regardless of capacity.
+ * Synchronous garbage collection of unused styles — those no element carries
+ * and no `inject()` handle references. Evicts the oldest ones once they exceed
+ * capacity. With `{ force: true }`, removes all of them regardless of capacity.
  *
  * @returns Number of styles evicted.
  */
@@ -294,12 +324,14 @@ export function createInjector(
 export type {
   StyleInjectorConfig,
   InjectionMode,
+  InjectOptions,
   InjectResult,
   DisposeFunction,
   RuleInfo,
   SheetInfo,
   RootRegistry,
   StyleRule,
+  StyleUsage,
   KeyframesInfo,
   KeyframesResult,
   KeyframesSteps,
@@ -313,7 +345,6 @@ export type {
   CounterStyleDescriptors,
   FunctionDefinition,
   FunctionParameter,
-  StyleUsage,
   GCConfig,
   GCOptions,
 } from './types';

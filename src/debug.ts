@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
-import { getCSSTextForNode, injector } from './injector';
+import { flushStyles, getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
 import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
@@ -72,7 +72,13 @@ export interface ChunkBreakdown {
 
 export interface Summary {
   activeClasses: string[];
+  /** Classes `gc({ force: true })` would delete right now. */
   unusedClasses: string[];
+  /**
+   * Held but in neither list: nothing renders them, yet collection will not
+   * take them — inside the grace window, or pinned by an `inject()` handle.
+   */
+  hotClasses: string[];
   totalStyledClasses: string[];
 
   activeCSSSize: number;
@@ -114,20 +120,21 @@ function sortTastyClasses(classes: Iterable<string>): string[] {
   return Array.from(classes).sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The registry for `root`, with every queued write landed first.
+ *
+ * Every injector read API is a flush point, and the reads below reach past
+ * those APIs straight into the registry and the sheet manager. Without this
+ * they would report a batch window's contents as absent — a rule that is
+ * enqueued but not yet in a sheet is missing from `globalRules`, from the
+ * sheets, and from anything counting either.
+ */
 function getRegistry(
   root: Document | ShadowRoot = document,
 ): RootRegistry | undefined {
-  return injector.instance._sheetManager?.getRegistry(root);
-}
+  flushStyles();
 
-function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
-  const registry = getRegistry(root);
-  if (!registry) return [];
-  const result: string[] = [];
-  for (const [cls, rc] of registry.refCounts as Map<string, number>) {
-    if (rc === 0) result.push(cls);
-  }
-  return sortTastyClasses(result);
+  return injector.instance._sheetManager?.getRegistry(root);
 }
 
 function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
@@ -143,6 +150,46 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
     }
   });
   return sortTastyClasses(classes);
+}
+
+/**
+ * Everything this injector holds in `root`, in the order the engine applies it,
+ * with the sources kept byte-for-byte — trimming would report a total smaller
+ * than one of its own parts whenever raw CSS has edge whitespace.
+ */
+function getAllCSS(root: Document | ShadowRoot = document): string {
+  const registry = getRegistry(root);
+  const sheetManager = injector.instance._sheetManager;
+  if (!registry || !sheetManager) return '';
+
+  return sheetManager.getOwnedCSSInOrder(registry, root).join('\n');
+}
+
+/**
+ * Injected classes that no element carries and nobody pinned — the exact set
+ * `gc({ force: true })` would delete.
+ *
+ * Deliberately borrowed from the injector rather than recomputed here: the two
+ * drifted apart once before, when this file still read "unused" off the pin
+ * counts the render path had stopped maintaining.
+ */
+function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
+  return sortTastyClasses(injector.instance.getUnusedClasses({ root }));
+}
+
+/** Every class this injector holds CSS for in `root`. */
+function getOwnedClasses(root: Document | ShadowRoot = document): string[] {
+  const registry = getRegistry(root);
+  if (!registry) return [];
+
+  const owned: string[] = [];
+  for (const [className, info] of registry.rules) {
+    // A negative sheet index marks a class whose CSS this injector does not
+    // hold: server-rendered, pre-allocated, or queued.
+    if (info.sheetIndex >= 0) owned.push(className);
+  }
+
+  return sortTastyClasses(owned);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,8 +344,21 @@ function buildChunkBreakdown(
 // Global-type CSS helper (internal only)
 // ---------------------------------------------------------------------------
 
+/**
+ * Every prefix `registry.globalRules` is keyed by. Anything missing here is a
+ * rule the summary would hold but never count, which is how the totals stopped
+ * adding up the first time.
+ */
+const GLOBAL_RULE_PREFIXES = {
+  global: 'global:',
+  property: 'property:',
+  fontFace: 'fontface:',
+  counterStyle: 'counterstyle:',
+  function: 'function:',
+} as const;
+
 function getGlobalTypeCSS(
-  type: 'global' | 'raw' | 'keyframes' | 'property',
+  type: keyof typeof GLOBAL_RULE_PREFIXES | 'raw' | 'keyframes',
   root: Document | ShadowRoot = document,
 ): { css: string; ruleCount: number; size: number } {
   const registry = getRegistry(root);
@@ -306,6 +366,20 @@ function getGlobalTypeCSS(
 
   const chunks: string[] = [];
   let rc = 0;
+
+  if (type === 'raw') {
+    // Raw blocks are kept by the sheet manager, not in `globalRules`, so the
+    // prefix scan below never sees them — and their rules are counted from the
+    // parsed sheet, since one raw block is one string but any number of rules.
+    const css = injector.instance.getRawCSSText({ root });
+    const sheetManager = injector.instance._sheetManager;
+
+    return {
+      css: prettifyCSS(css),
+      ruleCount: sheetManager?.getRawRuleCount(root) ?? 0,
+      size: css.length,
+    };
+  }
 
   if (type === 'keyframes') {
     for (const [, entry] of registry.keyframesCache) {
@@ -325,8 +399,7 @@ function getGlobalTypeCSS(
       }
     }
   } else {
-    const prefix =
-      type === 'global' ? 'global:' : type === 'raw' ? 'raw:' : 'property:';
+    const prefix = GLOBAL_RULE_PREFIXES[type];
     for (const [key, ri] of registry.globalRules) {
       if (!key.startsWith(prefix)) continue;
       const sheetInfo = registry.sheets[ri.sheetIndex];
@@ -462,7 +535,8 @@ export const tastyDebug = {
       }
     } else if (typeof target === 'string') {
       if (target === 'all') {
-        css = injector.instance.getCSSText({ root });
+        // Documented as component + global + raw, and raw has its own sheet.
+        css = getAllCSS(root);
       } else if (target === 'global') {
         css = getGlobalTypeCSS('global', root).css;
         return css; // already prettified
@@ -568,7 +642,19 @@ export const tastyDebug = {
 
     const activeClasses = findDomTastyClasses(root);
     const unusedClasses = getUnusedClasses(root);
-    const totalStyledClasses = [...activeClasses, ...unusedClasses];
+    // Everything, not just the two bands above: a class that went cold a
+    // moment ago is in neither, and dropping it here is the accounting failure
+    // this whole change started from.
+    const ownedClasses = getOwnedClasses(root);
+    const totalStyledClasses = sortTastyClasses(
+      new Set([...activeClasses, ...ownedClasses]),
+    );
+    const unusedSet = new Set(unusedClasses);
+    const activeSet = new Set(activeClasses);
+    const hotClasses = ownedClasses.filter(
+      (className) => !activeSet.has(className) && !unusedSet.has(className),
+    );
+    const hotCSS = injector.instance.getCSSTextForClasses(hotClasses, { root });
 
     const activeCSS = injector.instance.getCSSTextForClasses(activeClasses, {
       root,
@@ -576,7 +662,7 @@ export const tastyDebug = {
     const unusedCSS = injector.instance.getCSSTextForClasses(unusedClasses, {
       root,
     });
-    const allCSS = injector.instance.getCSSText({ root });
+    const allCSS = getAllCSS(root);
 
     const activeRuleCount = countRules(activeCSS);
     const unusedRuleCount = countRules(unusedCSS);
@@ -585,11 +671,29 @@ export const tastyDebug = {
     const rawData = getGlobalTypeCSS('raw', root);
     const kfData = getGlobalTypeCSS('keyframes', root);
     const propData = getGlobalTypeCSS('property', root);
+    // Folded into the global line rather than given their own: they are all
+    // at-rules injected once and kept forever, and leaving them out of the
+    // total is what made it not a total.
+    const atRuleData = (
+      ['fontFace', 'counterStyle', 'function'] as const
+    ).reduce(
+      (all, type) => {
+        const data = getGlobalTypeCSS(type, root);
+        return {
+          css: data.css ? `${all.css}\n${data.css}`.trim() : all.css,
+          ruleCount: all.ruleCount + data.ruleCount,
+          size: all.size + data.size,
+        };
+      },
+      { css: '', ruleCount: 0, size: 0 },
+    );
 
     const totalRuleCount =
       activeRuleCount +
       unusedRuleCount +
+      countRules(hotCSS) +
       globalData.ruleCount +
+      atRuleData.ruleCount +
       rawData.ruleCount +
       kfData.ruleCount +
       propData.ruleCount;
@@ -601,17 +705,18 @@ export const tastyDebug = {
     const summary: Summary = {
       activeClasses,
       unusedClasses,
+      hotClasses,
       totalStyledClasses,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
-      globalCSSSize: globalData.size,
+      globalCSSSize: globalData.size + atRuleData.size,
       rawCSSSize: rawData.size,
       keyframesCSSSize: kfData.size,
       propertyCSSSize: propData.size,
       totalCSSSize: allCSS.length,
       activeRuleCount,
       unusedRuleCount,
-      globalRuleCount: globalData.ruleCount,
+      globalRuleCount: globalData.ruleCount + atRuleData.ruleCount,
       rawRuleCount: rawData.ruleCount,
       keyframesRuleCount: kfData.ruleCount,
       propertyRuleCount: propData.ruleCount,
@@ -630,8 +735,12 @@ export const tastyDebug = {
       console.log(
         `Unused:   ${unusedClasses.length} classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
       );
+      if (hotClasses.length)
+        console.log(
+          `Held:     ${hotClasses.length} classes, ${countRules(hotCSS)} rules, ${fmtSize(hotCSS.length)} (not rendered, not yet collectable)`,
+        );
       console.log(
-        `Global:   ${globalData.ruleCount} rules, ${fmtSize(globalData.size)}`,
+        `Global:   ${globalData.ruleCount + atRuleData.ruleCount} rules, ${fmtSize(globalData.size + atRuleData.size)}`,
       );
       if (rawData.ruleCount)
         console.log(
@@ -720,8 +829,14 @@ export const tastyDebug = {
     const unused = getUnusedClasses(root);
     const metrics = injector.instance.getMetrics({ root });
 
+    // `all` is everything held, not the two bands above: a class that went cold
+    // a moment ago is in neither, and it is still taking up a sheet.
+    const all = sortTastyClasses(
+      new Set([...active, ...getOwnedClasses(root)]),
+    );
+
     const status: CacheStatus = {
-      classes: { active, unused, all: [...active, ...unused] },
+      classes: { active, unused, all },
       metrics,
     };
 

@@ -141,7 +141,7 @@ export class SheetManager {
 
       registry = {
         sheets: [],
-        refCounts: new Map(),
+        pinCounts: new Map(),
         rules: new Map(),
         cacheKeyToClassName: new Map(),
         ruleTextSet: new Set<string>(),
@@ -155,10 +155,9 @@ export class SheetManager {
         injectedFunctions: new Map<string, boolean>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
-        usageMap: new Map(),
+        unusedSince: new Map(),
+        localKeyframes: new Map(),
         touchCount: 0,
-        touchTick: -1,
-        touchedTick: new Set<string>(),
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
         injectionMode: this.detectInjectionMode(root),
@@ -898,36 +897,31 @@ export class SheetManager {
   }
 
   /**
-   * Force cleanup of unused styles
+   * Delete the given classes: their rules leave the sheets and every registry
+   * entry pointing at them is dropped.
+   *
+   * Deciding *what* is unused belongs to `StyleInjector.gc()`, which owns the
+   * DOM scan and the capacity policy. This only re-checks that each class is
+   * still safe to delete, and reports how many were.
+   *
+   * @returns Number of classes actually deleted.
    */
-  public forceCleanup(registry: RootRegistry): void {
-    this.performBulkCleanup(registry);
-  }
-
-  /**
-   * Perform bulk cleanup of all unused styles (refCount = 0).
-   */
-  private performBulkCleanup(registry: RootRegistry): void {
+  public deleteClasses(
+    registry: RootRegistry,
+    classNames: Iterable<string>,
+  ): number {
     const cleanupStartTime = Date.now();
 
-    // Calculate unused rules dynamically: rules that have refCount = 0
-    // and are not tracked in usageMap (GC-kept styles must survive)
-    const unusedClassNames = Array.from(registry.refCounts.entries())
-      .filter(
-        ([className, refCount]) =>
-          refCount === 0 && !registry.usageMap.has(className),
-      )
-      .map(([className]) => className);
-
-    if (unusedClassNames.length === 0) return;
-
-    const selected = unusedClassNames
+    const selected = Array.from(classNames)
       .map((className) => {
         const ruleInfo = registry.rules.get(className);
         return ruleInfo ? { className, ruleInfo } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
+    if (selected.length === 0) return 0;
+
+    const deleted = new Set<string>();
     let cleanedUpCount = 0;
     let totalCssSize = 0;
     let totalRulesDeleted = 0;
@@ -964,10 +958,9 @@ export class SheetManager {
       rulesInSheet.sort((a, b) => b.ruleInfo.ruleIndex - a.ruleInfo.ruleIndex);
 
       for (const { className, ruleInfo } of rulesInSheet) {
-        // SAFETY 1: Double-check refCount is still 0
-        const currentRefCount = registry.refCounts.get(className) || 0;
-        if (currentRefCount > 0) {
-          // Class became active again; do not delete
+        // SAFETY 1: Never delete a class someone pinned
+        if ((registry.pinCounts.get(className) ?? 0) > 0) {
+          // Class was pinned again between collection and deletion
           continue;
         }
 
@@ -1011,22 +1004,30 @@ export class SheetManager {
         // All safety checks passed - proceed with deletion
         this.deleteRule(registry, ruleInfo);
         registry.rules.delete(className);
-        registry.refCounts.delete(className);
+        registry.pinCounts.delete(className);
+        registry.unusedSince.delete(className);
 
-        // Clean up cache key mappings that point to this className
-        const keysToDelete: string[] = [];
-        for (const [
-          key,
-          mappedClassName,
-        ] of registry.cacheKeyToClassName.entries()) {
-          if (mappedClassName === className) {
-            keysToDelete.push(key);
+        // Last class animating these keyframes: nothing refers to them now.
+        for (const [key, entry] of registry.localKeyframes) {
+          if (!entry.owners.delete(className)) continue;
+          if (entry.owners.size === 0) {
+            entry.dispose();
+            registry.localKeyframes.delete(key);
           }
         }
-        for (const key of keysToDelete) {
+        deleted.add(className);
+        cleanedUpCount++;
+      }
+    }
+
+    // Cache keys are indexed by key, not by className, so finding the ones that
+    // point at a deleted class means scanning the map — once for the whole
+    // batch rather than once per class.
+    if (deleted.size > 0) {
+      for (const [key, mappedClassName] of registry.cacheKeyToClassName) {
+        if (deleted.has(mappedClassName)) {
           registry.cacheKeyToClassName.delete(key);
         }
-        cleanedUpCount++;
       }
     }
 
@@ -1043,6 +1044,8 @@ export class SheetManager {
         rulesDeleted: totalRulesDeleted,
       });
     }
+
+    return cleanedUpCount;
   }
 
   /**
@@ -1056,28 +1059,40 @@ export class SheetManager {
   }
 
   /**
+   * The CSS of one managed sheet, or `null` when it holds none this can read —
+   * an empty style element, or a sheet the engine refuses to hand over.
+   */
+  private readSheetCSS(sheetInfo: SheetInfo): string | null {
+    try {
+      if (sheetInfo.constructableSheet) {
+        const rules = Array.from(sheetInfo.constructableSheet.cssRules);
+        return rules.map((rule) => rule.cssText).join('\n');
+      }
+
+      if (sheetInfo.sheet) {
+        const styleElement = sheetInfo.sheet;
+        if (styleElement.textContent) return styleElement.textContent;
+        if (styleElement.sheet) {
+          const rules = Array.from(styleElement.sheet.cssRules);
+          return rules.map((rule) => rule.cssText).join('\n');
+        }
+      }
+    } catch (error) {
+      console.warn('[Tasty] Failed to read CSS from sheet:', error);
+    }
+
+    return null;
+  }
+
+  /**
    * Get CSS text from all sheets (for SSR)
    */
   getCSSText(registry: RootRegistry): string {
     const cssChunks: string[] = [];
 
     for (const sheetInfo of registry.sheets) {
-      try {
-        if (sheetInfo.constructableSheet) {
-          const rules = Array.from(sheetInfo.constructableSheet.cssRules);
-          cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
-        } else if (sheetInfo.sheet) {
-          const styleElement = sheetInfo.sheet;
-          if (styleElement.textContent) {
-            cssChunks.push(styleElement.textContent);
-          } else if (styleElement.sheet) {
-            const rules = Array.from(styleElement.sheet.cssRules);
-            cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
-          }
-        }
-      } catch (error) {
-        console.warn('[Tasty] Failed to read CSS from sheet:', error);
-      }
+      const css = this.readSheetCSS(sheetInfo);
+      if (css !== null) cssChunks.push(css);
     }
 
     return cssChunks.join('\n');
@@ -1089,14 +1104,11 @@ export class SheetManager {
   getMetrics(registry: RootRegistry): CacheMetrics | null {
     if (!registry.metrics) return null;
 
-    // Calculate unusedHits on demand - only count CSS rules since keyframes are disposed immediately
-    const unusedRulesCount = Array.from(registry.refCounts.values()).filter(
-      (count) => count === 0,
-    ).length;
-
+    // `unusedHits` needs a DOM scan to be meaningful, so `StyleInjector.getMetrics()`
+    // fills it in; a registry on its own cannot tell which classes are still rendered.
     return {
       ...registry.metrics,
-      unusedHits: unusedRulesCount,
+      unusedHits: 0,
     };
   }
 
@@ -1572,6 +1584,80 @@ export class SheetManager {
   /**
    * Get the raw CSS content
    */
+  /**
+   * The CSS this injector owns in `root`, one entry per sheet, in the order the
+   * engine applies them.
+   *
+   * `getCSSText()` walks the managed sheets only, and raw CSS has its own —
+   * which sits before, after, or *between* them depending on how it got there:
+   * prepended to `adoptedStyleSheets`, or wherever in `<head>` the first raw
+   * injection happened to land, with every managed sheet opened afterwards
+   * following it. Reporting a fixed order would describe the opposite winner
+   * from the live page whenever two rules of equal specificity meet, so the raw
+   * sheet is spliced in at the position the DOM actually gives it.
+   */
+  getOwnedCSSInOrder(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+  ): string[] {
+    const raw = this.getRawCSSText(root);
+    // Adopted mode prepends the raw sheet to `adoptedStyleSheets`, always, so
+    // there is nothing to compare positions against.
+    const rawElement = this.isAdoptedMode(root)
+      ? null
+      : this.rawStyleElements.get(root);
+
+    let rawIndex = raw && !rawElement ? 0 : -1;
+    const chunks: string[] = [];
+
+    for (const sheetInfo of registry.sheets) {
+      const css = this.readSheetCSS(sheetInfo);
+      if (css === null) continue;
+
+      if (
+        rawIndex < 0 &&
+        rawElement &&
+        sheetInfo.sheet &&
+        // DOCUMENT_POSITION_FOLLOWING: this managed sheet comes after the raw
+        // one, so the raw CSS belongs in front of it.
+        rawElement.compareDocumentPosition(sheetInfo.sheet) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        rawIndex = chunks.length;
+      }
+
+      chunks.push(css);
+    }
+
+    if (!raw) return chunks;
+
+    // No managed sheet follows it: the raw CSS is last.
+    chunks.splice(rawIndex < 0 ? chunks.length : rawIndex, 0, raw);
+
+    return chunks;
+  }
+
+  /**
+   * Top-level rules in the raw sheet.
+   *
+   * Read from the sheet the engine parsed, not from the text: a raw block is
+   * one string but any number of rules, and one rule — `@keyframes`, `@media` —
+   * can contain any number of blocks, so counting braces answers neither
+   * question.
+   */
+  getRawRuleCount(root: Document | ShadowRoot): number {
+    const sheet = this.isAdoptedMode(root)
+      ? this.rawConstructableSheets.get(root as ShadowRoot)
+      : this.rawStyleElements.get(root)?.sheet;
+
+    try {
+      return sheet?.cssRules.length ?? 0;
+    } catch {
+      // Sheet not readable (not yet attached, or cross-origin).
+      return 0;
+    }
+  }
+
   getRawCSSText(root: Document | ShadowRoot): string {
     // In adopted mode, read from the blocks map (source of truth)
     if (this.isAdoptedMode(root)) {

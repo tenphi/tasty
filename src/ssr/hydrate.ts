@@ -38,7 +38,7 @@ export function hydrateTastyClasses(classes?: string[]): void {
         ruleIndex: HYDRATED_RULE_INDEX,
         sheetIndex: HYDRATED_RULE_INDEX,
       });
-      registry.refCounts.set(cls, 0);
+      registry.pinCounts.set(cls, 0);
     }
   }
 }

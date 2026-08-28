@@ -108,10 +108,12 @@ value      hasGlobalRecipes
 value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
+value      holdKeyframes
 value      hslToRgbValues
 value      inject
 value      injectGlobal
 type       InjectionMode
+type       InjectOptions
 value      injector
 value      injectRawCSS
 type       InjectResult
@@ -143,6 +145,7 @@ value      okhstFunction
 value      okhstPlugin
 value      OUTER_STYLES
 type       OuterStyleProps
+value      ownKeyframes
 value      parseColor
 type       ParsedAdvancedState
 type       ParsedColor
@@ -384,10 +387,12 @@ value      hasGlobalRecipes
 value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
+value      holdKeyframes
 value      hslToRgbValues
 value      inject
 value      injectGlobal
 type       InjectionMode
+type       InjectOptions
 value      injector
 value      injectRawCSS
 type       InjectResult
@@ -417,6 +422,7 @@ value      okhstFunction
 value      okhstPlugin
 value      OUTER_STYLES
 type       OuterStyleProps
+value      ownKeyframes
 value      parseColor
 type       ParsedAdvancedState
 type       ParsedColor

@@ -59,6 +59,11 @@ export interface StyleInjectorConfig {
 /**
  * Per-className usage tracking for GC.
  */
+/**
+ * @deprecated Nothing reads this any more. Collection asks the DOM what is
+ * rendered rather than tracking usage per class, so there is no usage record
+ * to describe. Kept so existing imports keep type-checking.
+ */
 export interface StyleUsage {
   lastTouchedAt: number;
 }
@@ -72,18 +77,48 @@ export interface StyleUsage {
  */
 export interface GCConfig {
   /**
-   * Number of touch events between GC cycles.
+   * How long a class is left alone after collection first notices nothing is
+   * carrying it, in milliseconds (default 10,000).
+   *
+   * Rendering is not commit-aware: a render can resolve a class and commit it a
+   * little later, and in between nothing on the page carries it. Rather than
+   * try to tell that apart from a class that is finished — which cannot be done
+   * from outside React — collection simply does not touch anything that was in
+   * use recently. A render would have to stay pending for the whole window to
+   * lose its rules, and it gets them back on its next render.
+   */
+  grace?: number;
+
+  /**
+   * Number of touch events between automatic GC cycles.
    * @default 1000
    */
   touchInterval?: number;
   /**
    * Maximum number of unused styles to retain.
    * GC evicts the oldest unused styles when this limit is exceeded.
-   * Actively referenced styles (refCount > 0) and DOM-live styles
+   * Pinned styles and DOM-live styles
    * do not count against this limit.
    * @default 1000
    */
   capacity?: number;
+}
+
+/**
+ * Per-call options for inject().
+ */
+export interface InjectOptions {
+  root?: Document | ShadowRoot;
+  /** Reuse the class already injected for this key instead of writing again. */
+  cacheKey?: string;
+  /**
+   * Pin the injected class (default `true`). A pinned class is never evicted by
+   * `gc()`, and the returned `dispose()` releases the pin. Pass `false` when the
+   * caller keeps no handle and the DOM is the only record that the class is in
+   * use — the render path does this, because a hook-free render has no unmount
+   * signal to dispose on.
+   */
+  pin?: boolean;
 }
 
 /**
@@ -159,12 +194,13 @@ export interface CacheMetrics {
   startTime: number;
 
   // Calculated getters
-  unusedHits?: number; // calculated as current unused styles count (refCount = 0)
+  unusedHits?: number; // calculated as classes eligible for eviction (see gc())
 }
 
 export interface RootRegistry {
   sheets: SheetInfo[];
-  refCounts: Map<string, number>; // className -> refCount (0 means unused)
+  /** className -> outstanding `inject()` references; 0 means nobody holds a handle */
+  pinCounts: Map<string, number>;
   rules: Map<string, RuleInfo>; // className -> rule info (includes both active and unused)
   /** Cache key to className mapping to avoid dual storage of RuleInfo objects */
   cacheKeyToClassName: Map<string, string>; // cacheKey -> className
@@ -198,18 +234,37 @@ export interface RootRegistry {
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
-  /** Per-className usage tracking for GC */
-  usageMap: Map<string, StyleUsage>;
-  /** Touch counter for scheduling GC (per-root) */
-  touchCount: number;
   /**
-   * Millisecond that `touchedTick` refers to. `touch()` only ever stamps
-   * `lastTouchedAt` with the current millisecond, so a repeat touch of the same
-   * class name inside one millisecond is a no-op worth skipping.
+   * className -> when the class was first noticed to be carrying nothing:
+   * injection, or the first sweep that looked and did not find it on an
+   * element. Cleared the moment a sweep finds it rendered again.
+   *
+   * Deliberately "when it was noticed", not "when it stopped being rendered".
+   * Nothing observes the moment an element leaves, so a class that unmounted
+   * just before a sweep and one that unmounted just after the previous sweep
+   * would otherwise be treated differently — and the first would lose its
+   * grace window entirely. Starting the clock at the sighting gives every
+   * class the same full window, whenever it actually went.
+   *
+   * Written only by the sweep's own DOM scan and at injection, so rendering
+   * never pays for it.
    */
-  touchTick: number;
-  /** Class-name strings already touched during `touchTick`. */
-  touchedTick: Set<string>;
+  unusedSince: Map<string, number>;
+  /**
+   * Local `@keyframes` a class animates, by the name they were authored under.
+   *
+   * One reference is held per distinct set of steps, however many renders ask
+   * for it, and the classes that animate it own that reference between them.
+   * The last of them to be deleted releases it, so keyframes cannot outlive
+   * every rule that referred to them, and repeat renders cannot pile up
+   * references nobody gives back.
+   */
+  localKeyframes: Map<
+    string,
+    { name: string; dispose: () => void; owners: Set<string> }
+  >;
+  /** Renders since the last scheduled sweep (per-root) */
+  touchCount: number;
   /** How many entries from `window.__TASTY__` have been synced into this registry */
   serverClassSyncIndex: number;
   /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */

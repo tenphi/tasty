@@ -48,6 +48,7 @@ import type {
   FunctionDefinition,
   GCOptions,
   GlobalInjectResult,
+  InjectOptions,
   InjectResult,
   KeyframesCacheEntry,
   KeyframesInfo,
@@ -60,6 +61,17 @@ import type {
   StyleInjectorConfig,
   StyleRule,
 } from './types';
+
+/**
+ * How long a class is left alone after it was last known to be wanted.
+ * Long enough that a render cannot plausibly still be waiting to commit one.
+ */
+const DEFAULT_GC_GRACE = 10_000;
+
+/** Dispose handle handed back for injections that took no pin. */
+const noop = () => {
+  /* nothing to release */
+};
 
 /**
  * Placeholder `KeyframesInfo` for a cache entry reserved by a batched write and
@@ -138,14 +150,15 @@ function registerHydratedClass(
     ruleIndex: HYDRATED_RULE_INDEX,
     sheetIndex: HYDRATED_RULE_INDEX,
   });
-  registry.refCounts.set(className, 0);
+  registry.pinCounts.set(className, 0);
 }
 
 export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
   private globalRuleCounter = 0;
-  private pendingGCHandle: ReturnType<typeof requestIdleCallback> | null = null;
+  /** Cancels the scheduled sweep, whichever timer scheduled it. */
+  private cancelPendingGC: (() => void) | null = null;
   private namePrefix: string;
   private classRegex: RegExp;
   private rscClassRegex: RegExp;
@@ -318,12 +331,12 @@ export class StyleInjector {
   /**
    * Inject styles from StyleResult objects
    */
-  inject(
-    rules: StyleResult[],
-    options?: { root?: Document | ShadowRoot; cacheKey?: string },
-  ): InjectResult {
+  inject(rules: StyleResult[], options?: InjectOptions): InjectResult {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
+    // `pin: false` injects without holding the class: the caller keeps no handle
+    // and lets the DOM decide when the class is done (see `gc()`).
+    const pin = options?.pin ?? true;
 
     if (rules.length === 0) {
       return {
@@ -345,13 +358,16 @@ export class StyleInjector {
       className = registry.cacheKeyToClassName.get(cacheKey)!;
       const existingRuleInfo = registry.rules.get(className)!;
 
-      // Rules are already queued for a batched write. Bump the refCount and let
+      // Rules are already queued for a batched write. Record the pin and let
       // the queued write land — injecting again would duplicate every rule.
       if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
-        registry.refCounts.set(
-          className,
-          (registry.refCounts.get(className) || 0) + 1,
-        );
+        registry.unusedSince.delete(className);
+        if (pin) {
+          registry.pinCounts.set(
+            className,
+            (registry.pinCounts.get(className) || 0) + 1,
+          );
+        }
 
         if (registry.metrics) {
           registry.metrics.hits++;
@@ -359,7 +375,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
 
@@ -371,9 +387,17 @@ export class StyleInjector {
         existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
       if (!isPreAllocated) {
-        // Already injected - just increment refCount
-        const currentRefCount = registry.refCounts.get(className) || 0;
-        registry.refCounts.set(className, currentRefCount + 1);
+        // Handing the class to a render makes it wanted again: clearing the
+        // cold mark puts it back in band 1/3, so a sweep cannot take it out
+        // from under a render that has not committed yet. A `delete` that
+        // misses is what the live case costs, which is nothing.
+        registry.unusedSince.delete(className);
+
+        // Already injected — nothing to write, only the reference to record.
+        if (pin) {
+          const pins = registry.pinCounts.get(className) || 0;
+          registry.pinCounts.set(className, pins + 1);
+        }
 
         // Update metrics
         if (registry.metrics) {
@@ -382,7 +406,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
     } else if (cacheKey) {
@@ -391,10 +415,12 @@ export class StyleInjector {
 
       // Check if this className was hydrated from server-rendered styles
       if (this.tryHydratedHit(registry, cacheKey, className)) {
-        registry.refCounts.set(
-          className,
-          (registry.refCounts.get(className) || 0) + 1,
-        );
+        if (pin) {
+          registry.pinCounts.set(
+            className,
+            (registry.pinCounts.get(className) || 0) + 1,
+          );
+        }
 
         if (registry.metrics) {
           registry.metrics.hits++;
@@ -402,7 +428,7 @@ export class StyleInjector {
 
         return {
           className,
-          dispose: () => this.dispose(className, registry),
+          dispose: pin ? () => this.unpin(className, registry) : noop,
         };
       }
     } else {
@@ -513,7 +539,10 @@ export class StyleInjector {
       if (cacheKey) {
         registry.cacheKeyToClassName.set(cacheKey, className);
       }
-      registry.refCounts.set(className, 1);
+      if (pin) {
+        registry.pinCounts.set(className, 1);
+      }
+      registry.unusedSince.set(className, Date.now());
 
       const queued = enqueueStyleWrite(() => {
         if (applySheetWrite()) return;
@@ -528,24 +557,26 @@ export class StyleInjector {
 
       return {
         className,
-        dispose: () => {
-          // Still queued and this was the only owner: drop the write and the
-          // reservation rather than leaving an orphan rule for GC to find.
-          if (
-            !queued.done &&
-            registry.refCounts.get(className) === 1 &&
-            registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
-          ) {
-            queued.cancelled = true;
-            registry.rules.delete(className);
-            if (cacheKey) {
-              registry.cacheKeyToClassName.delete(cacheKey);
+        dispose: pin
+          ? () => {
+              // Still queued and this was the only owner: drop the write and the
+              // reservation rather than leaving an orphan rule for GC to find.
+              if (
+                !queued.done &&
+                registry.pinCounts.get(className) === 1 &&
+                registry.rules.get(className)?.ruleIndex === PENDING_RULE_INDEX
+              ) {
+                queued.cancelled = true;
+                registry.rules.delete(className);
+                if (cacheKey) {
+                  registry.cacheKeyToClassName.delete(cacheKey);
+                }
+                registry.pinCounts.set(className, 0);
+                return;
+              }
+              this.unpin(className, registry);
             }
-            registry.refCounts.set(className, 0);
-            return;
-          }
-          this.dispose(className, registry);
-        },
+          : noop,
       };
     }
 
@@ -558,11 +589,14 @@ export class StyleInjector {
       };
     }
 
-    registry.refCounts.set(className, 1);
+    if (pin) {
+      registry.pinCounts.set(className, 1);
+    }
+    registry.unusedSince.set(className, Date.now());
 
     return {
       className,
-      dispose: () => this.dispose(className, registry),
+      dispose: pin ? () => this.unpin(className, registry) : noop,
     };
   }
 
@@ -700,10 +734,73 @@ export class StyleInjector {
   }
 
   /**
-   * Increment refCount for an already-injected cacheKey and return a dispose.
-   * Used by useStyles on cache hits (hydration or runtime reuse) where
-   * the pipeline was skipped but refCount tracking is still needed.
-   * Returns null if the cacheKey is not found.
+   * Take a reference on local `@keyframes`, under the deterministic names the
+   * caller resolved.
+   *
+   * One reference per distinct set of steps, shared by every class that ends up
+   * animating it, so a repeat render takes nothing further. Ownership is
+   * assigned by `ownKeyframes()` once the rules exist to be inspected.
+   */
+  holdKeyframes(
+    steps: Record<string, KeyframesSteps>,
+    names: Map<string, string>,
+    options?: { root?: Document | ShadowRoot },
+  ): Map<string, string> {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    // Authored name -> the entry key holding it, so a chunk that runs the
+    // animation can be recorded as an owner.
+    const keys = new Map<string, string>();
+
+    for (const [authored, definition] of Object.entries(steps)) {
+      const resolved = names.get(authored) ?? authored;
+      let entry = registry.localKeyframes.get(resolved);
+
+      if (!entry) {
+        // `distinctByName`: the rules rewritten to this name need a rule under
+        // it. Two authored animations can share steps — `fade` and `spin` with
+        // the same from/to — and would otherwise collapse onto whichever name
+        // was injected first, leaving the other animating nothing.
+        const injected = this.keyframes(definition, {
+          name: resolved,
+          root,
+          distinctByName: true,
+        });
+        entry = {
+          name: injected.toString(),
+          dispose: injected.dispose,
+          owners: new Set(),
+        };
+        registry.localKeyframes.set(resolved, entry);
+      }
+
+      keys.set(authored, resolved);
+    }
+
+    return keys;
+  }
+
+  /**
+   * Record that `className` animates these keyframes, so the reference is
+   * released when the last such class is collected.
+   *
+   * Only classes whose rules actually reference the animation should be here:
+   * a class that merely rendered alongside one would otherwise keep the
+   * keyframes alive for as long as it lives.
+   */
+  ownKeyframes(
+    key: string,
+    className: string,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
+    const registry = this.sheetManager.getRegistry(options?.root || document);
+    registry.localKeyframes.get(key)?.owners.add(className);
+  }
+
+  /**
+   * Pin an already-injected cacheKey and return the handle that releases it.
+   * For callers that skipped the pipeline on a cache hit but still need the
+   * class held. Returns null if the cacheKey is not found.
    */
   trackRef(
     cacheKey: string,
@@ -715,8 +812,8 @@ export class StyleInjector {
     if (!registry.cacheKeyToClassName.has(cacheKey)) return null;
 
     const className = registry.cacheKeyToClassName.get(cacheKey)!;
-    const currentRefCount = registry.refCounts.get(className) || 0;
-    registry.refCounts.set(className, currentRefCount + 1);
+    const pins = registry.pinCounts.get(className) || 0;
+    registry.pinCounts.set(className, pins + 1);
 
     if (registry.metrics) {
       registry.metrics.hits++;
@@ -724,35 +821,34 @@ export class StyleInjector {
 
     return {
       className,
-      dispose: () => this.dispose(className, registry),
+      dispose: () => this.unpin(className, registry),
     };
   }
 
   /**
-   * Dispose of a className (decrements refCount only).
+   * Release one pin on a className. At zero pins the class is not deleted — it
+   * stays cached and collectible, and `gc()` decides when it actually goes.
    */
-  private dispose(className: string, registry: RootRegistry): void {
-    const currentRefCount = registry.refCounts.get(className);
-    if (currentRefCount == null || currentRefCount <= 0) {
+  private unpin(className: string, registry: RootRegistry): void {
+    const pins = registry.pinCounts.get(className);
+    if (pins == null || pins <= 0) {
       return;
     }
 
-    const newRefCount = currentRefCount - 1;
-    registry.refCounts.set(className, newRefCount);
+    const remaining = pins - 1;
+    registry.pinCounts.set(className, remaining);
 
-    if (newRefCount === 0 && registry.metrics) {
+    if (remaining === 0 && registry.metrics) {
       registry.metrics.totalUnused++;
     }
   }
 
   /**
-   * Force bulk cleanup of unused styles
+   * Remove every style that is neither in the DOM nor referenced by an
+   * outstanding `inject()` handle, ignoring the GC capacity threshold.
    */
   cleanup(root?: Document | ShadowRoot): void {
-    flushStyles();
-    const registry = this.sheetManager.getRegistry(root || document);
-    // Clean up ALL unused rules regardless of batch ratio
-    this.sheetManager.forceCleanup(registry);
+    this.gc({ root, force: true });
   }
 
   /**
@@ -819,7 +915,13 @@ export class StyleInjector {
     flushStyles();
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    return this.sheetManager.getMetrics(registry);
+    const metrics = this.sheetManager.getMetrics(registry);
+
+    if (metrics && typeof document !== 'undefined') {
+      metrics.unusedHits = this.collectUnused(registry, root).length;
+    }
+
+    return metrics;
   }
 
   /**
@@ -1093,11 +1195,27 @@ export class StyleInjector {
    */
   keyframes(
     steps: KeyframesSteps,
-    nameOrOptions?: string | { root?: Document | ShadowRoot; name?: string },
+    nameOrOptions?:
+      | string
+      | {
+          root?: Document | ShadowRoot;
+          name?: string;
+          /**
+           * Give this name its own rule even if another name already carries
+           * the same steps. Without it two names with identical steps share
+           * one rule under whichever name arrived first — fine when the caller
+           * only wants the animation, wrong when the name has to be the one it
+           * asked for.
+           */
+          distinctByName?: boolean;
+        },
   ): KeyframesResult {
     // Parse parameters
     const isStringName = typeof nameOrOptions === 'string';
     const providedName = isStringName ? nameOrOptions : nameOrOptions?.name;
+    const distinctByName = isStringName
+      ? false
+      : (nameOrOptions?.distinctByName ?? false);
     const root = isStringName ? document : nameOrOptions?.root || document;
     const registry = this.sheetManager.getRegistry(root);
 
@@ -1110,8 +1228,12 @@ export class StyleInjector {
       };
     }
 
-    // Generate content-based cache key (independent of provided name)
-    const contentHash = JSON.stringify(steps);
+    // Content-based cache key, scoped to the name when the caller needs that
+    // exact name to exist.
+    const contentHash =
+      distinctByName && providedName
+        ? `${providedName}\u0000${JSON.stringify(steps)}`
+        : JSON.stringify(steps);
 
     // Check if this exact content is already cached
     const existing = registry.keyframesCache.get(contentHash);
@@ -1288,67 +1410,40 @@ export class StyleInjector {
   // =========================================================================
 
   /**
-   * Record a render-time usage hit for one or more classNames.
-   * Handles space-separated multi-chunk classNames.
-   * When the global touch counter reaches `touchInterval`, schedules a GC
-   * via `requestIdleCallback`.
-   * No-op on the server.
+   * Count a render, and schedule a collection pass every `touchInterval` of
+   * them. Nothing else: what a class is worth keeping is decided by the sweep's
+   * own DOM scan, so rendering does not track usage at all.
+   *
+   * @deprecated The class name is ignored — pass anything, or stop calling it.
+   * Collection no longer records per-class usage, and scheduling does not need
+   * to know which class was rendered. A class handed back by `inject()` is
+   * marked wanted there, which is what reuse actually goes through.
    */
-  touch(className: string, options?: { root?: Document | ShadowRoot }): void {
+  touch(_className: string, options?: { root?: Document | ShadowRoot }): void {
     if (typeof document === 'undefined') return;
     if (!this.config.gc) return;
 
-    const root = options?.root || document;
-    const registry = this.sheetManager.getRegistry(root);
-    const now = Date.now();
+    const registry = this.sheetManager.getRegistry(options?.root || document);
 
-    // `touch()` runs on every render of every tasty component — on a fully
-    // cached render it is the only work left — and a page typically renders
-    // hundreds of components sharing a handful of class names. Everything below
-    // stamps `lastTouchedAt` with the millisecond we are already in, so
-    // re-touching the same class-name string inside that millisecond writes the
-    // value it already holds. Skip it: one Set lookup instead of a split, a
-    // regex test and two Map operations per chunk.
-    if (registry.touchTick !== now) {
-      registry.touchTick = now;
-      registry.touchedTick.clear();
-    } else if (registry.touchedTick.has(className)) {
-      return;
-    }
-    registry.touchedTick.add(className);
-
-    const parts =
-      className.indexOf(' ') === -1 ? [className] : className.split(' ');
-
-    for (const cls of parts) {
-      if (!this.classRegex.test(cls)) continue;
-      if (!registry.rules.has(cls)) continue;
-
-      const entry = registry.usageMap.get(cls);
-      if (entry) {
-        entry.lastTouchedAt = now;
-      } else {
-        registry.usageMap.set(cls, { lastTouchedAt: now });
-      }
-      registry.touchCount++;
-    }
-
-    const touchInterval = this.config.gc.touchInterval ?? 1000;
-    if (registry.touchCount >= touchInterval) {
+    if (++registry.touchCount >= (this.config.gc.touchInterval ?? 1000)) {
       registry.touchCount = 0;
       this.scheduleGC();
     }
   }
 
   /**
-   * Schedule a GC via `requestIdleCallback` (or synchronously as fallback).
-   * Runs GC on all active roots. Avoids double-scheduling via `pendingGCHandle`.
+   * Schedule a GC in idle time. Runs GC on all active roots, and avoids
+   * double-scheduling.
+   *
+   * Idle only. Without `requestIdleCallback` nothing is collected
+   * automatically: running the sweep inline here would put it inside the render
+   * that touched the class, and collection is never urgent enough for that.
    */
   private scheduleGC(): void {
-    if (this.pendingGCHandle != null) return;
+    if (this.cancelPendingGC) return;
 
     const runGC = () => {
-      this.pendingGCHandle = null;
+      this.cancelPendingGC = null;
       this.sheetManager.pruneDisconnectedRoots();
       for (const root of this.sheetManager.getActiveRoots()) {
         this.gc({ root });
@@ -1356,19 +1451,111 @@ export class StyleInjector {
     };
 
     if (typeof requestIdleCallback !== 'undefined') {
-      this.pendingGCHandle = requestIdleCallback(() => runGC());
-    } else {
-      runGC();
+      const handle = requestIdleCallback(() => runGC());
+      this.cancelPendingGC = () => cancelIdleCallback(handle);
     }
+  }
+
+  /**
+   * The one definition of "unused": this injector owns the class's rules, no
+   * element in `root` carries it, and nobody pinned it.
+   *
+   * `gc()` evicts from this set, `getMetrics()` counts it, and `tastyDebug`
+   * reports it — all through here, so the three can never disagree about what
+   * "unused" means. Entries carry their last `touch()` so callers can drop the
+   * oldest first; a class that was never touched sorts as oldest.
+   */
+  /**
+   * Everything the injector holds falls into one of five bands, and only the
+   * last of them is ever deleted:
+   *
+   * 1. rendered — some element carries the class right now
+   * 2. not ours — queued for a batched write, pre-allocated, or server-rendered
+   * 3. hot — nothing carries it, but that was noticed less than `grace` ago
+   * 4. cached — cold, but within `capacity` when ordered by when it went cold
+   * 5. the rest
+   *
+   * This returns bands 4 and 5 together, most recently cold first; `gc()` draws
+   * the capacity line through them. Band 3 is what makes collection safe
+   * without a commit signal: a render can resolve a class and commit it a
+   * little later, and during that gap nothing on the page carries it.
+   */
+  private collectUnused(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+  ): string[] {
+    const now = Date.now();
+    const grace = this.config.gc?.grace ?? DEFAULT_GC_GRACE;
+
+    // Scan the DOM for live classes (classList handles SVG elements too)
+    const liveClasses = new Set<string>();
+    for (const el of root.querySelectorAll('[class]')) {
+      for (const token of el.classList) {
+        if (this.classRegex.test(token)) liveClasses.add(token);
+      }
+    }
+
+    const unused: string[] = [];
+
+    for (const [className, ruleInfo] of registry.rules) {
+      // Band 2: a negative sheet index marks a rule this injector does not own
+      // — server rendered (hydrated), pre-allocated, or still queued.
+      if (ruleInfo.sheetIndex < 0) continue;
+
+      // Band 1.
+      if (liveClasses.has(className)) {
+        registry.unusedSince.delete(className);
+        continue;
+      }
+
+      // Someone still holds the dispose handle `inject()` returned.
+      if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
+
+      // Band 3. The clock starts at the sighting, not at whatever moment the
+      // element actually left — nothing was watching for that — so every class
+      // gets the same full window however long ago it went.
+      let since = registry.unusedSince.get(className);
+      if (since === undefined) {
+        since = now;
+        registry.unusedSince.set(className, now);
+      }
+      if (now - since < grace) continue;
+
+      unused.push(className);
+    }
+
+    // Most recently cold first, so `gc()` can keep that many and drop the tail.
+    unused.sort(
+      (a, b) =>
+        (registry.unusedSince.get(b) ?? 0) - (registry.unusedSince.get(a) ?? 0),
+    );
+
+    return unused;
+  }
+
+  /**
+   * Class names this injector holds CSS for that nothing renders and nobody
+   * pinned — exactly what `gc({ force: true })` would delete. Unordered.
+   */
+  getUnusedClasses(options?: { root?: Document | ShadowRoot }): string[] {
+    flushStyles();
+    if (typeof document === 'undefined') return [];
+
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+
+    return this.collectUnused(registry, root);
   }
 
   /**
    * Synchronous garbage collection.
    *
-   * 1. Quick upper-bound check: skip if unused count can't exceed capacity.
-   * 2. Scans the DOM for live tasty classNames (safety guard).
-   * 3. With `force: true`: deletes all unused entries inline.
-   *    Without `force`: collects unused, sorts oldest-first, evicts over capacity.
+   * 1. Quick upper-bound check: skip if the registry is smaller than capacity.
+   * 2. Scans the DOM for live tasty classNames — the DOM, not a ref count, is
+   *    what says a class rendered by a component is still in use.
+   * 3. With `force: true`: deletes every unused class.
+   *    Without `force`: keeps the `capacity` most recently touched and deletes
+   *    the rest, oldest first.
    *
    * @returns Number of styles evicted.
    */
@@ -1378,74 +1565,38 @@ export class StyleInjector {
     flushStyles();
     if (typeof document === 'undefined') return 0;
 
-    // Cancel any pending idle-scheduled GC to prevent double runs
-    if (this.pendingGCHandle != null) {
-      if (typeof cancelIdleCallback !== 'undefined') {
-        cancelIdleCallback(this.pendingGCHandle);
-      }
-      this.pendingGCHandle = null;
-    }
+    // Cancel any pending scheduled GC to prevent double runs
+    this.cancelPendingGC?.();
+    this.cancelPendingGC = null;
 
     const root = options?.root || document;
-    const force = options?.force ?? false;
+    const force = options?.force;
     const registry = this.sheetManager.getRegistry(root);
     const capacity = this.config.gc?.capacity ?? 1000;
 
-    // Quick upper-bound check: count active refs to see if there could
-    // possibly be enough unused entries to exceed capacity.
-    // This avoids the expensive DOM scan when most styles are active.
-    if (!force) {
-      let activeCount = 0;
-      for (const refCount of registry.refCounts.values()) {
-        if (refCount > 0) activeCount++;
-      }
-      if (registry.usageMap.size - activeCount <= capacity) {
-        return 0;
-      }
-    }
+    // Quick upper-bound check: not even every class being unused would exceed
+    // capacity, so skip the DOM scan.
+    if (!force && registry.rules.size <= capacity) return 0;
 
-    // Scan DOM for live classes (classList handles SVG elements too)
-    const liveClasses = new Set<string>();
-    for (const el of root.querySelectorAll('[class]')) {
-      for (const token of el.classList) {
-        if (this.classRegex.test(token)) {
-          liveClasses.add(token);
-        }
-      }
-    }
+    const unused = this.collectUnused(registry, root);
 
-    let swept = 0;
+    let doomed: string[];
 
     if (force) {
-      for (const [className] of registry.usageMap) {
-        if (liveClasses.has(className)) continue;
-        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-        registry.usageMap.delete(className);
-        swept++;
-      }
+      // Bands 4 and 5. Band 3 is spared even here: an explicit cleanup is still
+      // no reason to take rules from a render that has not committed yet.
+      doomed = unused;
+    } else if (unused.length > capacity) {
+      // Band 4 is the `capacity` classes that went cold most recently; band 5
+      // is everything behind them, and only band 5 goes.
+      doomed = unused.slice(capacity);
     } else {
-      const unused: { className: string; lastTouchedAt: number }[] = [];
-      for (const [className, usage] of registry.usageMap) {
-        if (liveClasses.has(className)) continue;
-        if ((registry.refCounts.get(className) ?? 0) > 0) continue;
-        unused.push({ className, lastTouchedAt: usage.lastTouchedAt });
-      }
-
-      if (unused.length > capacity) {
-        unused.sort((a, b) => a.lastTouchedAt - b.lastTouchedAt);
-        const toEvict = unused.length - capacity;
-        for (let i = 0; i < toEvict; i++) {
-          registry.usageMap.delete(unused[i].className);
-          swept++;
-        }
-      }
+      return 0;
     }
 
-    if (swept > 0) {
-      this.sheetManager.forceCleanup(registry);
-    }
+    if (doomed.length === 0) return 0;
 
-    return swept;
+    return this.sheetManager.deleteClasses(registry, doomed);
   }
 
   /**
@@ -1457,11 +1608,9 @@ export class StyleInjector {
     this.sheetManager.cleanup(targetRoot);
 
     // Clear pending GC when no active roots remain
-    if (this.pendingGCHandle != null && !this.sheetManager.hasActiveRoots()) {
-      if (typeof cancelIdleCallback !== 'undefined') {
-        cancelIdleCallback(this.pendingGCHandle);
-      }
-      this.pendingGCHandle = null;
+    if (this.cancelPendingGC && !this.sheetManager.hasActiveRoots()) {
+      this.cancelPendingGC();
+      this.cancelPendingGC = null;
     }
   }
 }

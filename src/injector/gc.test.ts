@@ -13,7 +13,9 @@ describe('GC: touch / gc', () => {
     document.body.innerHTML = '';
     injector = new StyleInjector({
       forceTextInjection: true,
-      gc: { touchInterval: 5, capacity: 3 },
+      // `grace: 0` for the collection tests: the window is what stops a class
+      // being taken the moment it is created, and has its own suite below.
+      gc: { touchInterval: 5, capacity: 3, grace: 0 },
     });
   });
 
@@ -28,162 +30,41 @@ describe('GC: touch / gc', () => {
   // -------------------------------------------------------------------------
 
   describe('touch', () => {
-    it('should record lastTouchedAt for a className', () => {
-      const { className } = injector.inject([
-        createStyleRule('.t0.t0', 'color: red'),
-      ]);
-
-      injector.touch(className);
-
-      const registry = injector['sheetManager'].getRegistry(document);
-      const usage = registry.usageMap.get(className);
-
-      expect(usage).toBeDefined();
-      expect(usage!.lastTouchedAt).toBeGreaterThan(0);
-    });
-
-    it('should update lastTouchedAt on repeated touches', () => {
-      const { className } = injector.inject([
-        createStyleRule('.t0.t0', 'color: red'),
-      ]);
-
-      injector.touch(className);
-      const registry = injector['sheetManager'].getRegistry(document);
-      const firstTime = registry.usageMap.get(className)!.lastTouchedAt;
-
-      // Advance time slightly
-      vi.spyOn(Date, 'now').mockReturnValue(firstTime + 100);
-      injector.touch(className);
-      expect(registry.usageMap.get(className)!.lastTouchedAt).toBe(
-        firstTime + 100,
-      );
-      vi.restoreAllMocks();
-    });
-
-    it('should handle space-separated multi-chunk classNames', () => {
-      const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
-      const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
-
-      injector.touch(`${r1.className} ${r2.className}`);
-
-      const registry = injector['sheetManager'].getRegistry(document);
-      expect(registry.usageMap.has(r1.className)).toBe(true);
-      expect(registry.usageMap.has(r2.className)).toBe(true);
-    });
-
-    it('should ignore non-tasty class tokens', () => {
-      injector.touch('my-custom-class');
-      const registry = injector['sheetManager'].getRegistry(document);
-      expect(registry.usageMap.size).toBe(0);
-    });
-
-    it('should ignore tasty-shaped tokens not in the registry', () => {
-      injector.touch('t999');
-      const registry = injector['sheetManager'].getRegistry(document);
-      expect(registry.usageMap.size).toBe(0);
-    });
-
-    it('should skip a repeat touch of the same className within one millisecond', () => {
-      const { className } = injector.inject([
-        createStyleRule('.t0.t0', 'color: red'),
-      ]);
-      const registry = injector['sheetManager'].getRegistry(document);
-
-      // Freeze the clock so every touch lands in the same millisecond.
-      vi.spyOn(Date, 'now').mockReturnValue(1_000);
-
-      injector.touch(className);
-      const afterFirst = registry.touchCount;
-
-      for (let i = 0; i < 20; i++) injector.touch(className);
-
-      // Every one of those would have written the timestamp it already holds.
-      expect(registry.touchCount).toBe(afterFirst);
-      expect(registry.usageMap.get(className)!.lastTouchedAt).toBe(1_000);
-
-      vi.restoreAllMocks();
-    });
-
-    it('should still count a different className in the same millisecond', () => {
-      const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
-      const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
-      const registry = injector['sheetManager'].getRegistry(document);
-
-      vi.spyOn(Date, 'now').mockReturnValue(1_000);
-
-      injector.touch(r1.className);
-      const afterFirst = registry.touchCount;
-      injector.touch(r2.className);
-
-      expect(registry.touchCount).toBeGreaterThan(afterFirst);
-      expect(registry.usageMap.has(r2.className)).toBe(true);
-
-      vi.restoreAllMocks();
-    });
-
-    it('should re-touch once the millisecond advances', () => {
-      const { className } = injector.inject([
-        createStyleRule('.t0.t0', 'color: red'),
-      ]);
-      const registry = injector['sheetManager'].getRegistry(document);
-
-      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000);
-      injector.touch(className);
-      injector.touch(className);
-      const afterSameMs = registry.touchCount;
-
-      nowSpy.mockReturnValue(1_001);
-      injector.touch(className);
-
-      expect(registry.touchCount).toBeGreaterThan(afterSameMs);
-      expect(registry.usageMap.get(className)!.lastTouchedAt).toBe(1_001);
-
-      vi.restoreAllMocks();
-    });
-
-    it('should increment touchCount and schedule GC at touchInterval', () => {
-      const gcSpy = vi.spyOn(injector, 'gc');
-
-      // Remove requestIdleCallback so GC runs synchronously
+    it('schedules a sweep every touchInterval renders', () => {
+      let scheduled = 0;
       const origRIC = globalThis.requestIdleCallback;
-      delete (globalThis as any).requestIdleCallback;
+      (globalThis as any).requestIdleCallback = () => ++scheduled;
 
-      // Inject enough styles to exceed capacity
-      for (let i = 0; i < 5; i++) {
-        const { className, dispose } = injector.inject([
-          createStyleRule(`.test-${i}`, `order: ${i}`),
-        ]);
-        injector.touch(className);
-        dispose();
-      }
+      // touchInterval is 5
+      for (let i = 0; i < 5; i++) injector.touch('t0');
 
-      // touchInterval is 5, and we touched 5 class tokens
-      expect(gcSpy).toHaveBeenCalled();
+      expect(scheduled).toBe(1);
 
       (globalThis as any).requestIdleCallback = origRIC;
     });
 
-    it('should not double-schedule GC when pendingGCHandle exists', () => {
-      let callbackCount = 0;
+    it('does nothing without gc configured', () => {
+      const plain = new StyleInjector({ forceTextInjection: true });
+      let scheduled = 0;
       const origRIC = globalThis.requestIdleCallback;
-      (globalThis as any).requestIdleCallback = (_cb: () => void) => {
-        callbackCount++;
-        return callbackCount;
-      };
+      (globalThis as any).requestIdleCallback = () => ++scheduled;
 
-      // Inject enough styles to trigger two intervals
-      for (let i = 0; i < 12; i++) {
-        const { className, dispose } = injector.inject([
-          createStyleRule(`.test-${i}`, `order: ${i}`),
-        ]);
-        injector.touch(className);
-        dispose();
-      }
+      for (let i = 0; i < 50; i++) plain.touch('t0');
 
-      // Should only have scheduled once (second interval sees pending handle)
-      expect(callbackCount).toBe(1);
+      expect(scheduled).toBe(0);
 
       (globalThis as any).requestIdleCallback = origRIC;
+      plain.destroy();
+    });
+
+    it('tracks nothing per class — the sweep decides what is wanted', () => {
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      injector.touch('t0 t1 t2');
+
+      // No per-class bookkeeping on the render path at all: one counter.
+      expect(registry.touchCount).toBe(1);
+      expect(registry.unusedSince.size).toBe(0);
     });
   });
 
@@ -204,10 +85,10 @@ describe('GC: touch / gc', () => {
       expect(swept).toBe(0);
     });
 
-    it('should not count active refs against capacity', () => {
+    it('should not count pinned styles against capacity', () => {
       const classNames: string[] = [];
 
-      // Create 5 styles, all actively referenced (refCount > 0)
+      // Create 5 styles, all pinned
       for (let i = 0; i < 5; i++) {
         const { className } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
@@ -216,7 +97,7 @@ describe('GC: touch / gc', () => {
         injector.touch(className);
       }
 
-      // capacity=3, but all 5 are active (refCount > 0) → 0 unused → skip
+      // capacity=3, but all 5 are pinned → 0 unused → skip
       const swept = injector.gc();
       expect(swept).toBe(0);
     });
@@ -236,11 +117,9 @@ describe('GC: touch / gc', () => {
 
       const registry = injector['sheetManager'].getRegistry(document);
 
-      // Touch all with staggered timestamps (oldest first)
+      // Stagger when each was last seen (oldest first)
       for (let i = 0; i < 5; i++) {
-        registry.usageMap.set(classNames[i], {
-          lastTouchedAt: now - (5 - i) * 1000,
-        });
+        registry.unusedSince.set(classNames[i], now - (5 - i) * 1000);
       }
 
       // Dispose all so they are eligible for GC
@@ -252,14 +131,13 @@ describe('GC: touch / gc', () => {
       const swept = injector.gc();
 
       expect(swept).toBe(2);
-      expect(registry.usageMap.size).toBeLessThanOrEqual(3);
       // The two oldest (classNames[0], classNames[1]) should be gone
-      expect(registry.usageMap.has(classNames[0])).toBe(false);
-      expect(registry.usageMap.has(classNames[1])).toBe(false);
+      expect(registry.rules.has(classNames[0])).toBe(false);
+      expect(registry.rules.has(classNames[1])).toBe(false);
       // The three newest should remain
-      expect(registry.usageMap.has(classNames[2])).toBe(true);
-      expect(registry.usageMap.has(classNames[3])).toBe(true);
-      expect(registry.usageMap.has(classNames[4])).toBe(true);
+      expect(registry.rules.has(classNames[2])).toBe(true);
+      expect(registry.rules.has(classNames[3])).toBe(true);
+      expect(registry.rules.has(classNames[4])).toBe(true);
     });
 
     it('should never evict styles currently in the DOM', () => {
@@ -280,8 +158,8 @@ describe('GC: touch / gc', () => {
       expect(swept).toBe(0);
     });
 
-    it('should never evict styles with refCount > 0', () => {
-      // Create 5 styles, all with refCount > 0 (not disposed)
+    it('should never evict pinned styles', () => {
+      // Create 5 styles, all pinned (not disposed)
       for (let i = 0; i < 5; i++) {
         const { className } = injector.inject([
           createStyleRule(`.test-${i}`, `order: ${i}`),
@@ -330,15 +208,16 @@ describe('GC: touch / gc', () => {
       injector.touch(className);
       dispose();
 
-      // usageMap has 1 entry, capacity is 3 — normally would skip
+      // one candidate, capacity is 3 — normally would skip
       const swept = injector.gc({ force: true });
 
       expect(swept).toBe(1);
-      const registry = injector['sheetManager'].getRegistry(document);
-      expect(registry.usageMap.size).toBe(0);
+      expect(
+        injector['sheetManager'].getRegistry(document).rules.has(className),
+      ).toBe(false);
     });
 
-    it('should still protect DOM-live and refCount>0 styles', () => {
+    it('should still protect DOM-live and pinned styles', () => {
       const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
       const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
       const { className: c3, dispose: d3 } = injector.inject([
@@ -349,7 +228,7 @@ describe('GC: touch / gc', () => {
       injector.touch(r2.className);
       injector.touch(c3);
 
-      // r1: refCount > 0 (not disposed)
+      // r1: pinned (not disposed)
       // r2: in DOM
       r2.dispose();
       const el = document.createElement('div');
@@ -362,9 +241,9 @@ describe('GC: touch / gc', () => {
 
       expect(swept).toBe(1);
       const registry = injector['sheetManager'].getRegistry(document);
-      expect(registry.usageMap.has(r1.className)).toBe(true);
-      expect(registry.usageMap.has(r2.className)).toBe(true);
-      expect(registry.usageMap.has(c3)).toBe(false);
+      expect(registry.rules.has(r1.className)).toBe(true);
+      expect(registry.rules.has(r2.className)).toBe(true);
+      expect(registry.rules.has(c3)).toBe(false);
     });
   });
 
@@ -372,22 +251,146 @@ describe('GC: touch / gc', () => {
   // destroy
   // -------------------------------------------------------------------------
 
+  // -------------------------------------------------------------------------
+  // grace
+  // -------------------------------------------------------------------------
+
+  describe('grace', () => {
+    function graceInjector(grace: number) {
+      return new StyleInjector({
+        forceTextInjection: true,
+        gc: { touchInterval: 5, capacity: 0, grace },
+      });
+    }
+
+    it('leaves a class alone while it is still within the window', () => {
+      const graced = graceInjector(10_000);
+      const { dispose } = graced.inject([
+        createStyleRule('.fresh.fresh', 'color: red'),
+      ]);
+      dispose();
+
+      // Nothing carries it and nothing pins it, but it was wanted a moment ago:
+      // a render that resolved it may not have committed yet.
+      expect(graced.gc({ force: true })).toBe(0);
+
+      graced.destroy();
+    });
+
+    it('collects it once the window has passed', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.stale.stale', 'color: red'),
+      ]);
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.unusedSince.set(className, Date.now() - 20_000);
+
+      expect(graced.gc({ force: true })).toBe(1);
+
+      graced.destroy();
+    });
+
+    it('starts the window when a sweep notices, not before', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.noticed.noticed', 'color: red'),
+      ]);
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      // As if it had been rendered all along and only just came off the page:
+      // no stamp, because nothing was watching for the moment it went.
+      registry.unusedSince.delete(className);
+
+      // The sweep that first looks and does not find it must not take it — it
+      // has no idea whether that happened an hour ago or a millisecond ago.
+      expect(graced.gc({ force: true })).toBe(0);
+      expect(Date.now() - registry.unusedSince.get(className)!).toBeLessThan(
+        1_000,
+      );
+
+      graced.destroy();
+    });
+
+    it('marks a cold class hot again when a render reuses it', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject(
+        [createStyleRule('.reused.reused', 'color: red')],
+        { cacheKey: 'reuse-key' },
+      );
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.unusedSince.set(className, Date.now() - 60_000);
+
+      // A render asks for the same styles and gets the cached class back. It
+      // may not commit for a while, so the class has to leave the eviction
+      // bands again.
+      graced.inject([createStyleRule('.reused.reused', 'color: red')], {
+        cacheKey: 'reuse-key',
+      });
+
+      expect(graced.gc({ force: true })).toBe(0);
+      expect(registry.rules.has(className)).toBe(true);
+
+      graced.destroy();
+    });
+
+    it('refreshes the window every time a sweep finds the class rendered', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.unusedSince.set(className, Date.now() - 20_000);
+
+      const el = document.createElement('div');
+      el.className = className;
+      document.body.appendChild(el);
+
+      // The sweep sees it live, so it is wanted now — and stays untouchable
+      // for a full window after it leaves.
+      expect(graced.gc({ force: true })).toBe(0);
+      el.remove();
+      expect(graced.gc({ force: true })).toBe(0);
+
+      expect(Date.now() - registry.unusedSince.get(className)!).toBeLessThan(
+        1_000,
+      );
+
+      graced.destroy();
+    });
+  });
+
   describe('destroy', () => {
     it('should cancel pending GC on full destroy', () => {
       let cancelledId: number | null = null;
+      const origRIC = globalThis.requestIdleCallback;
       const origCIC = globalThis.cancelIdleCallback;
+      (globalThis as any).requestIdleCallback = () => 42;
       (globalThis as any).cancelIdleCallback = (id: number) => {
         cancelledId = id;
       };
 
-      // Force a pending GC handle
-      injector['pendingGCHandle'] = 42;
+      // Reach the touch interval so a GC is pending
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.destroy-${i}`, `order: ${i}`),
+        ]);
+        injector.touch(className);
+        dispose();
+      }
 
       injector.destroy();
 
       expect(cancelledId).toBe(42);
-      expect(injector['pendingGCHandle']).toBeNull();
+      expect(injector['cancelPendingGC']).toBeNull();
 
+      (globalThis as any).requestIdleCallback = origRIC;
       (globalThis as any).cancelIdleCallback = origCIC;
     });
   });

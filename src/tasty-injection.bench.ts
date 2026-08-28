@@ -14,16 +14,15 @@ import { getGlobalParser } from './utils/styles';
  * Measures Tasty's cold new-rule path against equivalent CSS that is already
  * parsed and attached to the page.
  *
- * Four workloads keep the style-resolution boundary explicit:
+ * Two workloads keep the style-resolution boundary explicit:
  *
  * 1. One rule — add one new rule to an existing Tasty stylesheet, append one
  *    element, and force its computed style. A timed sample performs 50
  *    independent one-rule transactions and reports their total so the result
  *    stays above Chromium's timer resolution.
- * 2. 10, 100, or 1,000 rules together — generate and inject every rule in a
- *    group into one existing stylesheet, append the group's elements, then
- *    force their computed styles without writes in between. The smaller groups
- *    repeat within a sample to stay above Chromium's timer resolution.
+ * 2. 1,000 rules together — generate and inject every rule into one existing
+ *    stylesheet, append all 1,000 elements, then force their computed styles
+ *    without writes in between.
  *
  * In both controls, all equivalent CSS is parsed and attached before timing.
  * Every runtime stylesheet is warmed with an unrelated rule before timing, so
@@ -62,25 +61,11 @@ const ONE_RULE: Workload = {
   valueOffset: 0,
 };
 
-const TEN_RULES: Workload = {
-  name: '10 new rules together (10 transactions per sample)',
-  rulesPerTransaction: 10,
-  transactionsPerSample: 10,
-  valueOffset: 10_000,
-};
-
-const ONE_HUNDRED_RULES: Workload = {
-  name: '100 new rules together (one transaction per sample)',
-  rulesPerTransaction: 100,
-  transactionsPerSample: 1,
-  valueOffset: 100_000,
-};
-
 const ONE_THOUSAND_RULES: Workload = {
   name: '1,000 new rules together (one transaction per sample)',
   rulesPerTransaction: 1_000,
   transactionsPerSample: 1,
-  valueOffset: 1_000_000,
+  valueOffset: 100_000,
 };
 
 interface PreparedTree {
@@ -331,8 +316,6 @@ validateBenchmarkContract();
 
 describe('cold generation + injection', () => {
   registerWorkload(ONE_RULE);
-  registerWorkload(TEN_RULES);
-  registerWorkload(ONE_HUNDRED_RULES);
   registerWorkload(ONE_THOUSAND_RULES);
 });
 

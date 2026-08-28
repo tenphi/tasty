@@ -341,42 +341,27 @@ describe('local keyframes', () => {
     expect(keyframesInSheet()).toBe(1);
   });
 
-  it('writes the injected name into the rule that animates it', () => {
-    // A second, different `fade` collides with the first and is injected under
-    // another name. The rule has to carry that name: it is written once, and a
-    // correction afterwards would hit the cache key the first write claimed.
-    const First = tasty({ styles: FADE_STYLES });
-    render(<First />);
+  it('names keyframes from their content, and rules follow', () => {
+    const Fading = tasty({ styles: FADE_STYLES });
+    const { container } = render(<Fading />);
 
-    const Second = tasty({
-      styles: {
-        animation: 'fade 2s',
-        '@keyframes': { fade: { from: { opacity: 1 }, to: { opacity: 0 } } },
-      } as Styles,
-    });
-    const { container } = render(<Second />);
-
-    const css = getCSSText();
-    const injectedNames = [...css.matchAll(/@keyframes\s+([\w-]+)/g)].map(
+    const [emitted] = [...getCSSText().matchAll(/@keyframes\s+([\w-]+)/g)].map(
       (match) => match[1],
     );
 
-    expect(injectedNames.length).toBe(2);
-    expect(new Set(injectedNames).size).toBe(2);
-
-    // Whatever the second one ended up being called, its class must say so.
-    const renamed = injectedNames.find((name) => name !== 'fade')!;
-    const secondClasses = domClasses(container);
-    const secondCSS = injector.instance.getCSSTextForClasses(secondClasses);
-
-    expect(secondCSS).toContain(renamed);
+    // Content-addressed, not the bare authored name: that is what lets the
+    // server and the client agree on it without coordinating.
+    expect(emitted).toMatch(/^fade-[a-z0-9]+$/);
+    expect(
+      injector.instance.getCSSTextForClasses(domClasses(container)),
+    ).toContain(emitted);
   });
 
   it('does not alias two identical shorthands over different keyframes', () => {
-    // Same authored declaration, different animations. The earlier test varied
-    // the duration, which changes the chunk key on its own and so proved
-    // nothing: keep the shorthand identical and the key has to carry which
-    // keyframes the rule ended up animating.
+    // Same authored declaration, different animations. An earlier version of
+    // this test varied the duration, which changes the chunk key on its own and
+    // so proved nothing: keep the shorthand identical and the key has to carry
+    // which keyframes the rule ended up animating.
     const First = tasty({ styles: FADE_STYLES });
     const first = render(<First />);
 
@@ -390,18 +375,22 @@ describe('local keyframes', () => {
 
     const firstClasses = domClasses(first.container);
     const secondClasses = domClasses(second.container);
-
     expect(secondClasses).not.toEqual(firstClasses);
 
-    const injectedNames = [
-      ...getCSSText().matchAll(/@keyframes\s+([\w-]+)/g),
-    ].map((match) => match[1]);
-    expect(new Set(injectedNames).size).toBe(2);
+    const emitted = [...getCSSText().matchAll(/@keyframes\s+([\w-]+)/g)].map(
+      (match) => match[1],
+    );
+    expect(new Set(emitted).size).toBe(2);
 
-    const renamed = injectedNames.find((name) => name !== 'fade')!;
+    // Each class animates its own definition.
+    const firstCSS = injector.instance.getCSSTextForClasses(firstClasses);
     const secondCSS = injector.instance.getCSSTextForClasses(secondClasses);
+    const firstName = emitted.find((name) => firstCSS.includes(name))!;
+    const secondName = emitted.find((name) => secondCSS.includes(name))!;
 
-    expect(secondCSS).toContain(renamed);
+    expect(firstName).toBeDefined();
+    expect(secondName).toBeDefined();
+    expect(firstName).not.toBe(secondName);
   });
 
   it('does not treat crossfade as a use of fade', () => {

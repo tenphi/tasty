@@ -734,13 +734,8 @@ export class StyleInjector {
   }
 
   /**
-   * Take a reference on local `@keyframes` and report what they ended up being
-   * called, without deciding yet which classes own them.
-   *
-   * Names have to be resolved before the rules that animate them are written:
-   * an injected name can differ from the authored one, and a rule written
-   * first cannot be rewritten afterwards — its cache key is already claimed,
-   * so the second write is a hit and the corrected declarations are dropped.
+   * Take a reference on local `@keyframes`, under the deterministic names the
+   * caller resolved.
    *
    * One reference per distinct set of steps, shared by every class that ends up
    * animating it, so a repeat render takes nothing further. Ownership is
@@ -748,41 +743,33 @@ export class StyleInjector {
    */
   holdKeyframes(
     steps: Record<string, KeyframesSteps>,
+    names: Map<string, string>,
     options?: { root?: Document | ShadowRoot },
-  ): {
-    names: Map<string, string>;
-    keys: Map<string, string>;
-  } {
+  ): Map<string, string> {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    // Authored name -> the name it was actually injected under, which may
-    // differ when something else already holds that name.
-    const names = new Map<string, string>();
     // Authored name -> the entry key holding it, so a chunk that runs the
     // animation can be recorded as an owner.
     const keys = new Map<string, string>();
 
     for (const [authored, definition] of Object.entries(steps)) {
-      // Same key shape `keyframes()` dedupes on, so the two agree on what
-      // counts as the same animation.
-      const key = `${authored}\u0000${JSON.stringify(definition)}`;
-      let entry = registry.localKeyframes.get(key);
+      const resolved = names.get(authored) ?? authored;
+      let entry = registry.localKeyframes.get(resolved);
 
       if (!entry) {
-        const injected = this.keyframes(definition, { name: authored, root });
+        const injected = this.keyframes(definition, { name: resolved, root });
         entry = {
           name: injected.toString(),
           dispose: injected.dispose,
           owners: new Set(),
         };
-        registry.localKeyframes.set(key, entry);
+        registry.localKeyframes.set(resolved, entry);
       }
 
-      keys.set(authored, key);
-      names.set(authored, entry.name);
+      keys.set(authored, resolved);
     }
 
-    return { names, keys };
+    return keys;
   }
 
   /**

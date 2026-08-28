@@ -41,6 +41,8 @@ const BROWSER_TESTS = [
   'src/static/inject.test.ts',
   // SSR hydration reads styles back out of the document.
   'src/ssr/ssr.test.ts',
+  // Compares a server render against a client one, so it needs both.
+  'src/ssr/keyframes-parity.test.ts',
 ];
 
 /**

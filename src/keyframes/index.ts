@@ -7,6 +7,7 @@
 
 import type { KeyframesSteps } from '../injector/types';
 import type { Styles } from '../styles/types';
+import { hashString } from '../utils/hash';
 
 // ============================================================================
 // Constants
@@ -249,6 +250,39 @@ export function extractAnimationNamesFromStyles(styles: Styles): Set<string> {
  * @param nameMap Map from original name to injected name (only contains names that differ)
  * @returns Updated declarations string
  */
+/**
+ * The name a local `@keyframes` block is emitted under.
+ *
+ * Content-addressed, and a pure function of what was authored: the same steps
+ * always produce the same name, and different steps under the same authored
+ * name cannot collide. That is what lets the server and the client agree —
+ * a name handed out by whichever injector happened to see the definition first
+ * depends on run order, so the two would disagree on both the animation name
+ * and the class that references it.
+ */
+export function resolveKeyframesName(
+  authored: string,
+  steps: KeyframesSteps,
+): string {
+  return `${authored}-${hashString(JSON.stringify(steps))}`;
+}
+
+/**
+ * The emitted name for every local `@keyframes` in `styles`, by authored name.
+ * Pure — the server, the RSC pass and the client all reach the same answer.
+ */
+export function resolveKeyframesNames(
+  used: Record<string, KeyframesSteps>,
+): Map<string, string> {
+  const names = new Map<string, string>();
+
+  for (const [authored, steps] of Object.entries(used)) {
+    names.set(authored, resolveKeyframesName(authored, steps));
+  }
+
+  return names;
+}
+
 /**
  * Whether `declarations` names `animation` as an animation to run.
  *

@@ -58,9 +58,10 @@ import {
   hasLocalKeyframes,
   mergeKeyframes,
   referencesAnimation,
+  resolveKeyframesNames,
   replaceAnimationNames,
 } from './keyframes';
-import type { RenderResult } from './pipeline';
+import type { RenderResult, StyleResult } from './pipeline';
 import {
   flushPendingCSS,
   getRSCCache,
@@ -141,9 +142,11 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
   const parts: string[] = [];
 
   const usedKf = getUsedKeyframes(styles);
-  if (usedKf) {
-    for (const [name, steps] of Object.entries(usedKf)) {
-      const key = `__kf:${name}:${JSON.stringify(steps)}`;
+  const rscKeyframeNames = usedKf ? resolveKeyframesNames(usedKf) : null;
+  if (usedKf && rscKeyframeNames) {
+    for (const [authored, steps] of Object.entries(usedKf)) {
+      const name = rscKeyframeNames.get(authored) as string;
+      const key = `__kf:${name}`;
       if (!rscCache.emittedKeys.has(key)) {
         rscCache.emittedKeys.add(key);
         parts.push(formatKeyframesCSS(name, steps));
@@ -225,6 +228,8 @@ function computeStylesRSC(
   const rscCache = getRSCCache();
   const cssParts: string[] = [];
   const classNames: string[] = [];
+  const rscUsedKf = getUsedKeyframes(styles);
+  const rscKeyframeNames = rscUsedKf ? resolveKeyframesNames(rscUsedKf) : null;
 
   // Flush CSS accumulated by standalone style functions
   const pendingCSS = flushPendingCSS(rscCache);
@@ -236,25 +241,34 @@ function computeStylesRSC(
   for (const [chunkName, chunkStyleKeys] of chunkMap) {
     if (chunkStyleKeys.length === 0) continue;
 
-    const cacheKey = generateChunkCacheKey(
+    const baseKey = generateChunkCacheKey(
       styles,
       chunkName,
       chunkStyleKeys,
       stableStyles,
     );
+
+    // Rendered before the class is allocated, for the same reason as the other
+    // two paths: the key has to carry which keyframes these rules animate.
+    const renderResult = renderStylesForChunk(
+      styles,
+      chunkName,
+      chunkStyleKeys,
+    );
+    if (renderResult.rules.length === 0) continue;
+
+    const { rules, cacheKey } = applyKeyframeNames(
+      renderResult.rules,
+      baseKey,
+      rscKeyframeNames,
+    );
+
     const { className, isNew } = rscAllocateClassName(rscCache, cacheKey);
     classNames.push(className);
 
     if (isNew) {
-      const renderResult = renderStylesForChunk(
-        styles,
-        chunkName,
-        chunkStyleKeys,
-      );
-      if (renderResult.rules.length > 0) {
-        const css = formatRules(renderResult.rules, className);
-        if (css) cssParts.push(css);
-      }
+      const css = formatRules(rules, className);
+      if (css) cssParts.push(css);
     }
   }
 
@@ -301,24 +315,42 @@ function processChunkSSR(
   chunkName: string,
   styleKeys: string[],
   stableStyles: boolean,
+  keyframeNames?: Map<string, string> | null,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
-  const cacheKey = generateChunkCacheKey(
+  const baseKey = generateChunkCacheKey(
     styles,
     chunkName,
     styleKeys,
     stableStyles,
   );
+
+  // Rendered before the class is allocated: the key has to carry which
+  // keyframes these rules animate, or two components authoring the same
+  // shorthand over different definitions would share a class here and
+  // disagree with the client, which does carry it.
+  const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
+  if (renderResult.rules.length === 0) return null;
+
+  const { animations, rules, cacheKey } = applyKeyframeNames(
+    renderResult.rules,
+    baseKey,
+    keyframeNames,
+  );
+
   const { className, isNewAllocation } = collector.allocateClassName(cacheKey);
 
   if (isNewAllocation) {
-    const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
-    if (renderResult.rules.length > 0) {
-      collector.collectChunk(cacheKey, className, renderResult.rules);
-      return { name: chunkName, styleKeys, cacheKey, renderResult, className };
-    }
-    return null;
+    collector.collectChunk(cacheKey, className, rules);
+    return {
+      name: chunkName,
+      styleKeys,
+      cacheKey,
+      renderResult: { ...renderResult, rules },
+      className,
+      animations,
+    };
   }
 
   return {
@@ -328,6 +360,47 @@ function processChunkSSR(
     renderResult: { rules: [] },
     className,
   };
+}
+
+/**
+ * Point a chunk's rules at the resolved keyframe names, and fold those names
+ * into its cache key.
+ *
+ * Both halves matter, and both have to happen before the rules are written
+ * anywhere: the declarations have to name the animation that will exist, and
+ * the key has to distinguish two components that authored the same shorthand
+ * over different definitions. Shared by the client and the server so they
+ * cannot disagree about either.
+ */
+function applyKeyframeNames(
+  ruleset: StyleResult[],
+  baseKey: string,
+  keyframeNames?: Map<string, string> | null,
+): { animations: string[]; rules: StyleResult[]; cacheKey: string } {
+  if (!keyframeNames || keyframeNames.size === 0) {
+    return { animations: [], rules: ruleset, cacheKey: baseKey };
+  }
+
+  // Whole tokens only, so `crossfade` is not a use of `fade`.
+  const animations = [...keyframeNames.keys()].filter((authored) =>
+    ruleset.some((rule) => referencesAnimation(rule.declarations, authored)),
+  );
+
+  if (animations.length === 0) {
+    return { animations, rules: ruleset, cacheKey: baseKey };
+  }
+
+  const rules = ruleset.map((rule) => ({
+    ...rule,
+    declarations: replaceAnimationNames(rule.declarations, keyframeNames),
+  }));
+
+  const cacheKey = `${baseKey}\u0000kf:${animations
+    .map((authored) => `${authored}=${keyframeNames.get(authored)}`)
+    .sort()
+    .join(',')}`;
+
+  return { animations, rules, cacheKey };
 }
 
 /**
@@ -358,40 +431,11 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
-  // Which animations this chunk actually runs, by the name they were authored
-  // under. Whole tokens only, so `crossfade` is not a use of `fade`.
-  const animations = keyframeNames
-    ? [...keyframeNames.keys()].filter((authored) =>
-        renderResult.rules.some((rule) =>
-          referencesAnimation(rule.declarations, authored),
-        ),
-      )
-    : [];
-
-  // Renamed animations are rewritten before the first write, not after: the
-  // cache key is claimed by that write, so a later one is a hit and any
-  // correction is silently dropped.
-  const renamed = animations.filter(
-    (authored) => keyframeNames!.get(authored) !== authored,
-  );
-  const rules = renamed.length
-    ? renderResult.rules.map((rule) => ({
-        ...rule,
-        declarations: replaceAnimationNames(rule.declarations, keyframeNames!),
-      }))
-    : renderResult.rules;
-
-  // The key has to carry which keyframes these rules ended up animating.
-  // Two components can author the same `animation: fade 1s` over different
-  // `@keyframes fade`; the second is injected under another name, and without
-  // this they would share a key and the second would be handed the first's
-  // class, still animating the first's keyframes.
-  const injectKey = renamed.length
-    ? `${cacheKey}\u0000kf:${renamed
-        .map((authored) => `${authored}=${keyframeNames!.get(authored)}`)
-        .sort()
-        .join(',')}`
-    : cacheKey;
+  const {
+    animations,
+    rules,
+    cacheKey: injectKey,
+  } = applyKeyframeNames(renderResult.rules, cacheKey, keyframeNames);
 
   // `pin: false` — the render path keeps no dispose handle; the DOM is the
   // record of use, and `gc()` reclaims the class once no element carries it.
@@ -470,9 +514,13 @@ function collectAncillarySSR(
 ): void {
   const usedKf = getUsedKeyframes(styles);
   if (usedKf) {
-    for (const [name, steps] of Object.entries(usedKf)) {
-      const css = formatKeyframesCSS(name, steps);
-      collector.collectKeyframes(name, css);
+    // Emitted under the resolved name, so two different `fade` definitions are
+    // two rules rather than one deduplicated by name — and so the client
+    // agrees about which one a class animates.
+    const names = resolveKeyframesNames(usedKf);
+    for (const [authored, steps] of Object.entries(usedKf)) {
+      const name = names.get(authored) as string;
+      collector.collectKeyframes(name, formatKeyframesCSS(name, steps));
     }
   }
 
@@ -580,6 +628,9 @@ export function computeStyles(
   if (collector) {
     collector.collectInternals();
 
+    const ssrKf = getUsedKeyframes(resolved);
+    const ssrKeyframeNames = ssrKf ? resolveKeyframesNames(ssrKf) : null;
+
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
       const chunk = processChunkSSR(
         collector,
@@ -587,6 +638,7 @@ export function computeStyles(
         chunkName,
         chunkStyleKeys,
         stableStyles,
+        ssrKeyframeNames,
       );
       if (chunk) chunks.push(chunk);
     }
@@ -602,9 +654,14 @@ export function computeStyles(
 
     const usedKf = getUsedKeyframes(resolved);
 
-    // Keyframe names first: an injected name can differ from the authored one,
-    // and a rule written before the rename cannot be corrected afterwards.
-    const held = usedKf ? holdKeyframes(usedKf, { root }) : null;
+    // Names first, and resolved the same way on every path: the rules that
+    // animate them carry the name, and a rule written before it is known
+    // cannot be corrected afterwards.
+    const keyframeNames = usedKf ? resolveKeyframesNames(usedKf) : null;
+    const keyframeKeys =
+      usedKf && keyframeNames
+        ? holdKeyframes(usedKf, keyframeNames, { root })
+        : null;
 
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
       const chunk = processChunkSync(
@@ -613,7 +670,7 @@ export function computeStyles(
         chunkStyleKeys,
         stableStyles,
         root,
-        held?.names,
+        keyframeNames,
       );
       if (chunk) chunks.push(chunk);
     }
@@ -622,10 +679,10 @@ export function computeStyles(
     // that merely rendered alongside would keep it alive for its own lifetime.
     // The reference is taken once however many times this renders, and released
     // when the last owner is collected.
-    if (held) {
+    if (keyframeKeys) {
       for (const chunk of chunks) {
         for (const authored of chunk.animations ?? []) {
-          const key = held.keys.get(authored);
+          const key = keyframeKeys.get(authored);
           if (key) ownKeyframes(key, chunk.className, { root });
         }
       }

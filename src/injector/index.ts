@@ -227,15 +227,16 @@ export function getCSSTextForNode(
 }
 
 /**
- * Take a reference on local `@keyframes` and report what they ended up being
- * called. Names must be resolved before the rules that animate them are
- * written. Pair with `ownKeyframes()` once those rules exist.
+ * Take a reference on local `@keyframes` under the deterministic names the
+ * caller resolved, and report which entry holds each. Pair with
+ * `ownKeyframes()` once the rules exist to inspect.
  */
 export function holdKeyframes(
   steps: Record<string, KeyframesSteps>,
+  names: Map<string, string>,
   options?: { root?: Document | ShadowRoot },
-): { names: Map<string, string>; keys: Map<string, string> } {
-  return getGlobalInjector().holdKeyframes(steps, options);
+): Map<string, string> {
+  return getGlobalInjector().holdKeyframes(steps, names, options);
 }
 
 /**

@@ -11,3 +11,4 @@ What a style is worth keeping is now decided by the DOM. A sweep scans for the c
 - `gc()` and `cleanup()` collect on demand, and now actually delete.
 - Local `@keyframes` are owned by the classes that animate them: one reference however many times they render, released when the last of those classes is collected. New `holdKeyframes()`.
 - `tastyDebug.summary()` accounts for every class the injector holds, including ones that have gone cold but are not collectable yet — reported as `hotClasses` and on a new `Held:` line.
+- The main bundle limit moves 56.6 -> 56.9 kB for keyframe ownership and the fuller summary accounting; the other four are unchanged and under.

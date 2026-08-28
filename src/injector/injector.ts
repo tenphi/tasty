@@ -753,7 +753,9 @@ export class StyleInjector {
     let nameMap: Map<string, string> | null = null;
 
     for (const [authored, definition] of Object.entries(steps)) {
-      const key = `${authored}\u0000${hashString(JSON.stringify(definition))}`;
+      // Same key shape `keyframes()` dedupes on, so the two agree on what
+      // counts as the same animation.
+      const key = `${authored}\u0000${JSON.stringify(definition)}`;
       let entry = registry.localKeyframes.get(key);
 
       if (!entry) {

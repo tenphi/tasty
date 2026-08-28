@@ -43,6 +43,8 @@ const BROWSER_TESTS = [
   'src/ssr/ssr.test.ts',
   // Compares a server render against a client one, so it needs both.
   'src/ssr/keyframes-parity.test.ts',
+  // Extracted shared/page stylesheet ordering needs the cascade engine.
+  'src/ssr/astro-extraction-browser.test.ts',
 ];
 
 /**

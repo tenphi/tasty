@@ -197,7 +197,13 @@ const MIDDLEWARE_ENTRYPOINT_EXTRACT_STATIC =
   '@tenphi/tasty/ssr/astro-middleware-extract-static';
 
 export interface TastyIntegrationCSSOptions {
-  /** CSS delivery mode. Extraction only applies to prerendered builds. */
+  /**
+   * CSS delivery mode. Extraction only applies to prerendered builds.
+   * Extracted CSS preserves resource URLs verbatim, so use absolute URLs or
+   * data URLs. Root-relative URLs are also supported unless `assetsPrefix`
+   * sends CSS to an external origin. The build rejects resource URLs whose
+   * targets would change after extraction.
+   */
   mode?: 'inline' | 'extract';
 }
 
@@ -249,6 +255,8 @@ export function tastyIntegration(options?: TastyIntegrationOptions) {
   const cssMode = options?.css?.mode ?? 'inline';
   let base = '/';
   let assets = '_astro';
+  let assetsPrefix: string | Record<string, string> | undefined;
+  let site: URL | undefined;
 
   return {
     name: '@tenphi/tasty',
@@ -288,14 +296,23 @@ export function tastyIntegration(options?: TastyIntegrationOptions) {
       'astro:config:done': ({
         config,
       }: {
-        config: { base?: string; build?: { assets?: string } };
+        config: {
+          base?: string;
+          site?: URL;
+          build?: {
+            assets?: string;
+            assetsPrefix?: string | Record<string, string>;
+          };
+        };
       }) => {
         base = config.base ?? '/';
         assets = config.build?.assets ?? '_astro';
+        assetsPrefix = config.build?.assetsPrefix;
+        site = config.site;
       },
       'astro:build:done': async ({ dir }: { dir: URL }) => {
         if (cssMode !== 'extract') return;
-        await extractAstroCSS({ dir, base, assets });
+        await extractAstroCSS({ dir, base, assets, assetsPrefix, site });
       },
     },
   };

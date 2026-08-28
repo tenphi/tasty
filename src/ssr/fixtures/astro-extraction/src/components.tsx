@@ -43,6 +43,7 @@ export function Shared({ children }: { children?: ReactNode }) {
     result: '($value * 2)',
   });
   useRawCSS('.extract-raw { --extract-raw: 1; }', { id: 'extract-raw' });
+  useRawCSS('.cascade-probe { color: blue; }', { id: 'shared-cascade' });
   useGlobalStyles('.extract-global', { color: 'red' });
   useKeyframes(
     {
@@ -56,6 +57,7 @@ export function Shared({ children }: { children?: ReactNode }) {
 }
 
 export function PageOnly({ children }: { children?: ReactNode }) {
+  useRawCSS('.cascade-probe { color: red; }', { id: 'page-cascade' });
   useKeyframes(
     {
       from: { opacity: 1 },
@@ -64,5 +66,5 @@ export function PageOnly({ children }: { children?: ReactNode }) {
     { name: 'page-only-fade' },
   );
 
-  return <div>{children}</div>;
+  return <div className="cascade-probe">{children}</div>;
 }

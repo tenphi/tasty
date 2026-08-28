@@ -72,6 +72,16 @@
       "import": "./dist/ssr/astro-middleware-static.js",
       "default": "./dist/ssr/astro-middleware-static.js"
     },
+    "./ssr/astro-middleware-extract": {
+      "types": "./dist/ssr/astro-middleware-extract.d.ts",
+      "import": "./dist/ssr/astro-middleware-extract.js",
+      "default": "./dist/ssr/astro-middleware-extract.js"
+    },
+    "./ssr/astro-middleware-extract-static": {
+      "types": "./dist/ssr/astro-middleware-extract-static.d.ts",
+      "import": "./dist/ssr/astro-middleware-extract-static.js",
+      "default": "./dist/ssr/astro-middleware-extract-static.js"
+    },
     "./tasty.config": "./tasty.config.ts"
   },
   "files": [
@@ -85,7 +95,9 @@
     "./dist/ssr/astro.js",
     "./dist/ssr/astro-client.js",
     "./dist/ssr/astro-middleware.js",
-    "./dist/ssr/astro-middleware-static.js"
+    "./dist/ssr/astro-middleware-static.js",
+    "./dist/ssr/astro-middleware-extract.js",
+    "./dist/ssr/astro-middleware-extract-static.js"
   ],
   "engines": {
     "node": ">=20"
@@ -171,6 +183,7 @@
     "csstype": "^3.1.0"
   },
   "devDependencies": {
+    "@astrojs/react": "^4.4.2",
     "@babel/core": "^7.24.0",
     "@babel/helper-plugin-utils": "^7.24.0",
     "@babel/types": "^7.24.0",
@@ -188,6 +201,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitest/browser-playwright": "^4.1.10",
+    "astro": "^5.18.2",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "jiti": "^2.6.1",

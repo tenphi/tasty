@@ -128,13 +128,15 @@ The nonce is automatically applied to all `<style>` and `<script>` tags injected
 
 ## Astro
 
-Tasty offers three levels of Astro integration. Choose the one that matches your needs:
+Tasty offers several levels of Astro integration. Choose the one that matches your needs:
 
-| Setup                                  | Config needed | Deduplication   | Hooks work             | Client JS      |
-| -------------------------------------- | ------------- | --------------- | ---------------------- | -------------- |
-| Zero setup                             | None          | Per render tree | Yes (within each tree) | None           |
-| `tastyIntegration({ islands: false })` | One line      | Cross-tree      | Yes                    | None           |
-| `tastyIntegration()`                   | One line      | Cross-tree      | Yes                    | Auto-hydration |
+| Setup                                                     | Config needed | Deduplication                 | Hooks work             | Client JS      |
+| --------------------------------------------------------- | ------------- | ----------------------------- | ---------------------- | -------------- |
+| Zero setup                                                | None          | Per render tree               | Yes (within each tree) | None           |
+| `tastyIntegration({ islands: false })`                    | One line      | Cross-tree                    | Yes                    | None           |
+| `tastyIntegration()`                                      | One line      | Cross-tree                    | Yes                    | Auto-hydration |
+| `tastyIntegration({ css: { mode: 'extract' } })`          | One line      | Cross-tree and cross-page     | Yes                    | Auto-hydration |
+| `tastyIntegration({ islands: false, css: { mode: 'extract' } })` | One line | Cross-tree and cross-page | Yes                    | None           |
 
 ### Zero setup (static pages)
 
@@ -231,6 +233,39 @@ export default defineConfig({
 
 This gives the same middleware deduplication and hook support, but ships zero client-side JavaScript. No class-list `<script>` is emitted.
 
+#### Build-wide CSS extraction
+
+Static Astro builds can move repeated Tasty CSS into a content-hashed,
+browser-cacheable asset:
+
+```ts
+export default defineConfig({
+  integrations: [
+    react(),
+    tastyIntegration({
+      islands: false,
+      css: {
+        mode: 'extract',
+      },
+    }),
+  ],
+});
+```
+
+`css.mode` defaults to `'inline'`, so existing projects keep their current
+output. Extraction requires Astro 5 or newer and only applies to prerendered
+production pages. Development, preview-time SSR, and on-demand routes continue
+to receive the normal inline `<style data-tasty-ssr>` output.
+
+Extraction moves the largest common block whose position can be preserved on
+every generated page into one stylesheet. Page-only component, global, and raw
+CSS stays inline, so unvisited routes do not receive unrelated styles.
+
+The asset is written under Astro's configured `build.assets` directory (for
+example, `/_astro/tasty.a1b2c3.css`). Links include the configured Astro
+`base`, so nested routes do not need relative-path handling. The content hash
+and output are deterministic for identical builds.
+
 ### Manual middleware (advanced)
 
 If you need to compose Tasty's middleware with other middleware (e.g., via `sequence()`), use `tastyMiddleware()` directly:
@@ -263,10 +298,14 @@ Astro's `@astrojs/react` renderer calls `renderToString()` for each React compon
 - **Static components** (no `client:*`): Styles are collected during `renderToString` and injected into `</head>` as a single `<style>` tag. No JavaScript is shipped.
 - **Islands** (`client:load`, `client:visible`, etc.): Styles are collected during SSR the same way. On the client, the hydration script (auto-injected by `tastyIntegration()` or manually via `@tenphi/tasty/ssr/astro-client`) reads the class list from `window.__TASTY__` and pre-populates the injector's rules map. The island's `computeStyles()` calls see the class names as already registered and skip the pipeline during hydration.
 - The middleware reads the full response body, then injects the collected CSS into `</head>` before sending the final HTML.
+- In extraction mode, prerendered responses also carry temporary structured
+  artifact metadata. `astro:build:done` uses those collector-provided
+  boundaries to write the shared asset and rewrite generated HTML, then removes
+  the metadata. CSS is never split on newlines or parsed heuristically.
 
 ### CSP nonce
 
-Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags.
+Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags. In extraction mode, page-local inline style tags and the external stylesheet link retain the nonce.
 
 ---
 
@@ -355,7 +394,7 @@ const stream = await runWithCollector(collector, () =>
 | `@tenphi/tasty/ssr/next`                                                            | Next.js App Router: `TastyRegistry` component                                                                                                                                                                   |
 | `@tenphi/tasty/ssr/astro`                                                           | Astro: `tastyIntegration`, `tastyMiddleware`                                                                                                                                                                    |
 | `@tenphi/tasty/ssr/astro-client`                                                    | Astro: client-side cache hydration (auto-injected by integration, or import manually)                                                                                                                           |
-| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`. |
+| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static`<br>`@tenphi/tasty/ssr/astro-middleware-extract`<br>`@tenphi/tasty/ssr/astro-middleware-extract-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`. |
 
 ### `ServerStyleCollector`
 
@@ -429,7 +468,7 @@ Class names are also derived from the _resolved_ styles, so the server and the c
 
 ### Styles duplicated after hydration
 
-**Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`) configured via `configure()` is automatically deduplicated. When Tasty detects `<style data-tasty-ssr>` in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
+**Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`, `@function`) configured via `configure()` is automatically deduplicated. When Tasty detects an inline or extracted `[data-tasty-ssr]` stylesheet in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
 
 **Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, you can remove the SSR style tags and hydration scripts manually after hydration:
 

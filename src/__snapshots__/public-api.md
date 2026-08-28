@@ -506,6 +506,8 @@ value      createServerStyleCollector
 value      getSSRCollector
 value      hydrateTastyClasses
 value      runWithCollector
+type       ServerStyleArtifact
+type       ServerStyleArtifactKind
 value+type ServerStyleCollector
 
 ## @tenphi/tasty/ssr/next
@@ -516,6 +518,7 @@ type       TastyRegistryProps
 ## @tenphi/tasty/ssr/astro
 
 value      tastyIntegration
+type       TastyIntegrationCSSOptions
 type       TastyIntegrationOptions
 value      tastyMiddleware
 type       TastyMiddlewareOptions
@@ -529,5 +532,13 @@ _(no exports — side effects only)_
 value      onRequest
 
 ## @tenphi/tasty/ssr/astro-middleware-static
+
+value      onRequest
+
+## @tenphi/tasty/ssr/astro-middleware-extract
+
+value      onRequest
+
+## @tenphi/tasty/ssr/astro-middleware-extract-static
 
 value      onRequest

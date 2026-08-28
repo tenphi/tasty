@@ -796,11 +796,11 @@ export function markStylesGenerated(): void {
 
   // When SSR styles are already in the document, the SSR collector's
   // collectInternals() already rendered tokens, @property, globalStyles,
-  // @font-face, and @counter-style. Skip client-side injection to avoid
-  // duplicate CSS rules.
+  // @font-face, @counter-style, and @function. Skip client-side injection to
+  // avoid duplicate CSS rules.
   if (
     typeof document !== 'undefined' &&
-    document.querySelector('style[data-tasty-ssr]')
+    document.querySelector('[data-tasty-ssr]')
   ) {
     warnOnce(
       'ssr-globals-skip',

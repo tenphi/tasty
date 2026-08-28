@@ -14,6 +14,10 @@ export default defineConfig({
     'ssr/astro': 'src/ssr/astro.ts',
     'ssr/astro-middleware': 'src/ssr/astro-middleware.ts',
     'ssr/astro-middleware-static': 'src/ssr/astro-middleware-static.ts',
+    'ssr/astro-middleware-extract':
+      'src/ssr/astro-middleware-extract.ts',
+    'ssr/astro-middleware-extract-static':
+      'src/ssr/astro-middleware-extract-static.ts',
     'ssr/astro-client': 'src/ssr/astro-client.ts',
   },
   format: 'esm',
@@ -26,6 +30,10 @@ export default defineConfig({
     'module',
     'url',
     'node:async_hooks',
+    'node:crypto',
+    'node:fs/promises',
+    'node:path',
+    'node:url',
     'next/navigation',
   ],
   platform: 'browser',

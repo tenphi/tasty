@@ -734,23 +734,26 @@ export class StyleInjector {
   }
 
   /**
-   * Hold the local `@keyframes` a set of classes animates, and tell the caller
-   * what they ended up being called.
+   * Take a reference on local `@keyframes` and report what they ended up being
+   * called, without deciding yet which classes own them.
    *
-   * One reference per distinct set of steps, taken the first time it is asked
-   * for and shared by every class that animates it — a repeat render finds it
-   * already held and takes nothing further, which is what stops the reference
-   * count climbing for the life of the page. The reference goes when the last
-   * of those classes is deleted.
+   * Names have to be resolved before the rules that animate them are written:
+   * an injected name can differ from the authored one, and a rule written
+   * first cannot be rewritten afterwards — its cache key is already claimed,
+   * so the second write is a hit and the corrected declarations are dropped.
+   *
+   * One reference per distinct set of steps, shared by every class that ends up
+   * animating it, so a repeat render takes nothing further. Ownership is
+   * assigned by `ownKeyframes()` once the rules exist to be inspected.
    */
   holdKeyframes(
-    classNames: string[],
     steps: Record<string, KeyframesSteps>,
     options?: { root?: Document | ShadowRoot },
-  ): Map<string, string> | null {
+  ): { nameMap: Map<string, string> | null; keys: Map<string, string> } {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
     let nameMap: Map<string, string> | null = null;
+    const keys = new Map<string, string>();
 
     for (const [authored, definition] of Object.entries(steps)) {
       // Same key shape `keyframes()` dedupes on, so the two agree on what
@@ -768,7 +771,7 @@ export class StyleInjector {
         registry.localKeyframes.set(key, entry);
       }
 
-      for (const className of classNames) entry.owners.add(className);
+      keys.set(key, entry.name);
 
       if (entry.name !== authored) {
         if (!nameMap) nameMap = new Map();
@@ -776,7 +779,24 @@ export class StyleInjector {
       }
     }
 
-    return nameMap;
+    return { nameMap, keys };
+  }
+
+  /**
+   * Record that `className` animates these keyframes, so the reference is
+   * released when the last such class is collected.
+   *
+   * Only classes whose rules actually reference the animation should be here:
+   * a class that merely rendered alongside one would otherwise keep the
+   * keyframes alive for as long as it lives.
+   */
+  ownKeyframes(
+    key: string,
+    className: string,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
+    const registry = this.sheetManager.getRegistry(options?.root || document);
+    registry.localKeyframes.get(key)?.owners.add(className);
   }
 
   /**
@@ -1378,7 +1398,8 @@ export class StyleInjector {
    *
    * @deprecated The class name is ignored — pass anything, or stop calling it.
    * Collection no longer records per-class usage, and scheduling does not need
-   * to know which class was rendered.
+   * to know which class was rendered. A class handed back by `inject()` is
+   * marked wanted there, which is what reuse actually goes through.
    */
   touch(_className: string, options?: { root?: Document | ShadowRoot }): void {
     if (typeof document === 'undefined') return;

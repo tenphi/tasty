@@ -341,6 +341,37 @@ describe('local keyframes', () => {
     expect(keyframesInSheet()).toBe(1);
   });
 
+  it('writes the injected name into the rule that animates it', () => {
+    // A second, different `fade` collides with the first and is injected under
+    // another name. The rule has to carry that name: it is written once, and a
+    // correction afterwards would hit the cache key the first write claimed.
+    const First = tasty({ styles: FADE_STYLES });
+    render(<First />);
+
+    const Second = tasty({
+      styles: {
+        animation: 'fade 2s',
+        '@keyframes': { fade: { from: { opacity: 1 }, to: { opacity: 0 } } },
+      } as Styles,
+    });
+    const { container } = render(<Second />);
+
+    const css = getCSSText();
+    const injectedNames = [...css.matchAll(/@keyframes\s+([\w-]+)/g)].map(
+      (match) => match[1],
+    );
+
+    expect(injectedNames.length).toBe(2);
+    expect(new Set(injectedNames).size).toBe(2);
+
+    // Whatever the second one ended up being called, its class must say so.
+    const renamed = injectedNames.find((name) => name !== 'fade')!;
+    const secondClasses = domClasses(container);
+    const secondCSS = injector.instance.getCSSTextForClasses(secondClasses);
+
+    expect(secondCSS).toContain(renamed);
+  });
+
   it('releases them when the last class animating them is collected', () => {
     const Fading = tasty({ styles: FADE_STYLES });
     const { rerender } = render(<Fading />);
@@ -348,6 +379,35 @@ describe('local keyframes', () => {
     expect(keyframesInSheet()).toBe(1);
 
     rerender(<div />);
+    cleanup();
+
+    expect(keyframesInSheet()).toBe(0);
+  });
+
+  it('is not kept alive by a class that merely rendered alongside', () => {
+    // The animated component's colour chunk is shared with a plain one. That
+    // shared class does not animate anything, so it must not keep the
+    // keyframes alive once the class that does animate them is collected.
+    const Animated = tasty({
+      styles: { ...FADE_STYLES, color: '#red' } as Styles,
+    });
+    const Plain = tasty({ styles: { color: '#red' } });
+
+    const view = render(
+      <>
+        <Animated />
+        <Plain />
+      </>,
+    );
+
+    const shared = domClasses(view.container).filter(
+      (className, i, all) => all.indexOf(className) !== i,
+    );
+    expect(shared.length).toBeGreaterThan(0);
+    expect(keyframesInSheet()).toBe(1);
+
+    // Only the animated one goes; the shared colour class stays mounted.
+    view.rerender(<Plain />);
     cleanup();
 
     expect(keyframesInSheet()).toBe(0);

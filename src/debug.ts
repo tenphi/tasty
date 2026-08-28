@@ -761,8 +761,14 @@ export const tastyDebug = {
     const unused = getUnusedClasses(root);
     const metrics = injector.instance.getMetrics({ root });
 
+    // `all` is everything held, not the two bands above: a class that went cold
+    // a moment ago is in neither, and it is still taking up a sheet.
+    const all = sortTastyClasses(
+      new Set([...active, ...getOwnedClasses(root)]),
+    );
+
     const status: CacheStatus = {
-      classes: { active, unused, all: [...active, ...unused] },
+      classes: { active, unused, all },
       metrics,
     };
 

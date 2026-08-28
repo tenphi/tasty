@@ -145,6 +145,7 @@ value      okhstFunction
 value      okhstPlugin
 value      OUTER_STYLES
 type       OuterStyleProps
+value      ownKeyframes
 value      parseColor
 type       ParsedAdvancedState
 type       ParsedColor
@@ -421,6 +422,7 @@ value      okhstFunction
 value      okhstPlugin
 value      OUTER_STYLES
 type       OuterStyleProps
+value      ownKeyframes
 value      parseColor
 type       ParsedAdvancedState
 type       ParsedColor

@@ -227,16 +227,27 @@ export function getCSSTextForNode(
 }
 
 /**
- * Hold the local `@keyframes` a set of classes animates, and report what they
- * ended up being called. One reference per distinct set of steps, released when
- * the last class animating it is collected.
+ * Take a reference on local `@keyframes` and report what they ended up being
+ * called. Names must be resolved before the rules that animate them are
+ * written. Pair with `ownKeyframes()` once those rules exist.
  */
 export function holdKeyframes(
-  classNames: string[],
   steps: Record<string, KeyframesSteps>,
   options?: { root?: Document | ShadowRoot },
-): Map<string, string> | null {
-  return getGlobalInjector().holdKeyframes(classNames, steps, options);
+): { nameMap: Map<string, string> | null; keys: Map<string, string> } {
+  return getGlobalInjector().holdKeyframes(steps, options);
+}
+
+/**
+ * Record that a class animates these keyframes, so the reference is released
+ * when the last such class is collected.
+ */
+export function ownKeyframes(
+  key: string,
+  className: string,
+  options?: { root?: Document | ShadowRoot },
+): void {
+  getGlobalInjector().ownKeyframes(key, className, options);
 }
 
 /**
@@ -252,8 +263,8 @@ export function cleanup(root?: Document | ShadowRoot): void {
  * `gc.touchInterval` of them. Used internally by computeStyles and tasty().
  *
  * @deprecated The class name is ignored — collection asks the DOM what is
- * rendered rather than recording usage per class, so scheduling does not need
- * to know which class was involved. The argument is kept for compatibility.
+ * rendered rather than recording usage per class. The argument is kept so
+ * existing calls still compile.
  */
 export function touch(
   className: string,

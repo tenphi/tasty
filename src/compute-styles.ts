@@ -28,6 +28,7 @@ import {
   func,
   inject,
   holdKeyframes,
+  ownKeyframes,
   property,
   touch,
 } from './injector';
@@ -58,7 +59,7 @@ import {
   mergeKeyframes,
   replaceAnimationNames,
 } from './keyframes';
-import type { RenderResult, StyleResult } from './pipeline';
+import type { RenderResult } from './pipeline';
 import {
   flushPendingCSS,
   getRSCCache,
@@ -336,6 +337,7 @@ function processChunkSync(
   styleKeys: string[],
   stableStyles: boolean,
   root?: Document | ShadowRoot,
+  nameMap?: Map<string, string> | null,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
@@ -353,37 +355,34 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
+  // Renamed animations are rewritten before the first write, not after: the
+  // cache key is claimed by that write, so a later one is a hit and any
+  // correction is silently dropped.
+  const rules = nameMap
+    ? renderResult.rules.map((rule) => ({
+        ...rule,
+        declarations: replaceAnimationNames(rule.declarations, nameMap),
+      }))
+    : renderResult.rules;
+
   // `pin: false` — the render path keeps no dispose handle; the DOM is the
   // record of use, and `gc()` reclaims the class once no element carries it.
-  const { className } = inject(renderResult.rules, {
-    cacheKey,
-    root,
-    pin: false,
-  });
+  const { className } = inject(rules, { cacheKey, root, pin: false });
 
-  return { name: chunkName, styleKeys, cacheKey, renderResult, className };
+  return {
+    name: chunkName,
+    styleKeys,
+    cacheKey,
+    renderResult: { ...renderResult, rules },
+    className,
+  };
 }
 
-/**
- * Inject chunk rules synchronously, replacing animation names if needed.
- */
-function injectChunkRulesSync(
-  chunks: ProcessedChunk[],
-  nameMap: Map<string, string> | null,
-  root?: Document | ShadowRoot,
-): void {
-  for (const chunk of chunks) {
-    if (chunk.renderResult.rules.length > 0) {
-      const rulesToInject: StyleResult[] = nameMap
-        ? chunk.renderResult.rules.map((rule) => ({
-            ...rule,
-            declarations: replaceAnimationNames(rule.declarations, nameMap!),
-          }))
-        : chunk.renderResult.rules;
-
-      inject(rulesToInject, { cacheKey: chunk.cacheKey, root, pin: false });
-    }
-  }
+/** Whether any of this chunk's declarations name the given animation. */
+function animates(chunk: ProcessedChunk, keyframesName: string): boolean {
+  return chunk.renderResult.rules.some((rule) =>
+    rule.declarations.includes(keyframesName),
+  );
 }
 
 /**
@@ -577,6 +576,10 @@ export function computeStyles(
 
     const usedKf = getUsedKeyframes(resolved);
 
+    // Keyframe names first: an injected name can differ from the authored one,
+    // and a rule written before the rename cannot be corrected afterwards.
+    const held = usedKf ? holdKeyframes(usedKf, { root }) : null;
+
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
       const chunk = processChunkSync(
         resolved,
@@ -584,23 +587,23 @@ export function computeStyles(
         chunkStyleKeys,
         stableStyles,
         root,
+        held?.nameMap,
       );
       if (chunk) chunks.push(chunk);
     }
 
-    // The classes that animate these keyframes own them between them, so the
-    // reference is taken once however many times this renders, and released
-    // when the last of those classes is collected.
-    const nameMap = usedKf
-      ? holdKeyframes(
-          chunks.map((chunk) => chunk.className),
-          usedKf,
-          { root },
-        )
-      : null;
-
-    if (nameMap) {
-      injectChunkRulesSync(chunks, nameMap, root);
+    // Only the classes whose rules actually name the animation own it — one
+    // that merely rendered alongside would keep it alive for its own lifetime.
+    // The reference is taken once however many times this renders, and released
+    // when the last owner is collected.
+    if (held) {
+      for (const [key, injectedName] of held.keys) {
+        for (const chunk of chunks) {
+          if (animates(chunk, injectedName)) {
+            ownKeyframes(key, chunk.className, { root });
+          }
+        }
+      }
     }
 
     for (const chunk of chunks) {

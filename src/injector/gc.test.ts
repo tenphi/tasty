@@ -64,7 +64,7 @@ describe('GC: touch / gc', () => {
 
       // No per-class bookkeeping on the render path at all: one counter.
       expect(registry.touchCount).toBe(1);
-      expect(registry.lastSeenAt.size).toBe(0);
+      expect(registry.unusedSince.size).toBe(0);
     });
   });
 
@@ -119,7 +119,7 @@ describe('GC: touch / gc', () => {
 
       // Stagger when each was last seen (oldest first)
       for (let i = 0; i < 5; i++) {
-        registry.lastSeenAt.set(classNames[i], now - (5 - i) * 1000);
+        registry.unusedSince.set(classNames[i], now - (5 - i) * 1000);
       }
 
       // Dispose all so they are eligible for GC
@@ -285,9 +285,31 @@ describe('GC: touch / gc', () => {
       dispose();
 
       const registry = graced['sheetManager'].getRegistry(document);
-      registry.lastSeenAt.set(className, Date.now() - 20_000);
+      registry.unusedSince.set(className, Date.now() - 20_000);
 
       expect(graced.gc({ force: true })).toBe(1);
+
+      graced.destroy();
+    });
+
+    it('starts the window when a sweep notices, not before', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.noticed.noticed', 'color: red'),
+      ]);
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      // As if it had been rendered all along and only just came off the page:
+      // no stamp, because nothing was watching for the moment it went.
+      registry.unusedSince.delete(className);
+
+      // The sweep that first looks and does not find it must not take it — it
+      // has no idea whether that happened an hour ago or a millisecond ago.
+      expect(graced.gc({ force: true })).toBe(0);
+      expect(Date.now() - registry.unusedSince.get(className)!).toBeLessThan(
+        1_000,
+      );
 
       graced.destroy();
     });
@@ -300,7 +322,7 @@ describe('GC: touch / gc', () => {
       dispose();
 
       const registry = graced['sheetManager'].getRegistry(document);
-      registry.lastSeenAt.set(className, Date.now() - 20_000);
+      registry.unusedSince.set(className, Date.now() - 20_000);
 
       const el = document.createElement('div');
       el.className = className;
@@ -312,7 +334,7 @@ describe('GC: touch / gc', () => {
       el.remove();
       expect(graced.gc({ force: true })).toBe(0);
 
-      expect(Date.now() - registry.lastSeenAt.get(className)!).toBeLessThan(
+      expect(Date.now() - registry.unusedSince.get(className)!).toBeLessThan(
         1_000,
       );
 

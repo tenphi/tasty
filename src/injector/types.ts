@@ -68,8 +68,8 @@ export interface StyleInjectorConfig {
  */
 export interface GCConfig {
   /**
-   * How long a class is left alone after it was last known to be wanted, in
-   * milliseconds (default 10,000).
+   * How long a class is left alone after collection first notices nothing is
+   * carrying it, in milliseconds (default 10,000).
    *
    * Rendering is not commit-aware: a render can resolve a class and commit it a
    * little later, and in between nothing on the page carries it. Rather than
@@ -226,15 +226,21 @@ export interface RootRegistry {
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
   /**
-   * className -> the last moment the class was known to be wanted: when it was
-   * injected, and every sweep that finds it on an element. Collection leaves
-   * anything stamped within the grace window alone, and orders the rest
-   * least-recently-seen first.
+   * className -> when the class was first noticed to be carrying nothing:
+   * injection, or the first sweep that looked and did not find it on an
+   * element. Cleared the moment a sweep finds it rendered again.
    *
-   * Written only when a class is created and by the sweep's own DOM scan, so
-   * rendering never pays for it.
+   * Deliberately "when it was noticed", not "when it stopped being rendered".
+   * Nothing observes the moment an element leaves, so a class that unmounted
+   * just before a sweep and one that unmounted just after the previous sweep
+   * would otherwise be treated differently — and the first would lose its
+   * grace window entirely. Starting the clock at the sighting gives every
+   * class the same full window, whenever it actually went.
+   *
+   * Written only by the sweep's own DOM scan and at injection, so rendering
+   * never pays for it.
    */
-  lastSeenAt: Map<string, number>;
+  unusedSince: Map<string, number>;
   /** Renders since the last scheduled sweep (per-root) */
   touchCount: number;
   /** How many entries from `window.__TASTY__` have been synced into this registry */

@@ -110,7 +110,7 @@ describe('style lifetime', () => {
 
     const registry = getRegistry();
     expect(registry.rules.has(className)).toBe(false);
-    expect(registry.lastSeenAt.has(className)).toBe(false);
+    expect(registry.unusedSince.has(className)).toBe(false);
     expect(getCSSText()).not.toContain(className);
   });
 

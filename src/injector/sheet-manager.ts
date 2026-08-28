@@ -155,7 +155,7 @@ export class SheetManager {
         injectedFunctions: new Map<string, boolean>(),
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
-        lastSeenAt: new Map(),
+        unusedSince: new Map(),
         touchCount: 0,
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
@@ -1004,7 +1004,7 @@ export class SheetManager {
         this.deleteRule(registry, ruleInfo);
         registry.rules.delete(className);
         registry.pinCounts.delete(className);
-        registry.lastSeenAt.delete(className);
+        registry.unusedSince.delete(className);
         deleted.add(className);
         cleanedUpCount++;
       }

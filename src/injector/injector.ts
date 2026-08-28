@@ -535,7 +535,7 @@ export class StyleInjector {
       if (pin) {
         registry.pinCounts.set(className, 1);
       }
-      registry.lastSeenAt.set(className, Date.now());
+      registry.unusedSince.set(className, Date.now());
 
       const queued = enqueueStyleWrite(() => {
         if (applySheetWrite()) return;
@@ -585,7 +585,7 @@ export class StyleInjector {
     if (pin) {
       registry.pinCounts.set(className, 1);
     }
-    registry.lastSeenAt.set(className, Date.now());
+    registry.unusedSince.set(className, Date.now());
 
     return {
       className,
@@ -1369,6 +1369,21 @@ export class StyleInjector {
    * "unused" means. Entries carry their last `touch()` so callers can drop the
    * oldest first; a class that was never touched sorts as oldest.
    */
+  /**
+   * Everything the injector holds falls into one of five bands, and only the
+   * last of them is ever deleted:
+   *
+   * 1. rendered — some element carries the class right now
+   * 2. not ours — queued for a batched write, pre-allocated, or server-rendered
+   * 3. hot — nothing carries it, but that was noticed less than `grace` ago
+   * 4. cached — cold, but within `capacity` when ordered by when it went cold
+   * 5. the rest
+   *
+   * This returns bands 4 and 5 together, most recently cold first; `gc()` draws
+   * the capacity line through them. Band 3 is what makes collection safe
+   * without a commit signal: a render can resolve a class and commit it a
+   * little later, and during that gap nothing on the page carries it.
+   */
   private collectUnused(
     registry: RootRegistry,
     root: Document | ShadowRoot,
@@ -1376,36 +1391,48 @@ export class StyleInjector {
     const now = Date.now();
     const grace = this.config.gc?.grace ?? DEFAULT_GC_GRACE;
 
-    // Scan the DOM for live classes (classList handles SVG elements too). The
-    // scan doubles as the stamp: everything found is wanted right now.
+    // Scan the DOM for live classes (classList handles SVG elements too)
     const liveClasses = new Set<string>();
     for (const el of root.querySelectorAll('[class]')) {
       for (const token of el.classList) {
-        if (this.classRegex.test(token)) {
-          liveClasses.add(token);
-          registry.lastSeenAt.set(token, now);
-        }
+        if (this.classRegex.test(token)) liveClasses.add(token);
       }
     }
 
     const unused: string[] = [];
 
     for (const [className, ruleInfo] of registry.rules) {
-      // A negative sheet index marks a rule this injector does not own — server
-      // rendered (hydrated), pre-allocated, or still queued. Never ours to delete.
+      // Band 2: a negative sheet index marks a rule this injector does not own
+      // — server rendered (hydrated), pre-allocated, or still queued.
       if (ruleInfo.sheetIndex < 0) continue;
-      if (liveClasses.has(className)) continue;
+
+      // Band 1.
+      if (liveClasses.has(className)) {
+        registry.unusedSince.delete(className);
+        continue;
+      }
+
       // Someone still holds the dispose handle `inject()` returned.
       if ((registry.pinCounts.get(className) ?? 0) > 0) continue;
 
-      // In use recently enough that a render which resolved this class may not
-      // have committed it yet. Nothing is learned by taking it now, and a lot
-      // can go wrong, so leave it for a later pass.
-      const seenAt = registry.lastSeenAt.get(className) ?? 0;
-      if (now - seenAt < grace) continue;
+      // Band 3. The clock starts at the sighting, not at whatever moment the
+      // element actually left — nothing was watching for that — so every class
+      // gets the same full window however long ago it went.
+      let since = registry.unusedSince.get(className);
+      if (since === undefined) {
+        since = now;
+        registry.unusedSince.set(className, now);
+      }
+      if (now - since < grace) continue;
 
       unused.push(className);
     }
+
+    // Most recently cold first, so `gc()` can keep that many and drop the tail.
+    unused.sort(
+      (a, b) =>
+        (registry.unusedSince.get(b) ?? 0) - (registry.unusedSince.get(a) ?? 0),
+    );
 
     return unused;
   }
@@ -1460,13 +1487,13 @@ export class StyleInjector {
     let doomed: string[];
 
     if (force) {
+      // Bands 4 and 5. Band 3 is spared even here: an explicit cleanup is still
+      // no reason to take rules from a render that has not committed yet.
       doomed = unused;
     } else if (unused.length > capacity) {
-      // Least recently seen first.
-      const seenAt = (cls: string) => registry.lastSeenAt.get(cls) ?? 0;
-
-      unused.sort((a, b) => seenAt(a) - seenAt(b));
-      doomed = unused.slice(0, unused.length - capacity);
+      // Band 4 is the `capacity` classes that went cold most recently; band 5
+      // is everything behind them, and only band 5 goes.
+      doomed = unused.slice(capacity);
     } else {
       return 0;
     }

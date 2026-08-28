@@ -252,11 +252,25 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of renders between sweeps. When the counter reaches this value, a sweep is scheduled via `requestIdleCallback`; without idle callbacks nothing is collected automatically.
-- `gc.grace`: How long a class is left alone after it was last known to be wanted, in milliseconds (default `10000`). A class is "wanted" when it is injected, and again every sweep that finds it on an element.
+- `gc.grace`: How long a class is left alone after collection first notices nothing is carrying it, in milliseconds (default `10000`).
 
-> **What the grace window is for.** Rendering is not commit-aware: a render can resolve a class and commit it a little later, and in between nothing on the page carries it. From outside React that is indistinguishable from a class that is finished, so collection does not try to tell them apart — it simply leaves alone anything that was in use recently. A render would have to stay pending for the whole window to lose its rules, and it gets them back on its next render.
+**What a sweep does.** Everything the injector holds falls into one of five bands, and only the last is ever deleted:
+
+| Band | | Deleted |
+|---|---|---|
+| 1 | **Rendered** — some element carries the class right now | never |
+| 2 | **Not ours** — queued for a batched write, pre-allocated, or server-rendered | never |
+| 3 | **Hot** — nothing carries it, but that was noticed less than `grace` ago | never |
+| 4 | **Cached** — cold, but within `capacity` when ordered by when it went cold | never |
+| 5 | Everything else | on every sweep |
+
+`gc({ force: true })` and `cleanup()` take bands 4 and 5 together, ignoring capacity. Band 3 is spared even then: an explicit cleanup is still no reason to take rules from a render that has not committed yet.
+
+> **Why band 3 exists.** Rendering is not commit-aware: a render can resolve a class and commit it a little later, and in between nothing on the page carries it. From outside React that is indistinguishable from a class that is finished, so collection does not try to tell them apart — it leaves alone anything only just noticed to be cold. A render would have to stay pending for the whole window to lose its rules, and it gets them back on its next render.
 >
-> The window is also why collection costs nothing to run: the timestamp is written by the sweep's own DOM scan, so rendering tracks nothing per class.
+> The clock starts when a sweep *notices*, not when the element actually left — nothing observes that moment, so starting it at the sighting is what gives every class the same full window however long ago it went.
+>
+> This is also why collection costs nothing to run: the timestamps are written by the sweep's own DOM scan, so rendering tracks nothing per class.
 - `gc.capacity`: Maximum number of unused styles (not in the DOM, not pinned) to retain. When exceeded, the least recently used are evicted first. Rendered and pinned styles don't count against this limit.
 
 ---
@@ -390,8 +404,8 @@ gc({ force: true });
 cleanup();
 
 // Every `touchInterval` renders, a sweep is scheduled in idle time. It scans
-// the DOM for the classes actually on the page, and deletes injected rules that
-// are not on it, not pinned, and were last wanted longer ago than `grace`.
+// the DOM for the classes actually on the page and sorts everything the
+// injector holds into five bands — only the last one is deleted. See below.
 
 // Benefits:
 // - Activity-proportional: busy apps trigger GC more often

@@ -34,6 +34,12 @@ export interface TastyRegistryProps {
    * in server-rendered `<style>` tags. Default: true.
    */
   transferCache?: boolean;
+  /**
+   * URL of a stylesheet containing Tasty's configured global CSS.
+   * `withTastyNext()` sets this automatically. Pass false to disable it for
+   * this registry, or a URL to use a manually generated stylesheet.
+   */
+  sharedStylesheet?: string | false;
 }
 
 /**
@@ -63,6 +69,7 @@ export interface TastyRegistryProps {
 export function TastyRegistry({
   children,
   transferCache = true,
+  sharedStylesheet = process.env.TASTY_NEXT_SHARED_CSS_HREF,
 }: TastyRegistryProps) {
   const isClient = typeof window !== 'undefined';
 
@@ -73,8 +80,16 @@ export function TastyRegistry({
 
     registerSSRCollectorGetter(() => instance);
 
+    // The generated stylesheet already contains configured global artifacts.
+    // Mark that first batch as flushed so only request-specific styles stream.
+    if (sharedStylesheet) {
+      instance.collectInternals();
+      instance.flushCSS();
+    }
+
     return instance;
   });
+  const [streamState] = useState(() => ({ sharedStylesheetFlushed: false }));
   const nonce = getConfig().nonce;
 
   useServerInsertedHTML(() => {
@@ -83,7 +98,19 @@ export function TastyRegistry({
     const css = collector.flushCSS();
     const classNames = collector.getRenderedClassNames();
 
-    if (!css) return null;
+    let linkEl = null;
+    if (sharedStylesheet && !streamState.sharedStylesheetFlushed) {
+      streamState.sharedStylesheetFlushed = true;
+      linkEl = createElement('link', {
+        key: 'tasty-shared-styles',
+        rel: 'stylesheet',
+        href: sharedStylesheet,
+        'data-tasty-ssr': '',
+        nonce,
+      });
+    }
+
+    if (!css) return linkEl;
 
     const styleEl = createElement('style', {
       key: 'tasty-ssr-styles',
@@ -92,7 +119,9 @@ export function TastyRegistry({
       dangerouslySetInnerHTML: { __html: css },
     });
 
-    if (!transferCache || classNames.length === 0) return styleEl;
+    if (!transferCache || classNames.length === 0) {
+      return linkEl ? createElement(Fragment, null, linkEl, styleEl) : styleEl;
+    }
 
     const classListJSON = classNames.map((n) => `"${n}"`).join(',');
 
@@ -104,7 +133,7 @@ export function TastyRegistry({
       },
     });
 
-    return createElement(Fragment, null, styleEl, scriptEl);
+    return createElement(Fragment, null, linkEl, styleEl, scriptEl);
   });
 
   return createElement(

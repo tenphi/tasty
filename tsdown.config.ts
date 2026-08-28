@@ -11,11 +11,11 @@ export default defineConfig({
     'zero/next': 'src/zero/next.ts',
     'ssr/index': 'src/ssr/index.ts',
     'ssr/next': 'src/ssr/next.ts',
+    'ssr/next-config': 'src/ssr/next-config.ts',
     'ssr/astro': 'src/ssr/astro.ts',
     'ssr/astro-middleware': 'src/ssr/astro-middleware.ts',
     'ssr/astro-middleware-static': 'src/ssr/astro-middleware-static.ts',
-    'ssr/astro-middleware-extract':
-      'src/ssr/astro-middleware-extract.ts',
+    'ssr/astro-middleware-extract': 'src/ssr/astro-middleware-extract.ts',
     'ssr/astro-middleware-extract-static':
       'src/ssr/astro-middleware-extract-static.ts',
     'ssr/astro-client': 'src/ssr/astro-client.ts',
@@ -31,6 +31,7 @@ export default defineConfig({
     'url',
     'node:async_hooks',
     'node:crypto',
+    'node:fs',
     'node:fs/promises',
     'node:path',
     'node:url',

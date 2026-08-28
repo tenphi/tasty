@@ -521,6 +521,11 @@ value+type ServerStyleCollector
 value      TastyRegistry
 type       TastyRegistryProps
 
+## @tenphi/tasty/ssr/next-config
+
+type       TastyNextOptions
+value      withTastyNext
+
 ## @tenphi/tasty/ssr/astro
 
 value      tastyIntegration

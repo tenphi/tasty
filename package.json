@@ -52,6 +52,11 @@
       "import": "./dist/ssr/next.js",
       "default": "./dist/ssr/next.js"
     },
+    "./ssr/next-config": {
+      "types": "./dist/ssr/next-config.d.ts",
+      "import": "./dist/ssr/next-config.js",
+      "default": "./dist/ssr/next-config.js"
+    },
     "./ssr/astro": {
       "types": "./dist/ssr/astro.d.ts",
       "import": "./dist/ssr/astro.js",

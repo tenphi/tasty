@@ -1,5 +1,14 @@
 # @tenphi/tasty
 
+## 3.6.0
+
+### Minor Changes
+
+- [#285](https://github.com/tenphi/tasty/pull/285) [`2aeba77`](https://github.com/tenphi/tasty/commit/2aeba7786676dbf1b2ba57faa35983941d1307d0) Thanks [@tenphi](https://github.com/tenphi)! - Extract common Astro CSS as the base cascade and each page's remaining Tasty
+  CSS into a content-hashed override stylesheet. Extracted links now also respect
+  Astro's `build.assetsPrefix` configuration, and builds reject page-relative CSS
+  URLs whose meaning would change after extraction.
+
 ## 3.5.0
 
 ### Minor Changes

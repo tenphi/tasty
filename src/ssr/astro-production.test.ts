@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 
+import { chromium } from 'playwright';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
@@ -80,9 +81,30 @@ describe('Astro production extraction fixture', () => {
       expect(css).toContain(expected);
     }
     expect(css).not.toContain('page-only-fade');
-    expect(
-      await readFile(resolve(output, '_astro', pageAsset!), 'utf8'),
-    ).toContain('page-only-fade');
+    expect(css).toContain('.cascade-probe { color: blue; }');
+    const pageCSS = await readFile(
+      resolve(output, '_astro', pageAsset!),
+      'utf8',
+    );
+    expect(pageCSS).toContain('page-only-fade');
+    expect(pageCSS).toContain('.cascade-probe { color: red; }');
+
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(
+        `<style>${css}</style><style>${pageCSS}</style><div class="cascade-probe">probe</div>`,
+      );
+      expect(
+        await page
+          .locator('.cascade-probe')
+          .evaluate((element) =>
+            getComputedStyle(element).getPropertyValue('color'),
+          ),
+      ).toBe('rgb(255, 0, 0)');
+    } finally {
+      await browser.close();
+    }
   }, 30_000);
 });
 

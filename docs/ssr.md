@@ -264,11 +264,25 @@ styles form the base cascade and page-only styles can override them. A fully
 shared page omits the empty page stylesheet. If generated pages have no common
 artifacts, each page receives only its page stylesheet.
 
+The shared-base/page-override order is the extraction-mode cascade contract.
+It does not preserve an inline artifact order where a page-only rule originally
+appeared before a shared rule. Use shared styles for defaults and page-only
+styles for overrides.
+
+Extracted CSS preserves `url()` values verbatim. Relative URLs in an inline
+style resolve from the page, but in an extracted stylesheet they resolve from
+the asset directory. Use root-relative URLs such as `url(/fonts/brand.woff2)`,
+absolute URLs, or data URLs when extraction is enabled. The build fails with a
+clear error if an extracted artifact contains a page-relative or fragment-only
+URL rather than silently changing its target.
+
 Assets are written under Astro's configured `build.assets` directory (for
 example, `/_astro/tasty.shared.a1b2c3.css` and
 `/_astro/tasty.page.d4e5f6.css`). Links include the configured Astro `base`, so
 nested routes do not need relative-path handling. Content hashes and output are
-deterministic for identical builds.
+deterministic for identical builds. If `build.assetsPrefix` is configured,
+Tasty uses its CSS-specific prefix (or `fallback`) just like Astro-generated
+stylesheets.
 
 ### Manual middleware (advanced)
 

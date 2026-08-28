@@ -46,7 +46,13 @@ async function makeOutput(files: Record<string, string>): Promise<string> {
 async function runBuild(
   root: string,
   options: Parameters<typeof tastyIntegration>[0],
-  config: { base?: string; build?: { assets?: string } } = {},
+  config: {
+    base?: string;
+    build?: {
+      assets?: string;
+      assetsPrefix?: string | Record<string, string>;
+    };
+  } = {},
 ): Promise<void> {
   const integration = tastyIntegration(options);
   const configDone = integration.hooks['astro:config:done'];
@@ -127,6 +133,49 @@ describe('Astro build-wide CSS extraction', () => {
     expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(1);
   });
 
+  it.each(['images/icon.svg', '../fonts/brand.woff2', '#document-filter'])(
+    'rejects page-relative extracted CSS URL %s',
+    async (url) => {
+      const item = artifact(
+        'raw:relative-url',
+        'raw',
+        `.icon { background-image: url("${url}"); }`,
+        0,
+      );
+      const original = html([item]);
+      const root = await makeOutput({ 'index.html': original });
+
+      await expect(
+        runBuild(root, { css: { mode: 'extract' } }),
+      ).rejects.toThrow(`page-relative CSS URL "${url}"`);
+      expect(await read(root, 'index.html')).toBe(original);
+    },
+  );
+
+  it('accepts location-independent CSS URLs without matching comments or strings', async () => {
+    const item = artifact(
+      'raw:safe-urls',
+      'raw',
+      [
+        '.root { background: url(/images/root.png); }',
+        '.absolute { background: url("https://cdn.example.com/image.png"); }',
+        '.protocol-relative { background: url(//cdn.example.com/image.png); }',
+        '.data { background: url(data:image/png;base64,AA==); }',
+        '/* url(comment-relative.png) */',
+        '.label::before { content: "url(string-relative.png)"; }',
+      ].join('\n'),
+      0,
+    );
+    const root = await makeOutput({ 'index.html': html([item]) });
+
+    await runBuild(root, { css: { mode: 'extract' } });
+
+    const index = await read(root, 'index.html');
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      item.css,
+    );
+  });
+
   it('splits shared and page-only artifacts of every collector kind', async () => {
     const shared = [
       artifact(
@@ -138,7 +187,7 @@ describe('Astro build-wide CSS extraction', () => {
       artifact(
         'font-face:shared',
         'font-face',
-        '@font-face { font-family: Shared; src: url(shared.woff2); }',
+        '@font-face { font-family: Shared; src: url(/fonts/shared.woff2); }',
         1,
       ),
       artifact(
@@ -178,7 +227,7 @@ describe('Astro build-wide CSS extraction', () => {
       artifact(
         `font-face:${marker}`,
         'font-face',
-        `@font-face { font-family: ${marker}; src: url(${marker}.woff2); }`,
+        `@font-face { font-family: ${marker}; src: url(/fonts/${marker}.woff2); }`,
         1,
       ),
       artifact(
@@ -286,6 +335,49 @@ describe('Astro build-wide CSS extraction', () => {
       assetName(index, 'page'),
     ]);
     expect(index).not.toContain('data-tasty-extract');
+  });
+
+  it('uses shared CSS as the base cascade and page CSS as the override', async () => {
+    const common = artifact(
+      'global:common',
+      'global',
+      '.cascade-probe{color:blue}',
+      1,
+    );
+    const home = artifact(
+      'global:home',
+      'global',
+      '.cascade-probe{color:red}',
+      0,
+    );
+    const aboutOnly = artifact(
+      'global:about',
+      'global',
+      '.cascade-probe{color:green}',
+      0,
+    );
+    const root = await makeOutput({
+      'index.html': html([home, common]),
+      'about.html': html([aboutOnly, common]),
+    });
+
+    await runBuild(root, { css: { mode: 'extract' } });
+
+    const index = await read(root, 'index.html');
+    const about = await read(root, 'about.html');
+    expect(await read(root, `_astro/${assetName(index, 'shared')}`)).toBe(
+      common.css,
+    );
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      home.css,
+    );
+    expect(await read(root, `_astro/${assetName(about, 'page')}`)).toBe(
+      aboutOnly.css,
+    );
+    expect(assetNames(index)).toEqual([
+      assetName(index, 'shared'),
+      assetName(index, 'page'),
+    ]);
   });
 
   it('extracts common artifacts even after page artifacts diverge', async () => {
@@ -399,6 +491,61 @@ describe('Astro build-wide CSS extraction', () => {
       '.guide{display:grid}',
     );
   });
+
+  it.each([
+    ['string', 'https://cdn.example.com', 'https://cdn.example.com'],
+    [
+      'extension map',
+      {
+        css: 'https://css.example.com/',
+        fallback: 'https://cdn.example.com',
+      },
+      'https://css.example.com',
+    ],
+    [
+      'fallback map',
+      { fallback: 'https://fallback.example.com/' },
+      'https://fallback.example.com',
+    ],
+  ] as const)(
+    'uses an Astro %s assetsPrefix for both extracted stylesheets',
+    async (_label, assetsPrefix, expectedPrefix) => {
+      const common = artifact(
+        'chunk:common',
+        'chunk',
+        '.common{padding:1rem}',
+        0,
+      );
+      const root = await makeOutput({
+        'index.html': html([
+          common,
+          artifact('chunk:home', 'chunk', '.home{display:block}', 1),
+        ]),
+        'about.html': html([
+          common,
+          artifact('chunk:about', 'chunk', '.about{display:grid}', 1),
+        ]),
+      });
+
+      await runBuild(
+        root,
+        { css: { mode: 'extract' } },
+        {
+          base: '/docs/',
+          build: { assets: 'assets', assetsPrefix },
+        },
+      );
+
+      const index = await read(root, 'index.html');
+      expect(index).toContain(
+        `href="${expectedPrefix}/assets/${assetName(index, 'shared')}"`,
+      );
+      expect(index).toContain(
+        `href="${expectedPrefix}/assets/${assetName(index, 'page')}"`,
+      );
+      expect(index).not.toContain('href="/docs/assets/');
+    },
+  );
 
   it('emits deterministic shared and page assets across builds', async () => {
     const common = artifact('chunk:common', 'chunk', '.common{gap:1rem}', 0);

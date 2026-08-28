@@ -246,7 +246,6 @@ export default defineConfig({
       islands: false,
       css: {
         mode: 'extract',
-        strategy: 'shared',
       },
     }),
   ],
@@ -258,15 +257,9 @@ output. Extraction requires Astro 5 or newer and only applies to prerendered
 production pages. Development, preview-time SSR, and on-demand routes continue
 to receive the normal inline `<style data-tasty-ssr>` output.
 
-Two strategies are available:
-
-- **`shared` (default)** moves the largest common block whose position can be
-  preserved on every generated page into one stylesheet. Page-only component,
-  global, and raw CSS stays inline. This is the recommended option because it
-  caches the common core without sending styles for unrelated routes.
-- **`single`** emits the cascade-safe union of generated component class rules.
-  Route-specific `useGlobalStyles()` and `useRawCSS()` output stays inline so
-  it cannot affect another route.
+Extraction moves the largest common block whose position can be preserved on
+every generated page into one stylesheet. Page-only component, global, and raw
+CSS stays inline, so unvisited routes do not receive unrelated styles.
 
 The asset is written under Astro's configured `build.assets` directory (for
 example, `/_astro/tasty.a1b2c3.css`). Links include the configured Astro

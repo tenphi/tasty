@@ -75,7 +75,7 @@ describe('Astro build-wide CSS extraction', () => {
       'about/index.html': html([common, two]),
     });
 
-    await runBuild(root, { css: { mode: 'extract', strategy: 'shared' } });
+    await runBuild(root, { css: { mode: 'extract' } });
 
     const index = await read(root, 'index.html');
     const about = await read(root, 'about/index.html');
@@ -180,30 +180,6 @@ describe('Astro build-wide CSS extraction', () => {
     expect(await read(first, `_astro/${assetName(firstPage)}`)).toBe(
       await read(second, `_astro/${assetName(secondPage)}`),
     );
-  });
-
-  it('single mode extracts only the ordered class union', async () => {
-    const globalOne = artifact('global:one', 'global', 'body{color:red}', 0);
-    const globalTwo = artifact('global:two', 'global', 'body{color:blue}', 0);
-    const common = artifact('chunk:common', 'chunk', '.common{margin:0}', 1);
-    const one = artifact('chunk:one', 'chunk', '.one{display:block}', 2);
-    const two = artifact('chunk:two', 'chunk', '.two{display:grid}', 2);
-    const root = await makeOutput({
-      'index.html': html([globalOne, common, one]),
-      'about.html': html([globalTwo, common, two]),
-    });
-
-    await runBuild(root, { css: { mode: 'extract', strategy: 'single' } });
-
-    const index = await read(root, 'index.html');
-    const css = await read(root, `_astro/${assetName(index)}`);
-    expect(css).toContain(one.css);
-    expect(css).toContain(two.css);
-    expect(css.indexOf(common.css)).toBeLessThan(css.indexOf(one.css));
-    expect(css.indexOf(common.css)).toBeLessThan(css.indexOf(two.css));
-    expect(index).toContain(globalOne.css);
-    expect(index).not.toContain(globalTwo.css);
-    expect(css).not.toContain('body{');
   });
 
   it('leaves pages without Tasty metadata unchanged', async () => {

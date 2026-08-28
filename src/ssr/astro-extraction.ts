@@ -5,8 +5,6 @@ import { fileURLToPath } from 'node:url';
 
 import type { ServerStyleArtifact } from './collector';
 
-export type AstroCSSStrategy = 'shared' | 'single';
-
 const METADATA_START = '<template data-tasty-extract>';
 const METADATA_END = '</template>';
 
@@ -144,54 +142,6 @@ function selectSharedArtifacts(
   return best;
 }
 
-/** Topologically order the safe union while preserving every page's chunk order. */
-function selectSingleArtifacts(
-  pages: ExtractablePage[],
-): ServerStyleArtifact[] {
-  const artifacts = new Map<string, ServerStyleArtifact>();
-  const edges = new Map<string, Set<string>>();
-  const indegree = new Map<string, number>();
-  const rank = new Map<string, number>();
-
-  for (const page of pages) {
-    const chunks = page.artifacts.filter(({ kind }) => kind === 'chunk');
-    for (const artifact of chunks) {
-      if (!artifacts.has(artifact.id)) {
-        rank.set(artifact.id, rank.size);
-        artifacts.set(artifact.id, artifact);
-        edges.set(artifact.id, new Set());
-        indegree.set(artifact.id, 0);
-      }
-    }
-    for (let i = 1; i < chunks.length; i++) {
-      const before = chunks[i - 1].id;
-      const after = chunks[i].id;
-      if (before === after || edges.get(before)!.has(after)) continue;
-      edges.get(before)!.add(after);
-      indegree.set(after, indegree.get(after)! + 1);
-    }
-  }
-
-  const ready = [...artifacts.keys()]
-    .filter((id) => indegree.get(id) === 0)
-    .sort((a, b) => rank.get(a)! - rank.get(b)!);
-  const ordered: ServerStyleArtifact[] = [];
-  while (ready.length > 0) {
-    const id = ready.shift()!;
-    ordered.push(artifacts.get(id)!);
-    for (const after of edges.get(id)!) {
-      indegree.set(after, indegree.get(after)! - 1);
-      if (indegree.get(after) === 0) {
-        ready.push(after);
-        ready.sort((a, b) => rank.get(a)! - rank.get(b)!);
-      }
-    }
-  }
-
-  // A cycle means no single order can preserve every page's cascade.
-  return ordered.length === artifacts.size ? ordered : [];
-}
-
 function stylesheetHref(
   base: string,
   assets: string,
@@ -235,48 +185,10 @@ function transformPage(
   );
 }
 
-function transformSinglePage(
-  page: ExtractablePage,
-  selectedIds: Set<string>,
-  href: string,
-): string {
-  const indexes = page.artifacts
-    .map((artifact, index) => (selectedIds.has(artifact.id) ? index : -1))
-    .filter((index) => index !== -1);
-  if (indexes.length === 0) {
-    const metadataStart = page.html.indexOf(METADATA_START, page.styleStart);
-    return (
-      page.html.slice(0, metadataStart) + page.html.slice(page.replacementEnd)
-    );
-  }
-
-  const first = indexes[0];
-  const last = indexes[indexes.length - 1];
-  const middle = page.artifacts.slice(first, last + 1);
-  if (middle.some(({ id }) => !selectedIds.has(id))) {
-    const metadataStart = page.html.indexOf(METADATA_START, page.styleStart);
-    return (
-      page.html.slice(0, metadataStart) + page.html.slice(page.replacementEnd)
-    );
-  }
-
-  const before = page.artifacts.slice(0, first);
-  const after = page.artifacts.slice(last + 1);
-  const link = `<link rel="stylesheet" href="${href}" data-tasty-ssr>`;
-  const replacement =
-    styleTag(page.styleOpen, before) + link + styleTag(page.styleOpen, after);
-  return (
-    page.html.slice(0, page.styleStart) +
-    replacement +
-    page.html.slice(page.replacementEnd)
-  );
-}
-
 export async function extractAstroCSS(options: {
   dir: URL;
   base: string;
   assets: string;
-  strategy: AstroCSSStrategy;
 }): Promise<void> {
   const outputDir = fileURLToPath(options.dir);
   const paths = await findHTMLFiles(outputDir);
@@ -289,10 +201,7 @@ export async function extractAstroCSS(options: {
   ).filter((page): page is ExtractablePage => page !== null);
   if (pages.length === 0) return;
 
-  const selected =
-    options.strategy === 'single'
-      ? selectSingleArtifacts(pages)
-      : selectSharedArtifacts(pages);
+  const selected = selectSharedArtifacts(pages);
   if (selected.length === 0) {
     for (const page of pages) {
       const metadataStart = page.html.indexOf(METADATA_START, page.styleStart);
@@ -313,12 +222,7 @@ export async function extractAstroCSS(options: {
   await writeFile(join(assetDir, filename), css);
 
   const href = stylesheetHref(options.base, options.assets, filename);
-  const selectedIds = new Set(selected.map(({ id }) => id));
   for (const page of pages) {
-    const html =
-      options.strategy === 'single'
-        ? transformSinglePage(page, selectedIds, href)
-        : transformPage(page, selected, href);
-    await writeFile(page.path, html);
+    await writeFile(page.path, transformPage(page, selected, href));
   }
 }

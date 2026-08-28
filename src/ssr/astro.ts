@@ -11,7 +11,6 @@
 import { getConfig } from '../config';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { createExtractionMetadata, extractAstroCSS } from './astro-extraction';
-import type { AstroCSSStrategy } from './astro-extraction';
 import { ServerStyleCollector } from './collector';
 import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
 
@@ -200,11 +199,6 @@ const MIDDLEWARE_ENTRYPOINT_EXTRACT_STATIC =
 export interface TastyIntegrationCSSOptions {
   /** CSS delivery mode. Extraction only applies to prerendered builds. */
   mode?: 'inline' | 'extract';
-  /**
-   * `shared` extracts the largest common cascade-safe block. `single` emits
-   * the safe union of generated component classes. Default: `shared`.
-   */
-  strategy?: AstroCSSStrategy;
 }
 
 export interface TastyIntegrationOptions {
@@ -253,7 +247,6 @@ export interface TastyIntegrationOptions {
 export function tastyIntegration(options?: TastyIntegrationOptions) {
   const { islands = true } = options ?? {};
   const cssMode = options?.css?.mode ?? 'inline';
-  const cssStrategy = options?.css?.strategy ?? 'shared';
   let base = '/';
   let assets = '_astro';
 
@@ -302,7 +295,7 @@ export function tastyIntegration(options?: TastyIntegrationOptions) {
       },
       'astro:build:done': async ({ dir }: { dir: URL }) => {
         if (cssMode !== 'extract') return;
-        await extractAstroCSS({ dir, base, assets, strategy: cssStrategy });
+        await extractAstroCSS({ dir, base, assets });
       },
     },
   };

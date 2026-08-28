@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     tastyIntegration({
       islands: false,
-      css: { mode: 'extract', strategy: 'shared' },
+      css: { mode: 'extract' },
     }),
   ],
   vite: {

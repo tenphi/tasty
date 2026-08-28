@@ -79,8 +79,9 @@ export interface TastyBaseStylePropNames {}
  * real style inert rather than `never`-typed.
  */
 export type ExtraBaseStyleProps = {
-  [key in keyof TastyBaseStylePropNames &
-    keyof StylesInterface]?: StylePropValue<StylesInterface[key]>;
+  [
+    key in keyof TastyBaseStylePropNames & keyof StylesInterface
+  ]?: StylePropValue<StylesInterface[key]>;
 };
 
 /** Allowed mod value types */

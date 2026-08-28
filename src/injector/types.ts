@@ -343,9 +343,7 @@ export interface PropertyOptions extends PropertyDefinition {
  * - object — full form with optional `syntax` (type) and `default` value.
  */
 export type FunctionParameter =
-  | true
-  | string
-  | { syntax?: string; default?: string | number };
+  true | string | { syntax?: string; default?: string | number };
 
 /**
  * Definition for a CSS @function at-rule (custom function).

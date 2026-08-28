@@ -46,7 +46,6 @@ export function registerSSRCollectorGetterGlobal(fn: SSRCollectorGetter): void {
 export function getRegisteredSSRCollector(): ServerStyleCollector | null {
   if (_getSSRCollector) return _getSSRCollector();
   const getter = (globalThis as Record<string, unknown>)[GETTER_KEY] as
-    | SSRCollectorGetter
-    | undefined;
+    SSRCollectorGetter | undefined;
   return getter ? getter() : null;
 }

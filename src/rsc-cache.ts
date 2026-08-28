@@ -32,16 +32,14 @@ export interface RSCStyleCache {
  * React.cache provides per-request memoization in Server Components,
  * so each request gets its own isolated cache.
  */
-export const getRSCCache = cache(
-  (): RSCStyleCache => ({
-    cacheKeyToClassName: new Map(),
-    emittedKeys: new Set(),
-    internalsEmitted: false,
-    pendingCSS: [],
-    keyToIndex: new Map(),
-    generatedNames: new Map(),
-  }),
-);
+export const getRSCCache = cache((): RSCStyleCache => ({
+  cacheKeyToClassName: new Map(),
+  emittedKeys: new Set(),
+  internalsEmitted: false,
+  pendingCSS: [],
+  keyToIndex: new Map(),
+  generatedNames: new Map(),
+}));
 
 export function rscAllocateClassName(
   rscCache: RSCStyleCache,

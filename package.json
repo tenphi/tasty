@@ -222,13 +222,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.2 kB"
+      "limit": "57.5 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "54.2 kB"
+      "limit": "54.5 kB"
     },
     {
       "name": "static",

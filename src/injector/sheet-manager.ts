@@ -1573,6 +1573,48 @@ export class SheetManager {
    * Get the raw CSS content
    */
   /**
+   * The CSS this injector owns in `root`, in the order the engine applies it.
+   *
+   * `getCSSText()` walks the managed sheets only, and raw CSS has its own —
+   * which sits before or after them depending on how it got there: prepended
+   * to `adoptedStyleSheets`, or wherever in `<head>` the first raw injection
+   * happened to land. Reporting a fixed order would describe the opposite
+   * winner from the live page whenever two rules of equal specificity meet.
+   */
+  getOwnedCSSInOrder(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+  ): string[] {
+    const managed = this.getCSSText(registry);
+    const raw = this.getRawCSSText(root);
+
+    if (!raw) return managed ? [managed] : [];
+    if (!managed) return [raw];
+
+    return this.isRawFirst(registry, root) ? [raw, managed] : [managed, raw];
+  }
+
+  /** Whether the raw sheet precedes the managed ones in `root`. */
+  private isRawFirst(
+    registry: RootRegistry,
+    root: Document | ShadowRoot,
+  ): boolean {
+    // Adopted mode prepends the raw sheet, always.
+    if (this.isAdoptedMode(root)) return true;
+
+    const rawElement = this.rawStyleElements.get(root);
+    const managedElement = registry.sheets.find((sheet) => sheet.sheet)?.sheet;
+
+    if (!rawElement || !managedElement) return false;
+
+    // DOCUMENT_POSITION_FOLLOWING: the managed element comes after the raw one.
+    return Boolean(
+      rawElement.compareDocumentPosition(managedElement) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  }
+
+  /**
    * Top-level rules in the raw sheet.
    *
    * Read from the sheet the engine parsed, not from the text: a raw block is

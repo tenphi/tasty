@@ -149,6 +149,19 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
  * drifted apart once before, when this file still read "unused" off the pin
  * counts the render path had stopped maintaining.
  */
+/**
+ * Everything this injector holds in `root`, in the order the engine applies it,
+ * with the sources kept byte-for-byte — trimming would report a total smaller
+ * than one of its own parts whenever raw CSS has edge whitespace.
+ */
+function getAllCSS(root: Document | ShadowRoot = document): string {
+  const registry = getRegistry(root);
+  const sheetManager = injector.instance._sheetManager;
+  if (!registry || !sheetManager) return '';
+
+  return sheetManager.getOwnedCSSInOrder(registry, root).join('\n');
+}
+
 function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
   return sortTastyClasses(injector.instance.getUnusedClasses({ root }));
 }
@@ -512,10 +525,7 @@ export const tastyDebug = {
     } else if (typeof target === 'string') {
       if (target === 'all') {
         // Documented as component + global + raw, and raw has its own sheet.
-        css =
-          `${injector.instance.getCSSText({ root })}\n${injector.instance.getRawCSSText(
-            { root },
-          )}`.trim();
+        css = getAllCSS(root);
       } else if (target === 'global') {
         css = getGlobalTypeCSS('global', root).css;
         return css; // already prettified
@@ -641,10 +651,7 @@ export const tastyDebug = {
     const unusedCSS = injector.instance.getCSSTextForClasses(unusedClasses, {
       root,
     });
-    // `getCSSText()` covers the managed sheets; raw CSS lives in its own.
-    const managedCSS = injector.instance.getCSSText({ root });
-    const allCSS =
-      `${managedCSS}\n${injector.instance.getRawCSSText({ root })}`.trim();
+    const allCSS = getAllCSS(root);
 
     const activeRuleCount = countRules(activeCSS);
     const unusedRuleCount = countRules(unusedCSS);

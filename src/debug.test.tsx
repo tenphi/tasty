@@ -181,6 +181,35 @@ describe('tastyDebug', () => {
       expect(tastyDebug.css('all', { raw: true })).toContain('.debug-raw');
     });
 
+    it('reports the sheets in the order the engine applies them', () => {
+      configure({ gc: { grace: 0 } });
+
+      // Raw first: its style element lands in head before any managed sheet,
+      // so a fixed managed-then-raw order would name the wrong winner for two
+      // rules of equal specificity.
+      injectRawCSS('.review-order { color: red; }');
+      const { className } = computeStyles({ color: '#blue' });
+
+      const all = tastyDebug.css('all', { raw: true, prettify: false });
+
+      expect(all).toContain('.review-order');
+      expect(all).toContain(className);
+      expect(all.indexOf('.review-order')).toBeLessThan(all.indexOf(className));
+    });
+
+    it('keeps raw bytes whole in the total', () => {
+      configure({ gc: { grace: 0 } });
+
+      // Edge whitespace is ordinary in a multiline template literal, and
+      // trimming it made the total smaller than one of its own parts.
+      injectRawCSS('  .raw-space { color: red; }  ');
+
+      const summary = tastyDebug.summary({ raw: true });
+
+      expect(summary.rawCSSSize).toBeGreaterThan(0);
+      expect(summary.totalCSSSize).toBeGreaterThanOrEqual(summary.rawCSSSize);
+    });
+
     it('counts one raw at-rule as one rule', () => {
       configure({ gc: { grace: 0 } });
 

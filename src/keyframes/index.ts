@@ -249,6 +249,34 @@ export function extractAnimationNamesFromStyles(styles: Styles): Set<string> {
  * @param nameMap Map from original name to injected name (only contains names that differ)
  * @returns Updated declarations string
  */
+/**
+ * Whether `declarations` names `animation` as an animation to run.
+ *
+ * Only `animation` and `animation-name` values count, and only whole tokens
+ * within them: an animation called `crossfade` does not use keyframes called
+ * `fade`. Same parsing as `replaceAnimationNames`, so the two agree on what
+ * counts as a reference.
+ */
+export function referencesAnimation(
+  declarations: string,
+  animation: string,
+): boolean {
+  if (!declarations.includes('animation')) return false;
+
+  for (const part of declarations.split(';')) {
+    const colonIdx = part.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const prop = part.slice(0, colonIdx).trim().toLowerCase();
+    if (prop !== 'animation' && prop !== 'animation-name') continue;
+
+    const value = part.slice(colonIdx + 1);
+    if (replaceWord(value, animation, '\u0000') !== value) return true;
+  }
+
+  return false;
+}
+
 export function replaceAnimationNames(
   declarations: string,
   nameMap: Map<string, string>,

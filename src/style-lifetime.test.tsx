@@ -372,6 +372,77 @@ describe('local keyframes', () => {
     expect(secondCSS).toContain(renamed);
   });
 
+  it('does not alias two identical shorthands over different keyframes', () => {
+    // Same authored declaration, different animations. The earlier test varied
+    // the duration, which changes the chunk key on its own and so proved
+    // nothing: keep the shorthand identical and the key has to carry which
+    // keyframes the rule ended up animating.
+    const First = tasty({ styles: FADE_STYLES });
+    const first = render(<First />);
+
+    const Second = tasty({
+      styles: {
+        animation: 'fade 1s',
+        '@keyframes': { fade: { from: { opacity: 1 }, to: { opacity: 0 } } },
+      } as Styles,
+    });
+    const second = render(<Second />);
+
+    const firstClasses = domClasses(first.container);
+    const secondClasses = domClasses(second.container);
+
+    expect(secondClasses).not.toEqual(firstClasses);
+
+    const injectedNames = [
+      ...getCSSText().matchAll(/@keyframes\s+([\w-]+)/g),
+    ].map((match) => match[1]);
+    expect(new Set(injectedNames).size).toBe(2);
+
+    const renamed = injectedNames.find((name) => name !== 'fade')!;
+    const secondCSS = injector.instance.getCSSTextForClasses(secondClasses);
+
+    expect(secondCSS).toContain(renamed);
+  });
+
+  it('does not treat crossfade as a use of fade', () => {
+    // One component runs `fade` at the root and `crossfade` on Content; a
+    // second shares only the crossfade chunk. Matching declaration substrings
+    // would make that shared class an owner of `fade` and keep it forever.
+    const Both = tasty({
+      styles: {
+        animation: 'fade 1s',
+        Content: { animation: 'crossfade 1s' },
+        '@keyframes': {
+          fade: { from: { opacity: 0 }, to: { opacity: 1 } },
+          crossfade: { from: { opacity: 0.2 }, to: { opacity: 0.8 } },
+        },
+      } as Styles,
+    });
+    const Sharing = tasty({
+      styles: {
+        Content: { animation: 'crossfade 1s' },
+        '@keyframes': {
+          crossfade: { from: { opacity: 0.2 }, to: { opacity: 0.8 } },
+        },
+      } as Styles,
+    });
+
+    const view = render(
+      <>
+        <Both />
+        <Sharing />
+      </>,
+    );
+    expect(keyframesInSheet()).toBe(2);
+
+    view.rerender(<Sharing />);
+    cleanup();
+
+    // `crossfade` stays, `fade` goes: the shared class never ran `fade`.
+    expect(getCSSText()).toContain('crossfade');
+    expect(keyframesInSheet()).toBe(1);
+  });
+
   it('releases them when the last class animating them is collected', () => {
     const Fading = tasty({ styles: FADE_STYLES });
     const { rerender } = render(<Fading />);

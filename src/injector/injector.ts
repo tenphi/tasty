@@ -749,10 +749,17 @@ export class StyleInjector {
   holdKeyframes(
     steps: Record<string, KeyframesSteps>,
     options?: { root?: Document | ShadowRoot },
-  ): { nameMap: Map<string, string> | null; keys: Map<string, string> } {
+  ): {
+    names: Map<string, string>;
+    keys: Map<string, string>;
+  } {
     const root = options?.root || document;
     const registry = this.sheetManager.getRegistry(root);
-    let nameMap: Map<string, string> | null = null;
+    // Authored name -> the name it was actually injected under, which may
+    // differ when something else already holds that name.
+    const names = new Map<string, string>();
+    // Authored name -> the entry key holding it, so a chunk that runs the
+    // animation can be recorded as an owner.
     const keys = new Map<string, string>();
 
     for (const [authored, definition] of Object.entries(steps)) {
@@ -771,15 +778,11 @@ export class StyleInjector {
         registry.localKeyframes.set(key, entry);
       }
 
-      keys.set(key, entry.name);
-
-      if (entry.name !== authored) {
-        if (!nameMap) nameMap = new Map();
-        nameMap.set(authored, entry.name);
-      }
+      keys.set(authored, key);
+      names.set(authored, entry.name);
     }
 
-    return { nameMap, keys };
+    return { names, keys };
   }
 
   /**

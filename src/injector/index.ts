@@ -234,7 +234,7 @@ export function getCSSTextForNode(
 export function holdKeyframes(
   steps: Record<string, KeyframesSteps>,
   options?: { root?: Document | ShadowRoot },
-): { nameMap: Map<string, string> | null; keys: Map<string, string> } {
+): { names: Map<string, string>; keys: Map<string, string> } {
   return getGlobalInjector().holdKeyframes(steps, options);
 }
 

@@ -57,6 +57,7 @@ import {
   filterUsedKeyframes,
   hasLocalKeyframes,
   mergeKeyframes,
+  referencesAnimation,
   replaceAnimationNames,
 } from './keyframes';
 import type { RenderResult } from './pipeline';
@@ -102,6 +103,8 @@ interface ProcessedChunk {
   cacheKey: string;
   renderResult: RenderResult;
   className: string;
+  /** Local animations this chunk runs, by their authored names. */
+  animations?: string[];
 }
 
 const EMPTY_RESULT: ComputeStylesResult = { className: '' };
@@ -337,7 +340,7 @@ function processChunkSync(
   styleKeys: string[],
   stableStyles: boolean,
   root?: Document | ShadowRoot,
-  nameMap?: Map<string, string> | null,
+  keyframeNames?: Map<string, string> | null,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
@@ -355,34 +358,57 @@ function processChunkSync(
   );
   if (renderResult.rules.length === 0) return null;
 
+  // Which animations this chunk actually runs, by the name they were authored
+  // under. Whole tokens only, so `crossfade` is not a use of `fade`.
+  const animations = keyframeNames
+    ? [...keyframeNames.keys()].filter((authored) =>
+        renderResult.rules.some((rule) =>
+          referencesAnimation(rule.declarations, authored),
+        ),
+      )
+    : [];
+
   // Renamed animations are rewritten before the first write, not after: the
   // cache key is claimed by that write, so a later one is a hit and any
   // correction is silently dropped.
-  const rules = nameMap
+  const renamed = animations.filter(
+    (authored) => keyframeNames!.get(authored) !== authored,
+  );
+  const rules = renamed.length
     ? renderResult.rules.map((rule) => ({
         ...rule,
-        declarations: replaceAnimationNames(rule.declarations, nameMap),
+        declarations: replaceAnimationNames(rule.declarations, keyframeNames!),
       }))
     : renderResult.rules;
 
+  // The key has to carry which keyframes these rules ended up animating.
+  // Two components can author the same `animation: fade 1s` over different
+  // `@keyframes fade`; the second is injected under another name, and without
+  // this they would share a key and the second would be handed the first's
+  // class, still animating the first's keyframes.
+  const injectKey = renamed.length
+    ? `${cacheKey}\u0000kf:${renamed
+        .map((authored) => `${authored}=${keyframeNames!.get(authored)}`)
+        .sort()
+        .join(',')}`
+    : cacheKey;
+
   // `pin: false` — the render path keeps no dispose handle; the DOM is the
   // record of use, and `gc()` reclaims the class once no element carries it.
-  const { className } = inject(rules, { cacheKey, root, pin: false });
+  const { className } = inject(rules, {
+    cacheKey: injectKey,
+    root,
+    pin: false,
+  });
 
   return {
     name: chunkName,
     styleKeys,
-    cacheKey,
+    cacheKey: injectKey,
     renderResult: { ...renderResult, rules },
     className,
+    animations,
   };
-}
-
-/** Whether any of this chunk's declarations name the given animation. */
-function animates(chunk: ProcessedChunk, keyframesName: string): boolean {
-  return chunk.renderResult.rules.some((rule) =>
-    rule.declarations.includes(keyframesName),
-  );
 }
 
 /**
@@ -587,7 +613,7 @@ export function computeStyles(
         chunkStyleKeys,
         stableStyles,
         root,
-        held?.nameMap,
+        held?.names,
       );
       if (chunk) chunks.push(chunk);
     }
@@ -597,11 +623,10 @@ export function computeStyles(
     // The reference is taken once however many times this renders, and released
     // when the last owner is collected.
     if (held) {
-      for (const [key, injectedName] of held.keys) {
-        for (const chunk of chunks) {
-          if (animates(chunk, injectedName)) {
-            ownKeyframes(key, chunk.className, { root });
-          }
+      for (const chunk of chunks) {
+        for (const authored of chunk.animations ?? []) {
+          const key = held.keys.get(authored);
+          if (key) ownKeyframes(key, chunk.className, { root });
         }
       }
     }

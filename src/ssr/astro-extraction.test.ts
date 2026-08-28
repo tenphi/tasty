@@ -59,10 +59,18 @@ async function read(root: string, path: string): Promise<string> {
   return readFile(join(root, path), 'utf8');
 }
 
-function assetName(page: string): string {
-  const match = page.match(/href="[^"]+\/(tasty\.[a-f0-9]+\.css)"/);
+function assetName(page: string, scope: 'shared' | 'page'): string {
+  const match = page.match(
+    new RegExp(`href="[^"]+/(tasty\\.${scope}\\.[a-f0-9]+\\.css)"`),
+  );
   expect(match).not.toBeNull();
   return match![1];
+}
+
+function assetNames(page: string): string[] {
+  return [
+    ...page.matchAll(/href="[^"]+\/(tasty\.(?:shared|page)\.[a-f0-9]+\.css)"/g),
+  ].map((match) => match[1]);
 }
 
 describe('Astro build-wide CSS extraction', () => {
@@ -110,16 +118,57 @@ describe('Astro build-wide CSS extraction', () => {
     await runBuild(root, { css: { mode: 'extract' } });
 
     const index = await read(root, 'index.html');
-    expect(await read(root, `_astro/${assetName(index)}`)).toBe(
+    expect(await read(root, `_astro/${assetName(index, 'shared')}`)).toBe(
       shared.map(({ css }) => css).join('\n'),
     );
+    expect(assetNames(index)).toEqual([assetName(index, 'shared')]);
     expect(index).toContain('data-tasty-ssr nonce="abc"');
     expect(index).not.toContain('<style data-tasty-ssr');
     expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(1);
   });
 
-  it('keeps differing ancillary rule kinds local around shared CSS', async () => {
-    const pageArtifacts = (marker: string) => [
+  it('splits shared and page-only artifacts of every collector kind', async () => {
+    const shared = [
+      artifact(
+        'property:shared',
+        'property',
+        '@property --shared { syntax: "<number>"; }',
+        0,
+      ),
+      artifact(
+        'font-face:shared',
+        'font-face',
+        '@font-face { font-family: Shared; src: url(shared.woff2); }',
+        1,
+      ),
+      artifact(
+        'counter-style:shared',
+        'counter-style',
+        '@counter-style shared { system: cyclic; symbols: "s"; }',
+        2,
+      ),
+      artifact(
+        'function:shared',
+        'function',
+        '@function --shared() { result: 1; }',
+        3,
+      ),
+      artifact('raw:shared', 'raw', '.raw-shared { --x: 1; }', 4),
+      artifact(
+        'global:shared',
+        'global',
+        '.global-shared { color: green; }',
+        5,
+      ),
+      artifact('chunk:shared', 'chunk', '.chunk-shared { display: block; }', 6),
+      artifact(
+        'keyframes:shared',
+        'keyframes',
+        '@keyframes shared { to { opacity: .5; } }',
+        7,
+      ),
+    ];
+    const unique = (marker: string) => [
       artifact(
         `property:${marker}`,
         'property',
@@ -151,7 +200,12 @@ describe('Astro build-wide CSS extraction', () => {
         `.global-${marker} { color: ${marker}; }`,
         5,
       ),
-      artifact('chunk:shared', 'chunk', '.shared { display: block; }', 6),
+      artifact(
+        `chunk:${marker}`,
+        'chunk',
+        `.chunk-${marker} { display: grid; }`,
+        6,
+      ),
       artifact(
         `keyframes:${marker}`,
         'keyframes',
@@ -159,28 +213,47 @@ describe('Astro build-wide CSS extraction', () => {
         7,
       ),
     ];
+    const pageArtifacts = (marker: string) => {
+      const pageOnly = unique(marker);
+      return shared.flatMap((item, index) => [
+        { ...item, order: index * 2 },
+        { ...pageOnly[index], order: index * 2 + 1 },
+      ]);
+    };
     const root = await makeOutput({
-      'index.html': html(pageArtifacts('red'), 'abc'),
-      'about.html': html(pageArtifacts('blue'), 'abc'),
+      'index.html': html(pageArtifacts('crimson'), 'abc'),
+      'about.html': html(pageArtifacts('navy'), 'abc'),
     });
 
     await runBuild(root, { css: { mode: 'extract' } });
 
     const index = await read(root, 'index.html');
     const about = await read(root, 'about.html');
-    expect(await read(root, `_astro/${assetName(index)}`)).toBe(
-      '.shared { display: block; }',
+    expect(await read(root, `_astro/${assetName(index, 'shared')}`)).toBe(
+      shared.map(({ css }) => css).join('\n'),
     );
-    expect(index).toContain('red');
-    expect(index).not.toContain('blue');
-    expect(about).toContain('blue');
-    expect(about).not.toContain('red');
-    expect(index.match(/<style data-tasty-ssr nonce="abc">/g)).toHaveLength(2);
-    expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(1);
-    expect(index).toContain('data-tasty-ssr nonce="abc"');
+    const indexPageCSS = await read(root, `_astro/${assetName(index, 'page')}`);
+    const aboutPageCSS = await read(root, `_astro/${assetName(about, 'page')}`);
+    expect(indexPageCSS).toBe(
+      unique('crimson')
+        .map(({ css }) => css)
+        .join('\n'),
+    );
+    expect(aboutPageCSS).toBe(
+      unique('navy')
+        .map(({ css }) => css)
+        .join('\n'),
+    );
+    expect(index).not.toContain('crimson');
+    expect(index).not.toContain('navy');
+    expect(about).not.toContain('navy');
+    expect(about).not.toContain('crimson');
+    expect(index).not.toContain('<style data-tasty-ssr');
+    expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(2);
+    expect(index.match(/data-tasty-ssr nonce="abc"/g)).toHaveLength(2);
   });
 
-  it('extracts a shared block and keeps page-only component CSS local', async () => {
+  it('extracts shared and page-only component CSS into ordered assets', async () => {
     const common = artifact('chunk:common', 'chunk', '.common{color:red}', 0);
     const one = artifact('chunk:one', 'chunk', '.one{display:block}', 1);
     const two = artifact('chunk:two', 'chunk', '.two{display:grid}', 1);
@@ -193,19 +266,29 @@ describe('Astro build-wide CSS extraction', () => {
 
     const index = await read(root, 'index.html');
     const about = await read(root, 'about/index.html');
-    const filename = assetName(index);
-    expect(assetName(about)).toBe(filename);
+    const filename = assetName(index, 'shared');
+    expect(assetName(about, 'shared')).toBe(filename);
     expect(await read(root, `_astro/${filename}`)).toBe(common.css);
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      one.css,
+    );
+    expect(await read(root, `_astro/${assetName(about, 'page')}`)).toBe(
+      two.css,
+    );
     expect(index).not.toContain(common.css);
     expect(about).not.toContain(common.css);
-    expect(index).toContain(one.css);
+    expect(index).not.toContain(one.css);
     expect(index).not.toContain(two.css);
-    expect(about).toContain(two.css);
+    expect(about).not.toContain(two.css);
     expect(about).not.toContain(one.css);
+    expect(assetNames(index)).toEqual([
+      assetName(index, 'shared'),
+      assetName(index, 'page'),
+    ]);
     expect(index).not.toContain('data-tasty-extract');
   });
 
-  it('preserves multiline raw CSS and conflicting globals page-locally', async () => {
+  it('extracts common artifacts even after page artifacts diverge', async () => {
     const rawOne = artifact(
       'raw:one',
       'raw',
@@ -223,20 +306,59 @@ describe('Astro build-wide CSS extraction', () => {
     const common = artifact('chunk:common', 'chunk', '.common{margin:0}', 2);
     const root = await makeOutput({
       'index.html': html([rawOne, globalOne, common], 'abc'),
-      'about.html': html([rawTwo, globalTwo, common], 'abc'),
+      'about.html': html(
+        [rawTwo, { ...common, order: 1 }, { ...globalTwo, order: 2 }],
+        'abc',
+      ),
     });
 
     await runBuild(root, { css: { mode: 'extract' } });
 
     const index = await read(root, 'index.html');
     const about = await read(root, 'about.html');
-    expect(index).toContain(rawOne.css);
-    expect(index).toContain(globalOne.css);
-    expect(index).not.toContain(rawTwo.css);
-    expect(about).toContain(rawTwo.css);
-    expect(about).toContain(globalTwo.css);
-    expect(index).toContain('<style data-tasty-ssr nonce="abc">');
-    expect(index.indexOf('</style>')).toBeLessThan(index.indexOf('<link'));
+    const sharedCSS = await read(root, `_astro/${assetName(index, 'shared')}`);
+    const indexCSS = await read(root, `_astro/${assetName(index, 'page')}`);
+    const aboutCSS = await read(root, `_astro/${assetName(about, 'page')}`);
+    expect(sharedCSS).toBe(common.css);
+    expect(indexCSS).toBe([rawOne.css, globalOne.css].join('\n'));
+    expect(aboutCSS).toBe([rawTwo.css, globalTwo.css].join('\n'));
+    expect(assetNames(index)).toEqual([
+      assetName(index, 'shared'),
+      assetName(index, 'page'),
+    ]);
+    expect(assetNames(about)).toEqual([
+      assetName(about, 'shared'),
+      assetName(about, 'page'),
+    ]);
+    expect(index).not.toContain('<style data-tasty-ssr');
+    expect(index).toContain('data-tasty-ssr nonce="abc"');
+  });
+
+  it('writes only page stylesheets when styled pages share no artifacts', async () => {
+    const home = artifact('chunk:home', 'chunk', '.home{display:block}', 0);
+    const aboutOnly = artifact(
+      'chunk:about',
+      'chunk',
+      '.about{display:grid}',
+      0,
+    );
+    const root = await makeOutput({
+      'index.html': html([home]),
+      'about.html': html([aboutOnly]),
+    });
+
+    await runBuild(root, { css: { mode: 'extract' } });
+
+    const index = await read(root, 'index.html');
+    const about = await read(root, 'about.html');
+    expect(assetNames(index)).toEqual([assetName(index, 'page')]);
+    expect(assetNames(about)).toEqual([assetName(about, 'page')]);
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      home.css,
+    );
+    expect(await read(root, `_astro/${assetName(about, 'page')}`)).toBe(
+      aboutOnly.css,
+    );
   });
 
   it('uses the configured base and asset directory for nested routes', async () => {
@@ -247,8 +369,14 @@ describe('Astro build-wide CSS extraction', () => {
       0,
     );
     const root = await makeOutput({
-      'index.html': html([common]),
-      'guides/start/index.html': html([common]),
+      'index.html': html([
+        common,
+        artifact('chunk:home', 'chunk', '.home{display:block}', 1),
+      ]),
+      'guides/start/index.html': html([
+        common,
+        artifact('chunk:guide', 'chunk', '.guide{display:grid}', 1),
+      ]),
     });
 
     await runBuild(
@@ -258,41 +386,78 @@ describe('Astro build-wide CSS extraction', () => {
     );
 
     const nested = await read(root, 'guides/start/index.html');
-    expect(nested).toContain('href="/docs/assets/' + assetName(nested) + '"');
-    expect(await read(root, `assets/${assetName(nested)}`)).toBe(common.css);
+    expect(nested).toContain(
+      'href="/docs/assets/' + assetName(nested, 'shared') + '"',
+    );
+    expect(nested).toContain(
+      'href="/docs/assets/' + assetName(nested, 'page') + '"',
+    );
+    expect(await read(root, `assets/${assetName(nested, 'shared')}`)).toBe(
+      common.css,
+    );
+    expect(await read(root, `assets/${assetName(nested, 'page')}`)).toBe(
+      '.guide{display:grid}',
+    );
   });
 
-  it('emits deterministic asset names and content across builds', async () => {
+  it('emits deterministic shared and page assets across builds', async () => {
     const common = artifact('chunk:common', 'chunk', '.common{gap:1rem}', 0);
+    const local = artifact('chunk:local', 'chunk', '.local{margin:1rem}', 1);
     const first = await makeOutput({
-      'index.html': html([common]),
+      'index.html': html([common, local]),
       'about.html': html([common]),
     });
     const second = await makeOutput({
-      'index.html': html([common]),
+      'index.html': html([common, local]),
       'about.html': html([common]),
     });
-    const changedArtifact = artifact(
+    const changedSharedArtifact = artifact(
       'chunk:changed',
       'chunk',
       '.common{gap:2rem}',
       0,
     );
-    const changed = await makeOutput({
-      'index.html': html([changedArtifact]),
-      'about.html': html([changedArtifact]),
+    const changedShared = await makeOutput({
+      'index.html': html([changedSharedArtifact, local]),
+      'about.html': html([changedSharedArtifact]),
+    });
+    const changedLocal = artifact(
+      'chunk:local-changed',
+      'chunk',
+      '.local{margin:2rem}',
+      1,
+    );
+    const changedPage = await makeOutput({
+      'index.html': html([common, changedLocal]),
+      'about.html': html([common]),
     });
 
     await runBuild(first, { css: { mode: 'extract' } });
     await runBuild(second, { css: { mode: 'extract' } });
-    await runBuild(changed, { css: { mode: 'extract' } });
+    await runBuild(changedShared, { css: { mode: 'extract' } });
+    await runBuild(changedPage, { css: { mode: 'extract' } });
     const firstPage = await read(first, 'index.html');
     const secondPage = await read(second, 'index.html');
-    const changedPage = await read(changed, 'index.html');
-    expect(assetName(firstPage)).toBe(assetName(secondPage));
-    expect(assetName(firstPage)).not.toBe(assetName(changedPage));
-    expect(await read(first, `_astro/${assetName(firstPage)}`)).toBe(
-      await read(second, `_astro/${assetName(secondPage)}`),
+    const changedSharedPage = await read(changedShared, 'index.html');
+    const changedPagePage = await read(changedPage, 'index.html');
+    expect(assetName(firstPage, 'shared')).toBe(
+      assetName(secondPage, 'shared'),
+    );
+    expect(assetName(firstPage, 'shared')).not.toBe(
+      assetName(changedSharedPage, 'shared'),
+    );
+    expect(assetName(firstPage, 'shared')).toBe(
+      assetName(changedPagePage, 'shared'),
+    );
+    expect(assetName(firstPage, 'page')).toBe(assetName(secondPage, 'page'));
+    expect(assetName(firstPage, 'page')).toBe(
+      assetName(changedSharedPage, 'page'),
+    );
+    expect(assetName(firstPage, 'page')).not.toBe(
+      assetName(changedPagePage, 'page'),
+    );
+    expect(await read(first, `_astro/${assetName(firstPage, 'shared')}`)).toBe(
+      await read(second, `_astro/${assetName(secondPage, 'shared')}`),
     );
   });
 
@@ -306,7 +471,13 @@ describe('Astro build-wide CSS extraction', () => {
 
     await runBuild(root, { css: { mode: 'extract' } });
 
+    const index = await read(root, 'index.html');
     expect(await read(root, 'plain/index.html')).toBe(plain);
+    expect(assetNames(index)).toEqual([assetName(index, 'page')]);
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      common.css,
+    );
+    expect(index).not.toContain('<style data-tasty-ssr');
   });
 
   it('keeps inline mode unchanged when css.mode is omitted', async () => {

@@ -235,8 +235,8 @@ This gives the same middleware deduplication and hook support, but ships zero cl
 
 #### Build-wide CSS extraction
 
-Static Astro builds can move repeated Tasty CSS into a content-hashed,
-browser-cacheable asset:
+Static Astro builds can move Tasty CSS into content-hashed, browser-cacheable
+shared and page assets:
 
 ```ts
 export default defineConfig({
@@ -257,14 +257,18 @@ output. Extraction requires Astro 5 or newer and only applies to prerendered
 production pages. Development, preview-time SSR, and on-demand routes continue
 to receive the normal inline `<style data-tasty-ssr>` output.
 
-Extraction moves the largest common block whose position can be preserved on
-every generated page into one stylesheet. Page-only component, global, and raw
-CSS stays inline, so unvisited routes do not receive unrelated styles.
+Extraction writes every artifact emitted by all styled pages to a shared
+stylesheet. Each page's strict set difference is written to a separate page
+stylesheet. The shared link comes first and the page link follows, so shared
+styles form the base cascade and page-only styles can override them. A fully
+shared page omits the empty page stylesheet. If generated pages have no common
+artifacts, each page receives only its page stylesheet.
 
-The asset is written under Astro's configured `build.assets` directory (for
-example, `/_astro/tasty.a1b2c3.css`). Links include the configured Astro
-`base`, so nested routes do not need relative-path handling. The content hash
-and output are deterministic for identical builds.
+Assets are written under Astro's configured `build.assets` directory (for
+example, `/_astro/tasty.shared.a1b2c3.css` and
+`/_astro/tasty.page.d4e5f6.css`). Links include the configured Astro `base`, so
+nested routes do not need relative-path handling. Content hashes and output are
+deterministic for identical builds.
 
 ### Manual middleware (advanced)
 
@@ -300,12 +304,12 @@ Astro's `@astrojs/react` renderer calls `renderToString()` for each React compon
 - The middleware reads the full response body, then injects the collected CSS into `</head>` before sending the final HTML.
 - In extraction mode, prerendered responses also carry temporary structured
   artifact metadata. `astro:build:done` uses those collector-provided
-  boundaries to write the shared asset and rewrite generated HTML, then removes
-  the metadata. CSS is never split on newlines or parsed heuristically.
+  boundaries to write shared and page assets and rewrite generated HTML, then
+  removes the metadata. CSS is never split on newlines or parsed heuristically.
 
 ### CSP nonce
 
-Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags. In extraction mode, page-local inline style tags and the external stylesheet link retain the nonce.
+Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags. In extraction mode, the external stylesheet links retain the nonce.
 
 ---
 

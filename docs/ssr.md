@@ -269,12 +269,13 @@ It does not preserve an inline artifact order where a page-only rule originally
 appeared before a shared rule. Use shared styles for defaults and page-only
 styles for overrides.
 
-Extracted CSS preserves `url()` values verbatim. Relative URLs in an inline
+Extracted CSS preserves resource URLs verbatim. Relative URLs in an inline
 style resolve from the page, but in an extracted stylesheet they resolve from
-the asset directory. Use root-relative URLs such as `url(/fonts/brand.woff2)`,
-absolute URLs, or data URLs when extraction is enabled. The build fails with a
-clear error if an extracted artifact contains a page-relative or fragment-only
-URL rather than silently changing its target.
+the asset directory. Use absolute URLs or data URLs when extraction is enabled.
+Root-relative URLs such as `url(/fonts/brand.woff2)` are also safe while the
+stylesheet stays on the page's origin. The build fails with a clear error if an
+artifact contains a page-relative or fragment-only URL, including URL strings
+in `image-set()`, `image()`, `src()`, and `@import`.
 
 Assets are written under Astro's configured `build.assets` directory (for
 example, `/_astro/tasty.shared.a1b2c3.css` and
@@ -282,7 +283,12 @@ example, `/_astro/tasty.shared.a1b2c3.css` and
 nested routes do not need relative-path handling. Content hashes and output are
 deterministic for identical builds. If `build.assetsPrefix` is configured,
 Tasty uses its CSS-specific prefix (or `fallback`) just like Astro-generated
-stylesheets.
+stylesheets. When that prefix points to a different origin, root-relative
+resources would resolve against the asset origin rather than the page's origin,
+so the build rejects them as well. Tasty compares the prefix with Astro's `site`
+when it is configured; without `site`, an absolute or protocol-relative prefix
+is treated conservatively as cross-origin. Use a fully absolute resource URL in
+that configuration.
 
 ### Manual middleware (advanced)
 
@@ -319,7 +325,8 @@ Astro's `@astrojs/react` renderer calls `renderToString()` for each React compon
 - In extraction mode, prerendered responses also carry temporary structured
   artifact metadata. `astro:build:done` uses those collector-provided
   boundaries to write shared and page assets and rewrite generated HTML, then
-  removes the metadata. CSS is never split on newlines or parsed heuristically.
+  removes the metadata. Artifact boundaries are never inferred by splitting or
+  reparsing the generated CSS.
 
 ### CSP nonce
 

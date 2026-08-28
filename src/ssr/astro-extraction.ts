@@ -95,7 +95,95 @@ function skipCSSString(css: string, start: number, quote: string): number {
   return css.length;
 }
 
-function findPageRelativeURL(css: string): string | null {
+function decodeCSSEscapes(value: string): string {
+  return value.replace(
+    /\\(?:([\da-f]{1,6})\s?|\r\n|[\n\r\f]|(.))/gi,
+    (_match, hex: string | undefined, escaped: string | undefined) => {
+      if (hex) {
+        const codePoint = Number.parseInt(hex, 16);
+        return codePoint === 0 || codePoint > 0x10ffff
+          ? '\ufffd'
+          : String.fromCodePoint(codePoint);
+      }
+      return escaped ?? '';
+    },
+  );
+}
+
+function readCSSIdentifier(
+  css: string,
+  start: number,
+): { name: string; end: number } | null {
+  let name = '';
+  let index = start;
+
+  while (index < css.length) {
+    const char = css[index];
+    if (/[-_a-z\d]/i.test(char) || char.charCodeAt(0) >= 0x80) {
+      name += char;
+      index++;
+      continue;
+    }
+    if (char !== '\\' || index + 1 >= css.length) break;
+
+    const hex = css.slice(index + 1).match(/^[\da-f]{1,6}/i)?.[0];
+    if (hex) {
+      name += decodeCSSEscapes(`\\${hex}`);
+      index += hex.length + 1;
+      if (/\s/.test(css[index] ?? '')) index++;
+      continue;
+    }
+
+    if (/\r|\n|\f/.test(css[index + 1])) break;
+    name += css[index + 1];
+    index += 2;
+  }
+
+  return index === start ? null : { name, end: index };
+}
+
+function skipCSSWhitespaceAndComments(css: string, start: number): number {
+  let index = start;
+  for (;;) {
+    while (/\s/.test(css[index] ?? '')) index++;
+    if (css[index] !== '/' || css[index + 1] !== '*') return index;
+    const commentEnd = css.indexOf('*/', index + 2);
+    if (commentEnd === -1) return css.length;
+    index = commentEnd + 2;
+  }
+}
+
+interface UnsafeCSSResource {
+  url: string;
+  rootRelative: boolean;
+}
+
+function classifyCSSResource(
+  rawURL: string,
+  rejectRootRelative: boolean,
+): UnsafeCSSResource | null {
+  const url = decodeCSSEscapes(rawURL).trim();
+  if (!url || url.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(url)) {
+    return null;
+  }
+  if (url.startsWith('/')) {
+    return rejectRootRelative ? { url: rawURL, rootRelative: true } : null;
+  }
+  return { url: rawURL, rootRelative: false };
+}
+
+function findUnsafeCSSResource(
+  css: string,
+  rejectRootRelative: boolean,
+): UnsafeCSSResource | null {
+  const functionStack: (string | null)[] = [];
+  const stringResourceFunctions = new Set([
+    'image',
+    'image-set',
+    '-webkit-image-set',
+    'src',
+  ]);
+
   for (let index = 0; index < css.length; index++) {
     if (css[index] === '/' && css[index + 1] === '*') {
       const commentEnd = css.indexOf('*/', index + 2);
@@ -103,26 +191,63 @@ function findPageRelativeURL(css: string): string | null {
       continue;
     }
 
-    if (css[index] === '"' || css[index] === "'") {
-      index = skipCSSString(css, index, css[index]) - 1;
+    const quote = css[index];
+    if (quote === '"' || quote === "'") {
+      const stringEnd = skipCSSString(css, index, quote);
+      if (stringResourceFunctions.has(functionStack.at(-1) ?? '')) {
+        const unsafe = classifyCSSResource(
+          css.slice(index + 1, stringEnd - 1),
+          rejectRootRelative,
+        );
+        if (unsafe) return unsafe;
+      }
+      index = stringEnd - 1;
       continue;
     }
 
-    if (
-      css.slice(index, index + 4).toLowerCase() !== 'url(' ||
-      (index > 0 && /[\w-]/.test(css[index - 1]))
-    ) {
+    if (css[index] === ')') {
+      functionStack.pop();
       continue;
     }
 
-    let valueStart = index + 4;
-    while (/\s/.test(css[valueStart] ?? '')) valueStart++;
+    if (css[index] === '(') {
+      functionStack.push(null);
+      continue;
+    }
 
+    if (css[index] === '@') {
+      const atRule = readCSSIdentifier(css, index + 1);
+      if (atRule?.name.toLowerCase() === 'import') {
+        const valueStart = skipCSSWhitespaceAndComments(css, atRule.end);
+        const importQuote = css[valueStart];
+        if (importQuote === '"' || importQuote === "'") {
+          const valueEnd = skipCSSString(css, valueStart, importQuote);
+          const unsafe = classifyCSSResource(
+            css.slice(valueStart + 1, valueEnd - 1),
+            rejectRootRelative,
+          );
+          if (unsafe) return unsafe;
+        }
+      }
+      continue;
+    }
+
+    const identifier = readCSSIdentifier(css, index);
+    if (!identifier || css[identifier.end] !== '(') continue;
+
+    const functionName = identifier.name.toLowerCase();
+    if (functionName !== 'url') {
+      functionStack.push(functionName);
+      index = identifier.end;
+      continue;
+    }
+
+    const valueStart = skipCSSWhitespaceAndComments(css, identifier.end + 1);
+    const urlQuote = css[valueStart];
+    const quoted = urlQuote === '"' || urlQuote === "'";
     let valueEnd: number;
-    const quote = css[valueStart];
-    const quoted = quote === '"' || quote === "'";
     if (quoted) {
-      valueEnd = skipCSSString(css, valueStart, quote) - 1;
+      valueEnd = skipCSSString(css, valueStart, urlQuote) - 1;
       index = css.indexOf(')', valueEnd + 1);
     } else {
       valueEnd = valueStart;
@@ -134,22 +259,56 @@ function findPageRelativeURL(css: string): string | null {
     }
 
     if (index === -1) return null;
-    const url = css.slice(valueStart + (quoted ? 1 : 0), valueEnd).trim();
-    if (url && !url.startsWith('/') && !/^[a-z][a-z\d+.-]*:/i.test(url)) {
-      return url;
-    }
+    const unsafe = classifyCSSResource(
+      css.slice(valueStart + (quoted ? 1 : 0), valueEnd),
+      rejectRootRelative,
+    );
+    if (unsafe) return unsafe;
   }
 
   return null;
 }
 
-function validateExtractedURLs(pages: ExtractablePage[]): void {
+function crossOriginAssetsPrefix(
+  assetsPrefix?: string | Record<string, string>,
+  site?: URL,
+): string | null {
+  if (!assetsPrefix) return null;
+  const prefix =
+    typeof assetsPrefix === 'string'
+      ? assetsPrefix
+      : assetsPrefix.css || assetsPrefix.fallback;
+  if (!/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(prefix)) return null;
+  if (!site) return prefix;
+
+  try {
+    const prefixURL = prefix.startsWith('//')
+      ? new URL(`${site.protocol}${prefix}`)
+      : new URL(prefix);
+    return prefixURL.origin === site.origin ? null : prefix;
+  } catch {
+    return prefix;
+  }
+}
+
+function validateExtractedURLs(
+  pages: ExtractablePage[],
+  assetsPrefix?: string | Record<string, string>,
+  site?: URL,
+): void {
+  const externalPrefix = crossOriginAssetsPrefix(assetsPrefix, site);
   for (const page of pages) {
     for (const artifact of page.artifacts) {
-      const url = findPageRelativeURL(artifact.css);
-      if (url) {
+      const unsafe = findUnsafeCSSResource(
+        artifact.css,
+        externalPrefix !== null,
+      );
+      if (unsafe) {
+        const reason = unsafe.rootRelative
+          ? `root-relative CSS URL "${unsafe.url}" would resolve against the external assetsPrefix "${externalPrefix}" instead of the page origin`
+          : `page-relative CSS URL "${unsafe.url}" cannot preserve its target`;
         throw new Error(
-          `[Tasty] Astro CSS extraction cannot preserve page-relative CSS URL "${url}" in ${page.path} (${artifact.kind} artifact ${artifact.id}). Use a root-relative URL such as url(/path/to/asset), an absolute URL, or a data URL.`,
+          `[Tasty] Astro CSS extraction cannot preserve ${reason} in ${page.path} (${artifact.kind} artifact ${artifact.id}). Use an absolute URL or a data URL${externalPrefix ? '' : ', or a root-relative URL such as url(/path/to/asset)'}.`,
         );
       }
     }
@@ -223,6 +382,7 @@ export async function extractAstroCSS(options: {
   base: string;
   assets: string;
   assetsPrefix?: string | Record<string, string>;
+  site?: URL;
 }): Promise<void> {
   const outputDir = fileURLToPath(options.dir);
   const paths = await findHTMLFiles(outputDir);
@@ -234,7 +394,7 @@ export async function extractAstroCSS(options: {
     )
   ).filter((page): page is ExtractablePage => page !== null);
   if (pages.length === 0) return;
-  validateExtractedURLs(pages);
+  validateExtractedURLs(pages, options.assetsPrefix, options.site);
 
   const shared = selectSharedArtifacts(pages);
   const assetDir = join(outputDir, options.assets);

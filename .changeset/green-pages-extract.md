@@ -1,5 +1,5 @@
 ---
-'@tenphi/tasty': patch
+'@tenphi/tasty': minor
 ---
 
 Extract common Astro CSS as the base cascade and each page's remaining Tasty

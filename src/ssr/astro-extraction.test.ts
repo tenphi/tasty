@@ -48,6 +48,7 @@ async function runBuild(
   options: Parameters<typeof tastyIntegration>[0],
   config: {
     base?: string;
+    site?: URL;
     build?: {
       assets?: string;
       assetsPrefix?: string | Record<string, string>;
@@ -152,6 +153,131 @@ describe('Astro build-wide CSS extraction', () => {
     },
   );
 
+  it.each([
+    [
+      'image-set string',
+      '.icon { background-image: image-set("images/icon.png" 1x); }',
+      'images/icon.png',
+    ],
+    [
+      'vendor image-set string',
+      '.icon { background-image: -webkit-image-set("../icon.png" 1x); }',
+      '../icon.png',
+    ],
+    [
+      'image function string',
+      '.icon { background-image: image("./fallback.png"); }',
+      './fallback.png',
+    ],
+    [
+      'src function string',
+      '@font-face { src: src("fonts/brand.woff2"); }',
+      'fonts/brand.woff2',
+    ],
+    ['import string', '@import "theme.css";', 'theme.css'],
+    [
+      'escaped url function',
+      String.raw`.icon { background-image: u\72l(images/icon.png); }`,
+      'images/icon.png',
+    ],
+    [
+      'escaped relative URL value',
+      String.raw`.icon { background-image: url(\2e /images/icon.png); }`,
+      String.raw`\2e /images/icon.png`,
+    ],
+  ])('rejects a page-relative %s', async (_label, css, url) => {
+    const item = artifact('raw:relative-resource', 'raw', css, 0);
+    const original = html([item]);
+    const root = await makeOutput({ 'index.html': original });
+
+    await expect(runBuild(root, { css: { mode: 'extract' } })).rejects.toThrow(
+      `page-relative CSS URL "${url}"`,
+    );
+    expect(await read(root, 'index.html')).toBe(original);
+  });
+
+  it.each([
+    ['string', 'https://cdn.example.com'],
+    [
+      'CSS map',
+      {
+        css: 'https://css.example.com',
+        fallback: 'https://cdn.example.com',
+      },
+    ],
+    ['fallback map', { fallback: '//cdn.example.com' }],
+  ] as const)(
+    'rejects root-relative CSS URLs with an external %s assetsPrefix',
+    async (_label, assetsPrefix) => {
+      const item = artifact(
+        'raw:root-relative-url',
+        'raw',
+        '.icon { background-image: url(/images/icon.svg); }',
+        0,
+      );
+      const original = html([item]);
+      const root = await makeOutput({ 'index.html': original });
+
+      await expect(
+        runBuild(
+          root,
+          { css: { mode: 'extract' } },
+          { build: { assetsPrefix } },
+        ),
+      ).rejects.toThrow(
+        'root-relative CSS URL "/images/icon.svg" would resolve against the external assetsPrefix',
+      );
+      expect(await read(root, 'index.html')).toBe(original);
+    },
+  );
+
+  it('allows root-relative URLs with a same-origin assetsPrefix path', async () => {
+    const item = artifact(
+      'raw:root-relative-url',
+      'raw',
+      '.icon { background-image: image-set("/images/icon.svg" 1x); }',
+      0,
+    );
+    const root = await makeOutput({ 'index.html': html([item]) });
+
+    await runBuild(
+      root,
+      { css: { mode: 'extract' } },
+      { build: { assetsPrefix: '/cdn' } },
+    );
+
+    const index = await read(root, 'index.html');
+    expect(index).toContain('href="/cdn/_astro/');
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      item.css,
+    );
+  });
+
+  it('allows root-relative URLs with a configured same-origin absolute assetsPrefix', async () => {
+    const item = artifact(
+      'raw:root-relative-url',
+      'raw',
+      '.icon { background-image: url(/images/icon.svg); }',
+      0,
+    );
+    const root = await makeOutput({ 'index.html': html([item]) });
+
+    await runBuild(
+      root,
+      { css: { mode: 'extract' } },
+      {
+        site: new URL('https://site.example.com'),
+        build: { assetsPrefix: 'https://site.example.com/static' },
+      },
+    );
+
+    const index = await read(root, 'index.html');
+    expect(index).toContain('href="https://site.example.com/static/_astro/');
+    expect(await read(root, `_astro/${assetName(index, 'page')}`)).toBe(
+      item.css,
+    );
+  });
+
   it('accepts location-independent CSS URLs without matching comments or strings', async () => {
     const item = artifact(
       'raw:safe-urls',
@@ -161,6 +287,9 @@ describe('Astro build-wide CSS extraction', () => {
         '.absolute { background: url("https://cdn.example.com/image.png"); }',
         '.protocol-relative { background: url(//cdn.example.com/image.png); }',
         '.data { background: url(data:image/png;base64,AA==); }',
+        '.set { background: image-set("https://cdn.example.com/a.png" 1x); }',
+        '.typed-set { background: image-set(url(/a.png) type("image/png") 1x); }',
+        '@import url("https://cdn.example.com/theme.css");',
         '/* url(comment-relative.png) */',
         '.label::before { content: "url(string-relative.png)"; }',
       ].join('\n'),

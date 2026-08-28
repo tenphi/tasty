@@ -320,8 +320,21 @@ function buildChunkBreakdown(
 // Global-type CSS helper (internal only)
 // ---------------------------------------------------------------------------
 
+/**
+ * Every prefix `registry.globalRules` is keyed by. Anything missing here is a
+ * rule the summary would hold but never count, which is how the totals stopped
+ * adding up the first time.
+ */
+const GLOBAL_RULE_PREFIXES = {
+  global: 'global:',
+  property: 'property:',
+  fontFace: 'fontface:',
+  counterStyle: 'counterstyle:',
+  function: 'function:',
+} as const;
+
 function getGlobalTypeCSS(
-  type: 'global' | 'raw' | 'keyframes' | 'property',
+  type: keyof typeof GLOBAL_RULE_PREFIXES | 'raw' | 'keyframes',
   root: Document | ShadowRoot = document,
 ): { css: string; ruleCount: number; size: number } {
   const registry = getRegistry(root);
@@ -329,6 +342,17 @@ function getGlobalTypeCSS(
 
   const chunks: string[] = [];
   let rc = 0;
+
+  if (type === 'raw') {
+    // Raw blocks are kept by the sheet manager, not in `globalRules`, so the
+    // prefix scan below never sees them.
+    const css = injector.instance.getRawCSSText({ root });
+    return {
+      css: prettifyCSS(css),
+      ruleCount: countRules(css),
+      size: css.length,
+    };
+  }
 
   if (type === 'keyframes') {
     for (const [, entry] of registry.keyframesCache) {
@@ -348,8 +372,7 @@ function getGlobalTypeCSS(
       }
     }
   } else {
-    const prefix =
-      type === 'global' ? 'global:' : type === 'raw' ? 'raw:' : 'property:';
+    const prefix = GLOBAL_RULE_PREFIXES[type];
     for (const [key, ri] of registry.globalRules) {
       if (!key.startsWith(prefix)) continue;
       const sheetInfo = registry.sheets[ri.sheetIndex];
@@ -620,12 +643,29 @@ export const tastyDebug = {
     const rawData = getGlobalTypeCSS('raw', root);
     const kfData = getGlobalTypeCSS('keyframes', root);
     const propData = getGlobalTypeCSS('property', root);
+    // Folded into the global line rather than given their own: they are all
+    // at-rules injected once and kept forever, and leaving them out of the
+    // total is what made it not a total.
+    const atRuleData = (
+      ['fontFace', 'counterStyle', 'function'] as const
+    ).reduce(
+      (all, type) => {
+        const data = getGlobalTypeCSS(type, root);
+        return {
+          css: data.css ? `${all.css}\n${data.css}`.trim() : all.css,
+          ruleCount: all.ruleCount + data.ruleCount,
+          size: all.size + data.size,
+        };
+      },
+      { css: '', ruleCount: 0, size: 0 },
+    );
 
     const totalRuleCount =
       activeRuleCount +
       unusedRuleCount +
       countRules(hotCSS) +
       globalData.ruleCount +
+      atRuleData.ruleCount +
       rawData.ruleCount +
       kfData.ruleCount +
       propData.ruleCount;
@@ -641,14 +681,14 @@ export const tastyDebug = {
       totalStyledClasses,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
-      globalCSSSize: globalData.size,
+      globalCSSSize: globalData.size + atRuleData.size,
       rawCSSSize: rawData.size,
       keyframesCSSSize: kfData.size,
       propertyCSSSize: propData.size,
       totalCSSSize: allCSS.length,
       activeRuleCount,
       unusedRuleCount,
-      globalRuleCount: globalData.ruleCount,
+      globalRuleCount: globalData.ruleCount + atRuleData.ruleCount,
       rawRuleCount: rawData.ruleCount,
       keyframesRuleCount: kfData.ruleCount,
       propertyRuleCount: propData.ruleCount,
@@ -672,7 +712,7 @@ export const tastyDebug = {
           `Held:     ${hotClasses.length} classes, ${countRules(hotCSS)} rules, ${fmtSize(hotCSS.length)} (not rendered, not yet collectable)`,
         );
       console.log(
-        `Global:   ${globalData.ruleCount} rules, ${fmtSize(globalData.size)}`,
+        `Global:   ${globalData.ruleCount + atRuleData.ruleCount} rules, ${fmtSize(globalData.size + atRuleData.size)}`,
       );
       if (rawData.ruleCount)
         console.log(

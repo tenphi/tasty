@@ -3,11 +3,25 @@ import { cleanup, render } from '@testing-library/react';
 import { computeStyles } from './compute-styles';
 import { tastyDebug } from './debug';
 import { configure, resetConfig } from './config';
-import { destroy } from './injector';
+import {
+  counterStyle,
+  destroy,
+  fontFace,
+  func,
+  getCSSText,
+  injectGlobal,
+  injectRawCSS,
+  property,
+} from './injector';
 
 function Box(props: { color: string }) {
   const { className } = computeStyles({ color: props.color, padding: '2x' });
   return <div className={className} />;
+}
+
+/** Every top-level rule in the sheets, however it got there. */
+function sheetRuleCount(): number {
+  return (getCSSText().match(/\{[^}]*\}/g) ?? []).length;
 }
 
 describe('tastyDebug', () => {
@@ -113,6 +127,35 @@ describe('tastyDebug', () => {
       for (const cls of tastyDebug.summary({ raw: true }).unusedClasses) {
         expect(css).toContain(cls);
       }
+    });
+  });
+
+  describe('totals', () => {
+    it('counts every kind of rule the sheets hold', () => {
+      configure({ gc: { grace: 0 } });
+
+      // One of each: class rules, global, raw, @property, @font-face,
+      // @counter-style, @function, @keyframes.
+      const { className } = computeStyles({
+        color: '#red',
+        animation: 'fade 1s',
+        '@keyframes': { fade: { from: { opacity: 0 }, to: { opacity: 1 } } },
+      } as never);
+      const el = document.createElement('div');
+      el.className = className;
+      document.body.append(el);
+
+      injectGlobal([{ selector: '.debug-global', declarations: 'color: red' }]);
+      injectRawCSS('.debug-raw { color: blue; }');
+      property('--debug-prop', { syntax: '<length>', initialValue: '0px' });
+      fontFace('DebugFace', { src: 'url(a.woff2)' });
+      counterStyle('debug-counter', { system: 'cyclic', symbols: '"x"' });
+      func('--debug-fn', { returns: '<length>', body: '1px' });
+
+      const summary = tastyDebug.summary({ raw: true });
+
+      expect(summary.totalRuleCount).toBe(sheetRuleCount());
+      expect(summary.rawRuleCount).toBeGreaterThan(0);
     });
   });
 });

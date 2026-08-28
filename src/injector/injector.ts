@@ -757,7 +757,15 @@ export class StyleInjector {
       let entry = registry.localKeyframes.get(resolved);
 
       if (!entry) {
-        const injected = this.keyframes(definition, { name: resolved, root });
+        // `distinctByName`: the rules rewritten to this name need a rule under
+        // it. Two authored animations can share steps — `fade` and `spin` with
+        // the same from/to — and would otherwise collapse onto whichever name
+        // was injected first, leaving the other animating nothing.
+        const injected = this.keyframes(definition, {
+          name: resolved,
+          root,
+          distinctByName: true,
+        });
         entry = {
           name: injected.toString(),
           dispose: injected.dispose,
@@ -1187,11 +1195,27 @@ export class StyleInjector {
    */
   keyframes(
     steps: KeyframesSteps,
-    nameOrOptions?: string | { root?: Document | ShadowRoot; name?: string },
+    nameOrOptions?:
+      | string
+      | {
+          root?: Document | ShadowRoot;
+          name?: string;
+          /**
+           * Give this name its own rule even if another name already carries
+           * the same steps. Without it two names with identical steps share
+           * one rule under whichever name arrived first — fine when the caller
+           * only wants the animation, wrong when the name has to be the one it
+           * asked for.
+           */
+          distinctByName?: boolean;
+        },
   ): KeyframesResult {
     // Parse parameters
     const isStringName = typeof nameOrOptions === 'string';
     const providedName = isStringName ? nameOrOptions : nameOrOptions?.name;
+    const distinctByName = isStringName
+      ? false
+      : (nameOrOptions?.distinctByName ?? false);
     const root = isStringName ? document : nameOrOptions?.root || document;
     const registry = this.sheetManager.getRegistry(root);
 
@@ -1204,8 +1228,12 @@ export class StyleInjector {
       };
     }
 
-    // Generate content-based cache key (independent of provided name)
-    const contentHash = JSON.stringify(steps);
+    // Content-based cache key, scoped to the name when the caller needs that
+    // exact name to exist.
+    const contentHash =
+      distinctByName && providedName
+        ? `${providedName}\u0000${JSON.stringify(steps)}`
+        : JSON.stringify(steps);
 
     // Check if this exact content is already cached
     const existing = registry.keyframesCache.get(contentHash);

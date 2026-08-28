@@ -393,6 +393,36 @@ describe('local keyframes', () => {
     expect(firstName).not.toBe(secondName);
   });
 
+  it('gives two animations with identical steps a rule each', () => {
+    // `fade` and `spin` describe the same movement. The low-level cache keys
+    // keyframes by their steps, so without scoping it by name the second would
+    // collapse onto the first and animate nothing.
+    const Both = tasty({
+      styles: {
+        animation: 'fade 1s',
+        Content: { animation: 'spin 1s' },
+        '@keyframes': {
+          fade: { from: { opacity: 0 }, to: { opacity: 1 } },
+          spin: { from: { opacity: 0 }, to: { opacity: 1 } },
+        },
+      } as Styles,
+    });
+    const { container } = render(<Both />);
+
+    const emitted = [...getCSSText().matchAll(/@keyframes\s+([\w-]+)/g)].map(
+      (match) => match[1],
+    );
+    expect(emitted).toHaveLength(2);
+
+    // Whatever the rules name, a rule of that name has to exist.
+    const classCSS = injector.instance.getCSSTextForClasses(
+      domClasses(container),
+    );
+    for (const name of emitted) {
+      expect(classCSS).toContain(name);
+    }
+  });
+
   it('does not treat crossfade as a use of fade', () => {
     // One component runs `fade` at the root and `crossfade` on Content; a
     // second shares only the crossfade chunk. Matching declaration substrings

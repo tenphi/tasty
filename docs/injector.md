@@ -251,11 +251,12 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 - Most options have sensible defaults and auto-detection
 - `configure()` is optional - the injector works with defaults
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
-- `gc.releaseInterval`: Number of releases between collection passes. A component unmounting releases one entry per chunk it carried. When the counter reaches this value, a pass is scheduled via `requestIdleCallback`.
+- `gc.touchInterval`: Number of renders between sweeps. When the counter reaches this value, a sweep is scheduled via `requestIdleCallback`; without idle callbacks nothing is collected automatically.
+- `gc.grace`: How long a class is left alone after it was last known to be wanted, in milliseconds (default `10000`). A class is "wanted" when it is injected, and again every sweep that finds it on an element.
 
-> **Why collecting early is safe.** Rendering is not commit-aware: a concurrent render can yield between the render that names a class and the commit that mounts it, for any number of turns, and from outside React that is indistinguishable from a class that is finished. So collection does not try to tell them apart. A managed render writes nothing to a sheet — it resolves the class name and records the CSS it stands for — and the component's insertion effect inserts it on commit, re-creating anything that was collected in the meantime, before any layout effect runs. Deleting a rule early costs a re-insert, never a missing style.
+> **What the grace window is for.** Rendering is not commit-aware: a render can resolve a class and commit it a little later, and in between nothing on the page carries it. From outside React that is indistinguishable from a class that is finished, so collection does not try to tell them apart — it simply leaves alone anything that was in use recently. A render would have to stay pending for the whole window to lose its rules, and it gets them back on its next render.
 >
-> A bare `computeStyles()` has no commit to put its rules back, so it injects during the call and pins the class: never collected, and unaffected by any of this.
+> The window is also why collection costs nothing to run: the timestamp is written by the sweep's own DOM scan, so rendering tracks nothing per class.
 - `gc.capacity`: Maximum number of unused styles (not in the DOM, not pinned) to retain. When exceeded, the least recently used are evicted first. Rendered and pinned styles don't count against this limit.
 
 ---
@@ -388,10 +389,9 @@ gc({ force: true });
 // cleanup() is the same thing:
 cleanup();
 
-// Collection follows React commits. A styled component takes up its classes in
-// useInsertionEffect when it mounts and gives them back when it unmounts; every
-// `releaseInterval` releases, a pass runs in idle time and deletes whatever is
-// still unheld, keeping the `capacity` most recently released.
+// Every `touchInterval` renders, a sweep is scheduled in idle time. It scans
+// the DOM for the classes actually on the page, and deletes injected rules that
+// are not on it, not pinned, and were last wanted longer ago than `grace`.
 
 // Benefits:
 // - Activity-proportional: busy apps trigger GC more often

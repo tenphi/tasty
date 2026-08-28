@@ -789,17 +789,6 @@ function createDefaultConfig(isTest?: boolean): TastyConfig {
  * This locks the configuration - no further changes allowed.
  * Also injects internal and global properties.
  */
-/**
- * Bumped whenever the global injector is replaced. Caches that hold class names
- * across renders compare it to notice that the injector which knew what those
- * names stand for is gone.
- */
-let styleEpoch = 0;
-
-export function getStyleEpoch(): number {
-  return styleEpoch;
-}
-
 export function markStylesGenerated(): void {
   if (stylesGenerated) return; // Already marked, skip
 
@@ -1748,5 +1737,4 @@ export function resetConfig(): void {
   const storage: TastyGlobalStorage =
     typeof window !== 'undefined' ? window : globalThis;
   delete storage[GLOBAL_INJECTOR_KEY];
-  styleEpoch++;
 }

@@ -2,15 +2,11 @@
 '@tenphi/tasty': minor
 ---
 
-Style lifetime now follows React commits. A styled component takes up the classes its render resolved in a `useInsertionEffect` and gives them back when it unmounts; only a class that was held and then fully released is ever collected.
+Fix garbage collection of rendered styles. Since the render path became hook-free it no longer disposes the classes it injects, so their counts never fell back to `0` — and `gc()`, `cleanup()` and `tastyDebug.cleanup()` all treated a non-zero count as "still in use". Nothing was ever evicted, and injected CSS grew for the lifetime of the page.
 
-This replaces a model that could not work. Collection previously decided a class was finished by not finding it in the DOM, which is indistinguishable from a concurrent render that has resolved a class and not committed it yet — so a sweep could delete rules a pending render was about to attach. The new model does not try to tell those apart: a managed render writes nothing to a sheet, and the commit inserts from a recorded recipe, re-creating anything collected in between. Collecting early costs a re-insert, never a missing style.
+What a style is worth keeping is now decided by the DOM: a sweep scans for the classes actually on the page and deletes injected rules that are not on it, not pinned, and were last wanted longer ago than `gc.grace` (default 10s). Rendering is not commit-aware — a render can resolve a class and commit it a little later — and rather than try to tell that apart from a class that is finished, collection leaves anything recently in use alone.
 
-- `gc()` and `cleanup()` collect on demand; automatic collection is driven by unmounts, via the new `gc.releaseInterval`.
-- No `querySelectorAll('[class]')` anywhere — collection is map operations over what was released.
-- A bare `computeStyles()` has no commit to restore it, so it injects during the call and pins the class. SSR and RSC are unaffected: the commit hook is taken only where there is a document, so `tasty()` still works as a server component.
-- `touch()` is a deprecated no-op, `gc.touchInterval` gives way to `gc.releaseInterval`, and `StyleUsage` is replaced by `StyleRecipe`.
-- New: `acquireStyles`, `releaseStyles`, `defineRecipe`, `resolveChunk`, `hasRecipe`.
-- Collection is opt-in: without `gc` configured, components keep the synchronous path and pay nothing for a lifecycle they do not use.
-- Bundle limits move with the new code: main 56.6 -> 57.1 kB, core 53.65 -> 53.95 kB, babel-plugin 49.35 -> 49.8 kB.
-- Local `@keyframes` are part of what a class stands for. They go into the sheet when the class does and are disposed when it is collected, instead of being injected during render and never released.
+- New `gc.grace`. A class counts as wanted when it is injected, and again every sweep that finds it on an element.
+- Collection costs nothing on the render path: the timestamp is written by the sweep's own DOM scan, so nothing is tracked per class while rendering. `touch()` is now only a render counter, and `StyleUsage` is gone with the map it described.
+- `gc()` and `cleanup()` collect on demand, and now actually delete.
+- Local `@keyframes` are disposed with the class that animates them rather than leaking a reference per render.

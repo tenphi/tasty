@@ -108,7 +108,6 @@
     "bench:browser": "vitest bench --project browser",
     "bench:overhead": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-overhead.bench.tsx",
     "bench:injection": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-injection.bench.ts",
-    "bench:tree": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-tree.bench.tsx",
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "version": "changeset version",
@@ -209,13 +208,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.1 kB"
+      "limit": "56.6 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "53.95 kB"
+      "limit": "53.65 kB"
     },
     {
       "name": "static",
@@ -243,7 +242,7 @@
         "path",
         "crypto"
       ],
-      "limit": "49.8 kB"
+      "limit": "49.35 kB"
     }
   ]
 }

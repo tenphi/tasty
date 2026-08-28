@@ -1110,31 +1110,30 @@ describe('StyleInjector namePrefix', () => {
     rb.dispose();
   });
 
-  it('collects classes generated under the configured prefix', () => {
+  it('GC only collects classes carrying the configured prefix', () => {
     const gcInjector = new StyleInjector({
       forceTextInjection: true,
       namePrefix: 'mb',
-      gc: { capacity: 0 },
+      gc: { capacity: 0, grace: 0 },
     });
-    const cacheKey = 'gc-prefix-test';
-    const className = gcInjector.resolveChunk(cacheKey).name;
+    const { className, dispose } = gcInjector.inject(
+      cssToStyleResults('&{ color: red; }'),
+      { cacheKey: 'gc-prefix-test' },
+    );
 
     expect(className).toMatch(/^mb[a-z0-9]+$/);
 
-    gcInjector.defineRecipe(className, {
-      rules: cssToStyleResults('&{ color: red; }'),
-      cacheKey,
-    });
-    gcInjector.acquire(className);
+    // A default-prefix class on the page must not read as this injector's
+    // class being live, and must not stop it collecting.
+    const stranger = document.createElement('div');
+    stranger.className = 't999';
+    document.body.appendChild(stranger);
 
-    expect(gcInjector.getCSSText()).toContain('color: red');
-    expect(gcInjector.gc({ force: true })).toBe(0);
-
-    gcInjector.release(className);
+    dispose();
 
     expect(gcInjector.gc({ force: true })).toBe(1);
-    expect(gcInjector.getCSSText()).not.toContain('color: red');
 
+    stranger.remove();
     gcInjector.destroy();
   });
 

@@ -7,7 +7,6 @@ A diff here is a public API change and must be reflected in a changeset.
 
 ## @tenphi/tasty
 
-value      acquireStyles
 type       AllBaseProps
 type       AllBasePropsWithMods
 type       AnyStyleHandler
@@ -60,7 +59,6 @@ type       DebugOptions
 value      DEFAULT_NAME_PREFIX
 value      DEFAULT_ZERO_NAME_PREFIX
 value      defineHandler
-value      defineRecipe
 value      destroy
 value      DIMENSION_CHUNK_STYLES
 value      DIMENSION_STYLES
@@ -108,7 +106,6 @@ value      getRgbValuesFromRgbaString
 value      hasGlobalKeyframes
 value      hasGlobalRecipes
 value      hasPendingStyleWrites
-value      hasRecipe
 value      hasStylesGenerated
 value      hexToRgb
 value      hslToRgbValues
@@ -170,13 +167,11 @@ type       QueuedWrite
 type       RawCSSResult
 type       RawStyleHandler
 type       RecipeStyles
-value      releaseStyles
 type       RenderResult
 value      renderStyles
 value      resetConfig
 value      resetStyleBatch
 type       ResolveAsProps
-value      resolveChunk
 type       ResolvedStyleValue
 value      resolveFunctionColor
 type       ResolveModPropDef
@@ -206,7 +201,6 @@ type       StyleInjectorConfig
 type       StyleMap
 value+type StyleParser
 type       StylePropValue
-type       StyleRecipe
 type       StyleResult
 type       StyleRule
 type       Styles
@@ -296,7 +290,6 @@ value      withTastyZero
 
 ## @tenphi/tasty/core
 
-value      acquireStyles
 type       AnyStyleHandler
 value      APPEARANCE_CHUNK_STYLES
 type       AtRuleContext
@@ -345,7 +338,6 @@ type       DebugOptions
 value      DEFAULT_NAME_PREFIX
 value      DEFAULT_ZERO_NAME_PREFIX
 value      defineHandler
-value      defineRecipe
 value      destroy
 value      DIMENSION_CHUNK_STYLES
 value      DIMENSION_STYLES
@@ -390,7 +382,6 @@ value      getRgbValuesFromRgbaString
 value      hasGlobalKeyframes
 value      hasGlobalRecipes
 value      hasPendingStyleWrites
-value      hasRecipe
 value      hasStylesGenerated
 value      hexToRgb
 value      hslToRgbValues
@@ -450,12 +441,10 @@ type       QueuedWrite
 type       RawCSSResult
 type       RawStyleHandler
 type       RecipeStyles
-value      releaseStyles
 type       RenderResult
 value      renderStyles
 value      resetConfig
 value      resetStyleBatch
-value      resolveChunk
 type       ResolvedStyleValue
 value      resolveFunctionColor
 value      resolveRecipes
@@ -482,7 +471,6 @@ type       StyleInjectorConfig
 type       StyleMap
 value+type StyleParser
 type       StylePropValue
-type       StyleRecipe
 type       StyleResult
 type       StyleRule
 type       Styles

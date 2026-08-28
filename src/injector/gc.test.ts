@@ -5,16 +5,7 @@ function createStyleRule(selector: string, declarations: string): StyleRule {
   return { selector, declarations } as StyleRule;
 }
 
-/**
- * Collection follows React commits. A component acquires the classes its render
- * resolved when it mounts and releases them when it unmounts; only a class that
- * was acquired and then fully released can ever be deleted.
- *
- * These exercise the injector directly — `acquire`/`release` stand in for the
- * insertion effect that calls them. `src/style-lifetime.test.tsx` covers the
- * same contract through React.
- */
-describe('GC: acquire / release / gc', () => {
+describe('GC: touch / gc', () => {
   let injector: StyleInjector;
 
   beforeEach(() => {
@@ -22,7 +13,9 @@ describe('GC: acquire / release / gc', () => {
     document.body.innerHTML = '';
     injector = new StyleInjector({
       forceTextInjection: true,
-      gc: { releaseInterval: 5, capacity: 3 },
+      // `grace: 0` for the collection tests: the window is what stops a class
+      // being taken the moment it is created, and has its own suite below.
+      gc: { touchInterval: 5, capacity: 3, grace: 0 },
     });
   });
 
@@ -32,107 +25,46 @@ describe('GC: acquire / release / gc', () => {
     document.body.innerHTML = '';
   });
 
-  /** Describe a class the way a managed render does, without writing it. */
-  function describeClass(name: string, declarations = 'color: red') {
-    const cacheKey = `key:${name}`;
-    const className = injector.resolveChunk(cacheKey).name;
-    injector.defineRecipe(className, {
-      rules: [createStyleRule(`.${name}.${name}`, declarations)],
-      cacheKey,
-    });
-
-    return className;
-  }
-
-  const registry = () => injector['sheetManager'].getRegistry(document);
-
   // -------------------------------------------------------------------------
-  // acquire / release
+  // touch
   // -------------------------------------------------------------------------
 
-  describe('acquire', () => {
-    it('inserts the rules a recipe describes', () => {
-      const className = describeClass('a');
+  describe('touch', () => {
+    it('schedules a sweep every touchInterval renders', () => {
+      let scheduled = 0;
+      const origRIC = globalThis.requestIdleCallback;
+      (globalThis as any).requestIdleCallback = () => ++scheduled;
 
-      expect(injector.getCSSText()).not.toContain('color: red');
+      // touchInterval is 5
+      for (let i = 0; i < 5; i++) injector.touch('t0');
 
-      injector.acquire(className);
+      expect(scheduled).toBe(1);
 
-      expect(injector.getCSSText()).toContain('color: red');
-      expect(registry().committed.get(className)).toBe(1);
+      (globalThis as any).requestIdleCallback = origRIC;
     });
 
-    it('counts every holder of the same class', () => {
-      const className = describeClass('b');
+    it('does nothing without gc configured', () => {
+      const plain = new StyleInjector({ forceTextInjection: true });
+      let scheduled = 0;
+      const origRIC = globalThis.requestIdleCallback;
+      (globalThis as any).requestIdleCallback = () => ++scheduled;
 
-      injector.acquire(className);
-      injector.acquire(className);
+      for (let i = 0; i < 50; i++) plain.touch('t0');
 
-      expect(registry().committed.get(className)).toBe(2);
-      expect(injector.gc({ force: true })).toBe(0);
+      expect(scheduled).toBe(0);
+
+      (globalThis as any).requestIdleCallback = origRIC;
+      plain.destroy();
     });
 
-    it('acquires every chunk of a space-separated className', () => {
-      const first = describeClass('c1', 'color: red');
-      const second = describeClass('c2', 'order: 1');
+    it('tracks nothing per class — the sweep decides what is wanted', () => {
+      const registry = injector['sheetManager'].getRegistry(document);
 
-      injector.acquire(`${first} ${second}`);
+      injector.touch('t0 t1 t2');
 
-      expect(registry().committed.get(first)).toBe(1);
-      expect(registry().committed.get(second)).toBe(1);
-    });
-
-    it('puts back a class that was collected while a render was pending', () => {
-      const className = describeClass('d');
-
-      injector.acquire(className);
-      injector.release(className);
-      expect(injector.gc({ force: true })).toBe(1);
-      expect(injector.getCSSText()).not.toContain('color: red');
-
-      // The pending render finally commits.
-      injector.acquire(className);
-
-      expect(injector.getCSSText()).toContain('color: red');
-    });
-  });
-
-  describe('release', () => {
-    it('does not delete on the way past', () => {
-      const className = describeClass('e');
-
-      injector.acquire(className);
-      injector.release(className);
-
-      // Cleanups and setups interleave component by component, so the class a
-      // component just dropped may be picked straight back up by the next one.
-      expect(injector.getCSSText()).toContain('color: red');
-      expect(registry().candidates.has(className)).toBe(true);
-    });
-
-    it('only makes a class collectible once every holder is gone', () => {
-      const className = describeClass('f');
-
-      injector.acquire(className);
-      injector.acquire(className);
-      injector.release(className);
-
-      expect(injector.gc({ force: true })).toBe(0);
-
-      injector.release(className);
-
-      expect(injector.gc({ force: true })).toBe(1);
-    });
-
-    it('cancels the candidacy when the class is acquired again', () => {
-      const className = describeClass('g');
-
-      injector.acquire(className);
-      injector.release(className);
-      injector.acquire(className);
-
-      expect(registry().candidates.has(className)).toBe(false);
-      expect(injector.gc({ force: true })).toBe(0);
+      // No per-class bookkeeping on the render path at all: one counter.
+      expect(registry.touchCount).toBe(1);
+      expect(registry.lastSeenAt.size).toBe(0);
     });
   });
 
@@ -141,165 +73,255 @@ describe('GC: acquire / release / gc', () => {
   // -------------------------------------------------------------------------
 
   describe('gc', () => {
-    it('never collects a class no component ever held', () => {
-      // A bare computeStyles() or a pinned inject() has no commit to put it
-      // back, so it is never a candidate however unused it looks.
-      injector.inject([createStyleRule('.loose.loose', 'color: red')]);
+    it('should skip when unused count is within capacity', () => {
+      const { className, dispose } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      injector.touch(className);
+      dispose();
 
-      expect(injector.gc({ force: true })).toBe(0);
-      expect(injector.getCSSText()).toContain('color: red');
+      // capacity is 3, 1 unused entry → within capacity
+      const swept = injector.gc();
+      expect(swept).toBe(0);
     });
 
-    it('never collects a pinned class', () => {
-      const cacheKey = 'key:pinned';
-      const { className } = injector.inject(
-        [createStyleRule('.pinned.pinned', 'color: red')],
-        { cacheKey },
-      );
+    it('should not count pinned styles against capacity', () => {
+      const classNames: string[] = [];
 
-      injector.acquire(className);
-      injector.release(className);
-
-      expect(injector.gc({ force: true })).toBe(0);
-    });
-
-    it('should skip when the candidate count is within capacity', () => {
-      const className = describeClass('h');
-
-      injector.acquire(className);
-      injector.release(className);
-
-      // capacity is 3, 1 candidate → within capacity
-      expect(injector.gc()).toBe(0);
-    });
-
-    it('should not count held styles against capacity', () => {
+      // Create 5 styles, all pinned
       for (let i = 0; i < 5; i++) {
-        injector.acquire(describeClass(`held-${i}`, `order: ${i}`));
+        const { className } = injector.inject([
+          createStyleRule(`.test-${i}`, `order: ${i}`),
+        ]);
+        classNames.push(className);
+        injector.touch(className);
       }
 
-      expect(injector.gc()).toBe(0);
+      // capacity=3, but all 5 are pinned → 0 unused → skip
+      const swept = injector.gc();
+      expect(swept).toBe(0);
     });
 
-    it('should evict least recently released first when over capacity', () => {
-      const classNames = Array.from({ length: 5 }, (_, i) =>
-        describeClass(`lru-${i}`, `order: ${i}`),
-      );
-
-      for (const className of classNames) injector.acquire(className);
-      for (const className of classNames) injector.release(className);
-
-      // Stagger the release stamps, oldest first
+    it('should evict oldest unused styles when over capacity', () => {
+      const classNames: string[] = [];
+      const disposeFns: (() => void)[] = [];
       const now = Date.now();
-      classNames.forEach((className, i) => {
-        registry().candidates.set(className, now - (5 - i) * 1000);
-      });
 
-      // capacity=3, 5 candidates → evict the 2 oldest
-      expect(injector.gc()).toBe(2);
-      expect(registry().rules.has(classNames[0])).toBe(false);
-      expect(registry().rules.has(classNames[1])).toBe(false);
-      expect(registry().rules.has(classNames[2])).toBe(true);
-      expect(registry().rules.has(classNames[4])).toBe(true);
+      for (let i = 0; i < 5; i++) {
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.test-${i}`, `order: ${i}`),
+        ]);
+        classNames.push(className);
+        disposeFns.push(dispose);
+      }
+
+      const registry = injector['sheetManager'].getRegistry(document);
+
+      // Stagger when each was last seen (oldest first)
+      for (let i = 0; i < 5; i++) {
+        registry.lastSeenAt.set(classNames[i], now - (5 - i) * 1000);
+      }
+
+      // Dispose all so they are eligible for GC
+      for (const dispose of disposeFns) {
+        dispose();
+      }
+
+      // capacity=3, 5 unused → should evict 2 oldest
+      const swept = injector.gc();
+
+      expect(swept).toBe(2);
+      // The two oldest (classNames[0], classNames[1]) should be gone
+      expect(registry.rules.has(classNames[0])).toBe(false);
+      expect(registry.rules.has(classNames[1])).toBe(false);
+      // The three newest should remain
+      expect(registry.rules.has(classNames[2])).toBe(true);
+      expect(registry.rules.has(classNames[3])).toBe(true);
+      expect(registry.rules.has(classNames[4])).toBe(true);
+    });
+
+    it('should never evict styles currently in the DOM', () => {
+      const { className, dispose } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+
+      injector.touch(className);
+      dispose();
+
+      // Put the className in the DOM
+      const el = document.createElement('div');
+      el.className = className;
+      document.body.appendChild(el);
+
+      const swept = injector.gc({ force: true });
+
+      expect(swept).toBe(0);
+    });
+
+    it('should never evict pinned styles', () => {
+      // Create 5 styles, all pinned (not disposed)
+      for (let i = 0; i < 5; i++) {
+        const { className } = injector.inject([
+          createStyleRule(`.test-${i}`, `order: ${i}`),
+        ]);
+        injector.touch(className);
+      }
+
+      const swept = injector.gc({ force: true });
+
+      expect(swept).toBe(0);
     });
 
     it('should return 0 when there is nothing to evict', () => {
-      expect(injector.gc()).toBe(0);
+      const swept = injector.gc();
+      expect(swept).toBe(0);
     });
 
     it('should clean up registry entries after eviction', () => {
-      const cacheKey = 'key:i';
-      const className = injector.resolveChunk(cacheKey).name;
-      injector.defineRecipe(className, {
-        rules: [createStyleRule('.i.i', 'color: red')],
-        cacheKey,
-      });
+      const { className, dispose } = injector.inject(
+        [createStyleRule('.t0.t0', 'color: red')],
+        { cacheKey: 'test-key' },
+      );
 
-      injector.acquire(className);
-      injector.release(className);
+      injector.touch(className);
+      dispose();
 
-      expect(injector.gc({ force: true })).toBe(1);
-      expect(registry().rules.has(className)).toBe(false);
-      expect(registry().candidates.has(className)).toBe(false);
-      expect(registry().cacheKeyToClassName.has(cacheKey)).toBe(false);
+      // Force-evict
+      const swept = injector.gc({ force: true });
+
+      expect(swept).toBe(1);
+      const registry = injector['sheetManager'].getRegistry(document);
+      expect(registry.rules.has(className)).toBe(false);
+      expect(registry.cacheKeyToClassName.has('test-key')).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // gc({ force: true })
+  // -------------------------------------------------------------------------
 
   describe('gc({ force: true })', () => {
-    it('should remove ALL candidates regardless of capacity', () => {
-      const className = describeClass('j');
+    it('should remove ALL unused styles regardless of capacity', () => {
+      const { className, dispose } = injector.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      injector.touch(className);
+      dispose();
 
-      injector.acquire(className);
-      injector.release(className);
+      // one candidate, capacity is 3 — normally would skip
+      const swept = injector.gc({ force: true });
 
-      // capacity is 3 — normally would skip
-      expect(injector.gc({ force: true })).toBe(1);
-      expect(registry().candidates.size).toBe(0);
+      expect(swept).toBe(1);
+      expect(
+        injector['sheetManager'].getRegistry(document).rules.has(className),
+      ).toBe(false);
+    });
+
+    it('should still protect DOM-live and pinned styles', () => {
+      const r1 = injector.inject([createStyleRule('.t0.t0', 'color: red')]);
+      const r2 = injector.inject([createStyleRule('.t1.t1', 'color: blue')]);
+      const { className: c3, dispose: d3 } = injector.inject([
+        createStyleRule('.t2.t2', 'color: green'),
+      ]);
+
+      injector.touch(r1.className);
+      injector.touch(r2.className);
+      injector.touch(c3);
+
+      // r1: pinned (not disposed)
+      // r2: in DOM
+      r2.dispose();
+      const el = document.createElement('div');
+      el.className = r2.className;
+      document.body.appendChild(el);
+      // c3: disposed, not in DOM → evictable
+      d3();
+
+      const swept = injector.gc({ force: true });
+
+      expect(swept).toBe(1);
+      const registry = injector['sheetManager'].getRegistry(document);
+      expect(registry.rules.has(r1.className)).toBe(true);
+      expect(registry.rules.has(r2.className)).toBe(true);
+      expect(registry.rules.has(c3)).toBe(false);
     });
   });
 
   // -------------------------------------------------------------------------
-  // scheduling
+  // destroy
   // -------------------------------------------------------------------------
 
-  describe('scheduling', () => {
-    it('schedules a pass once releases reach releaseInterval', () => {
-      let scheduled = 0;
-      const origRIC = globalThis.requestIdleCallback;
-      (globalThis as any).requestIdleCallback = () => ++scheduled;
+  // -------------------------------------------------------------------------
+  // grace
+  // -------------------------------------------------------------------------
 
-      for (let i = 0; i < 5; i++) {
-        const className = describeClass(`sched-${i}`, `order: ${i}`);
-        injector.acquire(className);
-        injector.release(className);
-      }
+  describe('grace', () => {
+    function graceInjector(grace: number) {
+      return new StyleInjector({
+        forceTextInjection: true,
+        gc: { touchInterval: 5, capacity: 0, grace },
+      });
+    }
 
-      expect(scheduled).toBe(1);
+    it('leaves a class alone while it is still within the window', () => {
+      const graced = graceInjector(10_000);
+      const { dispose } = graced.inject([
+        createStyleRule('.fresh.fresh', 'color: red'),
+      ]);
+      dispose();
 
-      (globalThis as any).requestIdleCallback = origRIC;
+      // Nothing carries it and nothing pins it, but it was wanted a moment ago:
+      // a render that resolved it may not have committed yet.
+      expect(graced.gc({ force: true })).toBe(0);
+
+      graced.destroy();
     });
 
-    it('never runs the pass inline', async () => {
-      const gcSpy = vi.spyOn(injector, 'gc');
-      const origRIC = globalThis.requestIdleCallback;
-      delete (globalThis as any).requestIdleCallback;
+    it('collects it once the window has passed', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.stale.stale', 'color: red'),
+      ]);
+      dispose();
 
-      for (let i = 0; i < 5; i++) {
-        const className = describeClass(`inline-${i}`, `order: ${i}`);
-        injector.acquire(className);
-        injector.release(className);
-      }
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.lastSeenAt.set(className, Date.now() - 20_000);
 
-      // Releases run inside insertion-effect cleanups; collecting there would
-      // race the setups that follow.
-      expect(gcSpy).not.toHaveBeenCalled();
+      expect(graced.gc({ force: true })).toBe(1);
 
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(gcSpy).toHaveBeenCalled();
-
-      (globalThis as any).requestIdleCallback = origRIC;
+      graced.destroy();
     });
 
-    it('should not double-schedule while a pass is pending', () => {
-      let callbackCount = 0;
-      const origRIC = globalThis.requestIdleCallback;
-      (globalThis as any).requestIdleCallback = () => ++callbackCount;
+    it('refreshes the window every time a sweep finds the class rendered', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject([
+        createStyleRule('.t0.t0', 'color: red'),
+      ]);
+      dispose();
 
-      for (let i = 0; i < 12; i++) {
-        const className = describeClass(`double-${i}`, `order: ${i}`);
-        injector.acquire(className);
-        injector.release(className);
-      }
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.lastSeenAt.set(className, Date.now() - 20_000);
 
-      expect(callbackCount).toBe(1);
+      const el = document.createElement('div');
+      el.className = className;
+      document.body.appendChild(el);
 
-      (globalThis as any).requestIdleCallback = origRIC;
+      // The sweep sees it live, so it is wanted now — and stays untouchable
+      // for a full window after it leaves.
+      expect(graced.gc({ force: true })).toBe(0);
+      el.remove();
+      expect(graced.gc({ force: true })).toBe(0);
+
+      expect(Date.now() - registry.lastSeenAt.get(className)!).toBeLessThan(
+        1_000,
+      );
+
+      graced.destroy();
     });
   });
 
   describe('destroy', () => {
-    it('should cancel a pending pass on full destroy', () => {
+    it('should cancel pending GC on full destroy', () => {
       let cancelledId: number | null = null;
       const origRIC = globalThis.requestIdleCallback;
       const origCIC = globalThis.cancelIdleCallback;
@@ -308,10 +330,13 @@ describe('GC: acquire / release / gc', () => {
         cancelledId = id;
       };
 
+      // Reach the touch interval so a GC is pending
       for (let i = 0; i < 5; i++) {
-        const className = describeClass(`destroy-${i}`, `order: ${i}`);
-        injector.acquire(className);
-        injector.release(className);
+        const { className, dispose } = injector.inject([
+          createStyleRule(`.destroy-${i}`, `order: ${i}`),
+        ]);
+        injector.touch(className);
+        dispose();
       }
 
       injector.destroy();

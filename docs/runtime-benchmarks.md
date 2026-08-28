@@ -1,15 +1,13 @@
 # Runtime Benchmarks
 
 Tasty keeps its performance claims in reproducible benchmarks rather than
-combining unlike measurements into one score. The repository measures four
+combining unlike measurements into one score. The repository measures three
 different costs:
 
 1. Style parsing and generation in Node.
 2. The React overhead of an empty `tasty({})` wrapper.
 3. Cold browser generation and injection compared with equivalent CSS that is
    already on the page.
-4. A representative React update that combines wrapper, cache, generation,
-   injection, and style-resolution work.
 
 These are focused microbenchmarks, not page-load or interaction scores. Run
 them several times on an otherwise idle machine and use a production profile
@@ -21,10 +19,9 @@ to decide whether any cost matters in an application.
 pnpm bench
 pnpm bench:overhead
 pnpm bench:injection
-pnpm bench:tree
 ```
 
-`pnpm bench` runs the core pipeline benchmarks in Node. The other three commands
+`pnpm bench` runs the core pipeline benchmarks in Node. The other two commands
 use production code paths in headless Chromium. The first checkout may require
 `pnpm test:setup` to download Chromium.
 
@@ -106,21 +103,17 @@ snapshot experiment with controlled garbage collection.
 work when Tasty must generate and inject CSS that an otherwise equivalent page
 already has. It does not compare different stylesheet insertion techniques.
 
-The benchmark covers four group sizes with one style-resolution boundary per
-group:
+The benchmark covers two useful workloads:
 
-- **One new rule:** add one rule, append its element, and immediately read its
-  computed style. Each sample performs 50 independent groups for timer
-  stability.
-- **10 new rules together:** generate and insert 10 rules, append their 10
-  elements, then read every computed color without another write. Each sample
-  performs 10 independent groups.
-- **100 or 1,000 new rules together:** perform the same sequence once per
-  sample with 100 or 1,000 rules before the resolution boundary.
-
-Repeating the smaller groups inside one sample only raises the measurement
-above Chromium's timer resolution. Results are divided by that repetition
-count, so every row below describes one group with one resolution boundary.
+- **One new rule:** add one rule to an existing stylesheet, append its one
+  element, and immediately read its computed style. Each timed sample performs
+  50 independent one-rule transactions and reports their total; dividing the
+  raw/Tasty difference by 50 produces a stable per-rule result despite
+  Chromium's 0.1 ms timer resolution.
+- **1,000 new rules together:** generate and insert all 1,000 rules into one
+  stylesheet, append all 1,000 elements, then read every computed color without
+  another write in between. This gives the browser one style-resolution
+  boundary for the group.
 
 For every transaction, the existing-CSS control has the equivalent stylesheet
 parsed, adopted, and attached before timing. The runtime root has a Tasty
@@ -137,20 +130,20 @@ the result. Pre-creating both stylesheets also excludes one-time sheet creation
 and adoption from the subtraction.
 
 On an Apple M3 Pro with Chromium 151, three consecutive runs produced these
-normalized ranges:
+ranges:
 
-| New rules before one resolution | Groups per sample | Incremental cost per group | Incremental cost per rule |
-| ------------------------------: | ----------------: | -------------------------: | ------------------------: |
-|                               1 |                50 |             0.111–0.114 ms |                111–114 us |
-|                              10 |                10 |             0.142–0.159 ms |              14.2–15.9 us |
-|                             100 |                 1 |               0.90–0.94 ms |                9.0–9.4 us |
-|                           1,000 |                 1 |               7.58–8.10 ms |                7.6–8.1 us |
+| Workload                                             | CSS already present |  Tasty runtime | Incremental Tasty cost |
+| ---------------------------------------------------- | ------------------: | -------------: | ---------------------: |
+| One new rule + immediate resolution, per transaction |          2.8–3.3 us | 110.3–113.8 us |         107.3–111.0 us |
+| 1,000 new rules + one resolution                     |        1.86–2.06 ms |   9.01–9.98 ms |           7.13–7.92 ms |
+| 1,000-rule workload, incremental cost per rule       |                   — |              — |             7.1–7.9 us |
 
-The curve makes the fixed work visible. Delivering 1,000 rules before one
-resolution boundary cost roughly 67–73 times as much in total as delivering
-one rule and resolving it, not 1,000 times as much. The average incremental
-cost per rule was roughly 14–15 times lower because the group amortized fixed
-transaction work and let the browser resolve all stylesheet writes together.
+Directly compared, injecting 1,000 rules before one resolution boundary cost
+about 66–71 times as much in total as injecting one rule and resolving it—not
+1,000 times as much. Its average incremental cost per rule was about 14–16
+times lower. This is the same Tasty generation and injection path in both cases;
+the group amortizes fixed transaction work and lets the browser resolve all the
+stylesheet writes together.
 
 The subtraction is the meaningful result. It includes Tasty's cold style
 generation, cache and injector bookkeeping, rule insertion, and any additional
@@ -159,41 +152,12 @@ pretend to isolate `insertRule()` from the system that calls it.
 
 This is a deliberately cold workload. Reused styles resolve from cache and do
 not inject another rule. Different rule complexity, DOM shape, stylesheet size,
-browser, and hardware will change the number. Because the same group and
-resolution pattern is present in each workload's control, the difference
-answers the narrower delivery question: how much extra work did Tasty perform
-when the same CSS was not already there?
-
-## Representative React Tree
-
-[`tasty-tree.bench.tsx`](../src/tasty-tree.bench.tsx) bridges the isolated
-measurements with one production React update. Every path updates 1,000 host
-elements sharing 20 combinations of `color` and `padding`, then reads computed
-styles after the commit:
-
-- **CSS already present:** raw elements switch between classes whose rules were
-  attached before timing.
-- **Tasty, warm:** the elements switch between two sets of Tasty styles that
-  were generated before timing.
-- **Tasty, cold:** every update introduces 20 new combinations shared across
-  the 1,000 elements.
-
-The Tasty paths use the normal component API and `TastyBatchProvider`. On an
-Apple M3 Pro with production React 19.2.4 and Chromium 151, three consecutive
-runs produced these mean ranges:
-
-| Update path                         | Total time for 1,000 elements |
-| ----------------------------------- | ----------------------------: |
-| CSS already present                 |                  1.64–1.70 ms |
-| Tasty, shared styles already cached |                  4.17–4.43 ms |
-| Tasty, 20 new shared styles         |                  4.62–4.80 ms |
-
-In this workload, the warmed Tasty path added 2.52–2.73 ms over raw elements
-with existing CSS. Introducing 20 new shared combinations added another
-0.38–0.55 ms over the warm Tasty update. This is a synthetic update, not an
-application score: it excludes effects, layout reads, paint, and concurrent
-scheduling, while deliberately making all 1,000 elements participate in every
-commit.
+browser, and hardware will change the number. The single-rule and 1,000-rule
+results are not interchangeable: the first crosses the injection-to-resolution
+boundary once per rule, while the second lets the browser resolve 1,000 writes
+together. Because the same resolution pattern is present in each workload's
+control, the difference answers the narrower delivery question: how much extra
+work did Tasty perform when the same CSS was not already there?
 
 ## Reading the Results Together
 
@@ -206,8 +170,6 @@ They describe different paths:
   rule.
 - A genuinely new style pays generation and injection once, then becomes
   reusable.
-- A tree that shares a small style vocabulary pays the wrapper path per element
-  but cold generation only per new combination.
 - Browser style resolution, layout, and paint depend on the actual document and
   need application-level profiling.
 

@@ -60,48 +60,36 @@ export interface StyleInjectorConfig {
  * Per-className usage tracking for GC.
  */
 /**
- * The CSS a class name stands for, kept so the class can be re-created.
- *
- * This is what makes collection safe: a render hands a class name to a
- * component before the commit that mounts it, and collection can run in
- * between. The component's insertion effect re-inserts from the recipe when it
- * finally commits, so deleting a rule early costs a re-insert, never a
- * missing style.
- */
-export interface StyleRecipe {
-  rules: StyleResult[];
-  cacheKey?: string;
-  /**
-   * `@keyframes` these rules animate, by the name they were authored under.
-   *
-   * Kept here rather than injected during render for the same reason as the
-   * rules themselves: a render that is discarded must leave nothing behind.
-   * They are injected when the class is, and disposed when it is deleted —
-   * the injected name can differ from the authored one, so the animation
-   * declarations are rewritten at that point.
-   */
-  keyframes?: Record<string, KeyframesSteps>;
-}
-
-/**
  * Configuration for the style garbage collector.
  *
- * Collection is driven by React commits, not by timers or DOM scans: a styled
- * component acquires its classes in `useInsertionEffect` and releases them when
- * it unmounts. Every `releaseInterval` releases, a pass is scheduled to delete
- * whatever is still at zero, keeping the `capacity` most recently released.
+ * GC is triggered by touch count rather than timers: every `touchInterval`
+ * touches, an idle callback is scheduled to evict unused styles above
+ * `capacity`, oldest first.
  */
 export interface GCConfig {
   /**
-   * Number of releases between automatic collection passes. A component
-   * unmounting releases one entry per chunk it carried.
+   * How long a class is left alone after it was last known to be wanted, in
+   * milliseconds (default 10,000).
+   *
+   * Rendering is not commit-aware: a render can resolve a class and commit it a
+   * little later, and in between nothing on the page carries it. Rather than
+   * try to tell that apart from a class that is finished — which cannot be done
+   * from outside React — collection simply does not touch anything that was in
+   * use recently. A render would have to stay pending for the whole window to
+   * lose its rules, and it gets them back on its next render.
+   */
+  grace?: number;
+
+  /**
+   * Number of touch events between automatic GC cycles.
    * @default 1000
    */
-  releaseInterval?: number;
+  touchInterval?: number;
   /**
-   * Maximum number of collectible styles to retain. Collection evicts the
-   * least recently released first once this is exceeded. Mounted styles and
-   * pinned styles do not count against it.
+   * Maximum number of unused styles to retain.
+   * GC evicts the oldest unused styles when this limit is exceeded.
+   * Pinned styles and DOM-live styles
+   * do not count against this limit.
    * @default 1000
    */
   capacity?: number;
@@ -237,12 +225,18 @@ export interface RootRegistry {
   globalRules: Map<string, RuleInfo>; // globalKey -> rule info
   /** Resolver for auto-inferring @property types from declaration values */
   propertyTypeResolver: PropertyTypeResolver;
-  /** className -> how many mounted components hold it (0 means collectible) */
-  committed: Map<string, number>;
-  /** className -> disposers for the @keyframes its rules animate */
-  keyframeHandles: Map<string, (() => void)[]>;
-  /** className -> when it last dropped to zero, for least-recently-released order */
-  candidates: Map<string, number>;
+  /**
+   * className -> the last moment the class was known to be wanted: when it was
+   * injected, and every sweep that finds it on an element. Collection leaves
+   * anything stamped within the grace window alone, and orders the rest
+   * least-recently-seen first.
+   *
+   * Written only when a class is created and by the sweep's own DOM scan, so
+   * rendering never pays for it.
+   */
+  lastSeenAt: Map<string, number>;
+  /** Renders since the last scheduled sweep (per-root) */
+  touchCount: number;
   /** How many entries from `window.__TASTY__` have been synced into this registry */
   serverClassSyncIndex: number;
   /** Whether `<style data-tasty-rsc>` tags have been scanned for class names */

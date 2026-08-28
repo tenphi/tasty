@@ -16,7 +16,6 @@ import type {
   GCOptions,
   GlobalInjectResult,
   InjectOptions,
-  StyleRecipe,
   InjectResult,
   KeyframesResult,
   KeyframesSteps,
@@ -228,88 +227,24 @@ export function getCSSTextForNode(
 }
 
 /**
- * The class name a cache key resolves to, and whether its CSS is described
- * already. Pure — safe during render.
- */
-export function resolveChunk(cacheKey: string): {
-  name: string;
-  described: boolean;
-} {
-  return getGlobalInjector().resolveChunk(cacheKey);
-}
-
-/** Whether this class has already been described, so its CSS need not be re-rendered. */
-export function hasRecipe(className: string): boolean {
-  return getGlobalInjector().hasRecipe(className);
-}
-
-/**
- * Record the CSS a class name stands for without writing it to a sheet, so the
- * commit that mounts it can insert it — and put it back if it was collected.
- */
-export function defineRecipe(className: string, recipe: StyleRecipe): void {
-  const injector = getGlobalInjector();
-
-  // Describing a class is where styles are first generated on the managed
-  // path — the sheet write comes later, at commit — so this is what locks the
-  // configuration and emits the global tokens and @property rules those
-  // declarations resolve against.
-  markStylesGenerated();
-
-  injector.defineRecipe(className, recipe);
-}
-
-/**
- * Take up styles on commit: insert whatever is missing from the sheet and count
- * one more mounted holder. Call from `useInsertionEffect`, and pair with
- * `releaseStyles` in its cleanup.
- *
- * `className` may hold several space-separated chunk classes; they are acquired
- * together, so one component pays one effect.
- */
-export function acquireStyles(
-  className: string,
-  options?: { root?: Document | ShadowRoot },
-): void {
-  const injector = getGlobalInjector();
-
-  // A commit can be the first thing that reaches the sheet — hydration, or a
-  // class whose recipe another render described.
-  markStylesGenerated();
-
-  injector.acquire(className, options);
-}
-
-/**
- * Give up styles on unmount. At zero holders the classes become collectible,
- * but nothing is deleted here — see `gc()`.
- */
-export function releaseStyles(
-  className: string,
-  options?: { root?: Document | ShadowRoot },
-): void {
-  getGlobalInjector().release(className, options);
-}
-
-/**
- * Remove every injected rule that no mounted component holds and no `inject()`
- * handle pins. Equivalent to `gc({ force: true })`.
+ * Remove every injected rule that is neither in the DOM nor held by an
+ * outstanding `inject()` handle. Equivalent to `gc({ force: true })`.
  */
 export function cleanup(root?: Document | ShadowRoot): void {
   return getGlobalInjector().cleanup(root);
 }
 
 /**
- * @deprecated No longer does anything. Collection follows React commits —
- * styled components acquire their classes in `useInsertionEffect` and release
- * them on unmount — so there is no usage counter left to feed. Kept so existing
- * imports keep working; remove the call.
+ * Record a render-time usage hit for one or more classNames.
+ * Used internally by computeStyles and tasty() to track usage for GC.
+ * When the global touch counter reaches `touchInterval`, schedules GC.
  */
 export function touch(
-  _className: string,
-  _options?: { root?: Document | ShadowRoot },
+  className: string,
+  options?: { root?: Document | ShadowRoot },
 ): void {
-  /* no-op */
+  if (!getConfig().gc) return;
+  getGlobalInjector().touch(className, options);
 }
 
 /**
@@ -381,7 +316,6 @@ export type {
   CounterStyleDescriptors,
   FunctionDefinition,
   FunctionParameter,
-  StyleRecipe,
   GCConfig,
   GCOptions,
 } from './types';

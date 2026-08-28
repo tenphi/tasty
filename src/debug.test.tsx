@@ -10,6 +10,7 @@ import {
   func,
   getCSSText,
   injectGlobal,
+  getRawCSSText,
   injectRawCSS,
   property,
 } from './injector';
@@ -19,9 +20,24 @@ function Box(props: { color: string }) {
   return <div className={className} />;
 }
 
-/** Every top-level rule in the sheets, however it got there. */
+/**
+ * Every top-level rule the engine actually holds, read from the parsed sheets.
+ *
+ * Not a brace count over the CSS text: one rule can contain many blocks
+ * (`@keyframes`, `@media`) and one raw block can hold many rules, so counting
+ * braces answers neither question — and gets the right total only when those
+ * two errors happen to cancel.
+ */
 function sheetRuleCount(): number {
-  return (getCSSText().match(/\{[^}]*\}/g) ?? []).length;
+  let total = 0;
+
+  for (const el of document.head.querySelectorAll(
+    'style[data-tasty], style[data-tasty-raw]',
+  )) {
+    total += (el as HTMLStyleElement).sheet?.cssRules.length ?? 0;
+  }
+
+  return total;
 }
 
 describe('tastyDebug', () => {
@@ -156,6 +172,24 @@ describe('tastyDebug', () => {
 
       expect(summary.totalRuleCount).toBe(sheetRuleCount());
       expect(summary.rawRuleCount).toBeGreaterThan(0);
+
+      // Raw bytes belong in the totals too — they are in their own sheet, so
+      // reading only the managed ones leaves them out.
+      expect(summary.totalCSSSize).toBeGreaterThanOrEqual(
+        getCSSText().length + getRawCSSText().length,
+      );
+      expect(tastyDebug.css('all', { raw: true })).toContain('.debug-raw');
+    });
+
+    it('counts one raw at-rule as one rule', () => {
+      configure({ gc: { grace: 0 } });
+
+      injectRawCSS(
+        '@keyframes raw-review { from { opacity: 0 } 50% { opacity: .5 } to { opacity: 1 } }',
+      );
+
+      // Three blocks, one rule. Counting braces would say three.
+      expect(tastyDebug.summary({ raw: true }).rawRuleCount).toBe(1);
     });
   });
 });

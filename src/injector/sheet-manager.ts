@@ -1572,6 +1572,27 @@ export class SheetManager {
   /**
    * Get the raw CSS content
    */
+  /**
+   * Top-level rules in the raw sheet.
+   *
+   * Read from the sheet the engine parsed, not from the text: a raw block is
+   * one string but any number of rules, and one rule — `@keyframes`, `@media` —
+   * can contain any number of blocks, so counting braces answers neither
+   * question.
+   */
+  getRawRuleCount(root: Document | ShadowRoot): number {
+    const sheet = this.isAdoptedMode(root)
+      ? this.rawConstructableSheets.get(root as ShadowRoot)
+      : this.rawStyleElements.get(root)?.sheet;
+
+    try {
+      return sheet?.cssRules.length ?? 0;
+    } catch {
+      // Sheet not readable (not yet attached, or cross-origin).
+      return 0;
+    }
+  }
+
   getRawCSSText(root: Document | ShadowRoot): string {
     // In adopted mode, read from the blocks map (source of truth)
     if (this.isAdoptedMode(root)) {

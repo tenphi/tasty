@@ -345,11 +345,14 @@ function getGlobalTypeCSS(
 
   if (type === 'raw') {
     // Raw blocks are kept by the sheet manager, not in `globalRules`, so the
-    // prefix scan below never sees them.
+    // prefix scan below never sees them — and their rules are counted from the
+    // parsed sheet, since one raw block is one string but any number of rules.
     const css = injector.instance.getRawCSSText({ root });
+    const sheetManager = injector.instance._sheetManager;
+
     return {
       css: prettifyCSS(css),
-      ruleCount: countRules(css),
+      ruleCount: sheetManager?.getRawRuleCount(root) ?? 0,
       size: css.length,
     };
   }
@@ -508,7 +511,11 @@ export const tastyDebug = {
       }
     } else if (typeof target === 'string') {
       if (target === 'all') {
-        css = injector.instance.getCSSText({ root });
+        // Documented as component + global + raw, and raw has its own sheet.
+        css =
+          `${injector.instance.getCSSText({ root })}\n${injector.instance.getRawCSSText(
+            { root },
+          )}`.trim();
       } else if (target === 'global') {
         css = getGlobalTypeCSS('global', root).css;
         return css; // already prettified
@@ -634,7 +641,10 @@ export const tastyDebug = {
     const unusedCSS = injector.instance.getCSSTextForClasses(unusedClasses, {
       root,
     });
-    const allCSS = injector.instance.getCSSText({ root });
+    // `getCSSText()` covers the managed sheets; raw CSS lives in its own.
+    const managedCSS = injector.instance.getCSSText({ root });
+    const allCSS =
+      `${managedCSS}\n${injector.instance.getRawCSSText({ root })}`.trim();
 
     const activeRuleCount = countRules(activeCSS);
     const unusedRuleCount = countRules(unusedCSS);

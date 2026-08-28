@@ -52,11 +52,22 @@ describe('Astro production extraction fixture', () => {
     expect(about).not.toContain('<script');
 
     const css = await readFile(resolve(output, '_astro', tastyAsset!), 'utf8');
-    expect(css).toContain('display: block');
-    expect(css).toContain('padding: 10px');
-    expect(css).not.toContain('margin: 12px');
-    expect(index).toContain('margin: 12px');
-    expect(about).not.toContain('margin: 12px');
+    for (const expected of [
+      '@property --extract-size',
+      '@font-face',
+      '@counter-style extract-counter',
+      '@function --extract-double',
+      '.extract-raw',
+      '.extract-global',
+      'display: block',
+      '@keyframes extract-fade',
+    ]) {
+      expect(css).toContain(expected);
+    }
+    expect(css).not.toContain('page-only-fade');
+    expect(index).toContain('page-only-fade');
+    expect(about).not.toContain('page-only-fade');
+    expect(about).not.toContain('<style data-tasty-ssr');
   }, 30_000);
 });
 

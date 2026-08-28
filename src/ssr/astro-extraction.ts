@@ -174,7 +174,8 @@ function transformPage(
 
   const before = page.artifacts.slice(0, first);
   const after = page.artifacts.slice(first + selected.length);
-  const link = `<link rel="stylesheet" href="${href}" data-tasty-ssr>`;
+  const nonceAttr = page.styleOpen.match(/\snonce="[^"]*"/)?.[0] ?? '';
+  const link = `<link rel="stylesheet" href="${href}" data-tasty-ssr${nonceAttr}>`;
   const replacement =
     styleTag(page.styleOpen, before) + link + styleTag(page.styleOpen, after);
 

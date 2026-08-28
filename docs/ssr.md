@@ -305,7 +305,7 @@ Astro's `@astrojs/react` renderer calls `renderToString()` for each React compon
 
 ### CSP nonce
 
-Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags. In extraction mode, any page-local inline style tags retain the nonce; the external stylesheet link does not require one.
+Call `configure({ nonce: '...' })` before any rendering happens. The middleware reads the nonce and applies it to injected `<style>` and `<script>` tags. In extraction mode, page-local inline style tags and the external stylesheet link retain the nonce.
 
 ---
 
@@ -468,7 +468,7 @@ Class names are also derived from the _resolved_ styles, so the server and the c
 
 ### Styles duplicated after hydration
 
-**Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`) configured via `configure()` is automatically deduplicated. When Tasty detects `<style data-tasty-ssr>` in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
+**Global CSS** (`:root` tokens, `@property`, `globalStyles`, `@font-face`, `@counter-style`, `@function`) configured via `configure()` is automatically deduplicated. When Tasty detects an inline or extracted `[data-tasty-ssr]` stylesheet in the document, it skips client-side injection of globals that were already rendered by the SSR collector. This means `configure()` can be called with the full config on both server and client — no `typeof window === 'undefined'` guard is needed.
 
 **Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, you can remove the SSR style tags and hydration scripts manually after hydration:
 

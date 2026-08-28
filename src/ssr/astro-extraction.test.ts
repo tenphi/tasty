@@ -66,6 +66,120 @@ function assetName(page: string): string {
 }
 
 describe('Astro build-wide CSS extraction', () => {
+  it('extracts every collector artifact kind and preserves the CSP nonce', async () => {
+    const shared = [
+      artifact(
+        'property:shared',
+        'property',
+        '@property --size { syntax: "<length>"; inherits: false; initial-value: 0px; }',
+        0,
+      ),
+      artifact(
+        'font-face:shared',
+        'font-face',
+        '@font-face { font-family: Shared; src: local("Arial"); }',
+        1,
+      ),
+      artifact(
+        'counter-style:shared',
+        'counter-style',
+        '@counter-style shared { system: cyclic; symbols: "•"; }',
+        2,
+      ),
+      artifact(
+        'function:shared',
+        'function',
+        '@function --double(--value <number>) { result: calc(var(--value) * 2); }',
+        3,
+      ),
+      artifact('raw:shared', 'raw', '.raw { --shared: 1; }', 4),
+      artifact('global:shared', 'global', 'body { margin: 0; }', 5),
+      artifact('chunk:shared', 'chunk', '.shared { display: block; }', 6),
+      artifact(
+        'keyframes:shared',
+        'keyframes',
+        '@keyframes shared { to { opacity: .5; } }',
+        7,
+      ),
+    ];
+    const root = await makeOutput({
+      'index.html': html(shared, 'abc'),
+      'about.html': html(shared, 'abc'),
+    });
+
+    await runBuild(root, { css: { mode: 'extract' } });
+
+    const index = await read(root, 'index.html');
+    expect(await read(root, `_astro/${assetName(index)}`)).toBe(
+      shared.map(({ css }) => css).join('\n'),
+    );
+    expect(index).toContain('data-tasty-ssr nonce="abc"');
+    expect(index).not.toContain('<style data-tasty-ssr');
+    expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(1);
+  });
+
+  it('keeps differing ancillary rule kinds local around shared CSS', async () => {
+    const pageArtifacts = (marker: string) => [
+      artifact(
+        `property:${marker}`,
+        'property',
+        `@property --${marker} { syntax: "<number>"; }`,
+        0,
+      ),
+      artifact(
+        `font-face:${marker}`,
+        'font-face',
+        `@font-face { font-family: ${marker}; src: url(${marker}.woff2); }`,
+        1,
+      ),
+      artifact(
+        `counter-style:${marker}`,
+        'counter-style',
+        `@counter-style ${marker} { system: cyclic; symbols: "${marker}"; }`,
+        2,
+      ),
+      artifact(
+        `function:${marker}`,
+        'function',
+        `@function --${marker}() { result: ${marker}; }`,
+        3,
+      ),
+      artifact(`raw:${marker}`, 'raw', `.raw-${marker} { --x: 1; }`, 4),
+      artifact(
+        `global:${marker}`,
+        'global',
+        `.global-${marker} { color: ${marker}; }`,
+        5,
+      ),
+      artifact('chunk:shared', 'chunk', '.shared { display: block; }', 6),
+      artifact(
+        `keyframes:${marker}`,
+        'keyframes',
+        `@keyframes ${marker} { to { opacity: .5; } }`,
+        7,
+      ),
+    ];
+    const root = await makeOutput({
+      'index.html': html(pageArtifacts('red'), 'abc'),
+      'about.html': html(pageArtifacts('blue'), 'abc'),
+    });
+
+    await runBuild(root, { css: { mode: 'extract' } });
+
+    const index = await read(root, 'index.html');
+    const about = await read(root, 'about.html');
+    expect(await read(root, `_astro/${assetName(index)}`)).toBe(
+      '.shared { display: block; }',
+    );
+    expect(index).toContain('red');
+    expect(index).not.toContain('blue');
+    expect(about).toContain('blue');
+    expect(about).not.toContain('red');
+    expect(index.match(/<style data-tasty-ssr nonce="abc">/g)).toHaveLength(2);
+    expect(index.match(/<link rel="stylesheet"/g)).toHaveLength(1);
+    expect(index).toContain('data-tasty-ssr nonce="abc"');
+  });
+
   it('extracts a shared block and keeps page-only component CSS local', async () => {
     const common = artifact('chunk:common', 'chunk', '.common{color:red}', 0);
     const one = artifact('chunk:one', 'chunk', '.one{display:block}', 1);

@@ -1059,28 +1059,40 @@ export class SheetManager {
   }
 
   /**
+   * The CSS of one managed sheet, or `null` when it holds none this can read —
+   * an empty style element, or a sheet the engine refuses to hand over.
+   */
+  private readSheetCSS(sheetInfo: SheetInfo): string | null {
+    try {
+      if (sheetInfo.constructableSheet) {
+        const rules = Array.from(sheetInfo.constructableSheet.cssRules);
+        return rules.map((rule) => rule.cssText).join('\n');
+      }
+
+      if (sheetInfo.sheet) {
+        const styleElement = sheetInfo.sheet;
+        if (styleElement.textContent) return styleElement.textContent;
+        if (styleElement.sheet) {
+          const rules = Array.from(styleElement.sheet.cssRules);
+          return rules.map((rule) => rule.cssText).join('\n');
+        }
+      }
+    } catch (error) {
+      console.warn('[Tasty] Failed to read CSS from sheet:', error);
+    }
+
+    return null;
+  }
+
+  /**
    * Get CSS text from all sheets (for SSR)
    */
   getCSSText(registry: RootRegistry): string {
     const cssChunks: string[] = [];
 
     for (const sheetInfo of registry.sheets) {
-      try {
-        if (sheetInfo.constructableSheet) {
-          const rules = Array.from(sheetInfo.constructableSheet.cssRules);
-          cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
-        } else if (sheetInfo.sheet) {
-          const styleElement = sheetInfo.sheet;
-          if (styleElement.textContent) {
-            cssChunks.push(styleElement.textContent);
-          } else if (styleElement.sheet) {
-            const rules = Array.from(styleElement.sheet.cssRules);
-            cssChunks.push(rules.map((rule) => rule.cssText).join('\n'));
-          }
-        }
-      } catch (error) {
-        console.warn('[Tasty] Failed to read CSS from sheet:', error);
-      }
+      const css = this.readSheetCSS(sheetInfo);
+      if (css !== null) cssChunks.push(css);
     }
 
     return cssChunks.join('\n');
@@ -1573,45 +1585,56 @@ export class SheetManager {
    * Get the raw CSS content
    */
   /**
-   * The CSS this injector owns in `root`, in the order the engine applies it.
+   * The CSS this injector owns in `root`, one entry per sheet, in the order the
+   * engine applies them.
    *
    * `getCSSText()` walks the managed sheets only, and raw CSS has its own —
-   * which sits before or after them depending on how it got there: prepended
-   * to `adoptedStyleSheets`, or wherever in `<head>` the first raw injection
-   * happened to land. Reporting a fixed order would describe the opposite
-   * winner from the live page whenever two rules of equal specificity meet.
+   * which sits before, after, or *between* them depending on how it got there:
+   * prepended to `adoptedStyleSheets`, or wherever in `<head>` the first raw
+   * injection happened to land, with every managed sheet opened afterwards
+   * following it. Reporting a fixed order would describe the opposite winner
+   * from the live page whenever two rules of equal specificity meet, so the raw
+   * sheet is spliced in at the position the DOM actually gives it.
    */
   getOwnedCSSInOrder(
     registry: RootRegistry,
     root: Document | ShadowRoot,
   ): string[] {
-    const managed = this.getCSSText(registry);
     const raw = this.getRawCSSText(root);
+    // Adopted mode prepends the raw sheet to `adoptedStyleSheets`, always, so
+    // there is nothing to compare positions against.
+    const rawElement = this.isAdoptedMode(root)
+      ? null
+      : this.rawStyleElements.get(root);
 
-    if (!raw) return managed ? [managed] : [];
-    if (!managed) return [raw];
+    let rawIndex = raw && !rawElement ? 0 : -1;
+    const chunks: string[] = [];
 
-    return this.isRawFirst(registry, root) ? [raw, managed] : [managed, raw];
-  }
+    for (const sheetInfo of registry.sheets) {
+      const css = this.readSheetCSS(sheetInfo);
+      if (css === null) continue;
 
-  /** Whether the raw sheet precedes the managed ones in `root`. */
-  private isRawFirst(
-    registry: RootRegistry,
-    root: Document | ShadowRoot,
-  ): boolean {
-    // Adopted mode prepends the raw sheet, always.
-    if (this.isAdoptedMode(root)) return true;
+      if (
+        rawIndex < 0 &&
+        rawElement &&
+        sheetInfo.sheet &&
+        // DOCUMENT_POSITION_FOLLOWING: this managed sheet comes after the raw
+        // one, so the raw CSS belongs in front of it.
+        rawElement.compareDocumentPosition(sheetInfo.sheet) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        rawIndex = chunks.length;
+      }
 
-    const rawElement = this.rawStyleElements.get(root);
-    const managedElement = registry.sheets.find((sheet) => sheet.sheet)?.sheet;
+      chunks.push(css);
+    }
 
-    if (!rawElement || !managedElement) return false;
+    if (!raw) return chunks;
 
-    // DOCUMENT_POSITION_FOLLOWING: the managed element comes after the raw one.
-    return Boolean(
-      rawElement.compareDocumentPosition(managedElement) &
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    // No managed sheet follows it: the raw CSS is last.
+    chunks.splice(rawIndex < 0 ? chunks.length : rawIndex, 0, raw);
+
+    return chunks;
   }
 
   /**

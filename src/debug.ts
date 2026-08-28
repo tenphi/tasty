@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
-import { getCSSTextForNode, injector } from './injector';
+import { flushStyles, getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
 import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
@@ -120,9 +120,20 @@ function sortTastyClasses(classes: Iterable<string>): string[] {
   return Array.from(classes).sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The registry for `root`, with every queued write landed first.
+ *
+ * Every injector read API is a flush point, and the reads below reach past
+ * those APIs straight into the registry and the sheet manager. Without this
+ * they would report a batch window's contents as absent — a rule that is
+ * enqueued but not yet in a sheet is missing from `globalRules`, from the
+ * sheets, and from anything counting either.
+ */
 function getRegistry(
   root: Document | ShadowRoot = document,
 ): RootRegistry | undefined {
+  flushStyles();
+
   return injector.instance._sheetManager?.getRegistry(root);
 }
 
@@ -142,14 +153,6 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
 }
 
 /**
- * Injected classes that no element carries and nobody pinned — the exact set
- * `gc({ force: true })` would delete.
- *
- * Deliberately borrowed from the injector rather than recomputed here: the two
- * drifted apart once before, when this file still read "unused" off the pin
- * counts the render path had stopped maintaining.
- */
-/**
  * Everything this injector holds in `root`, in the order the engine applies it,
  * with the sources kept byte-for-byte — trimming would report a total smaller
  * than one of its own parts whenever raw CSS has edge whitespace.
@@ -162,6 +165,14 @@ function getAllCSS(root: Document | ShadowRoot = document): string {
   return sheetManager.getOwnedCSSInOrder(registry, root).join('\n');
 }
 
+/**
+ * Injected classes that no element carries and nobody pinned — the exact set
+ * `gc({ force: true })` would delete.
+ *
+ * Deliberately borrowed from the injector rather than recomputed here: the two
+ * drifted apart once before, when this file still read "unused" off the pin
+ * counts the render path had stopped maintaining.
+ */
 function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
   return sortTastyClasses(injector.instance.getUnusedClasses({ root }));
 }

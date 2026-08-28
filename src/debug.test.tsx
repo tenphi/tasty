@@ -9,6 +9,7 @@ import {
   fontFace,
   func,
   getCSSText,
+  hasPendingStyleWrites,
   injectGlobal,
   getRawCSSText,
   injectRawCSS,
@@ -195,6 +196,57 @@ describe('tastyDebug', () => {
       expect(all).toContain('.review-order');
       expect(all).toContain(className);
       expect(all.indexOf('.review-order')).toBeLessThan(all.indexOf(className));
+    });
+
+    it('splices the raw sheet in where the DOM puts it', () => {
+      // One rule per sheet, so the raw element lands between two managed ones.
+      configure({ gc: { grace: 0 }, maxRulesPerSheet: 1 });
+
+      const first = computeStyles({ color: '#red' }).className;
+      injectRawCSS('.review-between { color: green; }');
+      const second = computeStyles({ color: '#blue' }).className;
+
+      // The premise: raw is neither first nor last among the sheets, so an
+      // order reduced to one before/after bit cannot express it.
+      const kinds = Array.from(
+        document.head.querySelectorAll(
+          'style[data-tasty], style[data-tasty-raw]',
+        ),
+      ).map((el) => (el.hasAttribute('data-tasty-raw') ? 'raw' : 'managed'));
+
+      expect(kinds.indexOf('raw')).toBeGreaterThan(0);
+      expect(kinds.indexOf('raw')).toBeLessThan(kinds.length - 1);
+
+      const all = tastyDebug.css('all', { raw: true, prettify: false });
+
+      expect(all).toContain('.review-between');
+      expect(all.indexOf(first)).toBeLessThan(all.indexOf('.review-between'));
+      expect(all.indexOf('.review-between')).toBeLessThan(all.indexOf(second));
+    });
+
+    it('lands queued writes before reading', () => {
+      // Every injector read API flushes; these reads reach past those APIs into
+      // the registry, so without a flush of their own a batch window's contents
+      // read as absent.
+      configure({ gc: { grace: 0 }, batchInjection: 'always' });
+
+      const { className } = computeStyles({ color: '#red' });
+      injectGlobal([
+        { selector: '.batched-global', declarations: 'color: red' },
+      ]);
+      injectRawCSS('.batched-raw { color: blue; }');
+
+      expect(hasPendingStyleWrites()).toBe(true);
+
+      const all = tastyDebug.css('all', { raw: true, prettify: false });
+
+      expect(hasPendingStyleWrites()).toBe(false);
+      expect(all).toContain(className);
+      expect(all).toContain('.batched-global');
+      expect(all).toContain('.batched-raw');
+      expect(tastyDebug.summary({ raw: true }).globalRuleCount).toBeGreaterThan(
+        0,
+      );
     });
 
     it('keeps raw bytes whole in the total', () => {

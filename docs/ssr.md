@@ -166,7 +166,7 @@ meaning; use root-relative, absolute, or data URLs.
 | Option       | Type          | Default                   | Description                                                            |
 | ------------ | ------------- | ------------------------- | ---------------------------------------------------------------------- |
 | `config`     | `TastyConfig` | —                         | Config object; takes precedence over `configFile`                      |
-| `configFile` | `string`      | —                         | Project-relative config module path; required when `config` is omitted |
+| `configFile` | `string`      | —                         | Project-relative config module path; requires the optional `jiti` peer |
 | `rootDir`    | `string`      | current directory         | Next app root when the build runs from a monorepo root                 |
 | `outputDir`  | `string`      | `public/_tasty`           | Filesystem output directory                                            |
 | `publicPath` | `string`      | inferred from `outputDir` | Root-relative URL; required when output is outside `public`            |

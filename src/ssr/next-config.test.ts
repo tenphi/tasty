@@ -190,11 +190,24 @@ describe('withTastyNext', () => {
       outputDir,
       publicPath: '/_tasty',
       config: {},
-    })({ output: 'export' });
+    })({ basePath: '', output: 'export' });
 
     expect(result.env?.TASTY_NEXT_SHARED_CSS_HREF).toMatch(
       /^\/_tasty\/tasty\.shared\.[a-f\d]{12}\.css$/,
     );
     expect(result.headers).toBeUndefined();
+  });
+
+  it('normalizes long trailing-slash suffixes in linear time', async () => {
+    const outputDir = await makeTempDir();
+    const result = withTastyNext({
+      outputDir,
+      publicPath: `/assets${'/'.repeat(100_000)}`,
+      config: {},
+    })({});
+
+    expect(result.env?.TASTY_NEXT_SHARED_CSS_HREF).toMatch(
+      /^\/assets\/tasty\.shared\.[a-f\d]{12}\.css$/,
+    );
   });
 });

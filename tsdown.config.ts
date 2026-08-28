@@ -33,6 +33,7 @@ export default defineConfig({
     'node:crypto',
     'node:fs',
     'node:fs/promises',
+    'node:module',
     'node:path',
     'node:url',
     'next/navigation',

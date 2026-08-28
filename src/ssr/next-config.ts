@@ -7,15 +7,16 @@
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-
-import { createJiti } from 'jiti';
+import type { createJiti as createJitiType } from 'jiti';
 
 import { configure, resetConfig, type TastyConfig } from '../config';
 import { ServerStyleCollector } from './collector';
 import { findUnsafeCSSResource } from './css-resources';
 
 const ENV_KEY = 'TASTY_NEXT_SHARED_CSS_HREF';
+const packageRequire = createRequire(import.meta.url);
 
 interface NextConfig {
   basePath?: string;
@@ -88,6 +89,25 @@ function loadConfig(
   }
 
   const configPath = resolve(projectDir, options.configFile);
+  let jitiPath: string;
+  try {
+    jitiPath = packageRequire.resolve('jiti');
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'MODULE_NOT_FOUND'
+    ) {
+      throw new Error(
+        '[Tasty] `configFile` requires the optional `jiti` package. Install `jiti` or pass the imported config through `config` instead.',
+        { cause: error },
+      );
+    }
+    throw error;
+  }
+  const { createJiti } = packageRequire(jitiPath) as {
+    createJiti: typeof createJitiType;
+  };
   const jiti = createJiti(projectDir, { moduleCache: false });
   const loaded = jiti(configPath) as TastyConfig | { default: TastyConfig };
 
@@ -145,7 +165,10 @@ function normalizeURLPath(path: string, option: string): string {
   ) {
     throw new Error(`[Tasty] \`${option}\` must be a root-relative URL path.`);
   }
-  return path === '/' ? '' : path.replace(/\/+$/g, '');
+
+  let end = path.length;
+  while (end > 0 && path[end - 1] === '/') end--;
+  return path.slice(0, end);
 }
 
 function writeSharedCSS(outputDir: string, css: string): string {
@@ -180,7 +203,7 @@ export function withTastyNext(options: TastyNextOptions) {
       options.publicPath ?? inferPublicPath(projectDir, outputDir),
       'publicPath',
     );
-    const basePath = normalizeURLPath(nextConfig.basePath ?? '/', 'basePath');
+    const basePath = normalizeURLPath(nextConfig.basePath || '/', 'basePath');
     const css = collectSharedCSS(loadConfig(projectDir, options));
 
     if (!css) return nextConfig;

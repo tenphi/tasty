@@ -1,5 +1,33 @@
 # @tenphi/tasty
 
+## 3.5.0
+
+### Minor Changes
+
+- [#282](https://github.com/tenphi/tasty/pull/282) [`55ffef1`](https://github.com/tenphi/tasty/commit/55ffef17372224d4c17904cf34fc2a0284822cd6) Thanks [@tenphi](https://github.com/tenphi)! - Add build-wide shared stylesheet extraction to the Astro integration, with CSP
+  nonce support and client-side global style deduplication.
+
+- [#281](https://github.com/tenphi/tasty/pull/281) [`996910b`](https://github.com/tenphi/tasty/commit/996910bed6675373fbc77e643a8b5213bbdf017a) Thanks [@tenphi](https://github.com/tenphi)! - Fix garbage collection of rendered styles. Since the render path became hook-free it no longer disposes the classes it injects, so their counts never fell back to `0` — and `gc()`, `cleanup()` and `tastyDebug.cleanup()` all treated a non-zero count as "still in use". Nothing was ever evicted, and injected CSS grew for the lifetime of the page.
+
+  What a style is worth keeping is now decided by the DOM. A sweep scans for the classes actually on the page and sorts everything the injector holds into five bands — rendered, not ours to delete, cold for less than `gc.grace` (default 10s), cold but within `capacity`, and everything else — of which only the last is deleted. Rendering is not commit-aware, so a render can resolve a class and commit it a little later; rather than try to tell that apart from a class that is finished, collection leaves alone anything it has only just noticed going cold.
+
+  - New `gc.grace`. A class counts as wanted when it is injected, and again every sweep that finds it on an element.
+  - Collection costs nothing on the render path: the timestamps are written by the sweep's own DOM scan, so nothing is tracked per class while rendering. `touch()` is deprecated and now only counts renders to pace sweeps — the class name it takes is ignored, since a class handed back by `inject()` is marked wanted there instead. `StyleUsage` is deprecated too, describing a record nothing keeps any more. Both stay exported so existing imports keep working.
+  - `gc()` and `cleanup()` collect on demand, and now actually delete.
+  - Local `@keyframes` are owned by the classes whose rules actually name them: one reference however many times they render, released when the last owner is collected. Local `@keyframes` are emitted under a content-addressed name — `fade-<hash of its steps>` — resolved the same way by the client, the SSR collector and the RSC pass, and folded into the chunk's cache key. Two components authoring the same `animation: fade 1s` over different `@keyframes fade` therefore get two rules and two classes on every path, instead of one definition silently winning and the server and client disagreeing about which class to use. New `holdKeyframes()` and `ownKeyframes()`.
+  - `tastyDebug.summary()` accounts for every class the injector holds, including ones that have gone cold but are not collectable yet — reported as `hotClasses` and on a new `Held:` line.
+  - Bundle limits move for keyframe ownership, deterministic keyframe naming and the fuller summary accounting: main 56.6 -> 57.5 kB, core 53.65 -> 54.5 kB. The other three are unchanged and under.
+
+### Patch Changes
+
+- [#281](https://github.com/tenphi/tasty/pull/281) [`996910b`](https://github.com/tenphi/tasty/commit/996910bed6675373fbc77e643a8b5213bbdf017a) Thanks [@tenphi](https://github.com/tenphi)! - Rewrite the custom-property declaration regex in `PropertyTypeResolver` so no two quantifiers can claim the same trailing whitespace (CodeQL `js/polynomial-redos`). A declaration whose value is only whitespace — `--brand-color: ;` — is now skipped rather than read as an empty value, so it no longer auto-registers an `@property` off the strength of its name. Values with leading or trailing whitespace, including the newline left on the last declaration of a block written without a trailing semicolon, are read exactly as before.
+
+- [#281](https://github.com/tenphi/tasty/pull/281) [`996910b`](https://github.com/tenphi/tasty/commit/996910bed6675373fbc77e643a8b5213bbdf017a) Thanks [@tenphi](https://github.com/tenphi)! - Fix `tastyDebug` reporting zero unused classes. `summary()`, `cache()` and `css('unused')` derived "unused" from counters the render path stopped maintaining, so they always came up empty and silently dropped every injected-but-detached class from the totals — a page holding hundreds of stale rules printed `Unused: 0 classes`. Unused is now the set `gc()` would collect, read from the injector rather than recomputed, so the two cannot drift apart again.
+
+  The summary's totals are also the real totals now: raw CSS is read from the sheet it lives in and counted by the rules the engine parsed rather than by counting braces, and `@font-face`, `@counter-style` and `@function` are included. `css('all')` includes raw CSS, as it was already documented to — spliced in at the position the DOM gives its sheet, so two rules of equal specificity are reported with the winner the page actually applies. Reads that reach into the registry rather than through an injector API land the pending writes first, so a report taken inside a batch window no longer describes it as empty.
+
+  Bundle limit: babel-plugin 49.35 -> 49.6 kB.
+
 ## 3.4.0
 
 ### Minor Changes

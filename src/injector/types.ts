@@ -60,6 +60,15 @@ export interface StyleInjectorConfig {
  * Per-className usage tracking for GC.
  */
 /**
+ * @deprecated Nothing reads this any more. Collection asks the DOM what is
+ * rendered rather than tracking usage per class, so there is no usage record
+ * to describe. Kept so existing imports keep type-checking.
+ */
+export interface StyleUsage {
+  lastTouchedAt: number;
+}
+
+/**
  * Configuration for the style garbage collector.
  *
  * GC is triggered by touch count rather than timers: every `touchInterval`
@@ -241,6 +250,19 @@ export interface RootRegistry {
    * never pays for it.
    */
   unusedSince: Map<string, number>;
+  /**
+   * Local `@keyframes` a class animates, by the name they were authored under.
+   *
+   * One reference is held per distinct set of steps, however many renders ask
+   * for it, and the classes that animate it own that reference between them.
+   * The last of them to be deleted releases it, so keyframes cannot outlive
+   * every rule that referred to them, and repeat renders cannot pile up
+   * references nobody gives back.
+   */
+  localKeyframes: Map<
+    string,
+    { name: string; dispose: () => void; owners: Set<string> }
+  >;
   /** Renders since the last scheduled sweep (per-root) */
   touchCount: number;
   /** How many entries from `window.__TASTY__` have been synced into this registry */

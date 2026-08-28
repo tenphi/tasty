@@ -314,6 +314,30 @@ describe('GC: touch / gc', () => {
       graced.destroy();
     });
 
+    it('marks a cold class hot again when a render reuses it', () => {
+      const graced = graceInjector(10_000);
+      const { className, dispose } = graced.inject(
+        [createStyleRule('.reused.reused', 'color: red')],
+        { cacheKey: 'reuse-key' },
+      );
+      dispose();
+
+      const registry = graced['sheetManager'].getRegistry(document);
+      registry.unusedSince.set(className, Date.now() - 60_000);
+
+      // A render asks for the same styles and gets the cached class back. It
+      // may not commit for a while, so the class has to leave the eviction
+      // bands again.
+      graced.inject([createStyleRule('.reused.reused', 'color: red')], {
+        cacheKey: 'reuse-key',
+      });
+
+      expect(graced.gc({ force: true })).toBe(0);
+      expect(registry.rules.has(className)).toBe(true);
+
+      graced.destroy();
+    });
+
     it('refreshes the window every time a sweep finds the class rendered', () => {
       const graced = graceInjector(10_000);
       const { className, dispose } = graced.inject([

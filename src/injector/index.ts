@@ -227,6 +227,19 @@ export function getCSSTextForNode(
 }
 
 /**
+ * Hold the local `@keyframes` a set of classes animates, and report what they
+ * ended up being called. One reference per distinct set of steps, released when
+ * the last class animating it is collected.
+ */
+export function holdKeyframes(
+  classNames: string[],
+  steps: Record<string, KeyframesSteps>,
+  options?: { root?: Document | ShadowRoot },
+): Map<string, string> | null {
+  return getGlobalInjector().holdKeyframes(classNames, steps, options);
+}
+
+/**
  * Remove every injected rule that is neither in the DOM nor held by an
  * outstanding `inject()` handle. Equivalent to `gc({ force: true })`.
  */
@@ -235,9 +248,12 @@ export function cleanup(root?: Document | ShadowRoot): void {
 }
 
 /**
- * Record a render-time usage hit for one or more classNames.
- * Used internally by computeStyles and tasty() to track usage for GC.
- * When the global touch counter reaches `touchInterval`, schedules GC.
+ * Count a render, so that a collection pass is scheduled every
+ * `gc.touchInterval` of them. Used internally by computeStyles and tasty().
+ *
+ * @deprecated The class name is ignored — collection asks the DOM what is
+ * rendered rather than recording usage per class, so scheduling does not need
+ * to know which class was involved. The argument is kept for compatibility.
  */
 export function touch(
   className: string,
@@ -303,6 +319,7 @@ export type {
   SheetInfo,
   RootRegistry,
   StyleRule,
+  StyleUsage,
   KeyframesInfo,
   KeyframesResult,
   KeyframesSteps,

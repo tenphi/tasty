@@ -6,7 +6,9 @@ import { tastyDebug } from './debug';
 import { cleanup, destroy, gc, getCSSText, inject, injector } from './injector';
 import { HYDRATED_RULE_INDEX } from './injector/types';
 import type { RootRegistry, StyleRule } from './injector/types';
+import type { Styles } from './styles/types';
 import { hydrateTastyClasses } from './ssr/hydrate';
+import { tasty } from './tasty';
 
 /**
  * How long an injected style lives, and who gets to say so.
@@ -298,6 +300,79 @@ describe('style lifetime', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Local @keyframes belong to the classes that animate them: one reference
+// however many times they render, released when the last of those classes is
+// collected. Injecting per render instead piles up references nobody gives
+// back, and leaves the keyframes behind when the rules that used them go.
+// ---------------------------------------------------------------------------
+
+describe('local keyframes', () => {
+  const FADE_STYLES = {
+    animation: 'fade 1s',
+    '@keyframes': { fade: { from: { opacity: 0 }, to: { opacity: 1 } } },
+  } as Styles;
+
+  function keyframesInSheet(): number {
+    return (getCSSText().match(/@keyframes/g) ?? []).length;
+  }
+
+  beforeEach(() => {
+    configure({ gc: { grace: 0 } });
+  });
+
+  afterEach(() => {
+    unmountAll();
+    destroy();
+    resetConfig();
+  });
+
+  it('takes one reference however many times it renders', () => {
+    const Fading = tasty({});
+    const { rerender } = render(<Fading styles={FADE_STYLES} />);
+
+    expect(keyframesInSheet()).toBe(1);
+
+    // Instance styles bypass the factory cache, so every rerender runs the
+    // whole path again.
+    for (let i = 0; i < 5; i++) {
+      rerender(<Fading styles={{ ...FADE_STYLES }} />);
+    }
+
+    expect(keyframesInSheet()).toBe(1);
+  });
+
+  it('releases them when the last class animating them is collected', () => {
+    const Fading = tasty({ styles: FADE_STYLES });
+    const { rerender } = render(<Fading />);
+
+    expect(keyframesInSheet()).toBe(1);
+
+    rerender(<div />);
+    cleanup();
+
+    expect(keyframesInSheet()).toBe(0);
+  });
+
+  it('keeps them while another class still animates them', () => {
+    const One = tasty({ styles: FADE_STYLES });
+    const Two = tasty({ styles: { ...FADE_STYLES, color: '#red' } });
+    const { rerender } = render(
+      <>
+        <One />
+        <Two />
+      </>,
+    );
+
+    expect(keyframesInSheet()).toBe(1);
+
+    rerender(<Two />);
+    cleanup();
+
+    expect(keyframesInSheet()).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The anti-drift suite: gc(), getMetrics() and tastyDebug must never disagree
 // about which classes are unused. Each of them broke independently last time.
 // ---------------------------------------------------------------------------
@@ -351,6 +426,27 @@ describe('every reporter agrees on what is unused', () => {
     expect(after.unusedClasses).toEqual([]);
     // Collection must not disturb what is still on screen.
     expect(after.activeClasses).toEqual(before.activeClasses);
+  });
+
+  it('accounts for a class that went cold but is not collectable yet', () => {
+    // The default grace leaves a just-detached class in neither the active nor
+    // the unused list. Dropping it from the total is the accounting failure
+    // this whole change started from.
+    resetConfig();
+    configure({ gc: {} });
+
+    const { container, rerender } = render(<Box color="#salmon" />);
+    const detached = domClasses(container)[0];
+
+    rerender(<div />);
+
+    const summary = tastyDebug.summary({ raw: true });
+
+    expect(summary.activeClasses).not.toContain(detached);
+    expect(summary.unusedClasses).not.toContain(detached);
+    expect(summary.hotClasses).toContain(detached);
+    expect(summary.totalStyledClasses).toContain(detached);
+    expect([...summary.totalStyledClasses].sort()).toEqual(ownedClasses());
   });
 
   it('accounts for every class the injector holds', () => {

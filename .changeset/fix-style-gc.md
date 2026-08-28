@@ -7,6 +7,7 @@ Fix garbage collection of rendered styles. Since the render path became hook-fre
 What a style is worth keeping is now decided by the DOM. A sweep scans for the classes actually on the page and sorts everything the injector holds into five bands — rendered, not ours to delete, cold for less than `gc.grace` (default 10s), cold but within `capacity`, and everything else — of which only the last is deleted. Rendering is not commit-aware, so a render can resolve a class and commit it a little later; rather than try to tell that apart from a class that is finished, collection leaves alone anything it has only just noticed going cold.
 
 - New `gc.grace`. A class counts as wanted when it is injected, and again every sweep that finds it on an element.
-- Collection costs nothing on the render path: the timestamp is written by the sweep's own DOM scan, so nothing is tracked per class while rendering. `touch()` is now only a render counter, and `StyleUsage` is gone with the map it described.
+- Collection costs nothing on the render path: the timestamps are written by the sweep's own DOM scan, so nothing is tracked per class while rendering. `touch()` is now only a render counter and is deprecated — the class name it takes is ignored. `StyleUsage` is deprecated too, and describes a record nothing keeps any more; both are kept exported so existing imports still work.
 - `gc()` and `cleanup()` collect on demand, and now actually delete.
-- Local `@keyframes` are disposed with the class that animates them rather than leaking a reference per render.
+- Local `@keyframes` are owned by the classes that animate them: one reference however many times they render, released when the last of those classes is collected. New `holdKeyframes()`.
+- `tastyDebug.summary()` accounts for every class the injector holds, including ones that have gone cold but are not collectable yet — reported as `hotClasses` and on a new `Held:` line.

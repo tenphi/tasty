@@ -361,6 +361,7 @@ export class StyleInjector {
       // Rules are already queued for a batched write. Record the pin and let
       // the queued write land — injecting again would duplicate every rule.
       if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
+        registry.unusedSince.delete(className);
         if (pin) {
           registry.pinCounts.set(
             className,
@@ -386,6 +387,12 @@ export class StyleInjector {
         existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
 
       if (!isPreAllocated) {
+        // Handing the class to a render makes it wanted again: clearing the
+        // cold mark puts it back in band 1/3, so a sweep cannot take it out
+        // from under a render that has not committed yet. A `delete` that
+        // misses is what the live case costs, which is nothing.
+        registry.unusedSince.delete(className);
+
         // Already injected — nothing to write, only the reference to record.
         if (pin) {
           const pins = registry.pinCounts.get(className) || 0;
@@ -724,6 +731,50 @@ export class StyleInjector {
     flushStyles();
     const root = options?.root || document;
     return this.sheetManager.getRawCSSText(root);
+  }
+
+  /**
+   * Hold the local `@keyframes` a set of classes animates, and tell the caller
+   * what they ended up being called.
+   *
+   * One reference per distinct set of steps, taken the first time it is asked
+   * for and shared by every class that animates it — a repeat render finds it
+   * already held and takes nothing further, which is what stops the reference
+   * count climbing for the life of the page. The reference goes when the last
+   * of those classes is deleted.
+   */
+  holdKeyframes(
+    classNames: string[],
+    steps: Record<string, KeyframesSteps>,
+    options?: { root?: Document | ShadowRoot },
+  ): Map<string, string> | null {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    let nameMap: Map<string, string> | null = null;
+
+    for (const [authored, definition] of Object.entries(steps)) {
+      const key = `${authored}\u0000${hashString(JSON.stringify(definition))}`;
+      let entry = registry.localKeyframes.get(key);
+
+      if (!entry) {
+        const injected = this.keyframes(definition, { name: authored, root });
+        entry = {
+          name: injected.toString(),
+          dispose: injected.dispose,
+          owners: new Set(),
+        };
+        registry.localKeyframes.set(key, entry);
+      }
+
+      for (const className of classNames) entry.owners.add(className);
+
+      if (entry.name !== authored) {
+        if (!nameMap) nameMap = new Map();
+        nameMap.set(authored, entry.name);
+      }
+    }
+
+    return nameMap;
   }
 
   /**
@@ -1322,6 +1373,10 @@ export class StyleInjector {
    * Count a render, and schedule a collection pass every `touchInterval` of
    * them. Nothing else: what a class is worth keeping is decided by the sweep's
    * own DOM scan, so rendering does not track usage at all.
+   *
+   * @deprecated The class name is ignored — pass anything, or stop calling it.
+   * Collection no longer records per-class usage, and scheduling does not need
+   * to know which class was rendered.
    */
   touch(_className: string, options?: { root?: Document | ShadowRoot }): void {
     if (typeof document === 'undefined') return;

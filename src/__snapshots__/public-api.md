@@ -108,6 +108,7 @@ value      hasGlobalRecipes
 value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
+value      holdKeyframes
 value      hslToRgbValues
 value      inject
 value      injectGlobal
@@ -206,6 +207,7 @@ type       StyleRule
 type       Styles
 type       StylesInterface
 type       StylesWithoutSelectors
+type       StyleUsage
 type       StyleValue
 type       StyleValueStateMap
 type       SubElementDefinition
@@ -384,6 +386,7 @@ value      hasGlobalRecipes
 value      hasPendingStyleWrites
 value      hasStylesGenerated
 value      hexToRgb
+value      holdKeyframes
 value      hslToRgbValues
 value      inject
 value      injectGlobal
@@ -476,6 +479,7 @@ type       StyleRule
 type       Styles
 type       StylesInterface
 type       StylesWithoutSelectors
+type       StyleUsage
 type       StyleValue
 type       StyleValueStateMap
 type       SuffixForSelector

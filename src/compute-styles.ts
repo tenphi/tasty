@@ -27,7 +27,7 @@ import {
   fontFace,
   func,
   inject,
-  keyframes,
+  holdKeyframes,
   property,
   touch,
 } from './injector';
@@ -365,28 +365,6 @@ function processChunkSync(
 }
 
 /**
- * Inject keyframes synchronously and return a name replacement map.
- * On the client, keyframes are injected into the DOM.
- */
-function injectKeyframesSync(
-  usedKeyframes: Record<string, KeyframesSteps>,
-  root?: Document | ShadowRoot,
-): Map<string, string> | null {
-  let nameMap: Map<string, string> | null = null;
-
-  for (const [name, steps] of Object.entries(usedKeyframes)) {
-    const result = keyframes(steps, { name, root });
-    const injectedName = result.toString();
-    if (injectedName !== name) {
-      if (!nameMap) nameMap = new Map();
-      nameMap.set(name, injectedName);
-    }
-  }
-
-  return nameMap;
-}
-
-/**
  * Inject chunk rules synchronously, replacing animation names if needed.
  */
 function injectChunkRulesSync(
@@ -598,7 +576,6 @@ export function computeStyles(
     injectAncillarySync(resolved, root);
 
     const usedKf = getUsedKeyframes(resolved);
-    const nameMap = usedKf ? injectKeyframesSync(usedKf, root) : null;
 
     for (const [chunkName, chunkStyleKeys] of chunkMap) {
       const chunk = processChunkSync(
@@ -610,6 +587,17 @@ export function computeStyles(
       );
       if (chunk) chunks.push(chunk);
     }
+
+    // The classes that animate these keyframes own them between them, so the
+    // reference is taken once however many times this renders, and released
+    // when the last of those classes is collected.
+    const nameMap = usedKf
+      ? holdKeyframes(
+          chunks.map((chunk) => chunk.className),
+          usedKf,
+          { root },
+        )
+      : null;
 
     if (nameMap) {
       injectChunkRulesSync(chunks, nameMap, root);

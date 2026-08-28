@@ -156,6 +156,7 @@ export class SheetManager {
         globalRules: new Map(),
         propertyTypeResolver: new PropertyTypeResolver(),
         unusedSince: new Map(),
+        localKeyframes: new Map(),
         touchCount: 0,
         serverClassSyncIndex: 0,
         rscStylesScanned: false,
@@ -1005,6 +1006,15 @@ export class SheetManager {
         registry.rules.delete(className);
         registry.pinCounts.delete(className);
         registry.unusedSince.delete(className);
+
+        // Last class animating these keyframes: nothing refers to them now.
+        for (const [key, entry] of registry.localKeyframes) {
+          if (!entry.owners.delete(className)) continue;
+          if (entry.owners.size === 0) {
+            entry.dispose();
+            registry.localKeyframes.delete(key);
+          }
+        }
         deleted.add(className);
         cleanedUpCount++;
       }

@@ -72,7 +72,13 @@ export interface ChunkBreakdown {
 
 export interface Summary {
   activeClasses: string[];
+  /** Classes `gc({ force: true })` would delete right now. */
   unusedClasses: string[];
+  /**
+   * Held but in neither list: nothing renders them, yet collection will not
+   * take them — inside the grace window, or pinned by an `inject()` handle.
+   */
+  hotClasses: string[];
   totalStyledClasses: string[];
 
   activeCSSSize: number;
@@ -145,6 +151,21 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
  */
 function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
   return sortTastyClasses(injector.instance.getUnusedClasses({ root }));
+}
+
+/** Every class this injector holds CSS for in `root`. */
+function getOwnedClasses(root: Document | ShadowRoot = document): string[] {
+  const registry = getRegistry(root);
+  if (!registry) return [];
+
+  const owned: string[] = [];
+  for (const [className, info] of registry.rules) {
+    // A negative sheet index marks a class whose CSS this injector does not
+    // hold: server-rendered, pre-allocated, or queued.
+    if (info.sheetIndex >= 0) owned.push(className);
+  }
+
+  return sortTastyClasses(owned);
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +591,19 @@ export const tastyDebug = {
 
     const activeClasses = findDomTastyClasses(root);
     const unusedClasses = getUnusedClasses(root);
-    const totalStyledClasses = [...activeClasses, ...unusedClasses];
+    // Everything, not just the two bands above: a class that went cold a
+    // moment ago is in neither, and dropping it here is the accounting failure
+    // this whole change started from.
+    const ownedClasses = getOwnedClasses(root);
+    const totalStyledClasses = sortTastyClasses(
+      new Set([...activeClasses, ...ownedClasses]),
+    );
+    const unusedSet = new Set(unusedClasses);
+    const activeSet = new Set(activeClasses);
+    const hotClasses = ownedClasses.filter(
+      (className) => !activeSet.has(className) && !unusedSet.has(className),
+    );
+    const hotCSS = injector.instance.getCSSTextForClasses(hotClasses, { root });
 
     const activeCSS = injector.instance.getCSSTextForClasses(activeClasses, {
       root,
@@ -591,6 +624,7 @@ export const tastyDebug = {
     const totalRuleCount =
       activeRuleCount +
       unusedRuleCount +
+      countRules(hotCSS) +
       globalData.ruleCount +
       rawData.ruleCount +
       kfData.ruleCount +
@@ -603,6 +637,7 @@ export const tastyDebug = {
     const summary: Summary = {
       activeClasses,
       unusedClasses,
+      hotClasses,
       totalStyledClasses,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
@@ -632,6 +667,10 @@ export const tastyDebug = {
       console.log(
         `Unused:   ${unusedClasses.length} classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
       );
+      if (hotClasses.length)
+        console.log(
+          `Held:     ${hotClasses.length} classes, ${countRules(hotCSS)} rules, ${fmtSize(hotCSS.length)} (not rendered, not yet collectable)`,
+        );
       console.log(
         `Global:   ${globalData.ruleCount} rules, ${fmtSize(globalData.size)}`,
       );

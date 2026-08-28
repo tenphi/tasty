@@ -17,14 +17,7 @@ declare global {
 // ---------------------------------------------------------------------------
 
 type CSSTarget =
-  | 'all'
-  | 'global'
-  | 'active'
-  | 'unused'
-  | 'page'
-  | string
-  | string[]
-  | Element;
+  'all' | 'global' | 'active' | 'unused' | 'page' | string | string[] | Element;
 
 export interface DebugOptions {
   root?: Document | ShadowRoot;

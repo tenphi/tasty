@@ -249,8 +249,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       });
 
       const loaded = jiti(options.configFile) as
-        | TastyZeroConfig
-        | { default: TastyZeroConfig };
+        TastyZeroConfig | { default: TastyZeroConfig };
       // jiti returns the ESM namespace, so unwrap `default` when present.
       resolvedConfig =
         loaded && typeof loaded === 'object' && 'default' in loaded

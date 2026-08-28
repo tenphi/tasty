@@ -170,10 +170,7 @@ export interface FalseCondition {
  * Union of all condition node types
  */
 export type ConditionNode =
-  | StateCondition
-  | CompoundCondition
-  | TrueCondition
-  | FalseCondition;
+  StateCondition | CompoundCondition | TrueCondition | FalseCondition;
 
 // ============================================================================
 // Constructor Functions

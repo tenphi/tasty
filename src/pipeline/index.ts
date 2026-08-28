@@ -495,8 +495,7 @@ export function isSelector(key: string): boolean {
  * { valid: false, reason: 'Selector affix "+" targets elements outside the root scope.' }
  */
 type AffixResult =
-  | { valid: true; selectors: string[] }
-  | { valid: false; reason: string };
+  { valid: true; selectors: string[] } | { valid: false; reason: string };
 
 /**
  * Get all selector suffixes for a sub-element key.
@@ -1467,18 +1466,14 @@ export function renderStyles(
   // No className mode: return RenderResult with needsClassName flag
   // Normalize selector to string (join array with placeholder that injector will handle)
   return {
-    rules: rules.map(
-      (r): StyleResult => ({
-        selector: Array.isArray(r.selector)
-          ? r.selector.join('|||')
-          : r.selector,
-        declarations: r.declarations,
-        atRules: r.atRules,
-        needsClassName: true,
-        rootPrefix: r.rootPrefix,
-        startingStyle: r.startingStyle,
-      }),
-    ),
+    rules: rules.map((r): StyleResult => ({
+      selector: Array.isArray(r.selector) ? r.selector.join('|||') : r.selector,
+      declarations: r.declarations,
+      atRules: r.atRules,
+      needsClassName: true,
+      rootPrefix: r.rootPrefix,
+      startingStyle: r.startingStyle,
+    })),
   };
 }
 

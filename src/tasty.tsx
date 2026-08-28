@@ -423,8 +423,7 @@ export type AllBasePropsWithMods<
   TP extends TokenPropsInput = readonly never[],
 > = AllBaseProps & {
   [key in K[number]]?:
-    | StyleValue<StylesInterface[key]>
-    | StyleValueStateMap<StylesInterface[key]>;
+    StyleValue<StylesInterface[key]> | StyleValueStateMap<StylesInterface[key]>;
 } & BaseStyleProps &
   ExtraBaseStyleProps &
   Partial<TastyCustomProps> &

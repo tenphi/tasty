@@ -352,13 +352,7 @@ export interface StylesInterface extends Omit<
    * - `radius="inherit right"` // inherit only right corners (uses longhand properties)
    */
   radius?:
-    | 'round'
-    | 'ellipse'
-    | 'leaf'
-    | 'backleaf'
-    | 'inherit'
-    | string
-    | true;
+    'round' | 'ellipse' | 'leaf' | 'backleaf' | 'inherit' | string | true;
   /**
    * The flow style is a unified shorthand for controlling layout direction and wrapping in both flex and grid containers. Replaces `flexDirection` and `gridAutoFlow`.
    *
@@ -657,11 +651,10 @@ type SpecialStyleKeys =
   | 'recipe';
 
 export type StylesWithoutSelectors = {
-  [key in keyof StylesInterface as key extends SpecialStyleKeys
-    ? never
-    : key]?:
-    | StyleValue<StylesInterface[key]>
-    | StyleValueStateMap<StylesInterface[key]>;
+  [
+    key in keyof StylesInterface as key extends SpecialStyleKeys ? never : key
+  ]?:
+    StyleValue<StylesInterface[key]> | StyleValueStateMap<StylesInterface[key]>;
 };
 
 /**

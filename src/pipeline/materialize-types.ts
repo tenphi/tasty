@@ -95,8 +95,7 @@ export interface ParsedPseudoCondition {
 
 /** Modifier or pseudo condition (shared across own/root/parent) */
 export type ParsedSelectorCondition =
-  | ParsedModifierCondition
-  | ParsedPseudoCondition;
+  ParsedModifierCondition | ParsedPseudoCondition;
 
 /**
  * A group of selector conditions that produces an :is() or :not() wrapper.

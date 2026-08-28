@@ -50,9 +50,7 @@ export type PropHandler = (
  * - `['*', fn]` — unconditional; runs on every render of every component
  */
 export type PropHandlerDefinition =
-  | PropHandler
-  | [string, PropHandler]
-  | [string[], PropHandler];
+  PropHandler | [string, PropHandler] | [string[], PropHandler];
 
 interface NormalizedPropHandler {
   key: string;

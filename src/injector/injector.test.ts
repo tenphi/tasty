@@ -1060,7 +1060,7 @@ describe('StyleInjector namePrefix', () => {
       to: { opacity: 1 },
     });
 
-    expect(kf.toString()).toMatch(/^mbk\d+$/);
+    expect(kf.toString()).toMatch(/^mbk[a-z0-9]+$/);
     kf.dispose();
   });
 

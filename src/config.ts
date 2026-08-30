@@ -20,6 +20,7 @@ import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
+import { resetPrecompiledStyles } from './precompile/runtime';
 import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
 import {
@@ -1731,6 +1732,7 @@ export function resetConfig(): void {
   resetPropHandlers();
   resetBaseStyleProps();
   clearPipelineCache();
+  resetPrecompiledStyles();
   emittedWarnings.clear();
   resetStyleWarnings();
 

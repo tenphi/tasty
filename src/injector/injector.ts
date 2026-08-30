@@ -4,6 +4,7 @@
  */
 
 import type { StyleResult } from '../pipeline';
+import type { TastyPrecompiledDependencies } from '../precompile/types';
 import {
   getEffectiveDefinition,
   normalizePropertyDefinition,
@@ -162,10 +163,75 @@ export class StyleInjector {
   private namePrefix: string;
   private classRegex: RegExp;
   private rscClassRegex: RegExp;
+  private precompiledRevision = -1;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
     return this.sheetManager;
+  }
+
+  /**
+   * Seed deduplication metadata for rules supplied by an immutable external
+   * stylesheet. This records no owned sheet entries and performs no CSS work.
+   * @internal
+   */
+  registerPrecompiledDependencies(
+    dependencies: TastyPrecompiledDependencies,
+    revision: number,
+  ): void {
+    if (
+      typeof document === 'undefined' ||
+      this.precompiledRevision === revision
+    ) {
+      return;
+    }
+
+    const registry = this.sheetManager.getRegistry(document);
+    for (const item of dependencies.properties) {
+      if (!registry.injectedProperties.has(item.name)) {
+        registry.injectedProperties.set(item.name, item.definition);
+      }
+    }
+    for (const hash of dependencies.fontFaces) {
+      registry.injectedFontFaces.add(hash);
+    }
+    for (const item of dependencies.counterStyles) {
+      if (!registry.injectedCounterStyles.has(item.name)) {
+        registry.injectedCounterStyles.set(item.name, true);
+      }
+    }
+    for (const name of dependencies.functions) {
+      if (!registry.injectedFunctions.has(name)) {
+        registry.injectedFunctions.set(name, true);
+      }
+    }
+    for (const item of dependencies.keyframes) {
+      if (!registry.keyframesCache.has(item.contentKey)) {
+        registry.keyframesCache.set(item.contentKey, {
+          name: item.name,
+          refCount: Number.POSITIVE_INFINITY,
+          info: {
+            name: item.name,
+            ruleIndex: HYDRATED_RULE_INDEX,
+            sheetIndex: HYDRATED_RULE_INDEX,
+          },
+        });
+      }
+      if (!registry.keyframesNameToContent.has(item.name)) {
+        registry.keyframesNameToContent.set(item.name, item.contentKey);
+      }
+      if (!registry.localKeyframes.has(item.name)) {
+        registry.localKeyframes.set(item.name, {
+          name: item.name,
+          dispose: () => {
+            /* immutable external rule */
+          },
+          owners: new Set(),
+        });
+      }
+    }
+
+    this.precompiledRevision = revision;
   }
 
   /**
@@ -271,6 +337,39 @@ export class StyleInjector {
   }
 
   /**
+   * Resolve an already-owned or server-hydrated class before its declarations
+   * are rendered. A miss does not reserve a class or mutate the rule cache.
+   * @internal
+   */
+  prepareClassName(
+    cacheKey: string,
+    options?: { root?: Document | ShadowRoot },
+  ): { className: string; isExisting: boolean } {
+    const root = options?.root || document;
+    const registry = this.sheetManager.getRegistry(root);
+    const mapped = registry.cacheKeyToClassName.get(cacheKey);
+
+    if (mapped) {
+      const info = registry.rules.get(mapped);
+      if (
+        info &&
+        !(
+          info.ruleIndex === PLACEHOLDER_RULE_INDEX &&
+          info.sheetIndex === PLACEHOLDER_RULE_INDEX
+        )
+      ) {
+        return { className: mapped, isExisting: true };
+      }
+    }
+
+    const className = this.generateClassName(cacheKey);
+    return {
+      className,
+      isExisting: this.tryHydratedHit(registry, cacheKey, className),
+    };
+  }
+
+  /**
    * Allocate a className for a cacheKey without injecting styles yet.
    * This allows separating className allocation (render phase) from style injection (insertion phase).
    */
@@ -351,9 +450,14 @@ export class StyleInjector {
 
     // Check if we can reuse based on cache key
     const cacheKey = options?.cacheKey;
+    const preparedClassName = options?.preparedClassName;
     let className: string;
 
-    if (cacheKey && registry.cacheKeyToClassName.has(cacheKey)) {
+    if (preparedClassName) {
+      // prepareClassName() already proved this exact cache key was a miss and
+      // performed the hydration lookup before the pipeline ran.
+      className = preparedClassName;
+    } else if (cacheKey && registry.cacheKeyToClassName.has(cacheKey)) {
       // Reuse existing class for this cache key
       className = registry.cacheKeyToClassName.get(cacheKey)!;
       const existingRuleInfo = registry.rules.get(className)!;
@@ -1268,10 +1372,7 @@ export class StyleInjector {
       }
     } else {
       // No name provided, generate one
-      actualName = makeKeyframeName(
-        this.namePrefix,
-        String(registry.keyframesCounter++),
-      );
+      actualName = makeKeyframeName(this.namePrefix, hashString(contentHash));
     }
 
     // The insertion plus the `@property` scan over the resulting declarations.

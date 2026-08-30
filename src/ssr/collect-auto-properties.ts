@@ -12,6 +12,8 @@ import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { RSCStyleCache } from '../rsc-cache';
 import { pushRSCCSS } from '../rsc-cache';
 import type { Styles } from '../styles/types';
+import type { TastyStyleArtifactSource } from '../precompile/types';
+import { normalizePropertyDefinition } from '../properties';
 
 import type { ServerStyleCollector } from './collector';
 import { formatPropertyCSS } from './format-property';
@@ -23,7 +25,11 @@ import { formatPropertyCSS } from './format-property';
 function scanAndEmitAutoProperties(
   rules: StyleResult[],
   styles: Styles | undefined,
-  emit: (name: string, css: string) => void,
+  emit: (
+    name: string,
+    css: string,
+    definition: { syntax: string; inherits: boolean; initialValue: string },
+  ) => void,
 ): void {
   const registered = new Set<string>();
 
@@ -48,13 +54,14 @@ function scanAndEmitAutoProperties(
       (name) => registered.has(name),
       (name, syntax, initialValue) => {
         registered.add(name);
-        const css = formatPropertyCSS(name, {
+        const definition = {
           syntax,
           inherits: true,
           initialValue,
-        });
+        };
+        const css = formatPropertyCSS(name, definition);
         if (css) {
-          emit(name, css);
+          emit(name, css, definition);
         }
       },
     );
@@ -73,9 +80,15 @@ export function collectAutoInferredProperties(
   rules: StyleResult[],
   collector: ServerStyleCollector,
   styles?: Styles,
+  source: TastyStyleArtifactSource = 'component',
 ): void {
-  scanAndEmitAutoProperties(rules, styles, (name, css) => {
-    collector.collectProperty(`__auto:${name}`, css);
+  scanAndEmitAutoProperties(rules, styles, (name, css, definition) => {
+    collector.collectProperty(`__auto:${name}`, css, {
+      source,
+      cssName: name,
+      normalizedDefinition: normalizePropertyDefinition(definition),
+      rscKey: `__auto:${name}`,
+    });
   });
 }
 

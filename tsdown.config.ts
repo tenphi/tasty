@@ -1,4 +1,11 @@
 import { defineConfig } from 'tsdown';
+import { readFileSync } from 'node:fs';
+
+const packageVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 export default defineConfig({
   entry: {
@@ -19,6 +26,8 @@ export default defineConfig({
     'ssr/astro-middleware-extract-static':
       'src/ssr/astro-middleware-extract-static.ts',
     'ssr/astro-client': 'src/ssr/astro-client.ts',
+    'precompile/index': 'src/precompile/index.ts',
+    'precompile/register': 'src/precompile/register.ts',
   },
   format: 'esm',
   outDir: 'dist',
@@ -42,4 +51,7 @@ export default defineConfig({
   target: 'es2022',
   sourcemap: true,
   clean: true,
+  define: {
+    __TASTY_VERSION__: JSON.stringify(packageVersion),
+  },
 });

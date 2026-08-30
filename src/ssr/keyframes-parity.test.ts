@@ -6,6 +6,7 @@
 import { computeStyles } from '../compute-styles';
 import { resetConfig } from '../config';
 import { destroy } from '../injector';
+import { useCounterStyle, useKeyframes } from '../hooks';
 
 import { ServerStyleCollector } from './collector';
 import { registerSSRCollectorGetter } from './ssr-collector-ref';
@@ -65,5 +66,30 @@ describe('SSR/client parity for local keyframes', () => {
     const second = computeStyles(OTHER_FADE).className;
 
     expect([first, second]).toEqual(server.classNames);
+  });
+
+  it('content-addresses anonymous standalone rule names across environments', () => {
+    const collector = new ServerStyleCollector();
+    registerSSRCollectorGetter(() => collector);
+    const keyframeSteps = {
+      from: { opacity: 0 },
+      to: { opacity: 1 },
+    };
+    const counterDescriptors = {
+      system: 'cyclic' as const,
+      symbols: '"•"',
+    };
+
+    const serverKeyframes = useKeyframes(keyframeSteps);
+    const serverCounter = useCounterStyle(counterDescriptors);
+    registerSSRCollectorGetter(null as never);
+
+    const clientKeyframes = useKeyframes(keyframeSteps);
+    const clientCounter = useCounterStyle(counterDescriptors);
+
+    expect(clientKeyframes).toBe(serverKeyframes);
+    expect(clientCounter).toBe(serverCounter);
+    expect(serverKeyframes).toMatch(/^tk[a-z0-9]+$/);
+    expect(serverCounter).toMatch(/^tc[a-z0-9]+$/);
   });
 });

@@ -119,6 +119,12 @@ export interface InjectOptions {
    * signal to dispose on.
    */
   pin?: boolean;
+  /**
+   * Class derived by StyleInjector.prepareClassName() after it already checked
+   * the cache and hydration state. Internal render-path optimization.
+   * @internal
+   */
+  preparedClassName?: string;
 }
 
 /**

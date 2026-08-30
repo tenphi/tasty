@@ -11,8 +11,6 @@ interface UseCounterStyleOptions {
   root?: Document | ShadowRoot;
 }
 
-let clientCounterStyleCounter = 0;
-
 const getClientContentToName = createClientState(
   () => new Map<string, string>(),
 );
@@ -51,24 +49,27 @@ export function useCounterStyle(
   }
 
   const target = getStyleTarget();
+  const serializedContent = JSON.stringify(descriptors);
+  const rscKey = `__cs:${options?.name ?? ''}:${serializedContent}`;
+  const actualName =
+    options?.name ??
+    makeCounterStyleName(getNamePrefix(), hashString(serializedContent));
 
   if (target.mode === 'ssr') {
-    const actualName = target.collector.allocateCounterStyleName(options?.name);
     const css = formatCounterStyleRule(actualName, descriptors);
-    target.collector.collectCounterStyle(actualName, css);
+    target.collector.collectCounterStyle(actualName, css, {
+      source: 'component',
+      rscKeys: [rscKey],
+    });
     return actualName;
   }
 
   if (target.mode === 'rsc') {
-    const serializedContent = JSON.stringify(descriptors);
-    const key = `__cs:${options?.name ?? ''}:${serializedContent}`;
+    const key = rscKey;
 
     const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName =
-      options?.name ??
-      makeCounterStyleName(getNamePrefix(), hashString(serializedContent));
     const css = formatCounterStyleRule(actualName, descriptors);
     pushRSCCSS(target.cache, key, css);
     target.cache.generatedNames.set(key, actualName);
@@ -77,7 +78,6 @@ export function useCounterStyle(
 
   // Client path: stable name via content-based dedup
   const contentToName = getClientContentToName(options?.root ?? document);
-  const serializedContent = JSON.stringify(descriptors);
   const cacheKey = `${options?.name ?? ''}:${serializedContent}`;
 
   const existingName = contentToName.get(cacheKey);
@@ -85,9 +85,7 @@ export function useCounterStyle(
     return existingName;
   }
 
-  const name =
-    options?.name ??
-    makeCounterStyleName(getNamePrefix(), String(clientCounterStyleCounter++));
+  const name = actualName;
   contentToName.set(cacheKey, name);
 
   const injector = getGlobalInjector();

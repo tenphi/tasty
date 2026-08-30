@@ -553,3 +553,30 @@ value      onRequest
 ## @tenphi/tasty/ssr/astro-middleware-extract-static
 
 value      onRequest
+
+## @tenphi/tasty/precompile
+
+value      installTastyPrecompiled
+type       PrecompiledCounterStyleCacheEntry
+type       PrecompiledKeyframeCacheEntry
+type       PrecompiledPropertyCacheEntry
+value      precompileTastyStyles
+value      registerTastyPrecompiled
+type       TastyPrecompileCase
+type       TastyPrecompileCaseReport
+type       TastyPrecompiledChunk
+type       TastyPrecompiledDependencies
+type       TastyPrecompiledManifest
+type       TastyPrecompileResult
+type       TastyStyleArtifactSource
+
+## @tenphi/tasty/precompile/register
+
+value      installTastyPrecompiled
+type       PrecompiledCounterStyleCacheEntry
+type       PrecompiledKeyframeCacheEntry
+type       PrecompiledPropertyCacheEntry
+value      registerTastyPrecompiled
+type       TastyPrecompiledChunk
+type       TastyPrecompiledDependencies
+type       TastyPrecompiledManifest

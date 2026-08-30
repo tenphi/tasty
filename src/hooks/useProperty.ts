@@ -2,6 +2,10 @@ import { getGlobalInjector } from '../config';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
 import { formatPropertyCSS } from '../ssr/format-property';
 import type { PropertyOptions } from '../injector/types';
+import {
+  getEffectiveDefinition,
+  normalizePropertyDefinition,
+} from '../properties';
 
 /**
  * Options for {@link useProperty}. Extends the shared {@link PropertyOptions}
@@ -82,7 +86,19 @@ export function useProperty(name: string, options?: UsePropertyOptions): void {
       initialValue: options?.initialValue,
     });
     if (css) {
-      target.collector.collectProperty(name, css);
+      const effective = getEffectiveDefinition(name, {
+        syntax: options?.syntax,
+        inherits: options?.inherits,
+        initialValue: options?.initialValue,
+      });
+      target.collector.collectProperty(name, css, {
+        source: 'component',
+        cssName: effective.isValid ? effective.cssName : undefined,
+        normalizedDefinition: effective.isValid
+          ? normalizePropertyDefinition(effective.definition)
+          : undefined,
+        rscKey: `__prop:${name}`,
+      });
     }
     return;
   }

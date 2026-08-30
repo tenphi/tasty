@@ -87,6 +87,16 @@
       "import": "./dist/ssr/astro-middleware-extract-static.js",
       "default": "./dist/ssr/astro-middleware-extract-static.js"
     },
+    "./precompile": {
+      "types": "./dist/precompile/index.d.ts",
+      "import": "./dist/precompile/index.js",
+      "default": "./dist/precompile/index.js"
+    },
+    "./precompile/register": {
+      "types": "./dist/precompile/register.d.ts",
+      "import": "./dist/precompile/register.js",
+      "default": "./dist/precompile/register.js"
+    },
     "./tasty.config": "./tasty.config.ts"
   },
   "files": [
@@ -230,13 +240,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.5 kB"
+      "limit": "59 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "54.5 kB"
+      "limit": "56 kB"
     },
     {
       "name": "static",
@@ -264,7 +274,7 @@
         "path",
         "crypto"
       ],
-      "limit": "49.6 kB"
+      "limit": "50.2 kB"
     }
   ]
 }

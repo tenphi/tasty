@@ -7,7 +7,7 @@ different costs:
 1. Style parsing and generation in Node.
 2. The React overhead of an empty `tasty({})` wrapper.
 3. Cold browser generation and injection compared with equivalent CSS that is
-   already on the page.
+   already on the page or registered as a precompiled catalog.
 4. The steady-state interaction path — mod flips and styled subtrees opening
    and closing after the page has loaded.
 5. Page-load cold start: network, module compilation, execution and first
@@ -130,6 +130,13 @@ stylesheet pre-created with an unrelated sentinel rule, but not the measured
 rules. Both paths perform the same class assignment, DOM commit, and
 computed-style reads. Only the runtime path calls `computeStyles()` and inserts
 the new rules.
+
+The 1,000-rule workload also includes a precompiled Tasty case. Its catalog is
+generated and registered, and its CSS is parsed in an isolated document,
+before the timer starts. The timed work is the chunk-key lookup, class
+assignment, DOM commit, and the same computed-style reads. This keeps CSS
+delivery and registration out of render latency while preserving the real
+runtime lookup path.
 
 Preparation and cleanup happen outside the sample timer. Every runtime style
 value is unique within a cycle, the relevant caches are cleared between cycles,
@@ -336,6 +343,8 @@ blindly. They describe different paths:
   reusable.
 - A mod flip on an already-styled element pays neither; it is a class-name
   change.
+- A registered precompiled chunk skips declaration rendering and rule
+  insertion, while uncovered chunks in the same component remain dynamic.
 - Browser style resolution, layout, and paint depend on the actual document and
   need application-level profiling.
 

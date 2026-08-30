@@ -15,6 +15,7 @@ import type { ServerStyleCollector } from './ssr/collector';
 import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
 import { hashString } from './utils/hash';
 import { makeClassName } from './utils/name-prefix';
+import { applyRegisteredDependenciesToRSC } from './precompile/runtime';
 
 export interface RSCStyleCache {
   cacheKeyToClassName: Map<string, string>;
@@ -25,6 +26,10 @@ export interface RSCStyleCache {
   keyToIndex: Map<string, number>;
   /** Maps dedup key -> generated name for keyframes and counter-styles in RSC mode. */
   generatedNames: Map<string, string>;
+  /** Last registered precompile revision applied to this request cache. */
+  precompiledRevision: number;
+  precompiledEmittedKeys: Set<string>;
+  precompiledGeneratedNames: Map<string, string>;
 }
 
 /**
@@ -39,7 +44,15 @@ export const getRSCCache = cache((): RSCStyleCache => ({
   pendingCSS: [],
   keyToIndex: new Map(),
   generatedNames: new Map(),
+  precompiledRevision: -1,
+  precompiledEmittedKeys: new Set(),
+  precompiledGeneratedNames: new Map(),
 }));
+
+export function prepareRSCCache(cache: RSCStyleCache): RSCStyleCache {
+  applyRegisteredDependenciesToRSC(cache, getNamePrefix());
+  return cache;
+}
 
 export function rscAllocateClassName(
   rscCache: RSCStyleCache,
@@ -114,6 +127,6 @@ export function getStyleTarget(): StyleTarget {
   const collector = getRegisteredSSRCollector();
   if (collector) return { mode: 'ssr', collector };
   if (typeof document === 'undefined')
-    return { mode: 'rsc', cache: getRSCCache() };
+    return { mode: 'rsc', cache: prepareRSCCache(getRSCCache()) };
   return { mode: 'client' };
 }

@@ -66,6 +66,8 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
 | `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
+| `@tenphi/tasty/precompile` | Build-time component-catalog CSS and manifest compiler | Node |
+| `@tenphi/tasty/precompile/register` | Manifest registration and optional one-shot CSS text installation | Universal |
 | `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static` | Middleware entrypoints `tastyIntegration()` hands to Astro's `addMiddleware()`. Exported only so Astro can resolve them by specifier — never reference them directly. | Node |
 
 ## Project Structure
@@ -142,6 +144,7 @@ src/
 | [`docs/plugins.md`](docs/plugins.md) | Plugins & extension points — what a plugin is, how to choose between `functions`/`units`/`states`/`handlers`/`propHandlers`/`recipes`/`baseStyleProps`, the style-handler and props-middleware contracts, typing your extension, and a worked end-to-end plugin. |
 | [`docs/styles.md`](docs/styles.md) | Style properties reference — documents all custom style handlers (`fill`, `padding`, `margin`, `border`, `radius`, `flow`, `preset`, `shadow`, `outline`, `display`, `width`/`height`, `gap`, `inset`, `fade`, `scrollbar`) with their enhanced syntax and modifiers. |
 | [`docs/tasty-static.md`](docs/tasty-static.md) | Zero-runtime mode (`tastyStatic`) — build-time CSS generation for static sites and performance-critical pages. Covers Babel plugin setup, Next.js integration, static config files, and limitations. |
+| [`docs/precompile.md`](docs/precompile.md) | Precompiled component catalogs — build a shared UI-kit stylesheet and lookup manifest while retaining runtime fallback for uncovered styles. |
 | [`docs/pipeline.md`](docs/pipeline.md) | Style rendering pipeline — stages from parsed state keys through exclusive conditions, handler snapshots, merge-by-value, and CSS materialization; condition types, simplification, and caching. Implementation in `src/pipeline/`. |
 | [`docs/injector.md`](docs/injector.md) | Internal style injector architecture — hash-based deduplication, reference counting, CSS nesting flattening, keyframes injection, sheet management, SSR support, and Shadow DOM roots. Low-level infrastructure doc. |
 | [`docs/debug.md`](docs/debug.md) | Debug utilities (`tastyDebug`) — runtime CSS inspection, cache performance metrics, style chunk analysis, and troubleshooting via browser console. Development-only diagnostics. |

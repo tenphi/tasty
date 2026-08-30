@@ -19,20 +19,23 @@ import {
 import {
   getConfig,
   getGlobalKeyframes,
+  getGlobalInjector,
+  getNamePrefix,
   hasGlobalKeyframes,
   isFunctionsPolyfillEnabled,
+  markStylesGenerated,
 } from './config';
 import {
   counterStyle,
   fontFace,
   func,
-  inject,
   holdKeyframes,
   ownKeyframes,
   property,
   touch,
 } from './injector';
 import type { FontFaceDescriptors, KeyframesSteps } from './injector/types';
+import type { StyleInjector } from './injector/injector';
 import {
   extractLocalCounterStyle,
   formatCounterStyleRule,
@@ -65,10 +68,16 @@ import type { RenderResult, StyleResult } from './pipeline';
 import {
   flushPendingCSS,
   getRSCCache,
+  prepareRSCCache,
   rscAllocateClassName,
 } from './rsc-cache';
 import type { RSCStyleCache } from './rsc-cache';
-import { extractLocalProperties, hasLocalProperties } from './properties';
+import {
+  extractLocalProperties,
+  getEffectiveDefinition,
+  hasLocalProperties,
+  normalizePropertyDefinition,
+} from './properties';
 import { collectAutoInferredProperties } from './ssr/collect-auto-properties';
 import type { ServerStyleCollector } from './ssr/collector';
 import { formatKeyframesCSS } from './ssr/format-keyframes';
@@ -78,6 +87,11 @@ import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
 import type { Styles } from './styles/types';
 import { hasKeys } from './utils/has-keys';
 import { resolveRecipes } from './utils/resolve-recipes';
+import {
+  applyRegisteredDependenciesToInjector,
+  findPrecompiledChunk,
+  precompileRuntimeState,
+} from './precompile/runtime';
 
 export interface ComputeStylesResult {
   className: string;
@@ -109,6 +123,34 @@ interface ProcessedChunk {
 }
 
 const EMPTY_RESULT: ComputeStylesResult = { className: '' };
+
+function keyframeLookupSignature(
+  names: Map<string, string> | null | undefined,
+): string {
+  if (!names || names.size === 0) return '';
+  return [...names]
+    .map(([authored, resolved]) => `${authored}=${resolved}`)
+    .sort()
+    .join(',');
+}
+
+function precompiledLookupKey(baseKey: string, signature: string): string {
+  return signature ? `${baseKey}\0pkf:${signature}` : baseKey;
+}
+
+function lookupPrecompiledChunk(
+  baseKey: string,
+  signature: string,
+  root?: Document | ShadowRoot,
+) {
+  if (root && typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) {
+    return null;
+  }
+  return findPrecompiledChunk(
+    precompiledLookupKey(baseKey, signature),
+    getNamePrefix(),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // RSC (React Server Components) inline style support
@@ -224,12 +266,16 @@ function computeStylesRSC(
   styles: Styles,
   chunkMap: Map<string, string[]>,
   stableStyles: boolean,
+  precompiledEnabled = false,
 ): ComputeStylesResult {
-  const rscCache = getRSCCache();
+  const rscCache = prepareRSCCache(getRSCCache());
   const cssParts: string[] = [];
   const classNames: string[] = [];
   const rscUsedKf = getUsedKeyframes(styles);
   const rscKeyframeNames = rscUsedKf ? resolveKeyframesNames(rscUsedKf) : null;
+  const lookupSignature = precompiledEnabled
+    ? keyframeLookupSignature(rscKeyframeNames)
+    : '';
 
   // Flush CSS accumulated by standalone style functions
   const pendingCSS = flushPendingCSS(rscCache);
@@ -247,6 +293,14 @@ function computeStylesRSC(
       chunkStyleKeys,
       stableStyles,
     );
+
+    const precompiled = precompiledEnabled
+      ? lookupPrecompiledChunk(baseKey, lookupSignature)
+      : null;
+    if (precompiled) {
+      classNames.push(precompiled.className);
+      continue;
+    }
 
     // Rendered before the class is allocated, for the same reason as the other
     // two paths: the key has to carry which keyframes these rules animate.
@@ -325,6 +379,70 @@ function processChunkSSR(
     styleKeys,
     stableStyles,
   );
+  const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
+  if (renderResult.rules.length === 0) return null;
+
+  const { animations, rules, cacheKey } = applyKeyframeNames(
+    renderResult.rules,
+    baseKey,
+    keyframeNames,
+  );
+  const { className, isNewAllocation } = collector.allocateClassName(cacheKey);
+
+  if (isNewAllocation) {
+    collector.collectChunk(cacheKey, className, rules);
+    return {
+      name: chunkName,
+      styleKeys,
+      cacheKey,
+      renderResult: { ...renderResult, rules },
+      className,
+      animations,
+    };
+  }
+
+  return {
+    name: chunkName,
+    styleKeys,
+    cacheKey,
+    renderResult: { rules: [] },
+    className,
+  };
+}
+
+/** Catalog-aware SSR path, kept off the unregistered runtime hot path. */
+function processChunkSSRPrecompiled(
+  collector: ServerStyleCollector,
+  styles: Styles,
+  chunkName: string,
+  styleKeys: string[],
+  stableStyles: boolean,
+  keyframeNames?: Map<string, string> | null,
+  lookupSignature = '',
+  precompiledEnabled = false,
+): ProcessedChunk | null {
+  if (styleKeys.length === 0) return null;
+
+  const baseKey = generateChunkCacheKey(
+    styles,
+    chunkName,
+    styleKeys,
+    stableStyles,
+  );
+
+  if (precompiledEnabled && !collector.isPrecompileRecording()) {
+    const precompiled = lookupPrecompiledChunk(baseKey, lookupSignature);
+    if (precompiled) {
+      return {
+        name: chunkName,
+        styleKeys,
+        cacheKey: baseKey,
+        renderResult: { rules: [] },
+        className: precompiled.className,
+        animations: [...precompiled.animations],
+      };
+    }
+  }
 
   // Rendered before the class is allocated: the key has to carry which
   // keyframes these rules animate, or two components authoring the same
@@ -340,6 +458,14 @@ function processChunkSSR(
   );
 
   const { className, isNewAllocation } = collector.allocateClassName(cacheKey);
+
+  if (collector.isPrecompileRecording()) {
+    collector.recordPrecompiledChunk(
+      precompiledLookupKey(baseKey, lookupSignature),
+      className,
+      animations,
+    );
+  }
 
   if (isNewAllocation) {
     collector.collectChunk(cacheKey, className, rules);
@@ -414,6 +540,9 @@ function processChunkSync(
   stableStyles: boolean,
   root?: Document | ShadowRoot,
   keyframeNames?: Map<string, string> | null,
+  lookupSignature = '',
+  clientInjector?: StyleInjector,
+  precompiledEnabled = false,
 ): ProcessedChunk | null {
   if (styleKeys.length === 0) return null;
 
@@ -423,6 +552,31 @@ function processChunkSync(
     styleKeys,
     stableStyles,
   );
+  const precompiled = precompiledEnabled
+    ? lookupPrecompiledChunk(cacheKey, lookupSignature, root)
+    : null;
+  if (precompiled) {
+    return {
+      name: chunkName,
+      styleKeys,
+      cacheKey,
+      renderResult: { rules: [] },
+      className: precompiled.className,
+      animations: [...precompiled.animations],
+    };
+  }
+  const prepared = clientInjector?.prepareClassName(cacheKey, {
+    root,
+  });
+  if (prepared?.isExisting) {
+    return {
+      name: chunkName,
+      styleKeys,
+      cacheKey,
+      renderResult: { rules: [] },
+      className: prepared.className,
+    };
+  }
   const renderResult = renderStylesForChunk(
     styles,
     chunkName,
@@ -439,10 +593,11 @@ function processChunkSync(
 
   // `pin: false` — the render path keeps no dispose handle; the DOM is the
   // record of use, and `gc()` reclaims the class once no element carries it.
-  const { className } = inject(rules, {
+  const { className } = (clientInjector ?? getGlobalInjector()).inject(rules, {
     cacheKey: injectKey,
     root,
     pin: false,
+    preparedClassName: injectKey === cacheKey ? prepared?.className : undefined,
   });
 
   return {
@@ -520,7 +675,11 @@ function collectAncillarySSR(
     const names = resolveKeyframesNames(usedKf);
     for (const [authored, steps] of Object.entries(usedKf)) {
       const name = names.get(authored) as string;
-      collector.collectKeyframes(name, formatKeyframesCSS(name, steps));
+      collector.collectKeyframes(name, formatKeyframesCSS(name, steps), {
+        source: 'component',
+        contentKey: `${name}\0${JSON.stringify(steps)}`,
+        rscKeys: [`__kf:${name}`],
+      });
     }
   }
 
@@ -530,7 +689,15 @@ function collectAncillarySSR(
       for (const [token, definition] of Object.entries(localProperties)) {
         const css = formatPropertyCSS(token, definition);
         if (css) {
-          collector.collectProperty(token, css);
+          const effective = getEffectiveDefinition(token, definition);
+          collector.collectProperty(token, css, {
+            source: 'component',
+            cssName: effective.isValid ? effective.cssName : undefined,
+            normalizedDefinition: effective.isValid
+              ? normalizePropertyDefinition(effective.definition)
+              : undefined,
+            rscKey: `__prop:${token}`,
+          });
         }
       }
     }
@@ -546,7 +713,7 @@ function collectAncillarySSR(
         for (const desc of descriptors) {
           const hash = fontFaceContentHash(family, desc);
           const css = formatFontFaceRule(family, desc);
-          collector.collectFontFace(hash, css);
+          collector.collectFontFace(hash, css, { source: 'component' });
         }
       }
     }
@@ -557,7 +724,10 @@ function collectAncillarySSR(
     if (localCounterStyle) {
       for (const [name, descriptors] of Object.entries(localCounterStyle)) {
         const css = formatCounterStyleRule(name, descriptors);
-        collector.collectCounterStyle(name, css);
+        collector.collectCounterStyle(name, css, {
+          source: 'component',
+          rscKeys: [`__cs:${name}:${JSON.stringify(descriptors)}`],
+        });
       }
     }
   }
@@ -567,7 +737,9 @@ function collectAncillarySSR(
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
         const css = formatFunctionRule(name, definition);
-        collector.collectFunction(parseFunctionName(name), css);
+        collector.collectFunction(parseFunctionName(name), css, {
+          source: 'component',
+        });
       }
     }
   }
@@ -617,6 +789,7 @@ export function computeStyles(
   }
 
   const chunkMap = categorizeStyleKeys(resolved as Record<string, unknown>);
+  const precompiledEnabled = precompileRuntimeState.active === true;
 
   const collector =
     options?.ssrCollector !== undefined
@@ -626,29 +799,64 @@ export function computeStyles(
   const chunks: ProcessedChunk[] = [];
 
   if (collector) {
+    if (precompiledEnabled) {
+      collector.applyRegisteredPrecompiledDependencies();
+    }
     collector.collectInternals();
 
     const ssrKf = getUsedKeyframes(resolved);
     const ssrKeyframeNames = ssrKf ? resolveKeyframesNames(ssrKf) : null;
-
-    for (const [chunkName, chunkStyleKeys] of chunkMap) {
-      const chunk = processChunkSSR(
-        collector,
-        resolved,
-        chunkName,
-        chunkStyleKeys,
-        stableStyles,
-        ssrKeyframeNames,
-      );
-      if (chunk) chunks.push(chunk);
+    if (precompiledEnabled) {
+      const lookupSignature = keyframeLookupSignature(ssrKeyframeNames);
+      for (const [chunkName, chunkStyleKeys] of chunkMap) {
+        const chunk = processChunkSSRPrecompiled(
+          collector,
+          resolved,
+          chunkName,
+          chunkStyleKeys,
+          stableStyles,
+          ssrKeyframeNames,
+          lookupSignature,
+          precompiledEnabled,
+        );
+        if (chunk) chunks.push(chunk);
+      }
+    } else {
+      for (const [chunkName, chunkStyleKeys] of chunkMap) {
+        const chunk = processChunkSSR(
+          collector,
+          resolved,
+          chunkName,
+          chunkStyleKeys,
+          stableStyles,
+          ssrKeyframeNames,
+        );
+        if (chunk) chunks.push(chunk);
+      }
     }
 
     collectAncillarySSR(collector, resolved, chunks);
   } else if (typeof document === 'undefined') {
     // RSC path: render CSS to strings for inline <style> emission
-    return computeStylesRSC(resolved, chunkMap, stableStyles);
+    return computeStylesRSC(
+      resolved,
+      chunkMap,
+      stableStyles,
+      precompiledEnabled,
+    );
   } else {
     const root = options?.root;
+    const clientInjector = getGlobalInjector();
+
+    if (
+      precompiledEnabled &&
+      (!root ||
+        typeof ShadowRoot === 'undefined' ||
+        !(root instanceof ShadowRoot))
+    ) {
+      applyRegisteredDependenciesToInjector(clientInjector, getNamePrefix());
+    }
+    markStylesGenerated();
 
     injectAncillarySync(resolved, root);
 
@@ -658,6 +866,9 @@ export function computeStyles(
     // animate them carry the name, and a rule written before it is known
     // cannot be corrected afterwards.
     const keyframeNames = usedKf ? resolveKeyframesNames(usedKf) : null;
+    const lookupSignature = precompiledEnabled
+      ? keyframeLookupSignature(keyframeNames)
+      : '';
     const keyframeKeys =
       usedKf && keyframeNames
         ? holdKeyframes(usedKf, keyframeNames, { root })
@@ -671,6 +882,9 @@ export function computeStyles(
         stableStyles,
         root,
         keyframeNames,
+        lookupSignature,
+        clientInjector,
+        precompiledEnabled,
       );
       if (chunk) chunks.push(chunk);
     }

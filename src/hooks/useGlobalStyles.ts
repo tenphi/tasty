@@ -128,7 +128,9 @@ export function useGlobalStyles(
       const key = options?.id
         ? `global:${options.id}`
         : `global:${selector}:${hashString(css)}`;
-      target.collector.collectGlobalStyles(key, css, options?.id != null);
+      target.collector.collectGlobalStyles(key, css, options?.id != null, {
+        source: 'global',
+      });
     }
 
     if (getConfig().autoPropertyTypes !== false) {
@@ -136,6 +138,7 @@ export function useGlobalStyles(
         styleResults,
         target.collector,
         resolvedStyles,
+        'global',
       );
     }
     return;

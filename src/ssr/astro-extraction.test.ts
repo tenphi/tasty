@@ -23,7 +23,7 @@ function artifact(
   css: string,
   order: number,
 ): ServerStyleArtifact {
-  return { id, kind, css, order };
+  return { id, kind, css, order, source: 'component' };
 }
 
 function html(artifacts: ServerStyleArtifact[], nonce?: string): string {

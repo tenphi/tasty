@@ -136,7 +136,9 @@ export function useRawCSS(
     // A slot key (explicit `id`) replaces, matching client update tracking;
     // content-hashed keys only dedup.
     const key = opts?.id ? `raw:${opts.id}` : `raw:${hashString(css)}`;
-    target.collector.collectRawCSS(key, css, opts?.id != null);
+    target.collector.collectRawCSS(key, css, opts?.id != null, {
+      source: 'global',
+    });
     return;
   }
 

@@ -193,6 +193,8 @@ export interface CacheMetrics {
   hits: number;
   /** Hits served by a registered immutable precompiled stylesheet. */
   precompiledHits: number;
+  /** Distinct precompiled classes served since metrics were last reset. */
+  precompiledUniqueHits: number;
   misses: number;
   bulkCleanups: number; // number of bulk cleanup operations
   totalInsertions: number;
@@ -216,6 +218,8 @@ export interface RootRegistry {
   ruleTextSet: Set<string>;
   /** Performance metrics (optional) */
   metrics?: CacheMetrics;
+  /** Dev-only distinct precompiled classes served since metrics were reset. */
+  precompiledUsedClasses?: Set<string>;
   /** Keyframes cache by content hash -> entry */
   keyframesCache: Map<string, KeyframesCacheEntry>;
   /** Keyframes name to content hash mapping for collision detection */

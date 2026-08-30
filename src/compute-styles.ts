@@ -556,7 +556,7 @@ function processChunkSync(
     ? lookupPrecompiledChunk(cacheKey, lookupSignature, root)
     : null;
   if (precompiled) {
-    clientInjector?.recordPrecompiledHit({ root });
+    clientInjector?.recordPrecompiledHit(precompiled.className, { root });
     return {
       name: chunkName,
       styleKeys,

@@ -10,4 +10,6 @@ metadata now prevents duplicate ancillary at-rules, anonymous keyframe and
 counter-style names are content-addressed across environments, and normal SSR
 hydration can recognize covered chunks before running the style pipeline.
 `tastyDebug` includes precompiled stylesheet rules in its totals and reports
-precompiled cache hits separately.
+precompiled cache hits separately, including active, inactive, and distinct
+used precompiled classes so repeated renders cannot be mistaken for broad
+catalog coverage.

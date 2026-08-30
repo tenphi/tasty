@@ -902,12 +902,20 @@ export class StyleInjector {
   }
 
   /** Record a chunk lookup served by an immutable external stylesheet. */
-  recordPrecompiledHit(options?: { root?: Document | ShadowRoot }): void {
+  recordPrecompiledHit(
+    className: string,
+    options?: { root?: Document | ShadowRoot },
+  ): void {
     if (!this.config.devMode) return;
     const registry = this.sheetManager.getRegistry(options?.root || document);
     if (registry.metrics) {
       registry.metrics.hits++;
       registry.metrics.precompiledHits++;
+      const used = (registry.precompiledUsedClasses ??= new Set());
+      if (!used.has(className)) {
+        used.add(className);
+        registry.metrics.precompiledUniqueHits++;
+      }
     }
   }
 

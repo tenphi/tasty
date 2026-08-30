@@ -51,6 +51,10 @@ export interface CacheStatus {
     active: string[];
     unused: string[];
     all: string[];
+    runtimeActive: string[];
+    precompiledActive: string[];
+    precompiledInactive: string[];
+    precompiledUsed: string[];
   };
   metrics: CacheMetrics | null;
 }
@@ -66,6 +70,14 @@ export interface ChunkBreakdown {
 
 export interface Summary {
   activeClasses: string[];
+  /** Active DOM classes not covered by a registered precompiled manifest. */
+  runtimeActiveClasses: string[];
+  /** Registered precompiled classes currently present in the DOM. */
+  precompiledActiveClasses: string[];
+  /** Registered precompiled classes not currently present in the DOM. */
+  precompiledInactiveClasses: string[];
+  /** Distinct precompiled classes served since metrics were last reset. */
+  precompiledUsedClasses: string[];
   /** Classes `gc({ force: true })` would delete right now. */
   unusedClasses: string[];
   /**
@@ -725,11 +737,24 @@ export const tastyDebug = {
     const ownedClasses = getOwnedClasses(root);
     const precompiled = getPrecompiledDebugStats(root);
     const precompiledClasses = sortTastyClasses(precompiled.classNames);
+    const precompiledSet = new Set(precompiledClasses);
+    const runtimeActiveClasses = activeClasses.filter(
+      (className) => !precompiledSet.has(className),
+    );
+    const precompiledActiveClasses = activeClasses.filter((className) =>
+      precompiledSet.has(className),
+    );
+    const activeSet = new Set(activeClasses);
+    const precompiledInactiveClasses = precompiledClasses.filter(
+      (className) => !activeSet.has(className),
+    );
+    const precompiledUsedClasses = sortTastyClasses(
+      getRegistry(root)?.precompiledUsedClasses ?? [],
+    );
     const totalStyledClasses = sortTastyClasses(
       new Set([...activeClasses, ...ownedClasses, ...precompiledClasses]),
     );
     const unusedSet = new Set(unusedClasses);
-    const activeSet = new Set(activeClasses);
     const hotClasses = ownedClasses.filter(
       (className) => !activeSet.has(className) && !unusedSet.has(className),
     );
@@ -781,6 +806,10 @@ export const tastyDebug = {
 
     const summary: Summary = {
       activeClasses,
+      runtimeActiveClasses,
+      precompiledActiveClasses,
+      precompiledInactiveClasses,
+      precompiledUsedClasses,
       unusedClasses,
       hotClasses,
       totalStyledClasses,
@@ -811,10 +840,10 @@ export const tastyDebug = {
     if (!raw) {
       console.group('Tasty Summary');
       console.log(
-        `Active:   ${activeClasses.length} classes, ${activeRuleCount} rules, ${fmtSize(activeCSS.length)}`,
+        `Active:   ${activeClasses.length} classes (${runtimeActiveClasses.length} runtime, ${precompiledActiveClasses.length} precompiled), ${activeRuleCount} runtime rules, ${fmtSize(activeCSS.length)} runtime CSS`,
       );
       console.log(
-        `Unused:   ${unusedClasses.length} classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
+        `Unused:   ${unusedClasses.length} runtime classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
       );
       if (hotClasses.length)
         console.log(
@@ -837,7 +866,7 @@ export const tastyDebug = {
         );
       if (precompiled.manifestCount)
         console.log(
-          `Precompiled: ${precompiledClasses.length} classes, ${precompiled.ruleCount} rules, ${fmtSize(precompiled.cssSize)} (${precompiled.manifestCount} ${precompiled.manifestCount === 1 ? 'manifest' : 'manifests'})`,
+          `Precompiled: ${precompiledActiveClasses.length} active, ${precompiledInactiveClasses.length} inactive, ${precompiledUsedClasses.length}/${precompiledClasses.length} used since reset; ${precompiled.ruleCount} rules, ${fmtSize(precompiled.cssSize)} (${precompiled.manifestCount} ${precompiled.manifestCount === 1 ? 'manifest' : 'manifests'})`,
         );
       console.log(
         `Total:    ${totalStyledClasses.length} classes, ${totalRuleCountWithPrecompiled} rules, ${fmtSize(allCSS.length + precompiled.cssSize)}`,
@@ -846,11 +875,9 @@ export const tastyDebug = {
       if (metrics) {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
-        const precompiledLabel = metrics.precompiledHits
-          ? `, ${metrics.precompiledHits} precompiled ${metrics.precompiledHits === 1 ? 'hit' : 'hits'}`
-          : '';
+        const runtimeHits = metrics.hits - metrics.precompiledHits;
         console.log(
-          `Cache:    ${rate}% hit rate (${total} lookups${precompiledLabel})`,
+          `Lookups:  ${total} (${metrics.precompiledHits} precompiled across ${metrics.precompiledUniqueHits} classes, ${runtimeHits} runtime cache hits, ${metrics.misses} generated; ${rate}% reused)`,
         );
       }
 
@@ -921,6 +948,20 @@ export const tastyDebug = {
     const unused = getUnusedClasses(root);
     const metrics = getInjectorMetrics(root);
     const precompiled = getPrecompiledDebugStats(root);
+    const precompiledSet = new Set(precompiled.classNames);
+    const runtimeActive = active.filter(
+      (className) => !precompiledSet.has(className),
+    );
+    const precompiledActive = active.filter((className) =>
+      precompiledSet.has(className),
+    );
+    const activeSet = new Set(active);
+    const precompiledInactive = sortTastyClasses(
+      precompiled.classNames.filter((className) => !activeSet.has(className)),
+    );
+    const precompiledUsed = sortTastyClasses(
+      getRegistry(root)?.precompiledUsedClasses ?? [],
+    );
 
     // `all` is everything held, not the two bands above: a class that went cold
     // a moment ago is in neither, and it is still taking up a sheet.
@@ -929,18 +970,29 @@ export const tastyDebug = {
     );
 
     const status: CacheStatus = {
-      classes: { active, unused, all },
+      classes: {
+        active,
+        unused,
+        all,
+        runtimeActive,
+        precompiledActive,
+        precompiledInactive,
+        precompiledUsed,
+      },
       metrics,
     };
 
     if (!raw) {
       console.group('Cache');
-      console.log(`Active: ${active.length}, Unused: ${unused.length}`);
+      console.log(
+        `Active: ${active.length} (${runtimeActive.length} runtime, ${precompiledActive.length} precompiled), Unused: ${unused.length} runtime, Inactive precompiled: ${precompiledInactive.length}`,
+      );
       if (metrics) {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
+        const runtimeHits = metrics.hits - metrics.precompiledHits;
         console.log(
-          `Hits: ${metrics.hits} (${metrics.precompiledHits} precompiled), Misses: ${metrics.misses}, Rate: ${rate}%`,
+          `Precompiled: ${metrics.precompiledHits} hits across ${metrics.precompiledUniqueHits} classes, Runtime cache: ${runtimeHits} hits, Generated: ${metrics.misses}, Reuse: ${rate}%`,
         );
       }
       console.groupEnd();

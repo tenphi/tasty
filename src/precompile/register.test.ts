@@ -18,7 +18,7 @@ vi.mock('../chunks', async (importOriginal) => {
 import { configure, getNamePrefix, resetConfig } from '../config';
 import { computeStyles } from '../compute-styles';
 import { tastyDebug } from '../debug';
-import { destroy, getCSSText } from '../injector';
+import { destroy, getCSSText, injector } from '../injector';
 import { useGlobalStyles } from '../hooks';
 import { ServerStyleCollector } from '../ssr/collector';
 import { hydrateTastyClasses } from '../ssr/hydrate';
@@ -40,7 +40,9 @@ const styles = {
   display: 'flex',
 } as const;
 
-function compileManifest(): {
+function compileManifest(
+  stylesToCompile: Parameters<typeof computeStyles>[0] = styles,
+): {
   css: string;
   manifest: TastyPrecompiledManifest;
 } {
@@ -48,7 +50,7 @@ function compileManifest(): {
   collector.enablePrecompileRecording();
   beginPrecompileBuild();
   try {
-    computeStyles(styles, { ssrCollector: collector });
+    computeStyles(stylesToCompile, { ssrCollector: collector });
   } finally {
     endPrecompileBuild();
   }
@@ -151,7 +153,52 @@ describe('precompiled browser registration', () => {
     expect(summary.metrics?.precompiledHits).toBe(
       artifact.manifest.chunks.length,
     );
+    const uniqueClasses = [
+      ...new Set(artifact.manifest.chunks.map(({ className }) => className)),
+    ].sort();
+    expect(summary.metrics?.precompiledUniqueHits).toBe(uniqueClasses.length);
+    expect(summary.precompiledUsedClasses).toEqual(uniqueClasses);
     expect(summary.metrics?.hits).toBe(summary.metrics?.precompiledHits);
+  });
+
+  it('separates active runtime and precompiled coverage from repeated hits', () => {
+    const artifact = compileManifest({ ...styles, color: 'red' });
+    registerTastyPrecompiled(artifact.manifest);
+
+    const result = computeStyles({ ...styles, color: 'blue' });
+    computeStyles({ ...styles, color: 'blue' });
+    const element = document.createElement('div');
+    element.className = result.className;
+    document.body.append(element);
+
+    const summary = tastyDebug.summary({ raw: true });
+    const status = tastyDebug.cache({ raw: true });
+
+    expect(summary.activeClasses).toHaveLength(2);
+    expect(summary.runtimeActiveClasses).toHaveLength(1);
+    expect(summary.precompiledActiveClasses).toHaveLength(1);
+    expect(summary.precompiledInactiveClasses).toHaveLength(1);
+    expect(summary.precompiledUsedClasses).toEqual(
+      summary.precompiledActiveClasses,
+    );
+    expect(summary.metrics?.precompiledHits).toBe(2);
+    expect(summary.metrics?.precompiledUniqueHits).toBe(1);
+    expect(status.classes.runtimeActive).toEqual(summary.runtimeActiveClasses);
+    expect(status.classes.precompiledActive).toEqual(
+      summary.precompiledActiveClasses,
+    );
+    expect(status.classes.precompiledInactive).toEqual(
+      summary.precompiledInactiveClasses,
+    );
+    expect(status.classes.precompiledUsed).toEqual(
+      summary.precompiledUsedClasses,
+    );
+
+    injector.instance.resetMetrics();
+    const reset = tastyDebug.summary({ raw: true });
+    expect(reset.precompiledUsedClasses).toEqual([]);
+    expect(reset.metrics?.precompiledUniqueHits).toBe(0);
+    element.remove();
   });
 
   it('reuses covered chunks and renders only an uncovered override chunk', () => {

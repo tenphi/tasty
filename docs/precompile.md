@@ -161,6 +161,17 @@ assignments, or other compilation-affecting configuration invalidate a shared
 catalog. Such applications should use runtime generation or build a
 project-specific artifact.
 
+Chunk lookup is exact. A shared UI-kit catalog is most useful when applications
+render those components close to their cataloged styles; frequent project
+overrides can leave a large static asset mostly inactive while the expensive
+custom chunks still run through the pipeline. Use `tastyDebug.summary()` to
+compare active runtime and precompiled classes and to inspect distinct
+precompiled classes used since metrics were reset. For heavily styled
+applications, prefer a project-specific catalog that renders representative
+application routes and states under the application's real Tasty
+configuration. Do not load both the broad shared asset and a project-specific
+asset containing the same coverage.
+
 ## Performance Verification
 
 Catalog generation, registration, and stylesheet loading are startup work and

@@ -130,6 +130,7 @@ export class SheetManager {
         ? {
             hits: 0,
             precompiledHits: 0,
+            precompiledUniqueHits: 0,
             misses: 0,
             bulkCleanups: 0,
             totalInsertions: 0,
@@ -1121,6 +1122,7 @@ export class SheetManager {
       registry.metrics = {
         hits: 0,
         precompiledHits: 0,
+        precompiledUniqueHits: 0,
         misses: 0,
         bulkCleanups: 0,
         totalInsertions: 0,
@@ -1129,6 +1131,7 @@ export class SheetManager {
         cleanupHistory: [],
         startTime: Date.now(),
       };
+      registry.precompiledUsedClasses = undefined;
     }
   }
 

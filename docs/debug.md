@@ -157,6 +157,10 @@ One-shot overview of the entire Tasty CSS state. Logs a compact report.
 ```typescript
 interface Summary {
   activeClasses: string[];
+  runtimeActiveClasses: string[];
+  precompiledActiveClasses: string[];
+  precompiledInactiveClasses: string[];
+  precompiledUsedClasses: string[];
   unusedClasses: string[];
   totalStyledClasses: string[];
   precompiledClasses: string[];
@@ -191,19 +195,19 @@ interface Summary {
 // Logged automatically
 tastyDebug.summary();
 // Output:
-//   Active:   42 classes, 186 rules, 12.4KB
-//   Unused:   3 classes, 8 rules, 0.5KB
+//   Active:   42 classes (18 runtime, 24 precompiled), 81 runtime rules, 5.4KB runtime CSS
+//   Unused:   3 runtime classes, 8 rules, 0.5KB
 //   Global:   12 rules, 1.1KB
-//   Precompiled: 540 classes, 1,024 rules, 697.6KB (1 manifest)
+//   Precompiled: 24 active, 516 inactive, 31/540 used since reset; 1,024 rules, 697.6KB (1 manifest)
 //   Total:    585 classes, 1,230 rules, 711.6KB
-//   Cache:    94.2% hit rate (312 lookups, 280 precompiled hits)
+//   Lookups:  312 (280 precompiled across 31 classes, 14 runtime cache hits, 18 generated; 94.2% reused)
 
 // Silent
 const s = tastyDebug.summary({ raw: true });
 console.log(s.totalRuleCount); // 1230
 ```
 
-Registered precompiled stylesheets are immutable external assets, so `summary()` uses their manifest metadata for class, rule, and size totals without reading or parsing CSSOM. Precompiled hits are included in `metrics.hits` and also exposed as `metrics.precompiledHits`. CSS text methods continue to return injector-owned CSS; a linked external stylesheet may not be readable from JavaScript at all.
+Registered precompiled stylesheets are immutable external assets, so `summary()` uses their manifest metadata for class, rule, and size totals without reading or parsing CSSOM. `precompiledActiveClasses` is the subset currently present in the DOM, `precompiledInactiveClasses` is the rest of the registered asset, and `precompiledUsedClasses` records distinct classes served since metrics were reset. The last measure distinguishes broad catalog coverage from repeated renders of a small class set. Precompiled hits are included in `metrics.hits`; `metrics.precompiledHits` reports render-frequency hits and `metrics.precompiledUniqueHits` reports distinct served classes. CSS text methods continue to return injector-owned CSS; a linked external stylesheet may not be readable from JavaScript at all.
 
 ---
 

@@ -13,6 +13,7 @@ export type {
   TastyPrecompiledChunk,
   TastyPrecompiledDependencies,
   TastyPrecompiledManifest,
+  TastyPrecompiledStats,
 } from './types';
 
 export function registerTastyPrecompiled(

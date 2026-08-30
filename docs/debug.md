@@ -159,6 +159,8 @@ interface Summary {
   activeClasses: string[];
   unusedClasses: string[];
   totalStyledClasses: string[];
+  precompiledClasses: string[];
+  precompiledManifestCount: number;
 
   activeCSSSize: number;
   unusedCSSSize: number;
@@ -166,6 +168,7 @@ interface Summary {
   rawCSSSize: number;
   keyframesCSSSize: number;
   propertyCSSSize: number;
+  precompiledCSSSize: number;
   totalCSSSize: number;
 
   activeRuleCount: number;
@@ -174,6 +177,7 @@ interface Summary {
   rawRuleCount: number;
   keyframesRuleCount: number;
   propertyRuleCount: number;
+  precompiledRuleCount: number;
   totalRuleCount: number;
 
   metrics: CacheMetrics | null;
@@ -190,13 +194,16 @@ tastyDebug.summary();
 //   Active:   42 classes, 186 rules, 12.4KB
 //   Unused:   3 classes, 8 rules, 0.5KB
 //   Global:   12 rules, 1.1KB
-//   Total:    45 classes, 206 rules, 14.0KB
-//   Cache:    94.2% hit rate (312 lookups)
+//   Precompiled: 540 classes, 1,024 rules, 697.6KB (1 manifest)
+//   Total:    585 classes, 1,230 rules, 711.6KB
+//   Cache:    94.2% hit rate (312 lookups, 280 precompiled hits)
 
 // Silent
 const s = tastyDebug.summary({ raw: true });
-console.log(s.totalRuleCount); // 206
+console.log(s.totalRuleCount); // 1230
 ```
+
+Registered precompiled stylesheets are immutable external assets, so `summary()` uses their manifest metadata for class, rule, and size totals without reading or parsing CSSOM. Precompiled hits are included in `metrics.hits` and also exposed as `metrics.precompiledHits`. CSS text methods continue to return injector-owned CSS; a linked external stylesheet may not be readable from JavaScript at all.
 
 ---
 
@@ -247,7 +254,7 @@ interface CacheStatus {
 tastyDebug.cache();
 // Output:
 //   Active: 42, Unused: 3
-//   Hits: 294, Misses: 18, Rate: 94.2%
+//   Hits: 294 (280 precompiled), Misses: 18, Rate: 94.2%
 ```
 
 ---

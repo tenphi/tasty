@@ -17,10 +17,12 @@ vi.mock('../chunks', async (importOriginal) => {
 
 import { configure, getNamePrefix, resetConfig } from '../config';
 import { computeStyles } from '../compute-styles';
+import { tastyDebug } from '../debug';
 import { destroy, getCSSText } from '../injector';
 import { useGlobalStyles } from '../hooks';
 import { ServerStyleCollector } from '../ssr/collector';
 import { hydrateTastyClasses } from '../ssr/hydrate';
+import { disableDevWarnings, enableDevWarnings } from '../test/dev-env';
 import { TASTY_VERSION } from '../version';
 
 import { installTastyPrecompiled, registerTastyPrecompiled } from './register';
@@ -64,6 +66,10 @@ function compileManifest(): {
       tastyVersion: TASTY_VERSION,
       namePrefix: getNamePrefix(),
       cssHash: 'browser-catalog-hash',
+      stats: {
+        cssSize: css.length,
+        ruleCount: collector.getPrecompiledRuleCount(),
+      },
       chunks: collector.getPrecompiledChunks(),
       dependencies: collector.getPrecompiledDependencies(),
     },
@@ -72,6 +78,7 @@ function compileManifest(): {
 
 beforeEach(() => {
   resetConfig();
+  enableDevWarnings();
   configure({ forceTextInjection: true });
   renderCalls.value = 0;
 });
@@ -81,6 +88,7 @@ afterEach(() => {
   document
     .querySelectorAll('[data-tasty-precompiled]')
     .forEach((element) => element.remove());
+  disableDevWarnings();
   resetConfig();
 });
 
@@ -113,6 +121,37 @@ describe('precompiled browser registration', () => {
     );
     expect(renderCalls.value).toBe(0);
     expect(getCSSText()).not.toContain(`.${result.className}.`);
+  });
+
+  it('reports precompiled rules and cache hits separately in tastyDebug', () => {
+    const artifact = compileManifest();
+    installTastyPrecompiled(artifact);
+    renderCalls.value = 0;
+
+    computeStyles(styles);
+
+    const summary = tastyDebug.summary({ raw: true });
+    const installed = document.querySelector<HTMLStyleElement>(
+      'style[data-tasty-precompiled]',
+    );
+    expect(summary.precompiledManifestCount).toBe(1);
+    expect(summary.precompiledClasses).toEqual(
+      artifact.manifest.chunks.map(({ className }) => className).sort(),
+    );
+    expect(summary.precompiledCSSSize).toBe(artifact.css.length);
+    expect(summary.precompiledRuleCount).toBe(
+      artifact.manifest.stats.ruleCount,
+    );
+    expect(installed?.sheet?.cssRules.length).toBe(
+      artifact.manifest.stats.ruleCount,
+    );
+    expect(summary.totalRuleCount).toBeGreaterThanOrEqual(
+      artifact.manifest.stats.ruleCount,
+    );
+    expect(summary.metrics?.precompiledHits).toBe(
+      artifact.manifest.chunks.length,
+    );
+    expect(summary.metrics?.hits).toBe(summary.metrics?.precompiledHits);
   });
 
   it('reuses covered chunks and renders only an uncovered override chunk', () => {

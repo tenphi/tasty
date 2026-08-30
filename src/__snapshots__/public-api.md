@@ -567,6 +567,7 @@ type       TastyPrecompileCaseReport
 type       TastyPrecompiledChunk
 type       TastyPrecompiledDependencies
 type       TastyPrecompiledManifest
+type       TastyPrecompiledStats
 type       TastyPrecompileResult
 type       TastyStyleArtifactSource
 
@@ -580,3 +581,4 @@ value      registerTastyPrecompiled
 type       TastyPrecompiledChunk
 type       TastyPrecompiledDependencies
 type       TastyPrecompiledManifest
+type       TastyPrecompiledStats

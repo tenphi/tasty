@@ -26,6 +26,7 @@ export type {
   TastyPrecompiledChunk,
   TastyPrecompiledDependencies,
   TastyPrecompiledManifest,
+  TastyPrecompiledStats,
   TastyStyleArtifactSource,
 } from './types';
 
@@ -116,6 +117,10 @@ export async function precompileTastyStyles(options: {
       tastyVersion: TASTY_VERSION,
       namePrefix: getNamePrefix(),
       cssHash,
+      stats: {
+        cssSize: css.length,
+        ruleCount: collector.getPrecompiledRuleCount(),
+      },
       chunks: collector.getPrecompiledChunks(),
       dependencies: collector.getPrecompiledDependencies(),
     },

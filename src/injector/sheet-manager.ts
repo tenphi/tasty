@@ -129,6 +129,7 @@ export class SheetManager {
       const metrics: CacheMetrics | undefined = this.config.devMode
         ? {
             hits: 0,
+            precompiledHits: 0,
             misses: 0,
             bulkCleanups: 0,
             totalInsertions: 0,
@@ -1119,6 +1120,7 @@ export class SheetManager {
     if (registry.metrics) {
       registry.metrics = {
         hits: 0,
+        precompiledHits: 0,
         misses: 0,
         bulkCleanups: 0,
         totalInsertions: 0,

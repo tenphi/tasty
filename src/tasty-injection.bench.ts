@@ -397,6 +397,7 @@ function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
         tastyVersion: TASTY_VERSION,
         namePrefix: getNamePrefix(),
         cssHash: `${mode}-${count}`,
+        stats: { cssSize: 0, ruleCount: 0 },
         chunks: [...chunks.values()],
         dependencies,
       });

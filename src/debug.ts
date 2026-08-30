@@ -3,6 +3,7 @@ import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
 import { flushStyles, getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
+import { getRegisteredPrecompiledStats } from './precompile/runtime';
 import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
 
@@ -73,6 +74,9 @@ export interface Summary {
    */
   hotClasses: string[];
   totalStyledClasses: string[];
+  /** Classes supplied by registered immutable precompiled stylesheets. */
+  precompiledClasses: string[];
+  precompiledManifestCount: number;
 
   activeCSSSize: number;
   unusedCSSSize: number;
@@ -80,6 +84,7 @@ export interface Summary {
   rawCSSSize: number;
   keyframesCSSSize: number;
   propertyCSSSize: number;
+  precompiledCSSSize: number;
   totalCSSSize: number;
 
   activeRuleCount: number;
@@ -88,6 +93,7 @@ export interface Summary {
   rawRuleCount: number;
   keyframesRuleCount: number;
   propertyRuleCount: number;
+  precompiledRuleCount: number;
   totalRuleCount: number;
 
   metrics: CacheMetrics | null;
@@ -233,6 +239,24 @@ function getOwnedClasses(root: DebugRoot = defaultRoot()): string[] {
   }
 
   return sortTastyClasses(owned);
+}
+
+const NO_PRECOMPILED = {
+  manifestCount: 0,
+  classNames: [],
+  cssSize: 0,
+  ruleCount: 0,
+};
+
+/**
+ * Catalogs are registered against the document, so a Shadow root has none —
+ * and neither does an environment with no DOM at all, where every other reader
+ * here reports empty too.
+ */
+function getPrecompiledDebugStats(root: DebugRoot) {
+  return !root || (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot)
+    ? NO_PRECOMPILED
+    : getRegisteredPrecompiledStats(getNamePrefix());
 }
 
 // ---------------------------------------------------------------------------
@@ -699,8 +723,10 @@ export const tastyDebug = {
     // moment ago is in neither, and dropping it here is the accounting failure
     // this whole change started from.
     const ownedClasses = getOwnedClasses(root);
+    const precompiled = getPrecompiledDebugStats(root);
+    const precompiledClasses = sortTastyClasses(precompiled.classNames);
     const totalStyledClasses = sortTastyClasses(
-      new Set([...activeClasses, ...ownedClasses]),
+      new Set([...activeClasses, ...ownedClasses, ...precompiledClasses]),
     );
     const unusedSet = new Set(unusedClasses);
     const activeSet = new Set(activeClasses);
@@ -746,6 +772,8 @@ export const tastyDebug = {
       rawData.ruleCount +
       kfData.ruleCount +
       propData.ruleCount;
+    const totalRuleCountWithPrecompiled =
+      totalRuleCount + precompiled.ruleCount;
 
     const metrics = getInjectorMetrics(root);
     const defs = getDefs(root);
@@ -756,20 +784,24 @@ export const tastyDebug = {
       unusedClasses,
       hotClasses,
       totalStyledClasses,
+      precompiledClasses,
+      precompiledManifestCount: precompiled.manifestCount,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
       globalCSSSize: globalData.size + atRuleData.size,
       rawCSSSize: rawData.size,
       keyframesCSSSize: kfData.size,
       propertyCSSSize: propData.size,
-      totalCSSSize: allCSS.length,
+      precompiledCSSSize: precompiled.cssSize,
+      totalCSSSize: allCSS.length + precompiled.cssSize,
       activeRuleCount,
       unusedRuleCount,
       globalRuleCount: globalData.ruleCount + atRuleData.ruleCount,
       rawRuleCount: rawData.ruleCount,
       keyframesRuleCount: kfData.ruleCount,
       propertyRuleCount: propData.ruleCount,
-      totalRuleCount,
+      precompiledRuleCount: precompiled.ruleCount,
+      totalRuleCount: totalRuleCountWithPrecompiled,
       metrics,
       definedProperties: defs.properties,
       definedKeyframes: defs.keyframes,
@@ -803,14 +835,23 @@ export const tastyDebug = {
         console.log(
           `@property: ${propData.ruleCount} rules, ${fmtSize(propData.size)}`,
         );
+      if (precompiled.manifestCount)
+        console.log(
+          `Precompiled: ${precompiledClasses.length} classes, ${precompiled.ruleCount} rules, ${fmtSize(precompiled.cssSize)} (${precompiled.manifestCount} ${precompiled.manifestCount === 1 ? 'manifest' : 'manifests'})`,
+        );
       console.log(
-        `Total:    ${totalStyledClasses.length} classes, ${totalRuleCount} rules, ${fmtSize(allCSS.length)}`,
+        `Total:    ${totalStyledClasses.length} classes, ${totalRuleCountWithPrecompiled} rules, ${fmtSize(allCSS.length + precompiled.cssSize)}`,
       );
 
       if (metrics) {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
-        console.log(`Cache:    ${rate}% hit rate (${total} lookups)`);
+        const precompiledLabel = metrics.precompiledHits
+          ? `, ${metrics.precompiledHits} precompiled ${metrics.precompiledHits === 1 ? 'hit' : 'hits'}`
+          : '';
+        console.log(
+          `Cache:    ${rate}% hit rate (${total} lookups${precompiledLabel})`,
+        );
       }
 
       if (chunkBreakdown.totalChunkTypes > 0) {
@@ -879,11 +920,12 @@ export const tastyDebug = {
     const active = findDomTastyClasses(root);
     const unused = getUnusedClasses(root);
     const metrics = getInjectorMetrics(root);
+    const precompiled = getPrecompiledDebugStats(root);
 
     // `all` is everything held, not the two bands above: a class that went cold
     // a moment ago is in neither, and it is still taking up a sheet.
     const all = sortTastyClasses(
-      new Set([...active, ...getOwnedClasses(root)]),
+      new Set([...active, ...getOwnedClasses(root), ...precompiled.classNames]),
     );
 
     const status: CacheStatus = {
@@ -898,7 +940,7 @@ export const tastyDebug = {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
         console.log(
-          `Hits: ${metrics.hits}, Misses: ${metrics.misses}, Rate: ${rate}%`,
+          `Hits: ${metrics.hits} (${metrics.precompiledHits} precompiled), Misses: ${metrics.misses}, Rate: ${rate}%`,
         );
       }
       console.groupEnd();

@@ -901,6 +901,16 @@ export class StyleInjector {
     registry.localKeyframes.get(key)?.owners.add(className);
   }
 
+  /** Record a chunk lookup served by an immutable external stylesheet. */
+  recordPrecompiledHit(options?: { root?: Document | ShadowRoot }): void {
+    if (!this.config.devMode) return;
+    const registry = this.sheetManager.getRegistry(options?.root || document);
+    if (registry.metrics) {
+      registry.metrics.hits++;
+      registry.metrics.precompiledHits++;
+    }
+  }
+
   /**
    * Pin an already-injected cacheKey and return the handle that releases it.
    * For callers that skipped the pipeline on a cache hit but still need the

@@ -17,6 +17,11 @@ function isManifestShapeValid(manifest: TastyPrecompiledManifest): boolean {
     typeof manifest.namePrefix === 'string' &&
     typeof manifest.cssHash === 'string' &&
     manifest.cssHash.length > 0 &&
+    !!manifest.stats &&
+    Number.isSafeInteger(manifest.stats.cssSize) &&
+    manifest.stats.cssSize >= 0 &&
+    Number.isSafeInteger(manifest.stats.ruleCount) &&
+    manifest.stats.ruleCount >= 0 &&
     Array.isArray(manifest.chunks) &&
     manifest.chunks.every(
       (chunk) =>

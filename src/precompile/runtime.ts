@@ -100,6 +100,38 @@ export function getRegisteredPrecompiledDependencies(
   return store.dependencies?.get(namePrefix) ?? EMPTY_DEPENDENCIES;
 }
 
+export interface RegisteredPrecompiledStats {
+  manifestCount: number;
+  classNames: string[];
+  cssSize: number;
+  ruleCount: number;
+}
+
+/** @internal Metadata used by tastyDebug without reading or parsing CSSOM. */
+export function getRegisteredPrecompiledStats(
+  namePrefix: string,
+): RegisteredPrecompiledStats {
+  const classNames = new Set<string>();
+  let manifestCount = 0;
+  let cssSize = 0;
+  let ruleCount = 0;
+
+  for (const manifest of store.manifests?.values() ?? []) {
+    if (manifest.namePrefix !== namePrefix) continue;
+    manifestCount++;
+    cssSize += manifest.stats.cssSize;
+    ruleCount += manifest.stats.ruleCount;
+    for (const chunk of manifest.chunks) classNames.add(chunk.className);
+  }
+
+  return {
+    manifestCount,
+    classNames: [...classNames],
+    cssSize,
+    ruleCount,
+  };
+}
+
 export function applyRegisteredDependenciesToInjector(
   injector: StyleInjector,
   namePrefix: string,

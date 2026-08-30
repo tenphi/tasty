@@ -38,7 +38,7 @@ import {
 } from '../utils/name-prefix';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
-import { formatRules } from './format-rules';
+import { formatRulesWithStats } from './format-rules';
 import {
   getPrecompiledRevision,
   getRegisteredPrecompiledDependencies,
@@ -100,6 +100,7 @@ function artifactId(kind: ServerStyleArtifactKind, key: string, css: string) {
 
 export class ServerStyleCollector {
   private chunks = new Map<string, string>();
+  private chunkRuleCounts = new Map<string, number>();
   private cacheKeyToClassName = new Map<string, string>();
   private flushedKeys = new Set<string>();
   private propertyRules = new Map<string, string>();
@@ -349,9 +350,10 @@ export class ServerStyleCollector {
     rules: StyleResult[],
   ): void {
     if (this.chunks.has(cacheKey)) return;
-    const css = formatRules(rules, className);
+    const { css, ruleCount } = formatRulesWithStats(rules, className);
     if (css) {
       this.chunks.set(cacheKey, css);
+      this.chunkRuleCounts.set(cacheKey, ruleCount);
       this.setSource('chunk', cacheKey, 'component');
     }
   }
@@ -606,6 +608,37 @@ export class ServerStyleCollector {
       functions: [...this.precompiledFunctions],
       rscKeys: [...this.precompiledRSCKeys],
     };
+  }
+
+  /** @internal Structural top-level rule count for component artifacts. */
+  getPrecompiledRuleCount(): number {
+    const isComponent = (kind: ServerStyleArtifactKind, key: string) =>
+      (this.artifactSources.get(this.sourceKey(kind, key)) ?? 'component') ===
+      'component';
+
+    let count = 0;
+    for (const key of this.propertyRules.keys()) {
+      if (isComponent('property', key)) count++;
+    }
+    for (const key of this.fontFaceRules.keys()) {
+      if (isComponent('font-face', key)) count++;
+    }
+    for (const key of this.counterStyleRules.keys()) {
+      if (isComponent('counter-style', key)) count++;
+    }
+    for (const key of this.functionRules.keys()) {
+      if (isComponent('function', key)) count++;
+    }
+    for (const key of this.chunks.keys()) {
+      if (isComponent('chunk', key)) {
+        count += this.chunkRuleCounts.get(key) ?? 0;
+      }
+    }
+    for (const key of this.keyframeRules.keys()) {
+      if (isComponent('keyframes', key)) count++;
+    }
+
+    return count;
   }
 
   /**

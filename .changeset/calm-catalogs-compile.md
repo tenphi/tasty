@@ -7,4 +7,6 @@ universal runtime registration, optional one-shot browser installation, and
 browser/SSR/RSC chunk fast paths. Component dependency metadata now prevents
 duplicate ancillary at-rules, anonymous keyframe and counter-style names are
 content-addressed across environments, and normal SSR hydration can recognize
-covered chunks before running the style pipeline.
+covered chunks before running the style pipeline. `tastyDebug` includes
+precompiled stylesheet rules in its totals and reports precompiled cache hits
+separately.

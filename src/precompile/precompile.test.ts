@@ -112,6 +112,11 @@ describe('precompileTastyStyles', () => {
 
     expect(result.manifest.tastyVersion).toBe(TASTY_VERSION);
     expect(result.manifest.chunks.length).toBeGreaterThan(0);
+    expect(result.manifest.stats).toEqual({
+      cssSize: result.css.length,
+      ruleCount: expect.any(Number),
+    });
+    expect(result.manifest.stats.ruleCount).toBeGreaterThan(0);
     expect(result.manifest.dependencies.properties).toContainEqual(
       expect.objectContaining({ name: '--progress' }),
     );

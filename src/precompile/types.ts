@@ -34,12 +34,20 @@ export interface TastyPrecompiledChunk {
   animations: readonly string[];
 }
 
+export interface TastyPrecompiledStats {
+  /** Exact UTF-16 string length of the generated CSS payload. */
+  cssSize: number;
+  /** Number of top-level rules represented by the generated CSS payload. */
+  ruleCount: number;
+}
+
 export interface TastyPrecompiledManifest {
   schemaVersion: 1;
   id: string;
   tastyVersion: string;
   namePrefix: string;
   cssHash: string;
+  stats: TastyPrecompiledStats;
   chunks: readonly TastyPrecompiledChunk[];
   dependencies: TastyPrecompiledDependencies;
 }

@@ -191,6 +191,8 @@ interface CleanupStats {
 
 export interface CacheMetrics {
   hits: number;
+  /** Hits served by a registered immutable precompiled stylesheet. */
+  precompiledHits: number;
   misses: number;
   bulkCleanups: number; // number of bulk cleanup operations
   totalInsertions: number;

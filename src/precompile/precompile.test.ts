@@ -1,4 +1,5 @@
 import type * as ChunksModule from '../chunks';
+import { createElement } from 'react';
 
 const { renderCalls } = vi.hoisted(() => ({ renderCalls: { value: 0 } }));
 
@@ -61,6 +62,15 @@ const componentStyles = {
   marginTop: '$$identity(4px)',
 } as const;
 
+function ExecuteCatalogCase({ run }: { run: () => void }) {
+  run();
+  return null;
+}
+
+function catalogTree(run: () => void) {
+  return createElement(ExecuteCatalogCase, { run });
+}
+
 beforeEach(() => {
   resetConfig();
   renderCalls.value = 0;
@@ -96,16 +106,20 @@ describe('precompileTastyStyles', () => {
       cases: [
         {
           id: 'default',
-          render: () => {
-            useGlobalStyles('body', { color: 'red' });
-            useRawCSS('html { min-height: 100%; }');
-            useKeyframes(steps);
-            computeStyles(componentStyles);
-          },
+          render: () =>
+            catalogTree(() => {
+              useGlobalStyles('body', { color: 'red' });
+              useRawCSS('html { min-height: 100%; }');
+              useKeyframes(steps);
+              computeStyles(componentStyles);
+            }),
         },
         {
           id: 'variant',
-          render: () => computeStyles({ ...componentStyles, color: 'blue' }),
+          render: () =>
+            catalogTree(() =>
+              computeStyles({ ...componentStyles, color: 'blue' }),
+            ),
         },
       ],
     });
@@ -148,7 +162,12 @@ describe('precompileTastyStyles', () => {
 
     const result = await precompileTastyStyles({
       id: '@test/shared-config-dependency',
-      cases: [{ id: 'default', render: () => computeStyles(componentStyles) }],
+      cases: [
+        {
+          id: 'default',
+          render: () => catalogTree(() => computeStyles(componentStyles)),
+        },
+      ],
     });
 
     expect(result.css).toContain('@font-face');
@@ -167,11 +186,12 @@ describe('precompileTastyStyles', () => {
       cases: [
         {
           id: 'default',
-          render: () => {
-            useKeyframes(steps);
-            useCounterStyle({ system: 'cyclic', symbols: '"•"' });
-            computeStyles(componentStyles);
-          },
+          render: () =>
+            catalogTree(() => {
+              useKeyframes(steps);
+              useCounterStyle({ system: 'cyclic', symbols: '"•"' });
+              computeStyles(componentStyles);
+            }),
         },
       ],
     });
@@ -230,7 +250,12 @@ describe('precompileTastyStyles', () => {
   it('falls back safely for incompatible and conflicting manifests', async () => {
     const result = await precompileTastyStyles({
       id: '@test/conflicts',
-      cases: [{ id: 'default', render: () => computeStyles(componentStyles) }],
+      cases: [
+        {
+          id: 'default',
+          render: () => catalogTree(() => computeStyles(componentStyles)),
+        },
+      ],
     });
     vi.stubEnv('NODE_ENV', 'development');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -281,7 +306,12 @@ describe('precompileTastyStyles', () => {
   it('misses when a keyframe-dependent chunk resolves different animation names', async () => {
     const result = await precompileTastyStyles({
       id: '@test/keyframe-lookup',
-      cases: [{ id: 'default', render: () => computeStyles(componentStyles) }],
+      cases: [
+        {
+          id: 'default',
+          render: () => catalogTree(() => computeStyles(componentStyles)),
+        },
+      ],
     });
     registerTastyPrecompiled(result.manifest);
     renderCalls.value = 0;
@@ -304,12 +334,14 @@ describe('precompileTastyStyles', () => {
           {
             id: 'font',
             render: () =>
-              computeStyles({
-                '@font-face': {
-                  Unsafe: { src: 'url("fonts/unsafe.woff2")' },
-                },
-                display: 'block',
-              }),
+              catalogTree(() =>
+                computeStyles({
+                  '@font-face': {
+                    Unsafe: { src: 'url("fonts/unsafe.woff2")' },
+                  },
+                  display: 'block',
+                }),
+              ),
           },
         ],
       }),

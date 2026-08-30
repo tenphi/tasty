@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export type TastyStyleArtifactSource = 'config' | 'component' | 'global';
 
 export interface PrecompiledPropertyCacheEntry {
@@ -54,8 +56,8 @@ export interface TastyPrecompiledManifest {
 
 export interface TastyPrecompileCase {
   id: string;
-  /** Execute the caller's renderer, e.g. renderToStaticMarkup(<Case />). */
-  render(): unknown | Promise<unknown>;
+  /** Return the React tree to render for this catalog case. */
+  render(): ReactNode | Promise<ReactNode>;
 }
 
 export interface TastyPrecompileCaseReport {

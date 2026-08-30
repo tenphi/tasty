@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import { getNamePrefix } from '../config';
 import { getSSRCollector, runWithCollector } from '../ssr/async-storage';
@@ -73,7 +74,10 @@ export async function precompileTastyStyles(options: {
           .map(({ id }) => id),
       );
 
-      await runWithCollector(collector, item.render);
+      await runWithCollector(collector, async () => {
+        const tree = await item.render();
+        renderToStaticMarkup(tree);
+      });
 
       const addedClasses = collector
         .getPrecompiledChunks()

@@ -16,36 +16,34 @@ This mode complements SSR and `tastyStatic()`:
 
 ## Compile a Catalog
 
-`@tenphi/tasty/precompile` is Node-only. The render callback belongs to the
-caller so Tasty does not need a `react-dom` runtime dependency.
+`@tenphi/tasty/precompile` is Node-only. Each case returns a React tree; Tasty
+renders it inside the active style collector. The entry requires the optional
+`react` and `react-dom` peers used by the component library.
 
 ```tsx
 import { writeFile } from 'node:fs/promises';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { precompileTastyStyles } from '@tenphi/tasty/precompile';
 
 import { Button, Dialog } from './index.js';
 
 const artifact = await precompileTastyStyles({
-  id: '@acme/ui/catalog',
+  id: '@acme/ui',
   cases: [
     {
       id: 'button/default',
-      render: () => renderToStaticMarkup(<Button>Continue</Button>),
+      render: () => <Button>Continue</Button>,
     },
     {
       id: 'button/danger',
-      render: () =>
-        renderToStaticMarkup(<Button variant="danger">Delete</Button>),
+      render: () => <Button variant="danger">Delete</Button>,
     },
     {
       id: 'dialog/default',
-      render: () =>
-        renderToStaticMarkup(
-          <Dialog open title="Account">
-            Content
-          </Dialog>,
-        ),
+      render: () => (
+        <Dialog open title="Account">
+          Content
+        </Dialog>
+      ),
     },
   ],
 });
@@ -68,6 +66,11 @@ moved. Absolute, root-relative, and data URLs are accepted.
 The output is deterministic for a deterministic catalog and configuration.
 The report lists the classes and ordered collector artifacts first introduced
 by each case; use it to remove cases that add no coverage.
+
+The Node-only precompile entry renders each returned tree with React DOM's
+`renderToStaticMarkup()` inside the collector context. Catalog cases only need
+to construct their representative component tree, including any providers the
+design system normally requires.
 
 ## Publish and Register
 

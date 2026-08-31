@@ -1,5 +1,10 @@
 import { TASTY_VERSION } from '../version';
 
+import {
+  captureCompilationConfig,
+  diffCompilationConfig,
+  isCompilationConfigShapeValid,
+} from './fingerprint';
 import { getPrecompileStore, warnPrecompileOnce } from './runtime';
 import type {
   TastyPrecompiledChunk,
@@ -10,7 +15,8 @@ import type {
 function isManifestShapeValid(manifest: TastyPrecompiledManifest): boolean {
   const dependencies = manifest?.dependencies;
   return (
-    manifest.schemaVersion === 1 &&
+    manifest.schemaVersion === 2 &&
+    isCompilationConfigShapeValid(manifest.compilationConfig) &&
     typeof manifest.id === 'string' &&
     manifest.id.length > 0 &&
     typeof manifest.tastyVersion === 'string' &&
@@ -229,6 +235,90 @@ export function registerPrecompiledManifest(
   store.active = true;
   store.revision++;
   return true;
+}
+
+/**
+ * Drop every catalog whose recorded configuration no longer matches this host's.
+ *
+ * Deferred to the moment the config locks rather than run at registration: the
+ * registration module is a side-effect import, so it routinely executes before
+ * the host's own `configure()` call and there is nothing final to compare yet.
+ *
+ * A lookup key is a hash of the style *source*, not of the CSS it produced, so
+ * a host that redefines a unit, handler, recipe or chunk assignment the catalog
+ * compiled against still hits — and would be served CSS its own configuration
+ * would never generate. Disabling the catalog costs the lookup and falls back
+ * to runtime generation, which is always correct.
+ *
+ * @internal
+ */
+export function validatePrecompiledCompilationConfig(): void {
+  const store = getPrecompileStore();
+  if (!store.manifests?.size) return;
+
+  const runtime = captureCompilationConfig();
+  const rejected: string[] = [];
+
+  for (const manifest of store.manifests.values()) {
+    const reasons = diffCompilationConfig(manifest.compilationConfig, runtime);
+    if (reasons.length === 0) continue;
+
+    rejected.push(manifest.id);
+    warnPrecompileOnce(
+      `config-mismatch:${manifest.id}`,
+      `[Tasty] Ignoring precompiled styles "${manifest.id}": this application's configuration differs from the one the catalog was compiled under, so its CSS is not what these settings would produce. Falling back to runtime generation. Differences: ${reasons.join(', ')}.`,
+    );
+  }
+
+  if (rejected.length === 0) return;
+
+  for (const id of rejected) store.manifests.delete(id);
+
+  // Rebuild rather than subtract: a lookup key dropped by one catalog may still
+  // be provided by another that is still valid.
+  const chunks = (store.chunks ??= new Map());
+  const dependencies = (store.dependencies ??= new Map());
+  chunks.clear();
+  dependencies.clear();
+
+  for (const manifest of store.manifests.values()) {
+    dependencies.set(
+      manifest.namePrefix,
+      mergeDependencies(
+        dependencies.get(manifest.namePrefix),
+        manifest.dependencies,
+      ),
+    );
+    for (const chunk of manifest.chunks) {
+      if (!chunks.has(chunk.lookupKey)) {
+        chunks.set(chunk.lookupKey, {
+          ...chunk,
+          manifestId: manifest.id,
+          namePrefix: manifest.namePrefix,
+        });
+      }
+    }
+  }
+
+  store.active = store.manifests.size > 0;
+  store.revision++;
+}
+
+/**
+ * Validate the registered catalogs once per registration, on first use.
+ *
+ * Called from the lookup path rather than from `configure()`: registration is a
+ * side-effect import that normally runs before the host configures anything, so
+ * there is no final configuration to compare until a render asks for a class.
+ */
+export function ensurePrecompiledConfigValidated(): void {
+  const store = getPrecompileStore();
+  if (store.validatedRevision === store.revision) return;
+
+  // Set first: validation rebuilds the store and bumps `revision`, and the
+  // result of that rebuild is what we just checked.
+  validatePrecompiledCompilationConfig();
+  store.validatedRevision = store.revision;
 }
 
 export function isPrecompiledManifestRegistered(

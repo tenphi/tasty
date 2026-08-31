@@ -562,6 +562,7 @@ type       PrecompiledKeyframeCacheEntry
 type       PrecompiledPropertyCacheEntry
 value      precompileTastyStyles
 value      registerTastyPrecompiled
+type       TastyCompilationConfig
 type       TastyPrecompileCase
 type       TastyPrecompileCaseReport
 type       TastyPrecompiledChunk

@@ -1,0 +1,173 @@
+import {
+  getConfig,
+  getConfiguredOverrides,
+  getGlobalFunctions,
+  getGlobalRecipes,
+  isFunctionsPolyfillEnabled,
+} from '../config';
+import { getGlobalPredefinedStates } from '../states';
+import { hashString } from '../utils/hash';
+import { getGlobalParser } from '../utils/styles';
+
+import type { TastyCompilationConfig } from './types';
+
+/**
+ * A stable token for an arbitrary configuration value.
+ *
+ * Function-valued entries (unit handlers, parse functions) cannot be compared
+ * by body: a catalog is compiled from an unminified build while the runtime may
+ * be reading a minified one, so `toString()` differs for identical behaviour and
+ * would reject every production bundle. Their presence and arity are recorded
+ * instead, which catches an entry being added, removed or swapped for one of a
+ * different shape — not a rewritten body. That gap is documented on
+ * `TastyCompilationConfig`.
+ */
+function token(value: unknown): string {
+  if (typeof value === 'function') return `fn/${value.length}`;
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return `s/${hashString(value)}`;
+
+  return `j/${hashString(stableStringify(value))}`;
+}
+
+/** JSON with object keys sorted, so key order cannot change the token. */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object')
+    return JSON.stringify(value) ?? 'undefined';
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
+}
+
+function tokenize(
+  source: Record<string, unknown> | null | undefined,
+  prefix: string,
+) {
+  const out: Record<string, string> = {};
+  if (!source) return out;
+
+  for (const key of Object.keys(source).sort()) {
+    out[`${prefix}:${key}`] = token(source[key]);
+  }
+
+  return out;
+}
+
+/**
+ * Snapshot the configuration a precompiled catalog was compiled under.
+ *
+ * Read at build time into the manifest, and again at runtime once the config
+ * locks, so the two can be compared before any lookup trusts the catalog.
+ */
+export function captureCompilationConfig(): TastyCompilationConfig {
+  const config = getConfig();
+  const parser = getGlobalParser();
+  const overrides = getConfiguredOverrides();
+
+  return {
+    scoped: {
+      ...tokenize(getGlobalPredefinedStates(), 'state'),
+      ...tokenize(parser.getUnits() as Record<string, unknown>, 'unit'),
+      ...tokenize(getGlobalRecipes(), 'recipe'),
+      ...tokenize(getGlobalFunctions(), 'fn'),
+    },
+    // Names the host passed to `configure()`, not the live handler registry:
+    // that registry is populated lazily as styles are encountered, so it
+    // describes which styles have rendered so far rather than configuration.
+    exclusive: {
+      ...tokenize(
+        Object.fromEntries(overrides.handlers.map((name) => [name, 'custom'])),
+        'handler',
+      ),
+      ...tokenize(
+        Object.fromEntries(
+          overrides.propHandlers.map((name) => [name, 'custom']),
+        ),
+        'propHandler',
+      ),
+    },
+    scalars: {
+      autoPropertyTypes: String(config.autoPropertyTypes ?? ''),
+      functionsPolyfill: String(isFunctionsPolyfillEnabled()),
+    },
+  };
+}
+
+/**
+ * Describe every way `runtime` would compile differently from `compiled`.
+ *
+ * An empty result means the catalog's CSS is still what this configuration
+ * would produce. Names are reported rather than counted so the warning tells
+ * the consumer which setting to look at.
+ */
+export function diffCompilationConfig(
+  compiled: TastyCompilationConfig,
+  runtime: TastyCompilationConfig,
+): string[] {
+  const reasons: string[] = [];
+
+  for (const [key, value] of Object.entries(compiled.scalars)) {
+    const current = runtime.scalars[key];
+    if (current !== value) {
+      reasons.push(`${key} changed`);
+    }
+  }
+
+  // A name the catalog never saw cannot change a chunk it already compiled, so
+  // additions are accepted here; a changed or dropped one is not.
+  for (const [key, value] of Object.entries(compiled.scoped)) {
+    const current = runtime.scoped[key];
+    if (current === undefined) {
+      reasons.push(`${key} removed`);
+    } else if (current !== value) {
+      reasons.push(`${key} changed`);
+    }
+  }
+
+  // These record deviations from Tasty's built-in tables, which `tastyVersion`
+  // already pins. A runtime-only entry is therefore an override of a built-in
+  // the catalog may have compiled against, so extra keys count too.
+  const exclusiveKeys = new Set([
+    ...Object.keys(compiled.exclusive),
+    ...Object.keys(runtime.exclusive),
+  ]);
+  for (const key of exclusiveKeys) {
+    const before = compiled.exclusive[key];
+    const after = runtime.exclusive[key];
+    if (before === after) continue;
+    reasons.push(
+      before === undefined
+        ? `${key} added`
+        : after === undefined
+          ? `${key} removed`
+          : `${key} changed`,
+    );
+  }
+
+  return reasons.sort();
+}
+
+export function isCompilationConfigShapeValid(
+  value: TastyCompilationConfig | undefined,
+): boolean {
+  const isTokenMap = (map: unknown) =>
+    !!map &&
+    typeof map === 'object' &&
+    !Array.isArray(map) &&
+    Object.values(map as Record<string, unknown>).every(
+      (item) => typeof item === 'string',
+    );
+
+  return (
+    !!value &&
+    isTokenMap(value.scoped) &&
+    isTokenMap(value.exclusive) &&
+    isTokenMap(value.scalars)
+  );
+}

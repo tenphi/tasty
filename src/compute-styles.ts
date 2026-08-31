@@ -92,6 +92,7 @@ import {
   findPrecompiledChunk,
   precompileRuntimeState,
 } from './precompile/runtime';
+import { ensurePrecompiledConfigValidated } from './precompile/registry';
 
 export interface ComputeStylesResult {
   className: string;
@@ -143,6 +144,11 @@ function lookupPrecompiledChunk(
   signature: string,
   root?: Document | ShadowRoot,
 ) {
+  // The single choke point for every path that trusts a catalog class name, and
+  // the first moment the host's configuration is final. Cheap after the first
+  // call: it returns on a revision check.
+  ensurePrecompiledConfigValidated();
+
   if (root && typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) {
     return null;
   }

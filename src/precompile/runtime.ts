@@ -20,6 +20,11 @@ export interface PrecompileStore {
   buildCount: number;
   active: boolean;
   revision: number;
+  /**
+   * `revision` at which the registered catalogs were last checked against the
+   * host's configuration. `-1` means never.
+   */
+  validatedRevision: number;
   warnings: Set<string> | null;
 }
 
@@ -34,6 +39,7 @@ const store = (globalStore[STORE_KEY] ??= {
   dependencies: null,
   buildCount: 0,
   active: false,
+  validatedRevision: -1,
   revision: 0,
   warnings: null,
 });

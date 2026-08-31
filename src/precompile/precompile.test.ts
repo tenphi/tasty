@@ -358,3 +358,135 @@ describe('precompileTastyStyles', () => {
     ).rejects.toThrow('Duplicate precompile catalog case id');
   });
 });
+
+/**
+ * A lookup key hashes the style *source* (`gap: "1x"`), not the CSS it produced,
+ * so a host that redefines what `1x` means still hits every catalog chunk and
+ * would be served CSS its own configuration would never generate. Nothing about
+ * a unit, recipe, handler or state override changes a key, which is why the
+ * manifest carries the configuration it was compiled under.
+ */
+describe('compilation configuration guard', () => {
+  const catalogStyles = { display: 'flex', gap: '1x' } as const;
+
+  async function compileWith(
+    setup: () => void,
+  ): Promise<Awaited<ReturnType<typeof precompileTastyStyles>>> {
+    resetConfig();
+    setup();
+    return precompileTastyStyles({
+      id: '@test/config-guard',
+      cases: [
+        {
+          id: 'default',
+          render: () => catalogTree(() => computeStyles(catalogStyles)),
+        },
+      ],
+    });
+  }
+
+  it('keeps the catalog when the host only adds names it never compiled', async () => {
+    const result = await compileWith(() =>
+      configure({ units: { x: 'var(--gap)' } }),
+    );
+
+    // Exactly what a design system's consumer does: extra states of its own,
+    // nothing the catalog compiled against redefined.
+    resetConfig();
+    configure({
+      units: { x: 'var(--gap)' },
+      states: { '@mobile': '@media(w < 920px)' },
+      recipes: { appCard: { padding: '1x' } },
+    });
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    expect(computeStyles(catalogStyles).className).toBe(
+      result.manifest.chunks.map(({ className }) => className).join(' '),
+    );
+    expect(renderCalls.value).toBe(0);
+  });
+
+  it('drops the catalog when the host redefines a unit it compiled against', async () => {
+    const result = await compileWith(() =>
+      configure({ units: { x: 'var(--gap)' } }),
+    );
+
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure({ units: { x: 'var(--my-gap)' } });
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    const { className } = computeStyles(catalogStyles);
+
+    // The class name is unchanged — it hashes `gap: "1x"`, not the CSS that
+    // `1x` expands to. That identity is exactly why serving the catalog here
+    // was silent, and why the guard cannot be a lookup-time comparison.
+    expect(className).toBe(
+      result.manifest.chunks.map((chunk) => chunk.className).join(' '),
+    );
+    // Rendered rather than served, so the rule carries this host's `--my-gap`.
+    expect(renderCalls.value).toBeGreaterThan(0);
+    expect(warn.mock.calls.flat().join(' ')).toContain('unit:x changed');
+    expect(getPrecompileStore().manifests?.has('@test/config-guard')).toBe(
+      false,
+    );
+  });
+
+  it('drops the catalog when the host overrides a built-in style handler', async () => {
+    const result = await compileWith(() => configure({}));
+
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure({
+      handlers: { gap: ({ gap }: { gap?: string }) => ({ gap: gap ?? '0' }) },
+    });
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    computeStyles(catalogStyles);
+
+    expect(renderCalls.value).toBeGreaterThan(0);
+    expect(warn.mock.calls.flat().join(' ')).toContain('handler:gap added');
+  });
+
+  it('serves this host CSS rather than the catalog CSS it invalidated', async () => {
+    const result = await compileWith(() =>
+      configure({ units: { x: 'var(--gap)' } }),
+    );
+    expect(result.css).toContain('var(--gap)');
+
+    resetConfig();
+    configure({ units: { x: 'var(--my-gap)' } });
+    registerTastyPrecompiled(result.manifest);
+
+    const collector = new ServerStyleCollector();
+    computeStyles(catalogStyles, { ssrCollector: collector });
+    const css = collector
+      .getArtifacts()
+      .filter(({ source }) => source === 'component')
+      .map(({ css: artifactCSS }) => artifactCSS)
+      .join('\n');
+
+    expect(css).toContain('var(--my-gap)');
+    expect(css).not.toContain('var(--gap)');
+  });
+
+  it('rejects a manifest that predates the recorded configuration', async () => {
+    const result = await compileWith(() => configure({}));
+
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { compilationConfig: _dropped, ...legacy } = result.manifest;
+    registerTastyPrecompiled(legacy as typeof result.manifest);
+
+    expect(getPrecompileStore().manifests?.size ?? 0).toBe(0);
+    expect(warn).toHaveBeenCalled();
+  });
+});

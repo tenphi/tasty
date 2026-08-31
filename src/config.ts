@@ -551,6 +551,33 @@ function warnOnce(key: string, message: string): void {
 // Track whether styles have been generated (locks configuration)
 let stylesGenerated = false;
 
+/**
+ * Names of the style handlers and props middleware this host configured,
+ * accumulated across every `configure()` call.
+ *
+ * `configure()` applies these into the handler registry and then strips them
+ * from the stored config, and the registry itself is populated lazily as styles
+ * are encountered — so neither is a stable record of what the host asked for.
+ * A precompiled catalog needs exactly that record: replacing a built-in handler
+ * changes what an already-compiled chunk should contain without changing its
+ * lookup key.
+ */
+const configuredOverrides: {
+  handlers: Set<string>;
+  propHandlers: Set<string>;
+} = { handlers: new Set(), propHandlers: new Set() };
+
+/** @internal */
+export function getConfiguredOverrides(): {
+  handlers: readonly string[];
+  propHandlers: readonly string[];
+} {
+  return {
+    handlers: [...configuredOverrides.handlers].sort(),
+    propHandlers: [...configuredOverrides.propHandlers].sort(),
+  };
+}
+
 // Current configuration (null until first configure() or auto-configured on first use)
 let currentConfig: TastyConfig | null = null;
 
@@ -1576,6 +1603,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
+      configuredOverrides.handlers.add(name);
       const handler = normalizeHandlerDefinition(name, definition);
       registerHandler(handler, {
         key: name,
@@ -1587,6 +1615,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle props middleware
   if (Object.keys(mergedPropHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedPropHandlers)) {
+      configuredOverrides.propHandlers.add(name);
       registerPropHandler(name, definition, {
         source: propHandlerSources.get(name),
       });
@@ -1730,6 +1759,8 @@ export function resetConfig(): void {
   resetHandlers();
   resetStyleChunks();
   resetPropHandlers();
+  configuredOverrides.handlers.clear();
+  configuredOverrides.propHandlers.clear();
   resetBaseStyleProps();
   clearPipelineCache();
   resetPrecompiledStyles();

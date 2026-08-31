@@ -16,6 +16,7 @@ import type {
   TastyPrecompiledDependencies,
 } from './precompile/types';
 import { ServerStyleCollector } from './ssr/collector';
+import { captureCompilationConfig } from './precompile/fingerprint';
 import { TASTY_VERSION } from './version';
 
 /**
@@ -392,11 +393,14 @@ function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
         rscKeys: [],
       };
       registerTastyPrecompiled({
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: '@tenphi/tasty/injection-benchmark',
         tastyVersion: TASTY_VERSION,
         namePrefix: getNamePrefix(),
         cssHash: `${mode}-${count}`,
+        // The benchmark configures the runtime it measures, so the live
+        // configuration is by definition the one this catalog was built under.
+        compilationConfig: captureCompilationConfig(),
         stats: { cssSize: 0, ruleCount: 0 },
         chunks: [...chunks.values()],
         dependencies,

@@ -8,6 +8,7 @@ import { findUnsafeCSSResource } from '../ssr/css-resources';
 import { registerSSRCollectorGetterGlobal } from '../ssr/ssr-collector-ref';
 import { TASTY_VERSION } from '../version';
 
+import { captureCompilationConfig } from './fingerprint';
 import { beginPrecompileBuild, endPrecompileBuild } from './runtime';
 import type {
   TastyPrecompileCase,
@@ -22,6 +23,7 @@ export type {
   PrecompiledKeyframeCacheEntry,
   PrecompiledPropertyCacheEntry,
   TastyPrecompileCase,
+  TastyCompilationConfig,
   TastyPrecompileCaseReport,
   TastyPrecompileResult,
   TastyPrecompiledChunk,
@@ -55,6 +57,11 @@ export async function precompileTastyStyles(options: {
     }
     caseIds.add(item.id);
   }
+
+  // Captured before any case renders. Rendering registers style handlers
+  // lazily, so a snapshot taken afterwards would record which styles the
+  // catalog happened to use rather than how the host configured Tasty.
+  const compilationConfig = captureCompilationConfig();
 
   const collector = new ServerStyleCollector();
   collector.enablePrecompileRecording();
@@ -116,11 +123,12 @@ export async function precompileTastyStyles(options: {
   return {
     css,
     manifest: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: options.id,
       tastyVersion: TASTY_VERSION,
       namePrefix: getNamePrefix(),
       cssHash,
+      compilationConfig,
       stats: {
         cssSize: css.length,
         ruleCount: collector.getPrecompiledRuleCount(),

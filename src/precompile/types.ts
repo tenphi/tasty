@@ -43,12 +43,46 @@ export interface TastyPrecompiledStats {
   ruleCount: number;
 }
 
+/**
+ * The configuration a catalog was compiled under, recorded per entry so the
+ * runtime can tell a harmless addition from a real divergence.
+ *
+ * Function-valued entries are recorded by presence and arity rather than by
+ * body: a catalog is compiled from an unminified build while the runtime may be
+ * a minified one, so comparing sources would reject every production bundle.
+ * Rewriting a handler's body while keeping its name and arity is therefore not
+ * detected; adding, removing or replacing one is.
+ */
+export interface TastyCompilationConfig {
+  /**
+   * Entries addressed by name — states, units, recipes, functions. A name the
+   * catalog never saw cannot change a chunk it already compiled, so the runtime
+   * may add to these; changing or removing one it did see invalidates.
+   */
+  scoped: Record<string, string>;
+  /**
+   * Deviations from Tasty's built-in tables — style handlers, props middleware,
+   * chunk assignments. `tastyVersion` pins the baseline, so an entry present at
+   * runtime but absent here is an override of a built-in the catalog may have
+   * compiled against, and invalidates just as a change does.
+   */
+  exclusive: Record<string, string>;
+  /** Settings that apply to every chunk rather than to a named entry. */
+  scalars: Record<string, string>;
+}
+
 export interface TastyPrecompiledManifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   tastyVersion: string;
   namePrefix: string;
   cssHash: string;
+  /**
+   * Configuration the catalog was compiled under. Compared against the host's
+   * once its config locks; a divergence disables the catalog rather than
+   * serving CSS this configuration would not have produced.
+   */
+  compilationConfig: TastyCompilationConfig;
   stats: TastyPrecompiledStats;
   chunks: readonly TastyPrecompiledChunk[];
   dependencies: TastyPrecompiledDependencies;

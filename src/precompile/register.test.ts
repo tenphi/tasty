@@ -25,6 +25,7 @@ import { hydrateTastyClasses } from '../ssr/hydrate';
 import { disableDevWarnings, enableDevWarnings } from '../test/dev-env';
 import { TASTY_VERSION } from '../version';
 
+import { captureCompilationConfig } from './fingerprint';
 import { installTastyPrecompiled, registerTastyPrecompiled } from './register';
 import { beginPrecompileBuild, endPrecompileBuild } from './runtime';
 import type { TastyPrecompiledManifest } from './types';
@@ -63,11 +64,12 @@ function compileManifest(
   return {
     css,
     manifest: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: '@test/browser-catalog',
       tastyVersion: TASTY_VERSION,
       namePrefix: getNamePrefix(),
       cssHash: 'browser-catalog-hash',
+      compilationConfig: captureCompilationConfig(),
       stats: {
         cssSize: css.length,
         ruleCount: collector.getPrecompiledRuleCount(),

@@ -562,10 +562,10 @@ let stylesGenerated = false;
  * changes what an already-compiled chunk should contain without changing its
  * lookup key.
  */
-const configuredOverrides: {
-  handlers: Set<string>;
-  propHandlers: Set<string>;
-} = { handlers: new Set(), propHandlers: new Set() };
+const configuredOverrides: { handlers: string[]; propHandlers: string[] } = {
+  handlers: [],
+  propHandlers: [],
+};
 
 /** @internal */
 export function getConfiguredOverrides(): {
@@ -573,8 +573,8 @@ export function getConfiguredOverrides(): {
   propHandlers: readonly string[];
 } {
   return {
-    handlers: [...configuredOverrides.handlers].sort(),
-    propHandlers: [...configuredOverrides.propHandlers].sort(),
+    handlers: configuredOverrides.handlers,
+    propHandlers: configuredOverrides.propHandlers,
   };
 }
 
@@ -1603,7 +1603,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
-      configuredOverrides.handlers.add(name);
+      configuredOverrides.handlers.push(name);
       const handler = normalizeHandlerDefinition(name, definition);
       registerHandler(handler, {
         key: name,
@@ -1615,7 +1615,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle props middleware
   if (Object.keys(mergedPropHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedPropHandlers)) {
-      configuredOverrides.propHandlers.add(name);
+      configuredOverrides.propHandlers.push(name);
       registerPropHandler(name, definition, {
         source: propHandlerSources.get(name),
       });
@@ -1759,8 +1759,8 @@ export function resetConfig(): void {
   resetHandlers();
   resetStyleChunks();
   resetPropHandlers();
-  configuredOverrides.handlers.clear();
-  configuredOverrides.propHandlers.clear();
+  configuredOverrides.handlers.length = 0;
+  configuredOverrides.propHandlers.length = 0;
   resetBaseStyleProps();
   clearPipelineCache();
   resetPrecompiledStyles();

@@ -25,6 +25,14 @@ export interface PrecompileStore {
    * host's configuration. `-1` means never.
    */
   validatedRevision: number;
+  /**
+   * Configuration check, installed by the registration module.
+   *
+   * Held as a reference rather than imported here so that the comparison code
+   * ships with `precompile/register` instead of with `core`, which every
+   * application pays for whether or not it registers a catalog.
+   */
+  validate: (() => void) | null;
   warnings: Set<string> | null;
 }
 
@@ -40,6 +48,7 @@ const store = (globalStore[STORE_KEY] ??= {
   buildCount: 0,
   active: false,
   validatedRevision: -1,
+  validate: null,
   revision: 0,
   warnings: null,
 });
@@ -84,6 +93,11 @@ export function findPrecompiledChunk(
   lookupKey: string,
   namePrefix: string,
 ): TastyPrecompiledChunk | null {
+  // The first lookup is the first moment the host's configuration is final:
+  // registration is a side-effect import that normally runs before the host
+  // calls `configure()`. Cheap after that — it returns on a revision check.
+  store.validate?.();
+
   const chunk = store.chunks?.get(lookupKey);
   if (!chunk) return null;
   if (chunk.namePrefix !== namePrefix) {

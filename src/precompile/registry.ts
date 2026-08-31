@@ -234,6 +234,7 @@ export function registerPrecompiledManifest(
   }
   store.active = true;
   store.revision++;
+  store.validate = ensurePrecompiledConfigValidated;
   return true;
 }
 

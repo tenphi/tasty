@@ -45,6 +45,14 @@ function stableStringify(value: unknown): string {
   return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
 }
 
+/** Names recorded in `configure()` order, deduped into a comparable map. */
+function named(names: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of names) out[name] = 'custom';
+
+  return out;
+}
+
 function tokenize(
   source: Record<string, unknown> | null | undefined,
   prefix: string,
@@ -81,16 +89,8 @@ export function captureCompilationConfig(): TastyCompilationConfig {
     // that registry is populated lazily as styles are encountered, so it
     // describes which styles have rendered so far rather than configuration.
     exclusive: {
-      ...tokenize(
-        Object.fromEntries(overrides.handlers.map((name) => [name, 'custom'])),
-        'handler',
-      ),
-      ...tokenize(
-        Object.fromEntries(
-          overrides.propHandlers.map((name) => [name, 'custom']),
-        ),
-        'propHandler',
-      ),
+      ...tokenize(named(overrides.handlers), 'handler'),
+      ...tokenize(named(overrides.propHandlers), 'propHandler'),
     },
     scalars: {
       autoPropertyTypes: String(config.autoPropertyTypes ?? ''),

@@ -1,8 +1,6 @@
 import {
   getConfig,
   getConfiguredOverrides,
-  getGlobalConfigTokens,
-  getGlobalFunctions,
   getGlobalRecipes,
   isFunctionsPolyfillEnabled,
 } from '../config';
@@ -93,16 +91,28 @@ export function captureCompilationConfig(): TastyCompilationConfig {
       ...tokenize(getGlobalPredefinedStates(), 'state'),
       ...tokenize(parser.getUnits() as Record<string, unknown>, 'unit'),
       ...tokenize(getGlobalRecipes(), 'recipe'),
-      // Both flavours of `functions`: declarative `$$` CSS definitions and
-      // bare-key parse functions, which live in different registries.
-      ...tokenize(getGlobalFunctions(), 'fn'),
+      // Declarative `$$` CSS functions, read from what the host passed to
+      // `configure()` rather than from `getGlobalFunctions()`. With
+      // `polyfills.functions` enabled that registry stays empty and only a
+      // synthesized closure remains, so rewriting `$$scale` from
+      // `2 * $value` to `3 * $value` would keep the same name and arity and
+      // compare equal while the expanded CSS changed.
+      ...tokenize(named(overrides.functions), 'fn'),
+      // Bare-key parse functions, which live in their own registry. Recorded
+      // by presence and arity only — see `token()`.
       ...tokenize(getGlobalParseFunctions(), 'parseFn'),
-      // A token's value never reaches a chunk cache key — the key hashes
-      // `color: "#brand"`, not what `#brand` resolves to — so a catalog
-      // compiled against `#brand → red` would otherwise still hit under a
-      // runtime that maps it to green, and serve the red CSS. Both registries:
-      // `configure({ tokens })` and the `replaceTokens` substitutions.
-      ...tokenize(getGlobalConfigTokens(), 'token'),
+      // `replaceTokens` only. Its values are substituted at parse time and
+      // baked into the declaration (`padding: 8px`), so a changed value makes
+      // a compiled chunk wrong while its lookup key — a hash of the style
+      // source — stays the same.
+      //
+      // `configure({ tokens })` deliberately does NOT belong here. Those emit
+      // `:root` custom properties, which the catalog excludes, and a chunk
+      // using `#brand` compiles to `var(--brand-color)` whatever the current
+      // value is. The runtime `:root` rule supplies the new value, so the
+      // chunk stays correct across a palette change — and fingerprinting them
+      // would disable the whole catalog on every theme, which is exactly the
+      // dynamic behaviour `docs/precompile.md` promises.
       ...tokenize(getGlobalPredefinedTokens(), 'replaceToken'),
     },
     // Names the host passed to `configure()`, not the live handler registry:

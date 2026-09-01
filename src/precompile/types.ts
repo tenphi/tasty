@@ -50,8 +50,19 @@ export interface TastyPrecompiledStats {
  * Function-valued entries are recorded by presence and arity rather than by
  * body: a catalog is compiled from an unminified build while the runtime may be
  * a minified one, so comparing sources would reject every production bundle.
- * Rewriting a handler's body while keeping its name and arity is therefore not
- * detected; adding, removing or replacing one is.
+ * Rewriting a bare parse function's body while keeping its name and arity is
+ * therefore not detected; adding, removing or replacing one is. Settings the
+ * host declares as data — handlers, props middleware, declarative `$$`
+ * function definitions — are recorded from what it passed to `configure()`, so
+ * those are compared by value.
+ *
+ * What is deliberately absent: `configure({ tokens })` and everything else that
+ * resolves to a CSS custom property. A chunk using `#brand` compiles to
+ * `var(--brand-color)` whatever the palette says, and the `:root` rule that
+ * supplies the value is not part of the catalog — so a theme change leaves
+ * every compiled chunk correct. `replaceTokens` is the opposite case and is
+ * recorded: it substitutes at parse time, baking its value into the
+ * declaration.
  */
 export interface TastyCompilationConfig {
   /**

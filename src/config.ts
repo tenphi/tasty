@@ -552,29 +552,38 @@ function warnOnce(key: string, message: string): void {
 let stylesGenerated = false;
 
 /**
- * Names of the style handlers and props middleware this host configured,
- * accumulated across every `configure()` call.
+ * What the host passed to `configure()`, for the settings whose live registry
+ * is not a faithful record of it. Accumulated across every `configure()` call.
  *
- * `configure()` applies these into the handler registry and then strips them
- * from the stored config, and the registry itself is populated lazily as styles
- * are encountered — so neither is a stable record of what the host asked for.
+ * - Handlers and props middleware: `configure()` applies them into the handler
+ *   registry and then strips them from the stored config, and that registry is
+ *   populated lazily as styles are encountered — so neither is a stable record
+ *   of what the host asked for.
+ * - Declarative `@function` definitions: with `polyfills.functions` enabled,
+ *   `configure()` compiles each into a parse-function closure and deliberately
+ *   leaves `getGlobalFunctions()` empty, so the definition body survives
+ *   nowhere a fingerprint can read it.
+ *
  * A precompiled catalog needs exactly that record: replacing a built-in handler
- * changes what an already-compiled chunk should contain without changing its
- * lookup key.
+ * or rewriting a function body changes what an already-compiled chunk should
+ * contain without changing its lookup key.
  */
 const configuredOverrides: {
   handlers: [string, unknown][];
   propHandlers: [string, unknown][];
-} = { handlers: [], propHandlers: [] };
+  functions: [string, unknown][];
+} = { handlers: [], propHandlers: [], functions: [] };
 
 /** @internal */
 export function getConfiguredOverrides(): {
   handlers: readonly (readonly [string, unknown])[];
   propHandlers: readonly (readonly [string, unknown])[];
+  functions: readonly (readonly [string, unknown])[];
 } {
   return {
     handlers: configuredOverrides.handlers,
     propHandlers: configuredOverrides.propHandlers,
+    functions: configuredOverrides.functions,
   };
 }
 
@@ -1571,6 +1580,9 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // each into an inline parse-function closure (and skip native emission);
   // otherwise store them for eager native @function injection.
   if (Object.keys(functionDefs).length > 0) {
+    for (const entry of Object.entries(functionDefs)) {
+      configuredOverrides.functions.push(entry);
+    }
     if (isFunctionsPolyfillEnabled()) {
       for (const [name, definition] of Object.entries(functionDefs)) {
         registerFunctionPolyfill(name, definition);
@@ -1761,6 +1773,7 @@ export function resetConfig(): void {
   resetPropHandlers();
   configuredOverrides.handlers.length = 0;
   configuredOverrides.propHandlers.length = 0;
+  configuredOverrides.functions.length = 0;
   resetBaseStyleProps();
   clearPipelineCache();
   resetPrecompiledStyles();

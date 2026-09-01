@@ -33,6 +33,7 @@ import {
   getPrecompileStore,
   getRegisteredPrecompiledDependencies,
 } from './runtime';
+import type { TastyPrecompiledManifest } from './types';
 
 const steps = {
   from: { opacity: 0 },
@@ -279,13 +280,6 @@ describe('precompileTastyStyles', () => {
     expect(renderCalls.value).toBeGreaterThan(0);
 
     resetConfig();
-    // Same configuration the catalog was compiled under — `beforeEach` sets
-    // these, and a dropped token is now a real divergence. This scenario is
-    // about conflicting manifests, not configuration drift.
-    configure({
-      tokens: { $catalogGap: '8px' },
-      globalStyles: { body: { margin: 0 } },
-    });
     registerTastyPrecompiled(result.manifest);
     registerTastyPrecompiled({
       ...result.manifest,
@@ -310,6 +304,51 @@ describe('precompileTastyStyles', () => {
     );
     expect(renderCalls.value).toBe(0);
     expect(warn).toHaveBeenCalled();
+  });
+
+  it('ignores a malformed manifest instead of throwing during registration', async () => {
+    // The documented workflow imports a manifest from JSON and casts it, so
+    // every one of these is a shape a real file can have.
+    const result = await precompileTastyStyles({
+      id: '@test/malformed',
+      cases: [
+        {
+          id: 'default',
+          render: () => catalogTree(() => computeStyles(componentStyles)),
+        },
+      ],
+    });
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const malformed: unknown[] = [
+      null,
+      undefined,
+      'not a manifest',
+      [],
+      { ...result.manifest, chunks: [null] },
+      { ...result.manifest, chunks: [{ lookupKey: 'k', className: 'c' }] },
+      {
+        ...result.manifest,
+        dependencies: { ...result.manifest.dependencies, keyframes: [{}] },
+      },
+      { ...result.manifest, stats: null },
+    ];
+
+    for (const manifest of malformed) {
+      expect(() =>
+        registerTastyPrecompiled(manifest as TastyPrecompiledManifest),
+      ).not.toThrow();
+    }
+    expect(getPrecompileStore().manifests?.size ?? 0).toBe(0);
+
+    // The valid one still registers afterwards.
+    registerTastyPrecompiled(result.manifest);
+    renderCalls.value = 0;
+    expect(computeStyles(componentStyles).className).toBe(
+      result.manifest.chunks.map(({ className }) => className).join(' '),
+    );
+    expect(renderCalls.value).toBe(0);
   });
 
   it('misses when a keyframe-dependent chunk resolves different animation names', async () => {
@@ -380,6 +419,7 @@ describe('compilation configuration guard', () => {
 
   async function compileWith(
     setup: () => void,
+    stylesToCompile: Parameters<typeof computeStyles>[0] = catalogStyles,
   ): Promise<Awaited<ReturnType<typeof precompileTastyStyles>>> {
     resetConfig();
     setup();
@@ -388,7 +428,7 @@ describe('compilation configuration guard', () => {
       cases: [
         {
           id: 'default',
-          render: () => catalogTree(() => computeStyles(catalogStyles)),
+          render: () => catalogTree(() => computeStyles(stylesToCompile)),
         },
       ],
     });
@@ -487,26 +527,118 @@ describe('compilation configuration guard', () => {
   });
 
   it('drops the catalog when a replacement token it compiled against changes', async () => {
-    // The sharpest version of the same trap as the unit case above: a token's
-    // value never reaches a chunk cache key — the key hashes `color: "#brand"`,
-    // not what `#brand` resolves to — so without the fingerprint this hits and
-    // serves the old colour.
-    const result = await compileWith(() =>
-      configure({ tokens: { '#brand': '#ff0000' } }),
+    // The sharpest version of the same trap as the unit case above.
+    // `replaceTokens` substitutes at parse time, so `8px` is baked into the
+    // compiled declaration while the lookup key still hashes the unchanged
+    // source `padding: "$pad"` — without the fingerprint this hits and serves
+    // the old spacing.
+    const tokenStyles = { padding: '$pad' } as const;
+    const result = await compileWith(
+      () => configure({ replaceTokens: { $pad: '8px' } }),
+      tokenStyles,
     );
+    expect(result.css).toContain('8px');
 
     vi.stubEnv('NODE_ENV', 'development');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure({ replaceTokens: { $pad: '16px' } });
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    computeStyles(tokenStyles);
+
+    expect(renderCalls.value).toBeGreaterThan(0);
+    expect(warn.mock.calls.flat().join(' ')).toContain('replaceToken:$pad');
+  });
+
+  it('keeps the catalog when only a CSS-variable token changes', async () => {
+    // The mirror of the case above, and the reason `configure({ tokens })` is
+    // deliberately absent from the fingerprint. These emit `:root` custom
+    // properties — which the catalog excludes — and a chunk using `#brand`
+    // compiles to `var(--brand-color)` whatever the value is, so the runtime
+    // `:root` rule supplies the new colour and the chunk stays correct.
+    // Fingerprinting them would disable the whole catalog on every theme.
+    const tokenStyles = { fill: '#brand' } as const;
+    const result = await compileWith(
+      () => configure({ tokens: { '#brand': '#ff0000' } }),
+      tokenStyles,
+    );
+    expect(result.css).toContain('var(--brand-color)');
+    expect(result.css).not.toContain('#ff0000');
 
     resetConfig();
     configure({ tokens: { '#brand': '#00ff00' } });
     registerTastyPrecompiled(result.manifest);
 
     renderCalls.value = 0;
-    computeStyles(catalogStyles);
+    expect(computeStyles(tokenStyles).className).toBe(
+      result.manifest.chunks.map(({ className }) => className).join(' '),
+    );
+    expect(renderCalls.value).toBe(0);
+    expect(getPrecompileStore().manifests?.has('@test/config-guard')).toBe(
+      true,
+    );
+  });
+
+  it('drops the catalog when a polyfilled @function definition changes', async () => {
+    // With `polyfills.functions` on, `configure()` compiles each declarative
+    // definition into a parse-function closure and leaves `getGlobalFunctions()`
+    // empty. Reading the live registry would therefore see only a closure of
+    // the same name and arity, and a rewritten body — `2 *` to `3 *` — would
+    // compare equal while the expanded CSS changed.
+    const fnStyles = { width: '$$scale(4px)' } as const;
+    const scale = (multiplier: number) => ({
+      polyfills: { functions: true },
+      functions: {
+        $$scale: {
+          params: { '--value': '1' },
+          result: `calc(${multiplier} * var(--value))`,
+        },
+      },
+    });
+
+    const result = await compileWith(() => configure(scale(2)), fnStyles);
+    expect(result.css).toContain('calc(2 *');
+
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure(scale(3));
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    computeStyles(fnStyles);
 
     expect(renderCalls.value).toBeGreaterThan(0);
-    expect(warn.mock.calls.flat().join(' ')).toContain('token:');
+    expect(warn.mock.calls.flat().join(' ')).toContain('fn:$$scale changed');
+  });
+
+  it('keeps a matching catalog when a collector is built before configure()', async () => {
+    // Registration is a side-effect import, so it runs before the host's own
+    // `configure()` call — and a `ServerStyleCollector` constructed in that
+    // window used to validate against defaults and drop a catalog that matches
+    // once the configuration is installed.
+    const hostStyles = { padding: '$pad' } as const;
+    const result = await compileWith(
+      () => configure({ replaceTokens: { $pad: '8px' } }),
+      hostStyles,
+    );
+
+    resetConfig();
+    registerTastyPrecompiled(result.manifest);
+    const collector = new ServerStyleCollector();
+    configure({ replaceTokens: { $pad: '8px' } });
+
+    expect(getPrecompileStore().manifests?.has('@test/config-guard')).toBe(
+      true,
+    );
+
+    renderCalls.value = 0;
+    computeStyles(hostStyles, { ssrCollector: collector });
+    expect(renderCalls.value).toBe(0);
   });
 
   it('validates before an incompatible manifest can seed dependencies', async () => {

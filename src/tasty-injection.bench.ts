@@ -2,6 +2,7 @@ import { bench, describe } from 'vitest';
 
 import { computeStyles } from './compute-styles';
 import { configure, getNamePrefix, resetConfig } from './config';
+import { tastyDebug } from './debug';
 import { destroy } from './injector';
 import { clearPipelineCache } from './pipeline';
 import { clearConditionCache } from './pipeline/materialize';
@@ -85,6 +86,13 @@ const PRECOMPILED_RULES: Workload = {
   valueOffset: 1_000_000,
 };
 
+/** One rule, disjoint from every workload above, for the contract check. */
+const PRECOMPILED_CONTRACT: Workload = {
+  ...ONE_RULE,
+  name: 'precompiled contract',
+  valueOffset: 2_000_000,
+};
+
 interface PreparedTree {
   classNames: string[];
   fragment: DocumentFragment;
@@ -105,8 +113,7 @@ interface BenchmarkHarness {
 }
 
 interface PreparedPrecompiledSample {
-  document: Document;
-  frame: HTMLIFrameElement;
+  container: HTMLDivElement;
   fragment: DocumentFragment;
   styles: Styles[];
   targets: HTMLDivElement[];
@@ -294,18 +301,25 @@ function createHarness(
   };
 }
 
+/**
+ * Build one sample's styles and the catalog CSS that covers them.
+ *
+ * Everything stays in the main document. A catalog's CSS lives in exactly one
+ * document — the one `installTastyPrecompiled()` appends its `<style>` to — so
+ * a precompiled lookup only returns a class name for that document. Preparing
+ * these samples in per-sample iframes, as an earlier revision did, silently
+ * turned every lookup into a miss and left this task measuring the very
+ * runtime path it exists to be compared against. `validatePrecompiledContract`
+ * below now fails loudly if that ever happens again.
+ */
 function preparePrecompiledSample(
   workload: Workload,
   sample: number,
 ): {
   sample: PreparedPrecompiledSample;
   chunks: TastyPrecompiledChunk[];
+  css: string;
 } {
-  const frame = document.createElement('iframe');
-  document.body.append(frame);
-  const frameDocument = frame.contentDocument;
-  if (!frameDocument) throw new Error('Benchmark iframe has no document.');
-
   const styles = Array.from(
     { length: workload.rulesPerTransaction },
     (_, index) =>
@@ -313,6 +327,25 @@ function preparePrecompiledSample(
         color: colorFor(workload, sample, 0, index),
       }) as Styles,
   );
+
+  return {
+    sample: {
+      container: document.createElement('div'),
+      fragment: document.createDocumentFragment(),
+      styles,
+      targets: Array.from({ length: workload.rulesPerTransaction }, () =>
+        document.createElement('div'),
+      ),
+    },
+    ...compileCatalogFor(styles),
+  };
+}
+
+/** Compile `styles` the way a build-time catalog would, off the live runtime. */
+function compileCatalogFor(styles: readonly Styles[]): {
+  chunks: TastyPrecompiledChunk[];
+  css: string;
+} {
   const collector = new ServerStyleCollector();
   collector.enablePrecompileRecording();
   beginPrecompileBuild();
@@ -324,31 +357,55 @@ function preparePrecompiledSample(
     endPrecompileBuild();
   }
 
-  const style = frameDocument.createElement('style');
-  style.textContent = collector
-    .getArtifacts()
-    .filter(({ source }) => source === 'component')
-    .map(({ css }) => css)
-    .join('\n');
-  frameDocument.head.append(style);
-
   return {
-    sample: {
-      document: frameDocument,
-      frame,
-      fragment: frameDocument.createDocumentFragment(),
-      styles,
-      targets: Array.from({ length: workload.rulesPerTransaction }, () =>
-        frameDocument.createElement('div'),
-      ),
-    },
     chunks: collector.getPrecompiledChunks(),
+    css: collector
+      .getArtifacts()
+      .filter(({ source }) => source === 'component')
+      .map(({ css }) => css)
+      .join('\n'),
   };
+}
+
+function registerCatalog(
+  chunks: TastyPrecompiledChunk[],
+  cssHash: string,
+): void {
+  const dependencies: TastyPrecompiledDependencies = {
+    properties: [],
+    keyframes: [],
+    fontFaces: [],
+    counterStyles: [],
+    functions: [],
+    rscKeys: [],
+  };
+  registerTastyPrecompiled({
+    schemaVersion: 2,
+    id: '@tenphi/tasty/injection-benchmark',
+    tastyVersion: TASTY_VERSION,
+    namePrefix: getNamePrefix(),
+    cssHash,
+    // The benchmark configures the runtime it measures, so the live
+    // configuration is by definition the one this catalog was built under.
+    compilationConfig: captureCompilationConfig(),
+    stats: { cssSize: 0, ruleCount: 0 },
+    chunks,
+    dependencies,
+  });
+}
+
+function installCatalogCSS(css: string): HTMLStyleElement {
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.append(style);
+
+  return style;
 }
 
 function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
   let cursor = 0;
   let samples: PreparedPrecompiledSample[] = [];
+  let catalog: HTMLStyleElement | null = null;
 
   return {
     run() {
@@ -361,12 +418,11 @@ function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
 
       for (let index = 0; index < sample.targets.length; index++) {
         const target = sample.targets[index];
-        target.className = computeStyles(sample.styles[index], {
-          root: sample.document,
-        }).className;
+        target.className = computeStyles(sample.styles[index]).className;
         sample.fragment.append(target);
       }
-      sample.document.body.append(sample.fragment);
+      sample.container.append(sample.fragment);
+      document.body.append(sample.container);
       readComputedColors(sample.targets);
     },
     setup(mode) {
@@ -376,38 +432,28 @@ function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
 
       const count = (mode === 'warmup' ? WARMUP_ITERATIONS : ITERATIONS) + 1;
       const chunks = new Map<string, TastyPrecompiledChunk>();
+      const css: string[] = [];
       samples = Array.from({ length: count }, (_, sampleIndex) => {
         const prepared = preparePrecompiledSample(workload, sampleIndex);
         for (const chunk of prepared.chunks) {
           chunks.set(chunk.lookupKey, chunk);
         }
+        css.push(prepared.css);
         return prepared.sample;
       });
 
-      const dependencies: TastyPrecompiledDependencies = {
-        properties: [],
-        keyframes: [],
-        fontFaces: [],
-        counterStyles: [],
-        functions: [],
-        rscKeys: [],
-      };
-      registerTastyPrecompiled({
-        schemaVersion: 2,
-        id: '@tenphi/tasty/injection-benchmark',
-        tastyVersion: TASTY_VERSION,
-        namePrefix: getNamePrefix(),
-        cssHash: `${mode}-${count}`,
-        // The benchmark configures the runtime it measures, so the live
-        // configuration is by definition the one this catalog was built under.
-        compilationConfig: captureCompilationConfig(),
-        stats: { cssSize: 0, ruleCount: 0 },
-        chunks: [...chunks.values()],
-        dependencies,
-      });
+      // One stylesheet for every sample, which is what a catalog is: a single
+      // prebuilt asset covering the whole application. It makes this task the
+      // conservative one of the three — its 1,000 elements resolve against
+      // every sample's rules, while each control resolves against the 1,000
+      // in its own shadow root — so the measured advantage is a floor.
+      catalog = installCatalogCSS(css.join('\n'));
+      registerCatalog([...chunks.values()], `${mode}-${count}`);
     },
     teardown() {
-      for (const sample of samples) sample.frame.remove();
+      for (const sample of samples) sample.container.remove();
+      catalog?.remove();
+      catalog = null;
       samples = [];
       cursor = 0;
       configureBenchmarkRuntime();
@@ -438,6 +484,62 @@ function validateBenchmarkContract() {
   }
 }
 
+/**
+ * Fail the run if the precompiled task is not actually hitting the catalog.
+ *
+ * Without this the task degrades silently. A lookup that misses still produces
+ * a working class name and the right computed color, because a runtime class
+ * name is `hashString(cacheKey)` — the very string the catalog recorded — so
+ * neither the name nor the rendering can tell a hit from a miss. What differs
+ * is only whether the rule was generated and injected, which is the entire
+ * thing this task exists to measure the absence of. So the assertion reads the
+ * injector's own hit counter, which requires `devMode`; the benchmark runtime
+ * is restored before any timing.
+ *
+ * Its own value offset keeps these lookup keys disjoint from the harness pool.
+ */
+function validatePrecompiledContract() {
+  resetConfig();
+  configure({
+    batchInjection: false,
+    devMode: true,
+    forceTextInjection: false,
+  });
+  clearAllCaches();
+
+  const styles = [
+    Object.freeze({ color: colorFor(PRECOMPILED_CONTRACT, 0, 0, 0) }) as Styles,
+  ];
+  const { chunks, css } = compileCatalogFor(styles);
+  const style = installCatalogCSS(css);
+  registerCatalog(chunks, 'contract');
+
+  const target = document.createElement('div');
+  target.className = computeStyles(styles[0]).className;
+  document.body.append(target);
+  const color = getComputedStyle(target).color;
+  const { metrics } = tastyDebug.summary({ raw: true });
+
+  target.remove();
+  style.remove();
+  configureBenchmarkRuntime();
+  clearAllCaches();
+
+  if (!metrics?.precompiledHits) {
+    throw new Error(
+      'The precompiled workload is not hitting the catalog, so it would measure runtime generation instead.',
+    );
+  }
+  if (metrics.misses) {
+    throw new Error(
+      `The precompiled workload generated ${metrics.misses} rule(s) at runtime; every chunk it measures must come from the catalog.`,
+    );
+  }
+  if (!color) {
+    throw new Error('The precompiled catalog CSS did not apply to the target.');
+  }
+}
+
 function registerWorkload(workload: Workload) {
   describe(workload.name, () => {
     const existingCSS = createHarness(workload, true);
@@ -464,6 +566,7 @@ function registerWorkload(workload: Workload) {
 
 configureBenchmarkRuntime();
 validateBenchmarkContract();
+validatePrecompiledContract();
 
 describe('cold generation + injection', () => {
   registerWorkload(ONE_RULE);

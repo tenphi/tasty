@@ -7,6 +7,7 @@ import {
 } from './fingerprint';
 import { getPrecompileStore, warnPrecompileOnce } from './runtime';
 import type {
+  TastyCompilationConfig,
   TastyPrecompiledChunk,
   TastyPrecompiledDependencies,
   TastyPrecompiledManifest,
@@ -20,28 +21,37 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * The documented workflow imports a manifest from JSON and casts it, so the
- * shape is only as good as the file. Checking that a dependency field is an
- * array is not enough: `keyframes: [{}]` would pass and then throw while
- * iterating `item.rscKeys` in `mergeDependencies`, and `chunks: [null]` would
- * throw inside the validator itself. A malformed manifest should be warned
- * about and ignored, never crash registration.
+ * shape is only as good as the file — and the input is `unknown` here for that
+ * reason. Checking that a dependency field is an array is not enough:
+ * `keyframes: [{}]` would pass and then throw while iterating `item.rscKeys`
+ * in `mergeDependencies`, and `chunks: [null]` would throw inside the
+ * validator itself. Nor is optional chaining enough at the top level: `null`
+ * survives `manifest?.dependencies` and then throws on `manifest.schemaVersion`
+ * before registration can warn. A malformed manifest should be warned about
+ * and ignored, never crash registration.
  */
-function isManifestShapeValid(manifest: TastyPrecompiledManifest): boolean {
-  const dependencies = manifest?.dependencies;
+function isManifestShapeValid(
+  manifest: unknown,
+): manifest is TastyPrecompiledManifest {
+  if (!isRecord(manifest)) return false;
+  const dependencies = manifest.dependencies;
+  const stats = manifest.stats;
   return (
     manifest.schemaVersion === 2 &&
-    isCompilationConfigShapeValid(manifest.compilationConfig) &&
+    isCompilationConfigShapeValid(
+      manifest.compilationConfig as TastyCompilationConfig | undefined,
+    ) &&
     typeof manifest.id === 'string' &&
     manifest.id.length > 0 &&
     typeof manifest.tastyVersion === 'string' &&
     typeof manifest.namePrefix === 'string' &&
     typeof manifest.cssHash === 'string' &&
     manifest.cssHash.length > 0 &&
-    !!manifest.stats &&
-    Number.isSafeInteger(manifest.stats.cssSize) &&
-    manifest.stats.cssSize >= 0 &&
-    Number.isSafeInteger(manifest.stats.ruleCount) &&
-    manifest.stats.ruleCount >= 0 &&
+    isRecord(stats) &&
+    Number.isSafeInteger(stats.cssSize) &&
+    (stats.cssSize as number) >= 0 &&
+    Number.isSafeInteger(stats.ruleCount) &&
+    (stats.ruleCount as number) >= 0 &&
     Array.isArray(manifest.chunks) &&
     manifest.chunks.every(
       (chunk) =>
@@ -151,7 +161,7 @@ export function registerPrecompiledManifest(
 ): boolean {
   if (!isManifestShapeValid(manifest)) {
     warnPrecompileOnce(
-      `invalid:${manifest?.id ?? 'unknown'}`,
+      `invalid:${(manifest as TastyPrecompiledManifest | null)?.id ?? 'unknown'}`,
       '[Tasty] Ignoring an invalid precompiled style manifest.',
     );
     return false;

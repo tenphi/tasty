@@ -158,7 +158,6 @@ export class ServerStyleCollector {
       validateNamePrefix(namePrefix);
     }
     this.namePrefix = namePrefix ?? getNamePrefix();
-    this.applyRegisteredPrecompiledDependencies();
   }
 
   private sourceKey(kind: ServerStyleArtifactKind, key: string): string {
@@ -173,7 +172,17 @@ export class ServerStyleCollector {
     this.artifactSources.set(this.sourceKey(kind, key), source);
   }
 
-  /** Pick up manifests registered after this collector was constructed. */
+  /**
+   * Pick up manifests registered after this collector was constructed.
+   *
+   * Deliberately not called from the constructor. Reading the registered
+   * dependencies is what validates the catalogs against the host's
+   * configuration, and registration is a side-effect import that routinely
+   * runs before the host's own `configure()` call — so a collector built in
+   * between would validate against defaults and permanently drop a catalog
+   * that matches once configuration is installed. `collectInternals()` is the
+   * first style-producing operation on every path, which is late enough.
+   */
   applyRegisteredPrecompiledDependencies(): void {
     const revision = getPrecompiledRevision();
     if (revision === this.appliedPrecompiledRevision) return;
@@ -236,6 +245,12 @@ export class ServerStyleCollector {
   collectInternals(): void {
     if (this.internalsCollected) return;
     this.internalsCollected = true;
+
+    // The first style-producing operation, and the moment the configuration is
+    // final — so this is where the registered catalogs are seeded and checked.
+    // Every path reaches it: `computeStyles`, the SSR entry points, and the
+    // `useProperty` / `useFunction` / `useGlobalStyles` hooks.
+    this.applyRegisteredPrecompiledDependencies();
 
     for (const [token, definition] of Object.entries(
       getEffectiveProperties(),

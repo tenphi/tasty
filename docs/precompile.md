@@ -132,8 +132,12 @@ globals were already emitted.
 
 Dependency metadata seeds browser, SSR, and RSC caches as immutable external
 definitions. Tasty neither inserts duplicate ancillary rules nor adds external
-classes to its garbage-collected rule set. A `ShadowRoot` cannot see document
-CSS, so all styles targeting a shadow root use the normal runtime path.
+classes to its garbage-collected rule set. A precompiled hit is restricted to
+the document the catalog CSS lives in — a static stylesheet in the page, or the
+`<style>` `installTastyPrecompiled()` appends to the global `document`. Any
+other root uses the normal runtime path: a `ShadowRoot`, which cannot see
+document CSS, and another `Document` such as an iframe's, which the asset was
+never installed into.
 
 Registration is global across server module graphs and idempotent for the same
 manifest ID and CSS hash. Tasty rejects incompatible versions, name prefixes,
@@ -157,9 +161,16 @@ Use the smallest matrix that exposes every unique styled structure:
 7. Catalog every public styled component or mark it runtime-only with a reason.
 
 Consumer changes to parser functions, units, states, handlers, recipes, chunk
-assignments, or other compilation-affecting configuration invalidate a shared
-catalog. Such applications should use runtime generation or build a
-project-specific artifact.
+assignments, `replaceTokens`, or other compilation-affecting configuration
+invalidate a shared catalog. Such applications should use runtime generation or
+build a project-specific artifact.
+
+Theming does not invalidate a catalog. `configure({ tokens })` emits `:root`
+custom properties, which the asset excludes, and a chunk written against
+`#brand` compiles to `var(--brand-color)` whatever the current value is — so a
+palette swap leaves every compiled chunk correct. `replaceTokens` is listed
+above because it is the opposite: it substitutes at parse time and bakes its
+value into the declaration.
 
 Chunk lookup is exact. A shared UI-kit catalog is most useful when applications
 render those components close to their cataloged styles; frequent project
@@ -177,7 +188,12 @@ asset containing the same coverage.
 Catalog generation, registration, and stylesheet loading are startup work and
 should stay outside render samples. `pnpm bench:injection` includes a
 1,000-rule precompiled lookup case alongside cold generation and an
-already-present CSS control. Use `pnpm bench`, `pnpm bench:overhead`, and
+already-present CSS control. It asserts up front that the case is actually
+being served from the catalog, and fails the run otherwise: a class name is
+`hashString(cacheKey)` whether it came from the catalog or from runtime
+generation, so nothing in the name or the rendering distinguishes a hit from a
+miss, and a case that quietly stopped hitting would report the runtime path
+under the precompiled label. Use `pnpm bench`, `pnpm bench:overhead`, and
 `pnpm bench:injection` in alternating runs on the same idle machine when
 changing this path.
 

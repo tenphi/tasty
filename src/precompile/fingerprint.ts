@@ -1,13 +1,18 @@
 import {
   getConfig,
   getConfiguredOverrides,
+  getGlobalConfigTokens,
   getGlobalFunctions,
   getGlobalRecipes,
   isFunctionsPolyfillEnabled,
 } from '../config';
 import { getGlobalPredefinedStates } from '../states';
 import { hashString } from '../utils/hash';
-import { getGlobalParser } from '../utils/styles';
+import {
+  getGlobalParseFunctions,
+  getGlobalParser,
+  getGlobalPredefinedTokens,
+} from '../utils/styles';
 
 import type { TastyCompilationConfig } from './types';
 
@@ -45,10 +50,15 @@ function stableStringify(value: unknown): string {
   return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
 }
 
-/** Names recorded in `configure()` order, deduped into a comparable map. */
-function named(names: readonly string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const name of names) out[name] = 'custom';
+/**
+ * Entries recorded in `configure()` order, deduped into a comparable map.
+ * Later calls win, matching how `configure()` merges them.
+ */
+function named(
+  entries: readonly (readonly [string, unknown])[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, definition] of entries) out[name] = definition;
 
   return out;
 }
@@ -83,7 +93,17 @@ export function captureCompilationConfig(): TastyCompilationConfig {
       ...tokenize(getGlobalPredefinedStates(), 'state'),
       ...tokenize(parser.getUnits() as Record<string, unknown>, 'unit'),
       ...tokenize(getGlobalRecipes(), 'recipe'),
+      // Both flavours of `functions`: declarative `$$` CSS definitions and
+      // bare-key parse functions, which live in different registries.
       ...tokenize(getGlobalFunctions(), 'fn'),
+      ...tokenize(getGlobalParseFunctions(), 'parseFn'),
+      // A token's value never reaches a chunk cache key — the key hashes
+      // `color: "#brand"`, not what `#brand` resolves to — so a catalog
+      // compiled against `#brand → red` would otherwise still hit under a
+      // runtime that maps it to green, and serve the red CSS. Both registries:
+      // `configure({ tokens })` and the `replaceTokens` substitutions.
+      ...tokenize(getGlobalConfigTokens(), 'token'),
+      ...tokenize(getGlobalPredefinedTokens(), 'replaceToken'),
     },
     // Names the host passed to `configure()`, not the live handler registry:
     // that registry is populated lazily as styles are encountered, so it
@@ -93,7 +113,10 @@ export function captureCompilationConfig(): TastyCompilationConfig {
       ...tokenize(named(overrides.propHandlers), 'propHandler'),
     },
     scalars: {
-      autoPropertyTypes: String(config.autoPropertyTypes ?? ''),
+      // Compare effective behaviour, not the literal setting: the default is
+      // enabled, so an omitted value and an explicit `true` are the same thing
+      // and must not read as a divergence.
+      autoPropertyTypes: String(config.autoPropertyTypes !== false),
       functionsPolyfill: String(isFunctionsPolyfillEnabled()),
     },
   };

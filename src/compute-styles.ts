@@ -143,9 +143,17 @@ function lookupPrecompiledChunk(
   signature: string,
   root?: Document | ShadowRoot,
 ) {
-  if (root && typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) {
+  // A catalog's CSS lives in exactly one document: a static stylesheet in the
+  // page, or the `<style>` that `installTastyPrecompiled()` appends to the
+  // global `document`. Any other root — a `ShadowRoot`, or another `Document`
+  // such as an iframe's — cannot see it, so returning a class name for it would
+  // name a rule that is not there. `document` being undefined means there is no
+  // DOM to have installed into, and the SSR and RSC paths do not come through
+  // here.
+  if (root && !(typeof document !== 'undefined' && root === document)) {
     return null;
   }
+
   return findPrecompiledChunk(
     precompiledLookupKey(baseKey, signature),
     getNamePrefix(),

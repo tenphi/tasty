@@ -12,6 +12,20 @@ import type {
   TastyPrecompiledManifest,
 } from './types';
 
+const isStringArray = (value: unknown): boolean =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * The documented workflow imports a manifest from JSON and casts it, so the
+ * shape is only as good as the file. Checking that a dependency field is an
+ * array is not enough: `keyframes: [{}]` would pass and then throw while
+ * iterating `item.rscKeys` in `mergeDependencies`, and `chunks: [null]` would
+ * throw inside the validator itself. A malformed manifest should be warned
+ * about and ignored, never crash registration.
+ */
 function isManifestShapeValid(manifest: TastyPrecompiledManifest): boolean {
   const dependencies = manifest?.dependencies;
   return (
@@ -31,18 +45,37 @@ function isManifestShapeValid(manifest: TastyPrecompiledManifest): boolean {
     Array.isArray(manifest.chunks) &&
     manifest.chunks.every(
       (chunk) =>
+        isRecord(chunk) &&
         typeof chunk.lookupKey === 'string' &&
         typeof chunk.className === 'string' &&
-        Array.isArray(chunk.animations) &&
-        chunk.animations.every((name: unknown) => typeof name === 'string'),
+        isStringArray(chunk.animations),
     ) &&
-    !!dependencies &&
+    isRecord(dependencies) &&
     Array.isArray(dependencies.properties) &&
+    dependencies.properties.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.name === 'string' &&
+        typeof item.definition === 'string',
+    ) &&
     Array.isArray(dependencies.keyframes) &&
-    Array.isArray(dependencies.fontFaces) &&
+    dependencies.keyframes.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.name === 'string' &&
+        typeof item.contentKey === 'string' &&
+        isStringArray(item.rscKeys),
+    ) &&
+    isStringArray(dependencies.fontFaces) &&
     Array.isArray(dependencies.counterStyles) &&
-    Array.isArray(dependencies.functions) &&
-    Array.isArray(dependencies.rscKeys)
+    dependencies.counterStyles.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.name === 'string' &&
+        isStringArray(item.rscKeys),
+    ) &&
+    isStringArray(dependencies.functions) &&
+    isStringArray(dependencies.rscKeys)
   );
 }
 

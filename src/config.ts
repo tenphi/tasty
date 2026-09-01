@@ -562,15 +562,15 @@ let stylesGenerated = false;
  * changes what an already-compiled chunk should contain without changing its
  * lookup key.
  */
-const configuredOverrides: { handlers: string[]; propHandlers: string[] } = {
-  handlers: [],
-  propHandlers: [],
-};
+const configuredOverrides: {
+  handlers: [string, unknown][];
+  propHandlers: [string, unknown][];
+} = { handlers: [], propHandlers: [] };
 
 /** @internal */
 export function getConfiguredOverrides(): {
-  handlers: readonly string[];
-  propHandlers: readonly string[];
+  handlers: readonly (readonly [string, unknown])[];
+  propHandlers: readonly (readonly [string, unknown])[];
 } {
   return {
     handlers: configuredOverrides.handlers,
@@ -1603,7 +1603,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
-      configuredOverrides.handlers.push(name);
+      configuredOverrides.handlers.push([name, definition]);
       const handler = normalizeHandlerDefinition(name, definition);
       registerHandler(handler, {
         key: name,
@@ -1615,7 +1615,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle props middleware
   if (Object.keys(mergedPropHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedPropHandlers)) {
-      configuredOverrides.propHandlers.push(name);
+      configuredOverrides.propHandlers.push([name, definition]);
       registerPropHandler(name, definition, {
         source: propHandlerSources.get(name),
       });

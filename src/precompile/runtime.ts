@@ -117,6 +117,14 @@ export function getPrecompiledRevision(): number {
 export function getRegisteredPrecompiledDependencies(
   namePrefix: string,
 ): TastyPrecompiledDependencies {
+  // The single choke point for dependency exposure — browser, SSR and RSC all
+  // arrive here — and it runs BEFORE any chunk lookup. Validating only at
+  // lookup time let an incompatible manifest seed `@property` and keyframe
+  // metadata first; fallback generation then saw those definitions as already
+  // present and skipped the rules it should have emitted. A manifest that
+  // contributes only dependencies may never reach a lookup at all.
+  store.validate?.();
+
   return store.dependencies?.get(namePrefix) ?? EMPTY_DEPENDENCIES;
 }
 

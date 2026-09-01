@@ -16,7 +16,7 @@ vi.mock('../chunks', async (importOriginal) => {
   };
 });
 
-import { configure, resetConfig } from '../config';
+import { configure, getNamePrefix, resetConfig } from '../config';
 import { computeStyles } from '../compute-styles';
 import {
   useCounterStyle,
@@ -29,7 +29,10 @@ import { TASTY_VERSION } from '../version';
 
 import { precompileTastyStyles } from './index';
 import { registerTastyPrecompiled } from './register';
-import { getPrecompileStore } from './runtime';
+import {
+  getPrecompileStore,
+  getRegisteredPrecompiledDependencies,
+} from './runtime';
 
 const steps = {
   from: { opacity: 0 },
@@ -276,7 +279,13 @@ describe('precompileTastyStyles', () => {
     expect(renderCalls.value).toBeGreaterThan(0);
 
     resetConfig();
-    configure({});
+    // Same configuration the catalog was compiled under — `beforeEach` sets
+    // these, and a dropped token is now a real divergence. This scenario is
+    // about conflicting manifests, not configuration drift.
+    configure({
+      tokens: { $catalogGap: '8px' },
+      globalStyles: { body: { margin: 0 } },
+    });
     registerTastyPrecompiled(result.manifest);
     registerTastyPrecompiled({
       ...result.manifest,
@@ -475,6 +484,52 @@ describe('compilation configuration guard', () => {
 
     expect(css).toContain('var(--my-gap)');
     expect(css).not.toContain('var(--gap)');
+  });
+
+  it('drops the catalog when a replacement token it compiled against changes', async () => {
+    // The sharpest version of the same trap as the unit case above: a token's
+    // value never reaches a chunk cache key — the key hashes `color: "#brand"`,
+    // not what `#brand` resolves to — so without the fingerprint this hits and
+    // serves the old colour.
+    const result = await compileWith(() =>
+      configure({ tokens: { '#brand': '#ff0000' } }),
+    );
+
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure({ tokens: { '#brand': '#00ff00' } });
+    registerTastyPrecompiled(result.manifest);
+
+    renderCalls.value = 0;
+    computeStyles(catalogStyles);
+
+    expect(renderCalls.value).toBeGreaterThan(0);
+    expect(warn.mock.calls.flat().join(' ')).toContain('token:');
+  });
+
+  it('validates before an incompatible manifest can seed dependencies', async () => {
+    // Dependencies are applied before any chunk lookup, and a manifest that
+    // only contributes them may never reach a lookup at all. Seeding first let
+    // a rejected catalog mark `@property` definitions as already present, so
+    // fallback generation skipped the rules it should have emitted.
+    const result = await compileWith(() =>
+      configure({ units: { x: 'var(--gap)' } }),
+    );
+
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    resetConfig();
+    configure({ units: { x: 'var(--my-gap)' } });
+    registerTastyPrecompiled(result.manifest);
+
+    // Asking for dependencies — what the injector, SSR and RSC paths all do
+    // first — must already have rejected it.
+    getRegisteredPrecompiledDependencies(getNamePrefix());
+
+    expect(getPrecompileStore().manifests?.size ?? 0).toBe(0);
   });
 
   it('rejects a manifest that predates the recorded configuration', async () => {

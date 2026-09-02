@@ -38,11 +38,27 @@ const args = parseArgs(process.argv.slice(2));
  * because `NaN > 1` is false, print `CPU NaNx` and exit 0 — a typo that
  * produces publishable-looking results for a profile nobody asked for.
  */
-function requireCount(name, value, fallback, min) {
+function requireRate(name, value, fallback, min) {
   if (value === undefined) return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < min) {
     fail(`--${name} must be a number >= ${min}, got "${value}".`);
+  }
+
+  return parsed;
+}
+
+/**
+ * Counts additionally have to be whole. A fractional one does not fail, it
+ * lies: `--runs 1.5` printed "1.5 runs per cell" and then ran two, because the
+ * loop is `i < RUNS`; `--components 1.5` rendered one and failed much later
+ * comparing 1 against 1.5.
+ */
+function requireCount(name, value, fallback, min) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min) {
+    fail(`--${name} must be a whole number >= ${min}, got "${value}".`);
   }
 
   return parsed;
@@ -57,11 +73,11 @@ const RUNS = requireCount('runs', args.runs, 5, 1);
 const COMPONENTS = requireCount('components', args.components, 50, 1);
 const MODES = (args.mode ?? ALL_MODES.join(',')).split(',');
 const NETWORKS = (args.network ?? 'none,fast-4g,slow-4g').split(',');
+// Fractional CPU rates are meaningful — CDP throttles by a multiplier — so
+// these stay rates rather than counts. 1 means "no throttling"; below it there
+// is nothing to slow down.
 const CPUS = args.cpu
-  ? args.cpu
-      .split(',')
-      // 1 means "no throttling"; below it, CDP has nothing to slow down.
-      .map((rate) => requireCount('cpu', rate, undefined, 1))
+  ? args.cpu.split(',').map((rate) => requireRate('cpu', rate, undefined, 1))
   : CPU_RATES;
 
 const unknownModes = MODES.filter((mode) => !ALL_MODES.includes(mode));

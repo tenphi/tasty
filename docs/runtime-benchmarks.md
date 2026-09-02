@@ -1,7 +1,7 @@
 # Runtime Benchmarks
 
 Tasty keeps its performance claims in reproducible benchmarks rather than
-combining unlike measurements into one score. The repository measures three
+combining unlike measurements into one score. The repository measures five
 different costs:
 
 1. Style parsing and generation in Node.
@@ -34,10 +34,11 @@ code paths in headless Chromium. The first checkout may require
 current `dist/` — run `pnpm build` first.
 
 Run the Node and browser suites separately so they do not compete for CPU. The
-browser timer has 0.1 ms resolution, so both browser benchmarks perform many
+browser timer has 0.1 ms resolution, so the browser benchmarks perform many
 matched operations per sample and divide the absolute difference by the number
-of elements or rules. Machine load, browser versions, and CPU power will move
-the results.
+of elements, rules or interactions. Machine load, browser versions, and CPU
+power will move the results — on a loaded machine the absolute columns drift
+several percent while the raw/Tasty delta holds, so read the delta.
 
 ## Core Style Pipeline
 

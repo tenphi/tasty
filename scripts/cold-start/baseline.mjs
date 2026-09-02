@@ -8,6 +8,7 @@
  * browser, and a stylesheet the page links like any other static asset.
  */
 import { writeFile } from 'node:fs/promises';
+import { brotliCompressSync } from 'node:zlib';
 import { createElement } from 'react';
 
 import { stylesFor, TOKENS } from './fixtures.mjs';
@@ -46,5 +47,9 @@ export async function buildBaseline({ out, components }) {
     `export default ${JSON.stringify(classNames)};\n`,
   );
 
-  return { classes: classNames.length, cssBytes: css.length };
+  return {
+    classes: classNames.length,
+    cssBytes: css.length,
+    brotliBytes: brotliCompressSync(Buffer.from(css)).length,
+  };
 }

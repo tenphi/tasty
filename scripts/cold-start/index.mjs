@@ -23,6 +23,7 @@
  */
 import { createServer } from 'node:http';
 import { copyFile, readFile } from 'node:fs/promises';
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { chromium } from 'playwright';
 
 import { buildAssets, MODES as ALL_MODES, OUT } from './build.mjs';
@@ -30,26 +31,51 @@ import { buildBaseline } from './baseline.mjs';
 import { CPU_RATES, NETWORK_PROFILES } from './network.mjs';
 
 const args = parseArgs(process.argv.slice(2));
-const RUNS = args.runs ?? 5;
-const COMPONENTS = args.components ?? 50;
+
+/**
+ * Every option is validated before anything runs, and a bad one exits rather
+ * than degrading quietly. `--cpu nope` used to become `NaN`, skip throttling
+ * because `NaN > 1` is false, print `CPU NaNx` and exit 0 — a typo that
+ * produces publishable-looking results for a profile nobody asked for.
+ */
+function requireCount(name, value, fallback, min) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min) {
+    fail(`--${name} must be a number >= ${min}, got "${value}".`);
+  }
+
+  return parsed;
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+const RUNS = requireCount('runs', args.runs, 5, 1);
+const COMPONENTS = requireCount('components', args.components, 50, 1);
 const MODES = (args.mode ?? ALL_MODES.join(',')).split(',');
 const NETWORKS = (args.network ?? 'none,fast-4g,slow-4g').split(',');
-const CPUS = args.cpu ? args.cpu.split(',').map(Number) : CPU_RATES;
+const CPUS = args.cpu
+  ? args.cpu
+      .split(',')
+      // 1 means "no throttling"; below it, CDP has nothing to slow down.
+      .map((rate) => requireCount('cpu', rate, undefined, 1))
+  : CPU_RATES;
 
 const unknownModes = MODES.filter((mode) => !ALL_MODES.includes(mode));
 if (unknownModes.length) {
-  console.error(
+  fail(
     `Unknown --mode ${unknownModes.join(', ')}. Known modes: ${ALL_MODES.join(', ')}.`,
   );
-  process.exit(1);
 }
 
 const unknownNetworks = NETWORKS.filter((name) => !(name in NETWORK_PROFILES));
 if (unknownNetworks.length) {
-  console.error(
+  fail(
     `Unknown --network ${unknownNetworks.join(', ')}. Known profiles: ${Object.keys(NETWORK_PROFILES).join(', ')}.`,
   );
-  process.exit(1);
 }
 
 function parseArgs(argv) {
@@ -60,8 +86,6 @@ function parseArgs(argv) {
     const next = argv[i + 1];
     out[key] = next && !next.startsWith('--') ? (i++, next) : 'true';
   }
-  if (out.runs) out.runs = Number(out.runs);
-  if (out.components) out.components = Number(out.components);
   return out;
 }
 
@@ -81,6 +105,29 @@ ${mode === 'baseline' ? '<link rel="stylesheet" href="/baseline.css">' : ''}
 <div id="root"></div>
 <script type="module" src="/app-${mode}.js"></script>
 `;
+
+/**
+ * Assets go over the wire brotli-compressed, because that is what a static host
+ * serves and what the throttled link therefore has to carry. Sending the raw
+ * bundle instead would put 186 KB on a 1.6 Mbps link where a real deployment
+ * puts 52 KB — a ~700 ms difference on Slow 4G, attributed to Tasty.
+ *
+ * Compressed once and cached: this is a page-load benchmark, not a compression
+ * benchmark, and re-compressing per request would show up as server latency.
+ */
+const compressed = new Map();
+
+function encode(name, body) {
+  let cached = compressed.get(name);
+  if (!cached) {
+    cached = brotliCompressSync(body, {
+      params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
+    });
+    compressed.set(name, cached);
+  }
+
+  return cached;
+}
 
 async function serve() {
   const server = createServer(async (req, res) => {
@@ -103,11 +150,17 @@ async function serve() {
         return res.writeHead(404).end('');
       }
       try {
-        const body = await readFile(OUT + name);
+        const raw = await readFile(OUT + name);
+        const acceptsBrotli = /\bbr\b/.test(
+          req.headers['accept-encoding'] ?? '',
+        );
+        const body = acceptsBrotli ? encode(name, raw) : raw;
         res.writeHead(200, {
           'content-type': name.endsWith('.css')
             ? 'text/css'
             : 'text/javascript',
+          ...(acceptsBrotli ? { 'content-encoding': 'br' } : null),
+          vary: 'Accept-Encoding',
           // No caching: every run is a first visit, which is the case that hurts.
           'cache-control': 'no-store',
         });
@@ -221,7 +274,7 @@ async function measure(browser, base, { mode, network, cpu }) {
  * control if the whole page resolves the same, which the class names alone do
  * not prove.
  */
-async function verifyModes(browser, base, modes) {
+async function verifyModes(browser, base, modes, sizes) {
   const results = {};
   for (const mode of modes) {
     const context = await browser.newContext();
@@ -234,11 +287,19 @@ async function verifyModes(browser, base, modes) {
       metrics: window.__benchMetrics,
       proof: window.__benchProof,
       noPaint: window.__benchNoPaint === true,
+      transfer: Object.fromEntries(
+        performance
+          .getEntriesByType('resource')
+          .map((entry) => [
+            entry.name.slice(entry.name.lastIndexOf('/') + 1),
+            { encoded: entry.encodedBodySize, decoded: entry.decodedBodySize },
+          ]),
+      ),
     }));
     await context.close();
 
     const generated = state.metrics?.misses ?? 0;
-    results[mode] = { generated, ...state.proof };
+    results[mode] = { generated, transfer: state.transfer, ...state.proof };
 
     if (state.noPaint) {
       throw new Error(`${mode} mode never painted.`);
@@ -275,6 +336,19 @@ async function verifyModes(browser, base, modes) {
   if (!background || background === 'rgba(0, 0, 0, 0)') {
     throw new Error(
       `Every mode rendered an unstyled component (${background}); no CSS applied.`,
+    );
+  }
+
+  // What the throttled link actually carried. A static host serves brotli, so
+  // if these ever came back as the raw bundle the transfer column — the column
+  // that dominates this benchmark — would be inflated ~3.5x and attributed to
+  // Tasty.
+  const wire = results.runtime?.transfer?.['tasty.js'];
+  if (wire && wire.encoded !== sizes['tasty.js'].brotli) {
+    throw new Error(
+      `tasty.js crossed the wire as ${wire.encoded} bytes, not the ` +
+        `${sizes['tasty.js'].brotli} bytes the size table reports. ` +
+        'Assets must be served compressed, the way a static host serves them.',
     );
   }
 
@@ -336,11 +410,11 @@ console.log(
 );
 for (const [name, s] of Object.entries(sizes)) {
   console.log(
-    `  ${name.padEnd(10)} ${(s.raw / 1024).toFixed(0).padStart(4)} KB raw  ${(s.brotli / 1024).toFixed(1).padStart(5)} KB brotli`,
+    `  ${name.padEnd(10)} ${(s.brotli / 1024).toFixed(1).padStart(5)} KB over the wire (brotli)  ${(s.raw / 1024).toFixed(0).padStart(4)} KB decoded`,
   );
 }
 console.log(
-  `  baseline.css ${(baseline.cssBytes / 1024).toFixed(1).padStart(4)} KB   ${baseline.classes} classes\n`,
+  `  ${'baseline.css'.padEnd(10)} ${(baseline.brotliBytes / 1024).toFixed(1).padStart(5)} KB over the wire (brotli)  ${(baseline.cssBytes / 1024).toFixed(0).padStart(4)} KB decoded, ${baseline.classes} classes\n`,
 );
 
 const browser = await chromium.launch();
@@ -349,6 +423,7 @@ const { results: verified, background } = await verifyModes(
   browser,
   base,
   MODES,
+  sizes,
 );
 console.log(
   `mode check: all render ${COMPONENTS} components at ${background} — ` +

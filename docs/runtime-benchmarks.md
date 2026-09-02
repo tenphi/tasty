@@ -253,41 +253,48 @@ rather than counted in animation frames — `requestAnimationFrame` fires before
 paint, so a page that commits fast can reach its second frame with nothing
 painted yet.
 
-The Tasty bundle is built from what the page imports (`tasty`, `configure`,
-`computeStyles`, `tastyDebug`), so it is tree-shaken the way an application's
-would be: 52.0 KB brotli, 186 KB raw. Re-exporting the whole library instead
-adds ~4 KB brotli of code no page here calls, which would inflate the column
-that dominates this result.
+Two things about the payload decide whether this measures a deployment or a
+straw man, so both are enforced rather than assumed:
+
+- **Assets are served brotli-compressed**, the way a static host serves them.
+  The bundle is 52.0 KB on the wire and 186 KB decoded; putting the decoded
+  bytes on a 1.6 Mbps link would add ~700 ms and charge it to Tasty. The run
+  reads `encodedBodySize` back out of resource timing and fails if what
+  crossed the wire is not the compressed size the table reports.
+- **The bundle is built from what the page imports** (`tasty`, `configure`,
+  `computeStyles`, `tastyDebug`), so it is tree-shaken as an application's
+  would be. Re-exporting the whole library adds ~4 KB brotli of code no page
+  here calls.
 
 On an Apple M1 Max with React 19.2.8 and Chromium 151, first contentful paint:
 
 | Link / CPU            | baseline | runtime | prewarm | Tasty's cost |
 | --------------------- | -------: | ------: | ------: | -----------: |
-| No throttling, 1x     |    44 ms |   56 ms |   56 ms |       +12 ms |
-| Fast 4G, 1x           |   744 ms |  924 ms |  920 ms |      +180 ms |
-| Slow 4G, 1x           |  2764 ms | 3708 ms | 3712 ms |      +944 ms |
-| No throttling, 4x CPU |   156 ms |  204 ms |  204 ms |       +48 ms |
-| Fast 4G, 4x CPU       |   820 ms | 1052 ms | 1048 ms |      +232 ms |
-| Slow 4G, 4x CPU       |  2824 ms | 3836 ms | 3844 ms |     +1012 ms |
+| No throttling, 1x     |    40 ms |   52 ms |   52 ms |       +12 ms |
+| Fast 4G, 1x           |   624 ms |  680 ms |  676 ms |       +56 ms |
+| Slow 4G, 1x           |  2028 ms | 2304 ms | 2304 ms |      +276 ms |
+| No throttling, 4x CPU |   148 ms |  196 ms |  196 ms |       +48 ms |
+| Fast 4G, 4x CPU       |   684 ms |  784 ms |  788 ms |      +100 ms |
+| Slow 4G, 4x CPU       |  2096 ms | 2416 ms | 2408 ms |      +320 ms |
 
-That is one full run of the matrix; a second moved every cell by under 5%.
+That is one full run of the matrix; a second moved every cell by a few percent.
 
 **The cost is the bundle, not the work.** On Slow 4G the extra transfer alone
-accounts for 946 ms of the 944 ms FCP delta — the whole of it, within noise.
-Everything Tasty then *does* is small by comparison:
+accounts for 262 ms of the 276 ms FCP delta — nearly all of it. Everything
+Tasty then *does* is small by comparison:
 
 | Phase (Slow 4G, 1x)     | baseline | runtime | prewarm |
 | ----------------------- | -------: | ------: | ------: |
-| js+css transfer         |  2150 ms | 3096 ms | 3096 ms |
-| module compile (shared) |   1.7 ms |  1.6 ms |  1.5 ms |
-| tasty top-level execute |        — |  0.9 ms |  1.1 ms |
-| `configure()`           |        — |  0.5 ms |  0.4 ms |
-| prewarm                 |        — |       — |  4.7 ms |
-| render 1st component    |   2.0 ms |  6.7 ms |  2.5 ms |
-| render 49 more          |   1.0 ms |  6.0 ms |  5.7 ms |
+| js+css transfer         |  1420 ms | 1682 ms | 1681 ms |
+| module compile (shared) |   1.2 ms |  1.5 ms |  2.0 ms |
+| tasty top-level execute |        — |  1.2 ms |  0.9 ms |
+| `configure()`           |        — |  0.6 ms |  0.5 ms |
+| prewarm                 |        — |       — |  5.3 ms |
+| render 1st component    |   2.0 ms |  8.2 ms |  2.7 ms |
+| render 49 more          |   1.0 ms |  7.1 ms |  6.0 ms |
 
 Importing Tasty costs about 1 ms of top-level execution; `configure()` costs
-half of one. The rest of the CPU delta — under 10 ms for 50 components — is
+half of one. The rest of the CPU delta — about 13 ms for 50 components — is
 generation and injection, which is the cost the injection benchmark isolates.
 
 One asymmetry is worth naming: the control links a render-blocking stylesheet
@@ -297,20 +304,20 @@ delivery models, not a thumb on the scale, but it means the FCP delta is not
 purely "what Tasty costs to execute".
 
 **Prewarming moves the wake-up, it does not remove it.** The first styled render
-is ~4.5 ms more expensive than the ones after it, because that is when the
+is ~5 ms more expensive than the ones after it, because that is when the
 engine's deferred payload is actually compiled. A throwaway `computeStyles()`
-against a detached root pays it early: `render 1st` drops from 6.7 ms to
-2.5 ms. The prewarm itself costs 4.7 ms, so FCP does not move. It is worth
+against a detached root pays it early: `render 1st` drops from 8.2 ms to
+2.7 ms. The prewarm itself costs 5.3 ms, so FCP does not move. It is worth
 doing only when something else can overlap it, or when the first render is on a
 latency-critical path and the page has idle time before it.
 
 **Retained heap.** After a forced collection, the runtime page holds about
-1,013 KB more than the control (2,626 KB vs 1,613 KB) for 50 components — the
+1,013 KB more than the control (2,632 KB vs 1,619 KB) for 50 components — the
 parser caches, the chunk cache, the injector's registry and the generated CSS.
 The control is not zero either; most of its 1.6 MB is React and the DOM.
 
 CPU throttling changes which line moves. At 4x, module compilation of the
-larger graph becomes visible (7.4 ms → 26 ms) where at 1x it is free: V8
+larger graph becomes visible (5.9 ms → 25 ms) where at 1x it is free: V8
 pre-parses at import and compiles lazily, so a slower CPU pays for code the
 faster one never fully compiled. Transfer numbers from the unthrottled cells
 are not worth reading — with no emulated link, resource timings are scheduling
@@ -333,10 +340,11 @@ blindly. They describe different paths:
   need application-level profiling.
 
 The cold-start measurement is the one that puts the rest in proportion. On a
-slow connection, essentially all of Tasty's page-load cost is transferring the
-library; the generation and injection the microbenchmarks obsess over is ~10 ms
-for 50 components. Bundle size is therefore the lever with the largest effect
-on first paint, and the runtime levers matter for what happens after it.
+slow connection, nearly all of Tasty's page-load cost is transferring the
+library — 262 ms of a 276 ms delta — while the generation and injection the
+microbenchmarks obsess over is ~13 ms for 50 components. Bundle size is
+therefore the lever with the largest effect on first paint, and the runtime
+levers matter for what happens after it.
 
 The practical optimization target is therefore repeated work: keep style input
 stable when possible, reuse generated chunks, and generate CSS at build or

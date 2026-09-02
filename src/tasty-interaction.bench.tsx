@@ -7,6 +7,7 @@ import { bench, describe } from 'vitest';
 
 import { TastyBatchProvider } from './batch-provider';
 import { configure, resetConfig } from './config';
+import { tastyDebug } from './debug';
 import { destroy, resetStyleBatch } from './injector';
 import { tasty } from './tasty';
 
@@ -137,9 +138,9 @@ interface Mounted {
   root: Root;
   toggles: Toggle[];
   /**
-   * Captured once. Looking a row up per interaction would allocate a
-   * thousand-node `NodeList` inside every sample — the same cost in both arms,
-   * so it cancels in the delta, but it dwarfs the delta it is diluting.
+   * Captured once. Looking a row up per interaction would allocate a whole
+   * `NodeList` inside every sample — the same cost in both arms, so it cancels
+   * in the delta, but it dwarfs the delta it is diluting.
    */
   rows: HTMLElement[];
 }
@@ -208,6 +209,20 @@ function validateBenchmarkContract(): void {
     const mounted = mount(kind, 2);
     const row = mounted.rows[0]!;
     const rest = `${getComputedStyle(row).color} / ${getComputedStyle(row).backgroundColor}`;
+
+    // The premise of this case is that a mod flip injects nothing, because a
+    // style map's states all ship in one chunk on first render. Read before any
+    // toggle: if the hovered rule arrived lazily instead, the first sample
+    // would pay for injection and the rest would not.
+    if (kind === 'tasty') {
+      const injected = tastyDebug.css('active', { raw: true });
+      if (!injected.includes(HOVER_COLOR)) {
+        throw new Error(
+          'The hovered state was not injected until it was used, so this ' +
+            'case would time injection rather than a mod flip.',
+        );
+      }
+    }
 
     flushSync(() => mounted.toggles[0]!(true));
     const hovered = `${getComputedStyle(row).color} / ${getComputedStyle(row).backgroundColor}`;

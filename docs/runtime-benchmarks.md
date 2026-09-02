@@ -201,17 +201,24 @@ readable number and noise:
   The browser's side of an interaction is real, but it is the browser's;
   resolution boundaries are what the injection benchmark above measures.
 
-On an Apple M1 Max with React 19.2.8 and Chromium 151, three consecutive runs
-produced these ranges:
+The contract check also reads the injected CSS **before** any toggle and fails
+if the hovered rule is not already there. That a style map's states all ship in
+one chunk on first render is the premise of this case; if the hovered rule
+arrived lazily, the first sample would be timing injection.
 
-| Workload                                            | Raw elements |    Tasty mods |            Extra per unit |
-| --------------------------------------------------- | -----------: | ------------: | ------------------------: |
-| 300 single-element mod toggles in a 100-element tree |   2.4–2.5 ms |    2.9–3.0 ms | 1.6–1.7 us / interaction |
-| 20 mount + unmount cycles of a 200-element subtree   |   7.6–7.7 ms | 12.6–12.7 ms  |   1.22–1.27 us / element |
+On an Apple M1 Max with React 19.2.8 and Chromium 151, across several runs:
+
+| Workload                                             | Raw elements |   Tasty mods |           Extra per unit |
+| ---------------------------------------------------- | -----------: | -----------: | -----------------------: |
+| 300 single-element mod toggles in a 100-element tree |   2.1–2.5 ms |   2.7–3.1 ms | 1.6–2.1 us / interaction |
+| 20 mount + unmount cycles of a 200-element subtree    |   7.6–8.0 ms | 12.6–12.7 ms |   1.22–1.27 us / element |
+
+The absolute columns move several percent with machine load; the delta between
+the arms is the stable quantity, so read that rather than either column.
 
 Two things are worth reading out of this.
 
-A mod flip on an already-mounted element costs about 1.7 us. The CSS for both
+A mod flip on an already-mounted element costs about 2 us. The CSS for both
 states already exists — Tasty emits every state of a style map in one chunk on
 first render — so both arms perform the same commit, and what is left is
 Tasty's props and mod handling. That is the same order as the ~1 us empty

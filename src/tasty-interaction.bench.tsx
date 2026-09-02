@@ -28,17 +28,24 @@ import { tasty } from './tasty';
  * inside its own sample.
  */
 
-const TREE_SIZE = 1_000;
+/**
+ * Small on purpose. React finds a leaf's pending update by walking the sibling
+ * list, so in a 1,000-element tree a single-element update costs ~68 us of
+ * traversal — identical in both arms, and an order of magnitude above anything
+ * the styling layer contributes. That buries the delta this case exists to
+ * show, so the tree is sized to keep React's own overhead in proportion.
+ */
+const TREE_SIZE = 100;
 const SUBTREE_SIZE = 200;
 /**
  * One toggle is far below Chromium's 0.1 ms timer resolution, so a sample
- * performs this many independent single-element interactions — each its own
- * commit and its own style resolution — and the per-interaction cost is the
- * raw/Tasty difference divided by this number.
+ * flips the whole tree this many times over — each flip its own commit — and
+ * the per-interaction cost is the raw/Tasty difference divided by the total.
  */
-const TOGGLES_PER_SAMPLE = 100;
+const PASSES_PER_SAMPLE = 3;
+const TOGGLES_PER_SAMPLE = TREE_SIZE * PASSES_PER_SAMPLE;
 /** Same reason: one open-and-close of a 200-element subtree is ~0.4 ms. */
-const CHURN_CYCLES = 10;
+const CHURN_CYCLES = 20;
 
 const BENCH_OPTIONS = {
   iterations: 20,
@@ -129,6 +136,12 @@ interface Mounted {
   container: HTMLDivElement;
   root: Root;
   toggles: Toggle[];
+  /**
+   * Captured once. Looking a row up per interaction would allocate a
+   * thousand-node `NodeList` inside every sample — the same cost in both arms,
+   * so it cancels in the delta, but it dwarfs the delta it is diluting.
+   */
+  rows: HTMLElement[];
 }
 
 function mount(kind: 'raw' | 'tasty', count: number): Mounted {
@@ -150,21 +163,22 @@ function mount(kind: 'raw' | 'tasty', count: number): Mounted {
     throw new Error('Interaction benchmark leaf never published its setter');
   }
 
-  return { container, root, toggles };
+  const rows = Array.from(
+    container.querySelectorAll('[data-benchmark-root] > *'),
+  ).filter((node): node is HTMLElement => node instanceof HTMLElement);
+
+  if (rows.length !== count) {
+    throw new Error(
+      `Interaction benchmark rendered ${rows.length} of ${count} rows`,
+    );
+  }
+
+  return { container, root, toggles, rows };
 }
 
 function unmount({ container, root }: Mounted): void {
   flushSync(() => root.unmount());
   container.remove();
-}
-
-function rowAt(container: HTMLDivElement, index: number): HTMLElement {
-  const row = container.querySelectorAll('[data-benchmark-root] > *')[index];
-  if (!(row instanceof HTMLElement)) {
-    throw new Error(`Interaction benchmark rendered no row ${index}`);
-  }
-
-  return row;
 }
 
 /**
@@ -192,7 +206,7 @@ function validateBenchmarkContract(): void {
 
   for (const kind of ['raw', 'tasty'] as const) {
     const mounted = mount(kind, 2);
-    const row = rowAt(mounted.container, 0);
+    const row = mounted.rows[0]!;
     const rest = `${getComputedStyle(row).color} / ${getComputedStyle(row).backgroundColor}`;
 
     flushSync(() => mounted.toggles[0]!(true));
@@ -238,16 +252,22 @@ function benchmarkSingleToggle(name: string, kind: 'raw' | 'tasty') {
     name,
     () => {
       if (!mounted) throw new Error('Benchmark tree was not initialized');
-      hovered = !hovered;
 
-      for (let index = 0; index < TOGGLES_PER_SAMPLE; index++) {
-        flushSync(() => mounted!.toggles[index]!(hovered));
-        // Resolve each interaction before the next one, the way a frame would.
-        // Leaving them all to one final read would let the browser coalesce
-        // work an interaction never gets to coalesce.
-        checksum += getComputedStyle(rowAt(mounted.container, index)).color
-          .length;
+      // `hovered` carries across samples, so every pass is a real state change
+      // for every leaf rather than a no-op React can bail out of.
+      for (let pass = 0; pass < PASSES_PER_SAMPLE; pass++) {
+        hovered = !hovered;
+        for (let index = 0; index < TREE_SIZE; index++) {
+          flushSync(() => mounted!.toggles[index]!(hovered));
+        }
       }
+      // One resolution after the flips, not one per flip. Forcing a recalc
+      // between them costs ~70 us in BOTH arms — an order of magnitude above
+      // anything the library contributes — so it buries the delta this case
+      // exists to show. The browser's side of an interaction is real, but it
+      // is the browser's, and the injection benchmark is where resolution
+      // boundaries are measured.
+      checksum += getComputedStyle(mounted.rows[0]!).color.length;
     },
     {
       ...BENCH_OPTIONS,
@@ -281,7 +301,7 @@ function benchmarkSubtreeChurn(name: string, kind: 'raw' | 'tasty') {
     () => {
       for (let cycle = 0; cycle < CHURN_CYCLES; cycle++) {
         const mounted = mount(kind, SUBTREE_SIZE);
-        checksum += getComputedStyle(rowAt(mounted.container, 0)).color.length;
+        checksum += getComputedStyle(mounted.rows[0]!).color.length;
         unmount(mounted);
       }
     },

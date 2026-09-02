@@ -113,15 +113,6 @@ function sortTastyClasses(classes: Iterable<string>): string[] {
   return Array.from(classes).sort((a, b) => a.localeCompare(b));
 }
 
-/**
- * The registry for `root`, with every queued write landed first.
- *
- * Every injector read API is a flush point, and the reads below reach past
- * those APIs straight into the registry and the sheet manager. Without this
- * they would report a batch window's contents as absent — a rule that is
- * enqueued but not yet in a sheet is missing from `globalRules`, from the
- * sheets, and from anything counting either.
- */
 /** A DOM root to read, or `null` when the environment has no DOM at all. */
 type DebugRoot = Document | ShadowRoot | null;
 
@@ -150,6 +141,15 @@ function warnNoDom(raw: boolean): void {
   );
 }
 
+/**
+ * The registry for `root`, with every queued write landed first.
+ *
+ * Every injector read API is a flush point, and the reads below reach past
+ * those APIs straight into the registry and the sheet manager. Without this
+ * they would report a batch window's contents as absent — a rule that is
+ * enqueued but not yet in a sheet is missing from `globalRules`, from the
+ * sheets, and from anything counting either.
+ */
 function getRegistry(
   root: DebugRoot = defaultRoot(),
 ): RootRegistry | undefined {
@@ -183,19 +183,13 @@ function findDomTastyClasses(root: DebugRoot = defaultRoot()): string[] {
 function getAllCSS(root: DebugRoot = defaultRoot()): string {
   const registry = getRegistry(root);
   const sheetManager = injector.instance._sheetManager;
+  // `getRegistry` already returns nothing for a null root; the `!root` is what
+  // narrows the type for the call below.
   if (!root || !registry || !sheetManager) return '';
 
   return sheetManager.getOwnedCSSInOrder(registry, root).join('\n');
 }
 
-/**
- * Injected classes that no element carries and nobody pinned — the exact set
- * `gc({ force: true })` would delete.
- *
- * Deliberately borrowed from the injector rather than recomputed here: the two
- * drifted apart once before, when this file still read "unused" off the pin
- * counts the render path had stopped maintaining.
- */
 /**
  * The injector's own readers fall back to `document` when `root` is omitted, so
  * they have to be reached with a real root or not at all.
@@ -212,6 +206,14 @@ function getInjectorMetrics(root: DebugRoot): CacheMetrics | null {
   return injector.instance.getMetrics({ root });
 }
 
+/**
+ * Injected classes that no element carries and nobody pinned — the exact set
+ * `gc({ force: true })` would delete.
+ *
+ * Deliberately borrowed from the injector rather than recomputed here: the two
+ * drifted apart once before, when this file still read "unused" off the pin
+ * counts the render path had stopped maintaining.
+ */
 function getUnusedClasses(root: DebugRoot = defaultRoot()): string[] {
   if (!root) return [];
 

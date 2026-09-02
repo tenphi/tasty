@@ -25,7 +25,7 @@ import { createServer } from 'node:http';
 import { copyFile, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
-import { buildAssets, OUT } from './build.mjs';
+import { buildAssets, MODES as ALL_MODES, OUT } from './build.mjs';
 import { buildBaseline } from './baseline.mjs';
 import { CPU_RATES, NETWORK_PROFILES } from './network.mjs';
 
@@ -53,6 +53,9 @@ function parseArgs(argv) {
  * Only `baseline` links a stylesheet, because it is the only page whose CSS is
  * a static asset. The runtime modes have no stylesheet at all until Tasty
  * injects one.
+ *
+ * `mode` reaches this from the query string and is interpolated into markup, so
+ * it is looked up in the known set rather than used as given.
  */
 const page = (mode) => `<!doctype html>
 <meta charset="utf-8">
@@ -66,20 +69,27 @@ ${mode === 'baseline' ? '<link rel="stylesheet" href="/baseline.css">' : ''}
 async function serve() {
   const server = createServer(async (req, res) => {
     try {
-      const path = new URL(req.url, 'http://x').pathname;
-      if (path === '/') {
-        const mode =
-          new URL(req.url, 'http://x').searchParams.get('mode') ?? 'runtime';
+      const url = new URL(req.url, 'http://x');
+      if (url.pathname === '/') {
+        const requested = url.searchParams.get('mode') ?? 'runtime';
+        const mode = ALL_MODES.find((known) => known === requested);
+        if (!mode) return res.writeHead(404).end('');
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'no-store',
         });
         return res.end(page(mode));
       }
+      // A single safe filename, never a path: the request must not be able to
+      // name anything outside the build directory.
+      const name = url.pathname.slice(1);
+      if (!/^[a-z0-9.-]+\.(?:js|css)$/.test(name)) {
+        return res.writeHead(404).end('');
+      }
       try {
-        const body = await readFile(OUT + path.replace(/^\//, ''));
+        const body = await readFile(OUT + name);
         res.writeHead(200, {
-          'content-type': path.endsWith('.css')
+          'content-type': name.endsWith('.css')
             ? 'text/css'
             : 'text/javascript',
           // No caching: every run is a first visit, which is the case that hurts.
@@ -258,15 +268,22 @@ const fmt = (n) =>
   n == null ? '—' : n < 10 ? n.toFixed(1) : String(Math.round(n));
 
 function phases(r) {
-  const lastByte = Math.max(
-    r.tasty?.end ?? 0,
-    r.react?.end ?? 0,
-    r.app?.end ?? 0,
-    r.css?.end ?? 0,
+  const ends = [r.tasty?.end, r.react?.end, r.app?.end, r.css?.end].filter(
+    (value) => value != null,
   );
+  // The control requests its stylesheet from the head, before the module
+  // script, so starting this window at react.js would under-report exactly the
+  // column everything else is measured against.
+  const starts = [
+    r.tasty?.start,
+    r.react?.start,
+    r.app?.start,
+    r.css?.start,
+  ].filter((value) => value != null);
+  const lastByte = Math.max(...ends);
   return {
     html: r.navResponseEnd,
-    'js+css transfer': lastByte - (r.react?.start ?? r.app?.start ?? 0),
+    'js+css transfer': lastByte - Math.min(...starts),
     // The browser compiles the whole module graph between the last byte and
     // the first top-level statement, so this window is shared. The control
     // column is the same window without Tasty in the graph; the difference is

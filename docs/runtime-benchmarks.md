@@ -184,32 +184,41 @@ fails if either arm resolves to anything else, so an arm that quietly rendered
 unstyled elements cannot report a flattering number.
 
 Each leaf owns its own `useState`, which is what keeps a single-element
-interaction single: re-rendering the root to flip one row would time 1,000
-elements. One toggle is far below Chromium's 0.1 ms timer resolution, so a
-sample performs 100 independent interactions — each its own `flushSync` commit
-and its own computed-style read — and the churn case performs 10 open/close
-cycles. Divide the raw/Tasty difference by those counts.
+interaction single: re-rendering the root to flip one row would time the whole
+tree. One toggle is far below Chromium's 0.1 ms timer resolution, so a sample
+flips a 100-element tree three times over — 300 commits — and the churn case
+performs 20 open/close cycles. Divide the raw/Tasty difference by those counts.
+
+Two things had to be sized deliberately, and both are the difference between a
+readable number and noise:
+
+- **The tree is small (100 elements), not large.** React locates a leaf's
+  pending update by walking the sibling list, so in a 1,000-element tree a
+  single-element update costs ~68 us of traversal — identical in both arms and
+  an order of magnitude above anything the styling layer contributes.
+- **The sample resolves style once, not once per flip.** Forcing a recalc
+  between flips costs ~70 us in both arms, which buries the delta the same way.
+  The browser's side of an interaction is real, but it is the browser's;
+  resolution boundaries are what the injection benchmark above measures.
 
 On an Apple M1 Max with React 19.2.8 and Chromium 151, three consecutive runs
 produced these ranges:
 
-| Workload                                              | Raw elements |   Tasty mods |               Extra per unit |
-| ----------------------------------------------------- | -----------: | -----------: | ---------------------------: |
-| 100 single-element mod toggles in a 1,000-element tree |   9.6–9.8 ms | 9.9–10.1 ms |  1.5–4.7 us per interaction |
-| 10 mount + unmount cycles of a 200-element subtree     |   3.5–3.7 ms |   5.7–5.8 ms |        1.05–1.14 us per element |
+| Workload                                            | Raw elements |    Tasty mods |            Extra per unit |
+| --------------------------------------------------- | -----------: | ------------: | ------------------------: |
+| 300 single-element mod toggles in a 100-element tree |   2.4–2.5 ms |    2.9–3.0 ms | 1.6–1.7 us / interaction |
+| 20 mount + unmount cycles of a 200-element subtree   |   7.6–7.7 ms | 12.6–12.7 ms  |   1.22–1.27 us / element |
 
 Two things are worth reading out of this.
 
-A mod flip on an already-mounted element is close to free. The delta is a few
-microseconds and is the same order as the run-to-run spread of the raw
-baseline, so treat "under 5 us" as the claim rather than any single figure
-inside that range. The CSS for both states already exists, both arms perform
-the same commit and the same style resolution, and Tasty's remaining work is
-picking a class name.
+A mod flip on an already-mounted element costs about 1.7 us. The CSS for both
+states already exists — Tasty emits every state of a style map in one chunk on
+first render — so both arms perform the same commit, and what is left is
+Tasty's props and mod handling. That is the same order as the ~1 us empty
+wrapper measured above, which is most of where it comes from.
 
-Subtree churn, by contrast, is not about styling at all. Its per-element cost
-lands on top of the ~1 us empty-wrapper mount cost measured above, which is
-where essentially all of it comes from — the styles are already cached, so
+Subtree churn is not about styling at all. Its ~1.25 us per element sits right
+on the empty-wrapper mount cost, because the styles are already cached:
 reopening a menu re-pays the React wrapper, not the style pipeline.
 
 ## Page-Load Cold Start
@@ -236,53 +245,66 @@ rather than counted in animation frames — `requestAnimationFrame` fires before
 paint, so a page that commits fast can reach its second frame with nothing
 painted yet.
 
+The Tasty bundle is built from what the page imports (`tasty`, `configure`,
+`computeStyles`, `tastyDebug`), so it is tree-shaken the way an application's
+would be: 52.0 KB brotli, 186 KB raw. Re-exporting the whole library instead
+adds ~4 KB brotli of code no page here calls, which would inflate the column
+that dominates this result.
+
 On an Apple M1 Max with React 19.2.8 and Chromium 151, first contentful paint:
 
 | Link / CPU            | baseline | runtime | prewarm | Tasty's cost |
 | --------------------- | -------: | ------: | ------: | -----------: |
-| No throttling, 1x     |    40 ms |   48 ms |   52 ms |      +8 ms |
-| Fast 4G, 1x           |   744 ms |  936 ms |  936 ms |    +192 ms |
-| Slow 4G, 1x           |  2776 ms | 3792 ms | 3788 ms |   +1016 ms |
-| No throttling, 4x CPU |   140 ms |  192 ms |  188 ms |     +52 ms |
-| Fast 4G, 4x CPU       |   812 ms | 1052 ms | 1056 ms |    +240 ms |
-| Slow 4G, 4x CPU       |  2824 ms | 3908 ms | 3908 ms |   +1084 ms |
+| No throttling, 1x     |    44 ms |   56 ms |   56 ms |       +12 ms |
+| Fast 4G, 1x           |   744 ms |  924 ms |  920 ms |      +180 ms |
+| Slow 4G, 1x           |  2764 ms | 3708 ms | 3712 ms |      +944 ms |
+| No throttling, 4x CPU |   156 ms |  204 ms |  204 ms |       +48 ms |
+| Fast 4G, 4x CPU       |   820 ms | 1052 ms | 1048 ms |      +232 ms |
+| Slow 4G, 4x CPU       |  2824 ms | 3836 ms | 3844 ms |     +1012 ms |
 
-**The cost is the bundle, not the work.** Minified and brotli-compressed, the
-library is 56.1 KB (201 KB raw) on top of React's 50.7 KB. On Slow 4G that
-extra transfer alone accounts for 1,027 ms of the 1,016 ms FCP delta — the
-whole of it, within noise. Everything Tasty then *does* is small by comparison:
+**The cost is the bundle, not the work.** On Slow 4G the extra transfer alone
+accounts for 946 ms of the 944 ms FCP delta — the whole of it, within noise.
+Everything Tasty then *does* is small by comparison:
 
-| Phase (Slow 4G, 1x)      | baseline | runtime | prewarm |
-| ------------------------ | -------: | ------: | ------: |
-| js+css transfer          |  1567 ms | 2594 ms | 2588 ms |
-| module compile (shared)  |   3.2 ms |  3.8 ms |  3.6 ms |
-| tasty top-level execute  |        — |  0.9 ms |  0.9 ms |
-| `configure()`            |        — |  0.5 ms |  0.5 ms |
-| prewarm                  |        — |       — |  4.4 ms |
-| render 1st component     |   1.9 ms |  7.5 ms |  2.3 ms |
-| render 49 more           |   1.0 ms |  5.5 ms |  5.1 ms |
+| Phase (Slow 4G, 1x)     | baseline | runtime | prewarm |
+| ----------------------- | -------: | ------: | ------: |
+| js+css transfer         |  2150 ms | 3096 ms | 3096 ms |
+| module compile (shared) |   1.7 ms |  1.6 ms |  1.5 ms |
+| tasty top-level execute |        — |  0.9 ms |  1.1 ms |
+| `configure()`           |        — |  0.5 ms |  0.4 ms |
+| prewarm                 |        — |       — |  4.7 ms |
+| render 1st component    |   2.0 ms |  6.7 ms |  2.5 ms |
+| render 49 more          |   1.0 ms |  6.0 ms |  5.7 ms |
 
 Importing Tasty costs about 1 ms of top-level execution; `configure()` costs
-half of one. The rest of the CPU delta — roughly 10 ms for 50 components — is
+half of one. The rest of the CPU delta — under 10 ms for 50 components — is
 generation and injection, which is the cost the injection benchmark isolates.
+
+One asymmetry is worth naming: the control links a render-blocking stylesheet
+and the runtime modes have none, so the control's first paint waits for CSS the
+runtime modes never request. That is the real difference between the two
+delivery models, not a thumb on the scale, but it means the FCP delta is not
+purely "what Tasty costs to execute".
 
 **Prewarming moves the wake-up, it does not remove it.** The first styled render
 is ~4.5 ms more expensive than the ones after it, because that is when the
 engine's deferred payload is actually compiled. A throwaway `computeStyles()`
-against a detached root pays it early: `render 1st` drops from 7.5 ms to
-2.3 ms. The prewarm itself costs 4.4 ms, so FCP does not move. It is worth
+against a detached root pays it early: `render 1st` drops from 6.7 ms to
+2.5 ms. The prewarm itself costs 4.7 ms, so FCP does not move. It is worth
 doing only when something else can overlap it, or when the first render is on a
 latency-critical path and the page has idle time before it.
 
 **Retained heap.** After a forced collection, the runtime page holds about
-1,050 KB more than the control (2,659 KB vs 1,613 KB) for 50 components — the
+1,013 KB more than the control (2,626 KB vs 1,613 KB) for 50 components — the
 parser caches, the chunk cache, the injector's registry and the generated CSS.
 The control is not zero either; most of its 1.6 MB is React and the DOM.
 
 CPU throttling changes which line moves. At 4x, module compilation of the
-larger graph becomes visible (6.3 ms → 25 ms) where at 1x it is free: V8
+larger graph becomes visible (7.4 ms → 26 ms) where at 1x it is free: V8
 pre-parses at import and compiles lazily, so a slower CPU pays for code the
-faster one never fully compiled.
+faster one never fully compiled. Transfer numbers from the unthrottled cells
+are not worth reading — with no emulated link, resource timings are scheduling
+jitter.
 
 ## Reading the Results Together
 

@@ -59,9 +59,13 @@ export async function buildAssets({ components }) {
     footer: { js: 'performance.mark("react:eval-end");' },
   });
 
+  // Only what the page imports, so the bundle is tree-shaken the way an
+  // application's would be. Re-exporting the whole library instead would add
+  // ~4 KB brotli of code no page here calls and inflate the transfer column,
+  // which is the column that dominates the result.
   await writeFile(
     `${OUT}tasty.src.js`,
-    `export * from '${ROOT}dist/index.js';\n`,
+    `export { tasty, configure, computeStyles, tastyDebug } from '${ROOT}dist/index.js';\n`,
   );
   await build({
     ...MINIFY,

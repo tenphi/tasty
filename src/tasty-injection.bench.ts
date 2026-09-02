@@ -507,9 +507,8 @@ function validatePrecompiledContract() {
   });
   clearAllCaches();
 
-  const styles = [
-    Object.freeze({ color: colorFor(PRECOMPILED_CONTRACT, 0, 0, 0) }) as Styles,
-  ];
+  const expected = colorFor(PRECOMPILED_CONTRACT, 0, 0, 0);
+  const styles = [Object.freeze({ color: expected }) as Styles];
   const { chunks, css } = compileCatalogFor(styles);
   const style = installCatalogCSS(css);
   registerCatalog(chunks, 'contract');
@@ -535,8 +534,15 @@ function validatePrecompiledContract() {
       `The precompiled workload generated ${metrics.misses} rule(s) at runtime; every chunk it measures must come from the catalog.`,
     );
   }
-  if (!color) {
-    throw new Error('The precompiled catalog CSS did not apply to the target.');
+  // Against the workload's own colour, not merely non-empty: an unstyled div
+  // computes to `rgb(0, 0, 0)`, so a truthiness check would accept a catalog
+  // whose stylesheet never loaded — a lookup timed against CSS that has no
+  // effect. `colorFor` emits the same `rgb(r, g, b)` form getComputedStyle
+  // returns, and the workload's offset keeps it clear of any inherited default.
+  if (color !== expected) {
+    throw new Error(
+      `The precompiled catalog CSS did not apply: expected ${expected}, computed ${color}.`,
+    );
   }
 }
 

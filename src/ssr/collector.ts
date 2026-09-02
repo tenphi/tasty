@@ -180,8 +180,15 @@ export class ServerStyleCollector {
    * configuration, and registration is a side-effect import that routinely
    * runs before the host's own `configure()` call — so a collector built in
    * between would validate against defaults and permanently drop a catalog
-   * that matches once configuration is installed. `collectInternals()` is the
-   * first style-producing operation on every path, which is late enough.
+   * that matches once configuration is installed.
+   *
+   * Instead every method that consults an `external*` set calls this first, so
+   * the seed lands at whichever style-producing operation happens to come
+   * first. That gate belongs here rather than at the call sites: the standalone
+   * at-rule hooks (`useKeyframes`, `useCounterStyle`, `useFontFace`) go
+   * straight to `collect*` and never reach `collectInternals()`, so a catalog's
+   * standalone rule would otherwise be emitted a second time during SSR.
+   * After the first call this is an integer comparison.
    */
   applyRegisteredPrecompiledDependencies(): void {
     const revision = getPrecompiledRevision();
@@ -246,10 +253,6 @@ export class ServerStyleCollector {
     if (this.internalsCollected) return;
     this.internalsCollected = true;
 
-    // The first style-producing operation, and the moment the configuration is
-    // final — so this is where the registered catalogs are seeded and checked.
-    // Every path reaches it: `computeStyles`, the SSR entry points, and the
-    // `useProperty` / `useFunction` / `useGlobalStyles` hooks.
     this.applyRegisteredPrecompiledDependencies();
 
     for (const [token, definition] of Object.entries(
@@ -396,6 +399,7 @@ export class ServerStyleCollector {
     css: string,
     options?: CollectPropertyOptions,
   ): void {
+    this.applyRegisteredPrecompiledDependencies();
     if (options?.cssName && this.externalProperties.has(options.cssName))
       return;
     if (!this.propertyRules.has(name)) {
@@ -425,6 +429,7 @@ export class ServerStyleCollector {
     css: string,
     options?: CollectKeyframesOptions,
   ): void {
+    this.applyRegisteredPrecompiledDependencies();
     if (options?.contentKey && this.externalKeyframes.has(options.contentKey)) {
       return;
     }
@@ -467,6 +472,7 @@ export class ServerStyleCollector {
     css: string,
     options?: CollectArtifactOptions,
   ): void {
+    this.applyRegisteredPrecompiledDependencies();
     if (this.externalFontFaces.has(key)) return;
     if (!this.fontFaceRules.has(key)) {
       this.fontFaceRules.set(key, css);
@@ -490,6 +496,7 @@ export class ServerStyleCollector {
     css: string,
     options?: CollectCounterStyleOptions,
   ): void {
+    this.applyRegisteredPrecompiledDependencies();
     if (this.externalCounterStyles.has(name)) return;
     const source = options?.source ?? 'component';
     const existing = this.counterStyleRules.get(name);
@@ -535,6 +542,7 @@ export class ServerStyleCollector {
     css: string,
     options?: { weak?: boolean; source?: TastyStyleArtifactSource },
   ): void {
+    this.applyRegisteredPrecompiledDependencies();
     if (this.externalFunctions.has(name)) return;
     const source = options?.source ?? 'component';
     const existing = this.functionRules.get(name);

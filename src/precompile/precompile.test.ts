@@ -25,6 +25,7 @@ import {
   useRawCSS,
 } from '../hooks';
 import { ServerStyleCollector } from '../ssr/collector';
+import { registerSSRCollectorGetter } from '../ssr/ssr-collector-ref';
 import { TASTY_VERSION } from '../version';
 
 import { precompileTastyStyles } from './index';
@@ -249,6 +250,44 @@ describe('precompileTastyStyles', () => {
     expect(streamed.className).toBe(rendered.className);
     expect(renderCalls.value).toBe(0);
     expect(streamingCollector.flushCSS()).toBe('');
+  });
+
+  it('deduplicates a cataloged standalone rule reached only through its hook', async () => {
+    // `useKeyframes`, `useCounterStyle` and `useFontFace` call the collector's
+    // `collect*` methods directly and never `collectInternals()`. A collector
+    // that seeds the catalog only from `collectInternals()` therefore re-emits
+    // a standalone rule the registered asset already ships.
+    const result = await precompileTastyStyles({
+      id: '@test/standalone-dependency',
+      cases: [
+        {
+          id: 'default',
+          render: () =>
+            catalogTree(() => {
+              useKeyframes(steps);
+              useCounterStyle({ system: 'cyclic', symbols: '"•"' });
+            }),
+        },
+      ],
+    });
+    expect(result.css).toContain('@keyframes');
+    expect(result.manifest.dependencies.keyframes).toHaveLength(1);
+    expect(result.manifest.dependencies.counterStyles).toHaveLength(1);
+
+    registerTastyPrecompiled(result.manifest);
+
+    const collector = new ServerStyleCollector();
+    registerSSRCollectorGetter(() => collector);
+    try {
+      useKeyframes(steps);
+      useCounterStyle({ system: 'cyclic', symbols: '"•"' });
+    } finally {
+      // Reset the module-level ref, not a getter returning null: a getter
+      // shadows the globalThis fallback that `precompileTastyStyles` installs.
+      registerSSRCollectorGetter(null as never);
+    }
+
+    expect(collector.flushCSS()).toBe('');
   });
 
   it('falls back safely for incompatible and conflicting manifests', async () => {

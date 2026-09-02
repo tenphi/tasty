@@ -72,6 +72,16 @@ function ExecuteCatalogCase({ run }: { run: () => void }) {
   return null;
 }
 
+/**
+ * A chunk records its class name only when it cannot be derived from its key,
+ * so a manifest reader has to resolve it the way the runtime does.
+ */
+function classNamesOf(manifest: TastyPrecompiledManifest): string[] {
+  return manifest.chunks.map(
+    (chunk) => chunk.className ?? manifest.namePrefix + chunk.key,
+  );
+}
+
 function catalogTree(run: () => void) {
   return createElement(ExecuteCatalogCase, { run });
 }
@@ -215,9 +225,7 @@ describe('precompileTastyStyles', () => {
     expect(standaloneCounter).toMatch(/^tc[a-z0-9]+$/);
 
     const rsc = computeStyles(componentStyles);
-    expect(rsc.className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
-    );
+    expect(rsc.className).toBe(classNamesOf(result.manifest).join(' '));
     expect(rsc.css).toBeUndefined();
     expect(renderCalls.value).toBe(0);
 
@@ -226,9 +234,7 @@ describe('precompileTastyStyles', () => {
       ssrCollector: collector,
     });
 
-    expect(rendered.className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
-    );
+    expect(rendered.className).toBe(classNamesOf(result.manifest).join(' '));
     expect(renderCalls.value).toBe(0);
     expect(
       collector.getArtifacts().some(({ source }) => source === 'component'),
@@ -323,23 +329,23 @@ describe('precompileTastyStyles', () => {
     registerTastyPrecompiled({
       ...result.manifest,
       cssHash: 'different-css',
-      chunks: result.manifest.chunks.map((chunk) => ({
+      chunks: result.manifest.chunks.map((chunk, index) => ({
         ...chunk,
-        className: `${chunk.className}-conflict`,
+        className: `${classNamesOf(result.manifest)[index]}-conflict`,
       })),
     });
     registerTastyPrecompiled({
       ...result.manifest,
       id: '@test/lookup-conflict',
       cssHash: 'lookup-conflict-css',
-      chunks: result.manifest.chunks.map((chunk) => ({
+      chunks: result.manifest.chunks.map((chunk, index) => ({
         ...chunk,
-        className: `${chunk.className}-other`,
+        className: `${classNamesOf(result.manifest)[index]}-other`,
       })),
     });
     renderCalls.value = 0;
     expect(computeStyles(componentStyles).className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
+      classNamesOf(result.manifest).join(' '),
     );
     expect(renderCalls.value).toBe(0);
     expect(warn).toHaveBeenCalled();
@@ -385,7 +391,7 @@ describe('precompileTastyStyles', () => {
     registerTastyPrecompiled(result.manifest);
     renderCalls.value = 0;
     expect(computeStyles(componentStyles).className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
+      classNamesOf(result.manifest).join(' '),
     );
     expect(renderCalls.value).toBe(0);
   });
@@ -490,7 +496,7 @@ describe('compilation configuration guard', () => {
 
     renderCalls.value = 0;
     expect(computeStyles(catalogStyles).className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
+      classNamesOf(result.manifest).join(' '),
     );
     expect(renderCalls.value).toBe(0);
   });
@@ -513,9 +519,7 @@ describe('compilation configuration guard', () => {
     // The class name is unchanged — it hashes `gap: "1x"`, not the CSS that
     // `1x` expands to. That identity is exactly why serving the catalog here
     // was silent, and why the guard cannot be a lookup-time comparison.
-    expect(className).toBe(
-      result.manifest.chunks.map((chunk) => chunk.className).join(' '),
-    );
+    expect(className).toBe(classNamesOf(result.manifest).join(' '));
     // Rendered rather than served, so the rule carries this host's `--my-gap`.
     expect(renderCalls.value).toBeGreaterThan(0);
     expect(warn.mock.calls.flat().join(' ')).toContain('unit:x changed');
@@ -613,7 +617,7 @@ describe('compilation configuration guard', () => {
 
     renderCalls.value = 0;
     expect(computeStyles(tokenStyles).className).toBe(
-      result.manifest.chunks.map(({ className }) => className).join(' '),
+      classNamesOf(result.manifest).join(' '),
     );
     expect(renderCalls.value).toBe(0);
     expect(getPrecompileStore().manifests?.has('@test/config-guard')).toBe(

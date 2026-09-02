@@ -5,10 +5,14 @@ import {
   diffCompilationConfig,
   isCompilationConfigShapeValid,
 } from './fingerprint';
-import { getPrecompileStore, warnPrecompileOnce } from './runtime';
+import {
+  getPrecompileStore,
+  resolveChunkClassName,
+  warnPrecompileOnce,
+} from './runtime';
+import type { RegisteredChunk } from './runtime';
 import type {
   TastyCompilationConfig,
-  TastyPrecompiledChunk,
   TastyPrecompiledDependencies,
   TastyPrecompiledManifest,
 } from './types';
@@ -18,6 +22,8 @@ const isStringArray = (value: unknown): boolean =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+
+const EMPTY_ANIMATIONS: readonly string[] = Object.freeze([]);
 
 /**
  * The documented workflow imports a manifest from JSON and casts it, so the
@@ -56,9 +62,11 @@ function isManifestShapeValid(
     manifest.chunks.every(
       (chunk) =>
         isRecord(chunk) &&
-        typeof chunk.lookupKey === 'string' &&
-        typeof chunk.className === 'string' &&
-        isStringArray(chunk.animations),
+        typeof chunk.key === 'string' &&
+        chunk.key.length > 0 &&
+        (chunk.className === undefined ||
+          typeof chunk.className === 'string') &&
+        (chunk.animations === undefined || isStringArray(chunk.animations)),
     ) &&
     isRecord(dependencies) &&
     Array.isArray(dependencies.properties) &&
@@ -186,30 +194,37 @@ export function registerPrecompiledManifest(
     return false;
   }
 
-  const manifestChunks = new Map<string, TastyPrecompiledChunk>();
+  const manifestChunks = new Map<string, RegisteredChunk>();
   for (const chunk of manifest.chunks) {
-    const duplicate = manifestChunks.get(chunk.lookupKey);
+    const resolved: RegisteredChunk = {
+      className: resolveChunkClassName(chunk, manifest.namePrefix),
+      animations: chunk.animations ?? EMPTY_ANIMATIONS,
+      manifestId: manifest.id,
+      namePrefix: manifest.namePrefix,
+    };
+
+    const duplicate = manifestChunks.get(chunk.key);
     if (
       duplicate &&
-      (duplicate.className !== chunk.className ||
-        !sameStrings(duplicate.animations, chunk.animations))
+      (duplicate.className !== resolved.className ||
+        !sameStrings(duplicate.animations, resolved.animations))
     ) {
       warnPrecompileOnce(
-        `internal-chunk-conflict:${manifest.id}:${chunk.lookupKey}`,
+        `internal-chunk-conflict:${manifest.id}:${chunk.key}`,
         `[Tasty] Ignoring precompiled styles "${manifest.id}": the manifest maps one chunk lookup key more than once with different metadata.`,
       );
       return false;
     }
-    manifestChunks.set(chunk.lookupKey, chunk);
+    manifestChunks.set(chunk.key, resolved);
 
-    const existing = store.chunks?.get(chunk.lookupKey);
+    const existing = store.chunks?.get(chunk.key);
     if (
       existing &&
-      (existing.className !== chunk.className ||
-        !sameStrings(existing.animations, chunk.animations))
+      (existing.className !== resolved.className ||
+        !sameStrings(existing.animations, resolved.animations))
     ) {
       warnPrecompileOnce(
-        `chunk-conflict:${chunk.lookupKey}`,
+        `chunk-conflict:${chunk.key}`,
         `[Tasty] Ignoring precompiled styles "${manifest.id}": a chunk lookup key is already mapped to different metadata by "${existing.manifestId}".`,
       );
       return false;
@@ -266,14 +281,8 @@ export function registerPrecompiledManifest(
       manifest.dependencies,
     ),
   );
-  for (const chunk of manifest.chunks) {
-    if (!chunks.has(chunk.lookupKey)) {
-      chunks.set(chunk.lookupKey, {
-        ...chunk,
-        manifestId: manifest.id,
-        namePrefix: manifest.namePrefix,
-      });
-    }
+  for (const [key, chunk] of manifestChunks) {
+    if (!chunks.has(key)) chunks.set(key, chunk);
   }
   store.active = true;
   store.revision++;
@@ -334,13 +343,13 @@ export function validatePrecompiledCompilationConfig(): void {
       ),
     );
     for (const chunk of manifest.chunks) {
-      if (!chunks.has(chunk.lookupKey)) {
-        chunks.set(chunk.lookupKey, {
-          ...chunk,
-          manifestId: manifest.id,
-          namePrefix: manifest.namePrefix,
-        });
-      }
+      if (chunks.has(chunk.key)) continue;
+      chunks.set(chunk.key, {
+        className: resolveChunkClassName(chunk, manifest.namePrefix),
+        animations: chunk.animations ?? EMPTY_ANIMATIONS,
+        manifestId: manifest.id,
+        namePrefix: manifest.namePrefix,
+      });
     }
   }
 

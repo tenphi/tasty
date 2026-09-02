@@ -116,6 +116,17 @@ the nonce from `configure()`.
 
 ## What the Artifact Contains
 
+The manifest is a lookup table, not a copy of the styles. Each chunk records
+`hashString(lookupKey)` rather than the lookup key itself — the key is the
+serialized style source, which for a real design system averages several
+hundred bytes and would make the table larger than the stylesheet it indexes.
+Nothing reads it back: the runtime hashes its own cache key and compares. A
+chunk carries an explicit `className` only when it cannot be derived as
+`namePrefix + key`, which in practice is only the keyframe-dependent chunks,
+whose names come from resolved animation names. **Read a class name off a
+manifest as `chunk.className ?? manifest.namePrefix + chunk.key`, never as
+`chunk.className` alone.**
+
 The stylesheet contains only collector artifacts attributed to components:
 
 - style chunks;

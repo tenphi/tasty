@@ -30,10 +30,28 @@ export interface TastyPrecompiledDependencies {
   rscKeys: readonly string[];
 }
 
+/**
+ * One covered chunk, recorded as compactly as the runtime can reconstruct it.
+ *
+ * `key` is `hashString(lookupKey)` rather than the lookup key itself. The key
+ * is the serialized style source — 342 bytes on average for a real design
+ * system — and storing it made the lookup table larger than the stylesheet it
+ * indexes. Nothing reads it back: the runtime hashes its own cache key and
+ * compares. Two sources that hash alike would already collide today, because a
+ * runtime class name is that same hash, so this narrows nothing that was not
+ * already narrow. What it does give up is naming the offending styles in a
+ * chunk-conflict warning, which now names the hash.
+ */
 export interface TastyPrecompiledChunk {
-  lookupKey: string;
-  className: string;
-  animations: readonly string[];
+  key: string;
+  /**
+   * Omitted when it is `namePrefix + key`, which is every chunk whose class
+   * name derives from its own lookup key — all of them except the
+   * keyframe-dependent ones, whose names come from resolved animation names.
+   */
+  className?: string;
+  /** Omitted when the chunk animates nothing. */
+  animations?: readonly string[];
 }
 
 export interface TastyPrecompiledStats {

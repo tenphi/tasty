@@ -80,6 +80,16 @@ function compileManifest(
   };
 }
 
+/**
+ * A chunk records its class name only when it cannot be derived from its key,
+ * so a manifest reader has to resolve it the way the runtime does.
+ */
+function classNamesOf(manifest: TastyPrecompiledManifest): string[] {
+  return manifest.chunks.map(
+    (chunk) => chunk.className ?? manifest.namePrefix + chunk.key,
+  );
+}
+
 beforeEach(() => {
   resetConfig();
   enableDevWarnings();
@@ -99,9 +109,7 @@ afterEach(() => {
 describe('precompiled browser registration', () => {
   it('skips the pipeline for a normally hydrated non-keyframe chunk', () => {
     const artifact = compileManifest();
-    const classNames = artifact.manifest.chunks.map(
-      ({ className }) => className,
-    );
+    const classNames = classNamesOf(artifact.manifest);
     hydrateTastyClasses(classNames);
     renderCalls.value = 0;
 
@@ -120,9 +128,7 @@ describe('precompiled browser registration', () => {
 
     const result = computeStyles(styles);
 
-    expect(result.className).toBe(
-      artifact.manifest.chunks.map(({ className }) => className).join(' '),
-    );
+    expect(result.className).toBe(classNamesOf(artifact.manifest).join(' '));
     expect(renderCalls.value).toBe(0);
     expect(getCSSText()).not.toContain(`.${result.className}.`);
   });
@@ -140,7 +146,7 @@ describe('precompiled browser registration', () => {
     );
     expect(summary.precompiledManifestCount).toBe(1);
     expect(summary.precompiledClasses).toEqual(
-      artifact.manifest.chunks.map(({ className }) => className).sort(),
+      classNamesOf(artifact.manifest).sort(),
     );
     expect(summary.precompiledCSSSize).toBe(artifact.css.length);
     expect(summary.precompiledRuleCount).toBe(
@@ -155,9 +161,7 @@ describe('precompiled browser registration', () => {
     expect(summary.metrics?.precompiledHits).toBe(
       artifact.manifest.chunks.length,
     );
-    const uniqueClasses = [
-      ...new Set(artifact.manifest.chunks.map(({ className }) => className)),
-    ].sort();
+    const uniqueClasses = [...new Set(classNamesOf(artifact.manifest))].sort();
     expect(summary.metrics?.precompiledUniqueHits).toBe(uniqueClasses.length);
     expect(summary.precompiledUsedClasses).toEqual(uniqueClasses);
     expect(summary.metrics?.hits).toBe(summary.metrics?.precompiledHits);
@@ -210,7 +214,7 @@ describe('precompiled browser registration', () => {
 
     const result = computeStyles({ ...styles, color: 'blue' });
 
-    expect(result.className).toContain(artifact.manifest.chunks[0].className);
+    expect(result.className).toContain(classNamesOf(artifact.manifest)[0]);
     expect(renderCalls.value).toBe(1);
     expect(getCSSText()).toContain('color: blue');
   });

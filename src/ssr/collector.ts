@@ -382,13 +382,17 @@ export class ServerStyleCollector {
     className: string,
     animations: readonly string[],
   ): void {
-    if (!this.precompiledChunks.has(lookupKey)) {
-      this.precompiledChunks.set(lookupKey, {
-        lookupKey,
-        className,
-        animations: [...animations],
-      });
-    }
+    const key = hashString(lookupKey);
+    if (this.precompiledChunks.has(key)) return;
+
+    const chunk: TastyPrecompiledChunk = { key };
+    // Recorded only when it cannot be derived. `generateClassName` is
+    // `namePrefix + hashString(cacheKey)`, and the cache key is the lookup key
+    // for every chunk except the keyframe-dependent ones, where the name comes
+    // from resolved animation names instead.
+    if (className !== this.namePrefix + key) chunk.className = className;
+    if (animations.length > 0) chunk.animations = [...animations];
+    this.precompiledChunks.set(key, chunk);
   }
 
   /**

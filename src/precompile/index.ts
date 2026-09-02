@@ -9,7 +9,11 @@ import { registerSSRCollectorGetterGlobal } from '../ssr/ssr-collector-ref';
 import { TASTY_VERSION } from '../version';
 
 import { captureCompilationConfig } from './fingerprint';
-import { beginPrecompileBuild, endPrecompileBuild } from './runtime';
+import {
+  beginPrecompileBuild,
+  endPrecompileBuild,
+  resolveChunkClassName,
+} from './runtime';
 import type {
   TastyPrecompileCase,
   TastyPrecompileCaseReport,
@@ -34,6 +38,19 @@ export type {
 } from './types';
 
 export { registerTastyPrecompiled, installTastyPrecompiled } from './register';
+
+/**
+ * The class names a collector has covered so far.
+ *
+ * A chunk records its class name only when it cannot be derived from its key,
+ * so the report has to resolve it the same way the runtime does.
+ */
+function collectedClassNames(collector: ServerStyleCollector): string[] {
+  const namePrefix = getNamePrefix();
+  return collector
+    .getPrecompiledChunks()
+    .map((chunk) => resolveChunkClassName(chunk, namePrefix));
+}
 
 export async function precompileTastyStyles(options: {
   id: string;
@@ -71,9 +88,7 @@ export async function precompileTastyStyles(options: {
   beginPrecompileBuild();
   try {
     for (const item of options.cases) {
-      const classesBefore = new Set(
-        collector.getPrecompiledChunks().map(({ className }) => className),
-      );
+      const classesBefore = new Set(collectedClassNames(collector));
       const artifactsBefore = new Set(
         collector
           .getArtifacts()
@@ -86,10 +101,9 @@ export async function precompileTastyStyles(options: {
         renderToStaticMarkup(tree);
       });
 
-      const addedClasses = collector
-        .getPrecompiledChunks()
-        .map(({ className }) => className)
-        .filter((className) => !classesBefore.has(className));
+      const addedClasses = collectedClassNames(collector).filter(
+        (className) => !classesBefore.has(className),
+      );
       const addedArtifacts = collector
         .getArtifacts()
         .filter(

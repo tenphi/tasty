@@ -1,5 +1,6 @@
 import type { StyleInjector } from '../injector/injector';
 import type { RSCStyleCache } from '../rsc-cache';
+import { hashString } from '../utils/hash';
 import { isDevEnv } from '../utils/is-dev-env';
 
 import type {
@@ -8,7 +9,13 @@ import type {
   TastyPrecompiledManifest,
 } from './types';
 
-export interface RegisteredChunk extends TastyPrecompiledChunk {
+/**
+ * A chunk as the store holds it: the manifest's compact form with the class
+ * name already resolved, so the lookup path never has to derive one.
+ */
+export interface RegisteredChunk {
+  className: string;
+  animations: readonly string[];
   manifestId: string;
   namePrefix: string;
 }
@@ -92,13 +99,16 @@ export function endPrecompileBuild(): void {
 export function findPrecompiledChunk(
   lookupKey: string,
   namePrefix: string,
-): TastyPrecompiledChunk | null {
+): RegisteredChunk | null {
   // The first lookup is the first moment the host's configuration is final:
   // registration is a side-effect import that normally runs before the host
   // calls `configure()`. Cheap after that — it returns on a revision check.
   store.validate?.();
 
-  const chunk = store.chunks?.get(lookupKey);
+  // The manifest is keyed by the hash of the lookup key, not the key itself —
+  // see `TastyPrecompiledChunk`. Hashing here replaces the hash V8 would
+  // compute to probe a map keyed by the full string, so it is close to free.
+  const chunk = store.chunks?.get(hashString(lookupKey));
   if (!chunk) return null;
   if (chunk.namePrefix !== namePrefix) {
     warnPrecompileOnce(
@@ -108,6 +118,14 @@ export function findPrecompiledChunk(
     return null;
   }
   return chunk;
+}
+
+/** The class name a chunk resolves to — recorded, or derived from its key. */
+export function resolveChunkClassName(
+  chunk: TastyPrecompiledChunk,
+  namePrefix: string,
+): string {
+  return chunk.className ?? namePrefix + chunk.key;
 }
 
 export function getPrecompiledRevision(): number {
@@ -149,7 +167,9 @@ export function getRegisteredPrecompiledStats(
     manifestCount++;
     cssSize += manifest.stats.cssSize;
     ruleCount += manifest.stats.ruleCount;
-    for (const chunk of manifest.chunks) classNames.add(chunk.className);
+    for (const chunk of manifest.chunks) {
+      classNames.add(resolveChunkClassName(chunk, manifest.namePrefix));
+    }
   }
 
   return {

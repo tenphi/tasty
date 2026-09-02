@@ -436,7 +436,7 @@ function createPrecompiledHarness(workload: Workload): BenchmarkHarness {
       samples = Array.from({ length: count }, (_, sampleIndex) => {
         const prepared = preparePrecompiledSample(workload, sampleIndex);
         for (const chunk of prepared.chunks) {
-          chunks.set(chunk.lookupKey, chunk);
+          chunks.set(chunk.key, chunk);
         }
         css.push(prepared.css);
         return prepared.sample;

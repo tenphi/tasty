@@ -8,10 +8,15 @@ different costs:
 2. The React overhead of an empty `tasty({})` wrapper.
 3. Cold browser generation and injection compared with equivalent CSS that is
    already on the page.
+4. The steady-state interaction path — mod flips and styled subtrees opening
+   and closing after the page has loaded.
+5. Page-load cold start: network, module compilation, execution and first
+   paint, end to end in a throttled browser.
 
-These are focused microbenchmarks, not page-load or interaction scores. Run
-them several times on an otherwise idle machine and use a production profile
-to decide whether any cost matters in an application.
+The first four are focused microbenchmarks, not page-level scores. The fifth is
+a page-level measurement and is the only one that answers "what does a visitor
+wait for". Run them several times on an otherwise idle machine and use a
+production profile to decide whether any cost matters in an application.
 
 ## Reproducing the Results
 
@@ -19,11 +24,14 @@ to decide whether any cost matters in an application.
 pnpm bench
 pnpm bench:overhead
 pnpm bench:injection
+pnpm bench:interaction
+pnpm bench:cold-start
 ```
 
-`pnpm bench` runs the core pipeline benchmarks in Node. The other two commands
-use production code paths in headless Chromium. The first checkout may require
-`pnpm test:setup` to download Chromium.
+`pnpm bench` runs the core pipeline benchmarks in Node. The rest use production
+code paths in headless Chromium. The first checkout may require
+`pnpm test:setup` to download Chromium, and `pnpm bench:cold-start` needs a
+current `dist/` — run `pnpm build` first.
 
 Run the Node and browser suites separately so they do not compete for CPU. The
 browser timer has 0.1 ms resolution, so both browser benchmarks perform many
@@ -159,10 +167,127 @@ together. Because the same resolution pattern is present in each workload's
 control, the difference answers the narrower delivery question: how much extra
 work did Tasty perform when the same CSS was not already there?
 
+## Steady-State Interaction
+
+The benchmarks above measure mounting and whole-tree updates. A running
+application spends most of its time on neither. It flips mods — hovered,
+pressed, selected, expanded — on elements whose styles never change, one
+element at a time, and it mounts and unmounts small styled subtrees as menus
+and dialogs open. Both paths go through the state-map and ref-counting
+machinery rather than the parser, so a regression in them is invisible to every
+other benchmark here.
+
+[`tasty-interaction.bench.tsx`](../src/tasty-interaction.bench.tsx) pairs each
+case with a raw-DOM equivalent driven by a hand-written stylesheet that
+produces the same computed color and background in both states. The benchmark
+fails if either arm resolves to anything else, so an arm that quietly rendered
+unstyled elements cannot report a flattering number.
+
+Each leaf owns its own `useState`, which is what keeps a single-element
+interaction single: re-rendering the root to flip one row would time 1,000
+elements. One toggle is far below Chromium's 0.1 ms timer resolution, so a
+sample performs 100 independent interactions — each its own `flushSync` commit
+and its own computed-style read — and the churn case performs 10 open/close
+cycles. Divide the raw/Tasty difference by those counts.
+
+On an Apple M1 Max with React 19.2.8 and Chromium 151, three consecutive runs
+produced these ranges:
+
+| Workload                                              | Raw elements |   Tasty mods |               Extra per unit |
+| ----------------------------------------------------- | -----------: | -----------: | ---------------------------: |
+| 100 single-element mod toggles in a 1,000-element tree |   9.6–9.8 ms | 9.9–10.1 ms |  1.5–4.7 us per interaction |
+| 10 mount + unmount cycles of a 200-element subtree     |   3.5–3.7 ms |   5.7–5.8 ms |        1.05–1.14 us per element |
+
+Two things are worth reading out of this.
+
+A mod flip on an already-mounted element is close to free. The delta is a few
+microseconds and is the same order as the run-to-run spread of the raw
+baseline, so treat "under 5 us" as the claim rather than any single figure
+inside that range. The CSS for both states already exists, both arms perform
+the same commit and the same style resolution, and Tasty's remaining work is
+picking a class name.
+
+Subtree churn, by contrast, is not about styling at all. Its per-element cost
+lands on top of the ~1 us empty-wrapper mount cost measured above, which is
+where essentially all of it comes from — the styles are already cached, so
+reopening a menu re-pays the React wrapper, not the style pipeline.
+
+## Page-Load Cold Start
+
+Every benchmark above deliberately excludes the network, module compilation and
+the first render. [`scripts/cold-start`](../scripts/cold-start) measures exactly
+those: what a visitor waits for between requesting a page and seeing styled
+content, in a real Chromium under CDP network and CPU throttling.
+
+Three pages render the same 50 styled components and are verified, before any
+timing, to produce the same 50 elements at the same computed color:
+
+- **baseline** — the components server-rendered: identical markup, identical
+  class names, a linked stylesheet, and no Tasty on the page. Every other
+  column is a delta against this one.
+- **runtime** — Tasty generates the CSS in the browser, as a client-rendered
+  application does. The run asserts it really did (69 rules generated).
+- **prewarm** — the same, after one throwaway `computeStyles()` against a
+  detached root before the first component renders.
+
+Each cell is the median of 5 uncached loads in a fresh browser context. The run
+ends at the first contentful paint, observed through a `PerformanceObserver`
+rather than counted in animation frames — `requestAnimationFrame` fires before
+paint, so a page that commits fast can reach its second frame with nothing
+painted yet.
+
+On an Apple M1 Max with React 19.2.8 and Chromium 151, first contentful paint:
+
+| Link / CPU            | baseline | runtime | prewarm | Tasty's cost |
+| --------------------- | -------: | ------: | ------: | -----------: |
+| No throttling, 1x     |    40 ms |   48 ms |   52 ms |      +8 ms |
+| Fast 4G, 1x           |   744 ms |  936 ms |  936 ms |    +192 ms |
+| Slow 4G, 1x           |  2776 ms | 3792 ms | 3788 ms |   +1016 ms |
+| No throttling, 4x CPU |   140 ms |  192 ms |  188 ms |     +52 ms |
+| Fast 4G, 4x CPU       |   812 ms | 1052 ms | 1056 ms |    +240 ms |
+| Slow 4G, 4x CPU       |  2824 ms | 3908 ms | 3908 ms |   +1084 ms |
+
+**The cost is the bundle, not the work.** Minified and brotli-compressed, the
+library is 56.1 KB (201 KB raw) on top of React's 50.7 KB. On Slow 4G that
+extra transfer alone accounts for 1,027 ms of the 1,016 ms FCP delta — the
+whole of it, within noise. Everything Tasty then *does* is small by comparison:
+
+| Phase (Slow 4G, 1x)      | baseline | runtime | prewarm |
+| ------------------------ | -------: | ------: | ------: |
+| js+css transfer          |  1567 ms | 2594 ms | 2588 ms |
+| module compile (shared)  |   3.2 ms |  3.8 ms |  3.6 ms |
+| tasty top-level execute  |        — |  0.9 ms |  0.9 ms |
+| `configure()`            |        — |  0.5 ms |  0.5 ms |
+| prewarm                  |        — |       — |  4.4 ms |
+| render 1st component     |   1.9 ms |  7.5 ms |  2.3 ms |
+| render 49 more           |   1.0 ms |  5.5 ms |  5.1 ms |
+
+Importing Tasty costs about 1 ms of top-level execution; `configure()` costs
+half of one. The rest of the CPU delta — roughly 10 ms for 50 components — is
+generation and injection, which is the cost the injection benchmark isolates.
+
+**Prewarming moves the wake-up, it does not remove it.** The first styled render
+is ~4.5 ms more expensive than the ones after it, because that is when the
+engine's deferred payload is actually compiled. A throwaway `computeStyles()`
+against a detached root pays it early: `render 1st` drops from 7.5 ms to
+2.3 ms. The prewarm itself costs 4.4 ms, so FCP does not move. It is worth
+doing only when something else can overlap it, or when the first render is on a
+latency-critical path and the page has idle time before it.
+
+**Retained heap.** After a forced collection, the runtime page holds about
+1,050 KB more than the control (2,659 KB vs 1,613 KB) for 50 components — the
+parser caches, the chunk cache, the injector's registry and the generated CSS.
+The control is not zero either; most of its 1.6 MB is React and the DOM.
+
+CPU throttling changes which line moves. At 4x, module compilation of the
+larger graph becomes visible (6.3 ms → 25 ms) where at 1x it is free: V8
+pre-parses at import and compiles lazily, so a slower CPU pays for code the
+faster one never fully compiled.
+
 ## Reading the Results Together
 
-Do not add all three benchmark numbers to estimate an application blindly.
-They describe different paths:
+Do not add the microbenchmark numbers together to estimate an application
+blindly. They describe different paths:
 
 - A stable `tasty()` factory can skip the style pipeline on later renders, but
   its React wrapper still participates in reconciliation.
@@ -170,8 +295,16 @@ They describe different paths:
   rule.
 - A genuinely new style pays generation and injection once, then becomes
   reusable.
+- A mod flip on an already-styled element pays neither; it is a class-name
+  change.
 - Browser style resolution, layout, and paint depend on the actual document and
   need application-level profiling.
+
+The cold-start measurement is the one that puts the rest in proportion. On a
+slow connection, essentially all of Tasty's page-load cost is transferring the
+library; the generation and injection the microbenchmarks obsess over is ~10 ms
+for 50 components. Bundle size is therefore the lever with the largest effect
+on first paint, and the runtime levers matter for what happens after it.
 
 The practical optimization target is therefore repeated work: keep style input
 stable when possible, reuse generated chunks, and generate CSS at build or

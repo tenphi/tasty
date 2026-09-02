@@ -54,6 +54,19 @@ interface DebugOptions {
 
 When `raw` is `false` (the default), results are logged to the console **and** returned. When `raw` is `true`, results are returned silently.
 
+### Environments Without a DOM
+
+`tastyDebug` reads the document, so on a server — SSR, a Node REPL, a test
+runner in the `node` environment — there is nothing for it to read. Every
+method returns its empty result (`''`, an empty `InspectResult`, a summary of
+zeroes, `metrics: null`) instead of throwing, and explains itself once with a
+console warning. `{ raw: true }` suppresses that warning along with the rest of
+the logging.
+
+To see the styles a server render produced, read the `ServerStyleCollector`
+instead — `collector.getCSS()` and `collector.getRenderedClassNames()`. See
+[SSR](./ssr.md).
+
 ---
 
 ## API Reference

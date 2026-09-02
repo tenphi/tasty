@@ -15,6 +15,7 @@ export default defineConfig({
     benchmark: {
       include: [
         'src/tasty-injection.bench.ts',
+        'src/tasty-interaction.bench.tsx',
         'src/tasty-overhead.bench.tsx',
         'src/tasty-tree.bench.tsx',
       ],

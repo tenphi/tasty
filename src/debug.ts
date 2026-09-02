@@ -113,6 +113,34 @@ function sortTastyClasses(classes: Iterable<string>): string[] {
   return Array.from(classes).sort((a, b) => a.localeCompare(b));
 }
 
+/** A DOM root to read, or `null` when the environment has no DOM at all. */
+type DebugRoot = Document | ShadowRoot | null;
+
+/**
+ * The root these helpers read, or `null` where there is no DOM.
+ *
+ * `document` used to be a default parameter value, and a default is evaluated
+ * at the call site — so every read below threw a bare `ReferenceError` under
+ * Node, taking out five of the eight public methods. A debug utility must not
+ * be able to fail an SSR render because a call was left in, so the DOM-less
+ * case reports an empty result and says why.
+ */
+function defaultRoot(): DebugRoot {
+  return typeof document === 'undefined' ? null : document;
+}
+
+let warnedNoDom = false;
+
+/** Say once why the numbers are empty. Silent under `{ raw: true }`. */
+function warnNoDom(raw: boolean): void {
+  if (raw || warnedNoDom) return;
+  warnedNoDom = true;
+  console.warn(
+    '[Tasty] tastyDebug reads the DOM and this environment has none, so the ' +
+      'result is empty. During SSR, read the ServerStyleCollector instead.',
+  );
+}
+
 /**
  * The registry for `root`, with every queued write landed first.
  *
@@ -123,14 +151,16 @@ function sortTastyClasses(classes: Iterable<string>): string[] {
  * sheets, and from anything counting either.
  */
 function getRegistry(
-  root: Document | ShadowRoot = document,
+  root: DebugRoot = defaultRoot(),
 ): RootRegistry | undefined {
+  if (!root) return undefined;
   flushStyles();
 
   return injector.instance._sheetManager?.getRegistry(root);
 }
 
-function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
+function findDomTastyClasses(root: DebugRoot = defaultRoot()): string[] {
+  if (!root) return [];
   const classes = new Set<string>();
   const elements = (root as Document).querySelectorAll?.('[class]') || [];
   const classRegex = tastyClassRegex(getNamePrefix());
@@ -150,12 +180,30 @@ function findDomTastyClasses(root: Document | ShadowRoot = document): string[] {
  * with the sources kept byte-for-byte — trimming would report a total smaller
  * than one of its own parts whenever raw CSS has edge whitespace.
  */
-function getAllCSS(root: Document | ShadowRoot = document): string {
+function getAllCSS(root: DebugRoot = defaultRoot()): string {
   const registry = getRegistry(root);
   const sheetManager = injector.instance._sheetManager;
-  if (!registry || !sheetManager) return '';
+  // `getRegistry` already returns nothing for a null root; the `!root` is what
+  // narrows the type for the call below.
+  if (!root || !registry || !sheetManager) return '';
 
   return sheetManager.getOwnedCSSInOrder(registry, root).join('\n');
+}
+
+/**
+ * The injector's own readers fall back to `document` when `root` is omitted, so
+ * they have to be reached with a real root or not at all.
+ */
+function cssTextForClasses(classNames: string[], root: DebugRoot): string {
+  if (!root) return '';
+
+  return injector.instance.getCSSTextForClasses(classNames, { root });
+}
+
+function getInjectorMetrics(root: DebugRoot): CacheMetrics | null {
+  if (!root) return null;
+
+  return injector.instance.getMetrics({ root });
 }
 
 /**
@@ -166,12 +214,14 @@ function getAllCSS(root: Document | ShadowRoot = document): string {
  * drifted apart once before, when this file still read "unused" off the pin
  * counts the render path had stopped maintaining.
  */
-function getUnusedClasses(root: Document | ShadowRoot = document): string[] {
+function getUnusedClasses(root: DebugRoot = defaultRoot()): string[] {
+  if (!root) return [];
+
   return sortTastyClasses(injector.instance.getUnusedClasses({ root }));
 }
 
 /** Every class this injector holds CSS for in `root`. */
-function getOwnedClasses(root: Document | ShadowRoot = document): string[] {
+function getOwnedClasses(root: DebugRoot = defaultRoot()): string[] {
   const registry = getRegistry(root);
   if (!registry) return [];
 
@@ -291,7 +341,7 @@ function extractChunkName(cacheKey: string): string | null {
 
 function getChunkForClass(
   className: string,
-  root: Document | ShadowRoot = document,
+  root: DebugRoot = defaultRoot(),
 ): string | null {
   const registry = getRegistry(root);
   if (!registry) return null;
@@ -301,11 +351,10 @@ function getChunkForClass(
   return null;
 }
 
-function buildChunkBreakdown(
-  root: Document | ShadowRoot = document,
-): ChunkBreakdown {
+function buildChunkBreakdown(root: DebugRoot = defaultRoot()): ChunkBreakdown {
   const registry = getRegistry(root);
-  if (!registry) return { byChunk: {}, totalChunkTypes: 0, totalClasses: 0 };
+  if (!root || !registry)
+    return { byChunk: {}, totalChunkTypes: 0, totalClasses: 0 };
 
   const byChunk: ChunkBreakdown['byChunk'] = {};
   for (const [cacheKey, className] of registry.cacheKeyToClassName) {
@@ -352,10 +401,10 @@ const GLOBAL_RULE_PREFIXES = {
 
 function getGlobalTypeCSS(
   type: keyof typeof GLOBAL_RULE_PREFIXES | 'raw' | 'keyframes',
-  root: Document | ShadowRoot = document,
+  root: DebugRoot = defaultRoot(),
 ): { css: string; ruleCount: number; size: number } {
   const registry = getRegistry(root);
-  if (!registry) return { css: '', ruleCount: 0, size: 0 };
+  if (!root || !registry) return { css: '', ruleCount: 0, size: 0 };
 
   const chunks: string[] = [];
   let rc = 0;
@@ -430,7 +479,7 @@ function getGlobalTypeCSS(
 
 function getSourceCssForClasses(
   classNames: string[],
-  root: Document | ShadowRoot = document,
+  root: DebugRoot = defaultRoot(),
 ): string | null {
   const registry = getRegistry(root);
   if (!registry) return null;
@@ -451,7 +500,7 @@ function getSourceCssForClasses(
 // Definitions helper (internal)
 // ---------------------------------------------------------------------------
 
-function getDefs(root: Document | ShadowRoot = document) {
+function getDefs(root: DebugRoot = defaultRoot()) {
   const registry = getRegistry(root);
   let properties: string[] = [];
   if (registry?.injectedProperties) {
@@ -494,11 +543,16 @@ const CHUNK_ORDER = [
 export const tastyDebug = {
   css(target: CSSTarget, opts?: CSSOptions): string {
     const {
-      root = document,
+      root = defaultRoot(),
       prettify = true,
       raw = false,
       source = false,
     } = opts || {};
+    if (!root) {
+      warnNoDom(raw);
+
+      return '';
+    }
     let css = '';
 
     const classRegex = tastyClassRegex(getNamePrefix());
@@ -567,11 +621,13 @@ export const tastyDebug = {
   },
 
   inspect(target: string | Element, opts?: DebugOptions): InspectResult {
-    const { root = document, raw = false } = opts || {};
-    const element =
-      typeof target === 'string'
+    const { root = defaultRoot(), raw = false } = opts || {};
+    const element = !root
+      ? null
+      : typeof target === 'string'
         ? (root as Document).querySelector?.(target)
         : target;
+    if (!root) warnNoDom(raw);
 
     if (!element) {
       const empty: InspectResult = {
@@ -582,7 +638,10 @@ export const tastyDebug = {
         size: 0,
         rules: 0,
       };
-      if (!raw) console.warn('[Tasty] debug.inspect: element not found');
+      // With no DOM at all, `warnNoDom` above already said why; "element not
+      // found" would only misdirect.
+      if (!raw && root)
+        console.warn('[Tasty] debug.inspect: element not found');
       return empty;
     }
 
@@ -597,7 +656,7 @@ export const tastyDebug = {
       chunkName: getChunkForClass(className, root),
     }));
 
-    const css = getCSSTextForNode(element, { root });
+    const css = getCSSTextForNode(element, { root: root ?? undefined });
     const rules = countRules(css);
 
     const result: InspectResult = {
@@ -631,7 +690,8 @@ export const tastyDebug = {
   },
 
   summary(opts?: DebugOptions): Summary {
-    const { root = document, raw = false } = opts || {};
+    const { root = defaultRoot(), raw = false } = opts || {};
+    if (!root) warnNoDom(raw);
 
     const activeClasses = findDomTastyClasses(root);
     const unusedClasses = getUnusedClasses(root);
@@ -647,14 +707,10 @@ export const tastyDebug = {
     const hotClasses = ownedClasses.filter(
       (className) => !activeSet.has(className) && !unusedSet.has(className),
     );
-    const hotCSS = injector.instance.getCSSTextForClasses(hotClasses, { root });
+    const hotCSS = cssTextForClasses(hotClasses, root);
 
-    const activeCSS = injector.instance.getCSSTextForClasses(activeClasses, {
-      root,
-    });
-    const unusedCSS = injector.instance.getCSSTextForClasses(unusedClasses, {
-      root,
-    });
+    const activeCSS = cssTextForClasses(activeClasses, root);
+    const unusedCSS = cssTextForClasses(unusedClasses, root);
     const allCSS = getAllCSS(root);
 
     const activeRuleCount = countRules(activeCSS);
@@ -691,7 +747,7 @@ export const tastyDebug = {
       kfData.ruleCount +
       propData.ruleCount;
 
-    const metrics = injector.instance.getMetrics({ root });
+    const metrics = getInjectorMetrics(root);
     const defs = getDefs(root);
     const chunkBreakdown = buildChunkBreakdown(root);
 
@@ -790,7 +846,8 @@ export const tastyDebug = {
   },
 
   chunks(opts?: DebugOptions): ChunkBreakdown {
-    const { root = document, raw = false } = opts || {};
+    const { root = defaultRoot(), raw = false } = opts || {};
+    if (!root) warnNoDom(raw);
     const breakdown = buildChunkBreakdown(root);
 
     if (!raw) {
@@ -817,10 +874,11 @@ export const tastyDebug = {
   },
 
   cache(opts?: DebugOptions): CacheStatus {
-    const { root = document, raw = false } = opts || {};
+    const { root = defaultRoot(), raw = false } = opts || {};
+    if (!root) warnNoDom(raw);
     const active = findDomTastyClasses(root);
     const unused = getUnusedClasses(root);
-    const metrics = injector.instance.getMetrics({ root });
+    const metrics = getInjectorMetrics(root);
 
     // `all` is everything held, not the two bands above: a class that went cold
     // a moment ago is in neither, and it is still taking up a sheet.
@@ -850,7 +908,9 @@ export const tastyDebug = {
   },
 
   cleanup(opts?: { root?: Document | ShadowRoot }): void {
-    injector.instance.cleanup(opts?.root);
+    const root = opts?.root ?? defaultRoot();
+    if (!root) return;
+    injector.instance.cleanup(root);
   },
 
   help(): void {
@@ -879,7 +939,8 @@ Options: { raw: true } suppresses logging, { root: shadowRoot } targets Shadow D
 // Page CSS (minimal, kept internal)
 // ---------------------------------------------------------------------------
 
-function getPageCSS(root: Document | ShadowRoot = document): string {
+function getPageCSS(root: DebugRoot = defaultRoot()): string {
+  if (!root) return '';
   const chunks: string[] = [];
   try {
     if ('styleSheets' in root) {

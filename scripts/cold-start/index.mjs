@@ -217,8 +217,9 @@ async function measure(browser, base, { mode, network, cpu }) {
  * Two things have to hold. The runtime modes must actually generate their CSS
  * in the browser — a page that quietly served it some other way would report
  * the wrong path under the runtime label. And every mode must produce the same
- * pixels: the control is only a control if it renders what the runtime renders,
- * which the class names alone do not prove.
+ * pixels, for every component and not merely the first: the control is only a
+ * control if the whole page resolves the same, which the class names alone do
+ * not prove.
  */
 async function verifyModes(browser, base, modes) {
   const results = {};
@@ -254,18 +255,23 @@ async function verifyModes(browser, base, modes) {
     }
   }
 
-  // An unstyled div computes `rgba(0, 0, 0, 0)`, so equality alone would pass
-  // on a page whose CSS never applied. Both halves have to be checked.
-  const backgrounds = new Set(Object.values(results).map((r) => r.background));
-  if (backgrounds.size > 1) {
-    throw new Error(
-      'Modes do not render the same pixels: ' +
-        Object.entries(results)
-          .map(([m, r]) => `${m} ${r.background}`)
-          .join(', '),
+  const [reference, ...others] = Object.keys(results);
+  for (const mode of others) {
+    const index = results[reference].styles.findIndex(
+      (style, at) => style !== results[mode].styles[at],
     );
+    if (index !== -1) {
+      throw new Error(
+        `${mode} does not render what ${reference} renders, from component ${index} on:\n` +
+          `  ${reference}: ${results[reference].styles[index]}\n` +
+          `  ${mode}: ${results[mode].styles[index]}`,
+      );
+    }
   }
-  const [background] = backgrounds;
+
+  // Equality alone would also pass on a page whose CSS never applied at all —
+  // an unstyled div computes `rgba(0, 0, 0, 0)`. Both halves have to be checked.
+  const background = results[reference].styles[0]?.split('|')[3];
   if (!background || background === 'rgba(0, 0, 0, 0)') {
     throw new Error(
       `Every mode rendered an unstyled component (${background}); no CSS applied.`,

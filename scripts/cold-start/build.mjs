@@ -211,12 +211,30 @@ function appSource(components, mode) {
   // render-blocking stylesheet (the control has one, the runtime modes do not)
   // is exactly the case where that happens.
   L.push('function finish() {');
-  L.push('  const first = document.querySelector("#root > *");');
+  L.push('  const rows = document.querySelectorAll("#root > *");');
+  L.push('  // A fingerprint of EVERY component, not just the first: the');
+  L.push('  // control is only a control if the whole page resolves the same,');
+  L.push('  // and a handler the server-rendered CSS missed would otherwise');
+  L.push('  // show up as a free win in the timings.');
+  L.push('  const props = [');
+  L.push("    'display',");
+  L.push("    'padding',");
+  L.push("    'color',");
+  L.push("    'backgroundColor',");
+  L.push("    'borderRadius',");
+  L.push("    'borderTopWidth',");
+  L.push("    'boxShadow',");
+  L.push("    'width',");
+  L.push("    'height',");
+  L.push("    'fontSize',");
+  L.push("    'outlineOffset',");
+  L.push('  ];');
   L.push('  window.__benchProof = {');
-  L.push('    rendered: document.querySelectorAll("#root > *").length,');
-  L.push(
-    '    background: first ? getComputedStyle(first).backgroundColor : null,',
-  );
+  L.push('    rendered: rows.length,');
+  L.push('    styles: Array.from(rows, (row) => {');
+  L.push('      const computed = getComputedStyle(row);');
+  L.push("      return props.map((name) => computed[name]).join('|');");
+  L.push('    }),');
   L.push('  };');
   L.push(
     isBaseline

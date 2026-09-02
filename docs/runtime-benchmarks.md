@@ -270,6 +270,8 @@ On an Apple M1 Max with React 19.2.8 and Chromium 151, first contentful paint:
 | Fast 4G, 4x CPU       |   820 ms | 1052 ms | 1048 ms |      +232 ms |
 | Slow 4G, 4x CPU       |  2824 ms | 3836 ms | 3844 ms |     +1012 ms |
 
+That is one full run of the matrix; a second moved every cell by under 5%.
+
 **The cost is the bundle, not the work.** On Slow 4G the extra transfer alone
 accounts for 946 ms of the 944 ms FCP delta — the whole of it, within noise.
 Everything Tasty then *does* is small by comparison:

@@ -22,6 +22,8 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm format:check` | Check formatting |
 | `pnpm bench` | Run pipeline benchmarks (Node project — the numbers quoted in the README) |
 | `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
+| `pnpm bench:interaction` | Run the steady-state interaction benchmark — mod flips and subtree churn (production React, headless Chromium) |
+| `pnpm bench:cold-start` | Run the page-load cold-start benchmark — transfer, compile, execute, first paint under CDP throttling (needs `pnpm build` first) |
 | `pnpm size` | Check bundle sizes (size-limit) |
 | `pnpm check:test-only` | Verify test-only code stays out of the build (run after `pnpm build`) |
 | `pnpm hygiene` | Run lint + format check + typecheck together |

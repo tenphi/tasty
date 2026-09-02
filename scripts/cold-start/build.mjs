@@ -6,10 +6,13 @@
  * would report a build artifact nobody serves.
  */
 import { build } from 'esbuild';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: the latter keeps percent-encoding, so a
+// checkout under a path with a space produces specifiers nothing can resolve.
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export const OUT = `${ROOT}.bench-cold-start/`;
 
@@ -26,6 +29,15 @@ const MINIFY = {
 };
 
 export async function buildAssets({ components }) {
+  try {
+    await access(`${ROOT}dist/index.js`);
+  } catch {
+    throw new Error(
+      'The cold-start benchmark measures the built library, and dist/ is ' +
+        'missing or stale. Run `pnpm build` first.',
+    );
+  }
+
   await rm(OUT, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
 

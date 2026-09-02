@@ -32,9 +32,25 @@ import { CPU_RATES, NETWORK_PROFILES } from './network.mjs';
 const args = parseArgs(process.argv.slice(2));
 const RUNS = args.runs ?? 5;
 const COMPONENTS = args.components ?? 50;
-const MODES = (args.mode ?? 'baseline,runtime,prewarm').split(',');
+const MODES = (args.mode ?? ALL_MODES.join(',')).split(',');
 const NETWORKS = (args.network ?? 'none,fast-4g,slow-4g').split(',');
 const CPUS = args.cpu ? args.cpu.split(',').map(Number) : CPU_RATES;
+
+const unknownModes = MODES.filter((mode) => !ALL_MODES.includes(mode));
+if (unknownModes.length) {
+  console.error(
+    `Unknown --mode ${unknownModes.join(', ')}. Known modes: ${ALL_MODES.join(', ')}.`,
+  );
+  process.exit(1);
+}
+
+const unknownNetworks = NETWORKS.filter((name) => !(name in NETWORK_PROFILES));
+if (unknownNetworks.length) {
+  console.error(
+    `Unknown --network ${unknownNetworks.join(', ')}. Known profiles: ${Object.keys(NETWORK_PROFILES).join(', ')}.`,
+  );
+  process.exit(1);
+}
 
 function parseArgs(argv) {
   const out = {};
@@ -301,9 +317,11 @@ function phases(r) {
   };
 }
 
-const { server, base } = await serve();
+// Build before listening: a failed build should exit, not leave an open
+// server holding the process alive.
 const sizes = await buildAssets({ components: COMPONENTS });
 const baseline = await buildBaseline({ out: OUT, components: COMPONENTS });
+const { server, base } = await serve();
 // The page renders the same fixtures the control was server-rendered from.
 await copyFile(new URL('./fixtures.mjs', import.meta.url), `${OUT}fixtures.js`);
 

@@ -16,7 +16,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export const OUT = `${ROOT}.bench-cold-start/`;
 
-export const MODES = ['baseline', 'runtime', 'prewarm'];
+export const MODES = ['baseline', 'runtime', 'precompiled', 'prewarm'];
 
 const MINIFY = {
   bundle: true,
@@ -71,22 +71,36 @@ export async function buildAssets({ components }) {
     footer: { js: 'performance.mark("react:eval-end");' },
   });
 
-  // Only what the page imports, so the bundle is tree-shaken the way an
+  // Only what the page imports, so each bundle is tree-shaken the way an
   // application's would be. Re-exporting the whole library instead would add
   // ~4 KB brotli of code no page here calls and inflate the transfer column,
   // which is the column that dominates the result.
-  await writeFile(
-    `${OUT}tasty.src.js`,
-    `export { tasty, configure, computeStyles, tastyDebug } from '${ROOT}dist/index.js';\n`,
-  );
-  await build({
-    ...MINIFY,
-    entryPoints: [`${OUT}tasty.src.js`],
-    outfile: `${OUT}tasty.js`,
-    external: ['react', 'react-dom', 'react-dom/client'],
-    banner: { js: 'performance.mark("tasty:eval-start");' },
-    footer: { js: 'performance.mark("tasty:eval-end");' },
-  });
+  //
+  // One bundle per delivery strategy rather than one shared bundle: a catalog
+  // page ships the registration runtime and a runtime page does not, and that
+  // difference is part of what the two approaches cost. Folding it into a
+  // shared bundle would charge every column for it and quietly understate the
+  // catalog.
+  const bundles = {
+    'tasty.js':
+      "export { tasty, configure, computeStyles, tastyDebug } from '<dist>/index.js';",
+    'tasty-precompiled.js':
+      "export { tasty, configure, computeStyles, tastyDebug } from '<dist>/index.js';\n" +
+      "export { registerTastyPrecompiled } from '<dist>/precompile/register.js';",
+  };
+
+  for (const [name, source] of Object.entries(bundles)) {
+    const entry = `${OUT}${name.replace(/\.js$/, '.src.js')}`;
+    await writeFile(entry, `${source.replaceAll('<dist>', `${ROOT}dist`)}\n`);
+    await build({
+      ...MINIFY,
+      entryPoints: [entry],
+      outfile: OUT + name,
+      external: ['react', 'react-dom', 'react-dom/client'],
+      banner: { js: 'performance.mark("tasty:eval-start");' },
+      footer: { js: 'performance.mark("tasty:eval-end");' },
+    });
+  }
 
   // One entry per mode, written verbatim rather than bundled: each is a few
   // lines, and each must import Tasty as a separate resource so the benchmark
@@ -102,6 +116,7 @@ export async function buildAssets({ components }) {
   for (const [label, name] of [
     ['react.js', 'react.js'],
     ['tasty.js', 'tasty.js'],
+    ['tasty+cat.js', 'tasty-precompiled.js'],
     ['app.js', 'app-runtime.js'],
   ]) {
     const code = await readFile(OUT + name);
@@ -124,7 +139,14 @@ function appSource(components, mode) {
     L.push("import classNames from '/baseline.js';");
   } else {
     L.push("import { stylesFor, TOKENS } from '/fixtures.js';");
-    L.push("import * as T from '/tasty.js';");
+    L.push(
+      mode === 'precompiled'
+        ? "import * as T from '/tasty-precompiled.js';"
+        : "import * as T from '/tasty.js';",
+    );
+    if (mode === 'precompiled') {
+      L.push("import manifest from '/catalog.manifest.js';");
+    }
   }
   L.push('');
   L.push("performance.mark('modules:ready');");
@@ -158,6 +180,17 @@ function appSource(components, mode) {
       "  return classNames.map((c) => () => createElement('div', { className: c }, 'x'));",
     );
   } else {
+    if (mode === 'precompiled') {
+      L.push("  performance.mark('catalog:start');");
+      L.push(
+        '  // The stylesheet is already in the document as a <link>, which is',
+      );
+      L.push(
+        '  // how a catalog ships; only the lookup table is registered here.',
+      );
+      L.push('  T.registerTastyPrecompiled(manifest);');
+      L.push("  performance.mark('catalog:end');");
+    }
     if (mode === 'prewarm') {
       // One throwaway style computation against a detached root: it compiles
       // the parser, the pipeline and the style handlers without touching the

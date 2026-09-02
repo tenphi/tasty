@@ -266,7 +266,8 @@ const NO_PRECOMPILED = {
  * here reports empty too.
  */
 function getPrecompiledDebugStats(root: DebugRoot) {
-  return !root || (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot)
+  return !root ||
+    (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot)
     ? NO_PRECOMPILED
     : getRegisteredPrecompiledStats(getNamePrefix());
 }

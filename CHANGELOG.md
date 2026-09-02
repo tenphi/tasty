@@ -1,5 +1,34 @@
 # @tenphi/tasty
 
+## 3.7.0
+
+### Minor Changes
+
+- [#287](https://github.com/tenphi/tasty/pull/287) [`3a7be8c`](https://github.com/tenphi/tasty/commit/3a7be8c18a4e5023c113f78df2669e774ab48b41) Thanks [@tenphi](https://github.com/tenphi)! - Add a Next.js config wrapper that extracts eager configured globals into one
+  content-hashed, immutable shared stylesheet while route-specific CSS keeps
+  using the streaming App Router registry.
+
+### Patch Changes
+
+- [#290](https://github.com/tenphi/tasty/pull/290) [`d63615c`](https://github.com/tenphi/tasty/commit/d63615cb748e9abb99dfc3ad31c1afdf77898385) Thanks [@tenphi](https://github.com/tenphi)! - Fix `tastyDebug` throwing in environments without a DOM. Every reader took
+  `document` as a default parameter value, which is evaluated per call, so
+  `css`, `inspect`, `summary`, `chunks` and `cache` raised
+  `ReferenceError: document is not defined` on a server, in a Node REPL, or in a
+  test runner's `node` environment. They now return their empty result and
+  explain themselves once with a console warning, which `{ raw: true }`
+  suppresses along with the rest of the logging.
+
+- [#290](https://github.com/tenphi/tasty/pull/290) [`d63615c`](https://github.com/tenphi/tasty/commit/d63615cb748e9abb99dfc3ad31c1afdf77898385) Thanks [@tenphi](https://github.com/tenphi)! - Add two benchmarks that cover paths nothing measured before: `bench:interaction`
+  for the steady-state path a loaded application actually spends its time on (mod
+  flips on mounted elements, styled subtrees opening and closing), and
+  `bench:cold-start` for page load end to end — brotli-compressed bundle
+  transfer, module compilation, execution, first render and first contentful
+  paint under CDP network and CPU throttling, against a server-rendered control.
+  Both verify before timing that every arm renders the same pixels, and the
+  cold-start run additionally fails if what crossed the wire is not the
+  compressed payload it reports. Results and how to read them are in
+  `docs/runtime-benchmarks.md`.
+
 ## 3.6.0
 
 ### Minor Changes

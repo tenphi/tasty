@@ -1,5 +1,12 @@
 import { playwright } from '@vitest/browser-playwright';
+import { readFileSync } from 'node:fs';
 import { defaultExclude, defineConfig } from 'vitest/config';
+
+const packageVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 /**
  * Suites that need a **real CSS engine**.
@@ -38,6 +45,7 @@ const BROWSER_TESTS = [
   'src/compute-styles.test.ts',
   'src/config.test.ts',
   'src/rsc-cache.test.ts',
+  'src/precompile/register.test.ts',
   'src/static/inject.test.ts',
   // SSR hydration reads styles back out of the document.
   'src/ssr/ssr.test.ts',
@@ -55,6 +63,9 @@ const BROWSER_TESTS = [
  * they can load production React without changing the browser test environment.
  */
 export default defineConfig({
+  define: {
+    __TASTY_VERSION__: JSON.stringify(packageVersion),
+  },
   test: {
     projects: [
       {

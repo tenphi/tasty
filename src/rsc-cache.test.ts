@@ -9,6 +9,9 @@ function createCache(): RSCStyleCache {
     pendingCSS: [],
     keyToIndex: new Map(),
     generatedNames: new Map(),
+    precompiledRevision: -1,
+    precompiledEmittedKeys: new Set(),
+    precompiledGeneratedNames: new Map(),
   };
 }
 

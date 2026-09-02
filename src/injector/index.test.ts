@@ -596,7 +596,7 @@ describe('Global Style Injector API', () => {
         to: { opacity: 1 },
       });
 
-      expect(fade.toString()).toMatch(/^tk\d+$/);
+      expect(fade.toString()).toMatch(/^tk[a-z0-9]+$/);
       expect(typeof fade.dispose).toBe('function');
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
@@ -623,7 +623,7 @@ describe('Global Style Injector API', () => {
         '100%': { transform: 'rotate(360deg)' },
       });
 
-      expect(spin.toString()).toMatch(/^tk\d+$/);
+      expect(spin.toString()).toMatch(/^tk[a-z0-9]+$/);
     });
 
     it('should handle empty steps', () => {
@@ -645,7 +645,7 @@ describe('Global Style Injector API', () => {
         },
       });
 
-      expect(animation.toString()).toMatch(/^tk\d+$/);
+      expect(animation.toString()).toMatch(/^tk[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -684,7 +684,7 @@ describe('Global Style Injector API', () => {
         },
       });
 
-      expect(animation.toString()).toMatch(/^tk\d+$/);
+      expect(animation.toString()).toMatch(/^tk[a-z0-9]+$/);
 
       const styleElements = document.head.querySelectorAll('[data-tasty]');
       const allCssText = Array.from(styleElements)
@@ -710,7 +710,7 @@ describe('Global Style Injector API', () => {
         { root: shadowRoot },
       );
 
-      expect(pulse.toString()).toMatch(/^tk\d+$/);
+      expect(pulse.toString()).toMatch(/^tk[a-z0-9]+$/);
       expect(shadowRoot.querySelectorAll('[data-tasty]').length).toBe(1);
     });
 
@@ -721,7 +721,7 @@ describe('Global Style Injector API', () => {
       fade.dispose();
 
       // Should still work after dispose (cleanup happens later)
-      expect(name).toMatch(/^tk\d+$/);
+      expect(name).toMatch(/^tk[a-z0-9]+$/);
     });
 
     it('should allow custom names via options', () => {

@@ -138,23 +138,28 @@ export function useKeyframes(
     return '';
   }
 
+  const serializedContent = JSON.stringify(steps);
+  const actualName =
+    opts?.name ??
+    makeKeyframeName(getNamePrefix(), hashString(serializedContent));
+  const rscKey = `__kf:${opts?.name ?? ''}:${serializedContent}`;
+
   if (target.mode === 'ssr') {
-    const actualName = target.collector.allocateKeyframeName(opts?.name);
     const css = formatKeyframesCSS(actualName, steps);
-    target.collector.collectKeyframes(actualName, css);
+    target.collector.collectKeyframes(actualName, css, {
+      source: 'component',
+      contentKey: serializedContent,
+      rscKeys: [rscKey],
+    });
     return actualName;
   }
 
   if (target.mode === 'rsc') {
-    const serializedContent = JSON.stringify(steps);
-    const key = `__kf:${opts?.name ?? ''}:${serializedContent}`;
+    const key = rscKey;
 
     const existingName = target.cache.generatedNames.get(key);
     if (existingName) return existingName;
 
-    const actualName =
-      opts?.name ??
-      makeKeyframeName(getNamePrefix(), hashString(serializedContent));
     const css = formatKeyframesCSS(actualName, steps);
     pushRSCCSS(target.cache, key, css);
     target.cache.generatedNames.set(key, actualName);
@@ -163,7 +168,6 @@ export function useKeyframes(
 
   // Client path: stable name via content-based dedup
   const state = clientState ?? getClientState(opts?.root ?? document);
-  const serializedContent = JSON.stringify(steps);
   const cacheKey = `${opts?.name ?? ''}:${serializedContent}`;
 
   const cachedName = state.contentToName.get(cacheKey);

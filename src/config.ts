@@ -20,6 +20,7 @@ import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
+import { resetPrecompiledStyles } from './precompile/runtime';
 import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
 import {
@@ -549,6 +550,42 @@ function warnOnce(key: string, message: string): void {
 
 // Track whether styles have been generated (locks configuration)
 let stylesGenerated = false;
+
+/**
+ * What the host passed to `configure()`, for the settings whose live registry
+ * is not a faithful record of it. Accumulated across every `configure()` call.
+ *
+ * - Handlers and props middleware: `configure()` applies them into the handler
+ *   registry and then strips them from the stored config, and that registry is
+ *   populated lazily as styles are encountered — so neither is a stable record
+ *   of what the host asked for.
+ * - Declarative `@function` definitions: with `polyfills.functions` enabled,
+ *   `configure()` compiles each into a parse-function closure and deliberately
+ *   leaves `getGlobalFunctions()` empty, so the definition body survives
+ *   nowhere a fingerprint can read it.
+ *
+ * A precompiled catalog needs exactly that record: replacing a built-in handler
+ * or rewriting a function body changes what an already-compiled chunk should
+ * contain without changing its lookup key.
+ */
+const configuredOverrides: {
+  handlers: [string, unknown][];
+  propHandlers: [string, unknown][];
+  functions: [string, unknown][];
+} = { handlers: [], propHandlers: [], functions: [] };
+
+/** @internal */
+export function getConfiguredOverrides(): {
+  handlers: readonly (readonly [string, unknown])[];
+  propHandlers: readonly (readonly [string, unknown])[];
+  functions: readonly (readonly [string, unknown])[];
+} {
+  return {
+    handlers: configuredOverrides.handlers,
+    propHandlers: configuredOverrides.propHandlers,
+    functions: configuredOverrides.functions,
+  };
+}
 
 // Current configuration (null until first configure() or auto-configured on first use)
 let currentConfig: TastyConfig | null = null;
@@ -1543,6 +1580,9 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // each into an inline parse-function closure (and skip native emission);
   // otherwise store them for eager native @function injection.
   if (Object.keys(functionDefs).length > 0) {
+    for (const entry of Object.entries(functionDefs)) {
+      configuredOverrides.functions.push(entry);
+    }
     if (isFunctionsPolyfillEnabled()) {
       for (const [name, definition] of Object.entries(functionDefs)) {
         registerFunctionPolyfill(name, definition);
@@ -1575,6 +1615,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle custom handlers
   if (Object.keys(mergedHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedHandlers)) {
+      configuredOverrides.handlers.push([name, definition]);
       const handler = normalizeHandlerDefinition(name, definition);
       registerHandler(handler, {
         key: name,
@@ -1586,6 +1627,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle props middleware
   if (Object.keys(mergedPropHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedPropHandlers)) {
+      configuredOverrides.propHandlers.push([name, definition]);
       registerPropHandler(name, definition, {
         source: propHandlerSources.get(name),
       });
@@ -1729,8 +1771,12 @@ export function resetConfig(): void {
   resetHandlers();
   resetStyleChunks();
   resetPropHandlers();
+  configuredOverrides.handlers.length = 0;
+  configuredOverrides.propHandlers.length = 0;
+  configuredOverrides.functions.length = 0;
   resetBaseStyleProps();
   clearPipelineCache();
+  resetPrecompiledStyles();
   emittedWarnings.clear();
   resetStyleWarnings();
 

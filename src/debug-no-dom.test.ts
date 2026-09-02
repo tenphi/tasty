@@ -40,6 +40,16 @@ describe('tastyDebug without a DOM', () => {
       expect(summary.totalRuleCount).toBe(0);
       expect(summary.totalCSSSize).toBe(0);
       expect(summary.metrics).toBeNull();
+      // Precompiled coverage is reported off the same DOM read, so it has to
+      // come back empty rather than half-populated from the registry.
+      expect(summary.precompiledClasses).toEqual([]);
+      expect(summary.precompiledActiveClasses).toEqual([]);
+      expect(summary.precompiledInactiveClasses).toEqual([]);
+      expect(summary.precompiledUsedClasses).toEqual([]);
+      expect(summary.runtimeActiveClasses).toEqual([]);
+      expect(summary.precompiledManifestCount).toBe(0);
+      expect(summary.precompiledCSSSize).toBe(0);
+      expect(summary.precompiledRuleCount).toBe(0);
 
       expect(tastyDebug.chunks({ raw: true })).toEqual({
         byChunk: {},
@@ -48,7 +58,15 @@ describe('tastyDebug without a DOM', () => {
       });
 
       const cache = tastyDebug.cache({ raw: true });
-      expect(cache.classes).toEqual({ active: [], unused: [], all: [] });
+      expect(cache.classes).toEqual({
+        active: [],
+        unused: [],
+        all: [],
+        runtimeActive: [],
+        precompiledActive: [],
+        precompiledInactive: [],
+        precompiledUsed: [],
+      });
       expect(cache.metrics).toBeNull();
 
       expect(() => tastyDebug.cleanup()).not.toThrow();

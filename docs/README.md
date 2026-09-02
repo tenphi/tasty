@@ -16,13 +16,14 @@ Use this hub to move from the core idea to a working component, then into design
 
 - **Application developer using an existing design system**: [Getting Started](getting-started.md), then [React API](react-api.md).
 - **Design-system author**: [Methodology](methodology.md), [Building a Design System](design-system.md), [Configuration](configuration.md), and [Adoption Guide](adoption.md).
-- **Platform or tooling engineer**: [Configuration](configuration.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
+- **Platform or tooling engineer**: [Configuration](configuration.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Precompiled Component Catalogs](precompile.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
 
 ## By Styling Approach
 
 - **React components**: [React API](react-api.md)
 - **Zero-client-runtime React with `tasty()`**: [Server-Side Rendering](ssr.md), especially the static Astro integration
 - **Build-time extraction with `tastyStatic()`**: [Build-Time Extraction](tasty-static.md)
+- **Shared UI-kit CSS with runtime fallback**: [Precompiled Component Catalogs](precompile.md)
 - **Hydrated `tasty()` with server collection**: [Server-Side Rendering](ssr.md)
 - **Upgrading from v2**: [Migration Guide (v2 → v3)](migration-v3.md)
 
@@ -37,3 +38,4 @@ Use this hub to move from the core idea to a working component, then into design
 - **Understand how selector generation works internally**: [Style rendering pipeline](pipeline.md)
 - **Understand runtime injection internals**: [Style Injector](injector.md)
 - **Reproduce and interpret performance measurements**: [Runtime Benchmarks](runtime-benchmarks.md)
+- **Precompile a UI-kit component catalog**: [Precompiled Component Catalogs](precompile.md)

@@ -67,7 +67,9 @@ export function useFunction(
 
     const css = formatFunctionRule(name, definition);
     if (css) {
-      target.collector.collectFunction(parseFunctionName(name), css);
+      target.collector.collectFunction(parseFunctionName(name), css, {
+        source: 'component',
+      });
     }
     return;
   }

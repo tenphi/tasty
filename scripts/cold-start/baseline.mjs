@@ -11,7 +11,8 @@ import { writeFile } from 'node:fs/promises';
 import { brotliCompressSync } from 'node:zlib';
 import { createElement } from 'react';
 
-import { stylesFor, TOKENS } from './fixtures.mjs';
+import { stylesFor } from './fixtures.mjs';
+import { loadConfiguredRuntime } from './runtime.mjs';
 
 const CLASS_ATTR = /\sclass="([^"]*)"/;
 
@@ -19,11 +20,9 @@ export async function buildBaseline({ out, components }) {
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { createServerStyleCollector, runWithCollector } =
     await import('../../dist/ssr/index.js');
-  const { configure, tasty } = await import('../../dist/index.js');
-
-  // Same tokens as the page, and configured before the collector exists so its
-  // `:root` custom properties land in the stylesheet the control links.
-  configure({ tokens: TOKENS });
+  // Configured before the collector exists, so its `:root` custom properties
+  // land in the stylesheet the control links.
+  const { tasty } = await loadConfiguredRuntime();
 
   const collector = createServerStyleCollector();
   const classNames = runWithCollector(collector, () =>

@@ -81,8 +81,8 @@ function groupRules(rules: GroupedRule[]): GroupedRule[] {
  * Produces the same CSS text as SheetManager.insertRule() would insert
  * into the DOM, but as a plain string suitable for SSR output.
  */
-export function formatRules(rules: StyleResult[], className: string): string {
-  if (rules.length === 0) return '';
+function formatRuleList(rules: StyleResult[], className: string): string[] {
+  if (rules.length === 0) return [];
 
   const resolvedRules = rules.map((rule) => ({
     selector: resolveSelector(rule, className),
@@ -111,5 +111,23 @@ export function formatRules(rules: StyleResult[], className: string): string {
     cssRules.push(fullRule);
   }
 
-  return cssRules.join('\n');
+  return cssRules;
+}
+
+export function formatRules(rules: StyleResult[], className: string): string {
+  return formatRuleList(rules, className).join('\n');
+}
+
+/**
+ * Format rules and retain the number of top-level CSS rules produced.
+ *
+ * The precompiler uses this structural count so debug metadata never has to
+ * parse the generated stylesheet text.
+ */
+export function formatRulesWithStats(
+  rules: StyleResult[],
+  className: string,
+): { css: string; ruleCount: number } {
+  const cssRules = formatRuleList(rules, className);
+  return { css: cssRules.join('\n'), ruleCount: cssRules.length };
 }

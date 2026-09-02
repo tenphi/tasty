@@ -3,6 +3,7 @@ import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
 import { flushStyles, getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
+import { getRegisteredPrecompiledStats } from './precompile/runtime';
 import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
 
@@ -50,6 +51,10 @@ export interface CacheStatus {
     active: string[];
     unused: string[];
     all: string[];
+    runtimeActive: string[];
+    precompiledActive: string[];
+    precompiledInactive: string[];
+    precompiledUsed: string[];
   };
   metrics: CacheMetrics | null;
 }
@@ -65,6 +70,14 @@ export interface ChunkBreakdown {
 
 export interface Summary {
   activeClasses: string[];
+  /** Active DOM classes not covered by a registered precompiled manifest. */
+  runtimeActiveClasses: string[];
+  /** Registered precompiled classes currently present in the DOM. */
+  precompiledActiveClasses: string[];
+  /** Registered precompiled classes not currently present in the DOM. */
+  precompiledInactiveClasses: string[];
+  /** Distinct precompiled classes served since metrics were last reset. */
+  precompiledUsedClasses: string[];
   /** Classes `gc({ force: true })` would delete right now. */
   unusedClasses: string[];
   /**
@@ -73,6 +86,9 @@ export interface Summary {
    */
   hotClasses: string[];
   totalStyledClasses: string[];
+  /** Classes supplied by registered immutable precompiled stylesheets. */
+  precompiledClasses: string[];
+  precompiledManifestCount: number;
 
   activeCSSSize: number;
   unusedCSSSize: number;
@@ -80,6 +96,7 @@ export interface Summary {
   rawCSSSize: number;
   keyframesCSSSize: number;
   propertyCSSSize: number;
+  precompiledCSSSize: number;
   totalCSSSize: number;
 
   activeRuleCount: number;
@@ -88,6 +105,7 @@ export interface Summary {
   rawRuleCount: number;
   keyframesRuleCount: number;
   propertyRuleCount: number;
+  precompiledRuleCount: number;
   totalRuleCount: number;
 
   metrics: CacheMetrics | null;
@@ -233,6 +251,25 @@ function getOwnedClasses(root: DebugRoot = defaultRoot()): string[] {
   }
 
   return sortTastyClasses(owned);
+}
+
+const NO_PRECOMPILED = {
+  manifestCount: 0,
+  classNames: [],
+  cssSize: 0,
+  ruleCount: 0,
+};
+
+/**
+ * Catalogs are registered against the document, so a Shadow root has none —
+ * and neither does an environment with no DOM at all, where every other reader
+ * here reports empty too.
+ */
+function getPrecompiledDebugStats(root: DebugRoot) {
+  return !root ||
+    (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot)
+    ? NO_PRECOMPILED
+    : getRegisteredPrecompiledStats(getNamePrefix());
 }
 
 // ---------------------------------------------------------------------------
@@ -699,11 +736,26 @@ export const tastyDebug = {
     // moment ago is in neither, and dropping it here is the accounting failure
     // this whole change started from.
     const ownedClasses = getOwnedClasses(root);
+    const precompiled = getPrecompiledDebugStats(root);
+    const precompiledClasses = sortTastyClasses(precompiled.classNames);
+    const precompiledSet = new Set(precompiledClasses);
+    const runtimeActiveClasses = activeClasses.filter(
+      (className) => !precompiledSet.has(className),
+    );
+    const precompiledActiveClasses = activeClasses.filter((className) =>
+      precompiledSet.has(className),
+    );
+    const activeSet = new Set(activeClasses);
+    const precompiledInactiveClasses = precompiledClasses.filter(
+      (className) => !activeSet.has(className),
+    );
+    const precompiledUsedClasses = sortTastyClasses(
+      getRegistry(root)?.precompiledUsedClasses ?? [],
+    );
     const totalStyledClasses = sortTastyClasses(
-      new Set([...activeClasses, ...ownedClasses]),
+      new Set([...activeClasses, ...ownedClasses, ...precompiledClasses]),
     );
     const unusedSet = new Set(unusedClasses);
-    const activeSet = new Set(activeClasses);
     const hotClasses = ownedClasses.filter(
       (className) => !activeSet.has(className) && !unusedSet.has(className),
     );
@@ -746,6 +798,8 @@ export const tastyDebug = {
       rawData.ruleCount +
       kfData.ruleCount +
       propData.ruleCount;
+    const totalRuleCountWithPrecompiled =
+      totalRuleCount + precompiled.ruleCount;
 
     const metrics = getInjectorMetrics(root);
     const defs = getDefs(root);
@@ -753,23 +807,31 @@ export const tastyDebug = {
 
     const summary: Summary = {
       activeClasses,
+      runtimeActiveClasses,
+      precompiledActiveClasses,
+      precompiledInactiveClasses,
+      precompiledUsedClasses,
       unusedClasses,
       hotClasses,
       totalStyledClasses,
+      precompiledClasses,
+      precompiledManifestCount: precompiled.manifestCount,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
       globalCSSSize: globalData.size + atRuleData.size,
       rawCSSSize: rawData.size,
       keyframesCSSSize: kfData.size,
       propertyCSSSize: propData.size,
-      totalCSSSize: allCSS.length,
+      precompiledCSSSize: precompiled.cssSize,
+      totalCSSSize: allCSS.length + precompiled.cssSize,
       activeRuleCount,
       unusedRuleCount,
       globalRuleCount: globalData.ruleCount + atRuleData.ruleCount,
       rawRuleCount: rawData.ruleCount,
       keyframesRuleCount: kfData.ruleCount,
       propertyRuleCount: propData.ruleCount,
-      totalRuleCount,
+      precompiledRuleCount: precompiled.ruleCount,
+      totalRuleCount: totalRuleCountWithPrecompiled,
       metrics,
       definedProperties: defs.properties,
       definedKeyframes: defs.keyframes,
@@ -779,10 +841,10 @@ export const tastyDebug = {
     if (!raw) {
       console.group('Tasty Summary');
       console.log(
-        `Active:   ${activeClasses.length} classes, ${activeRuleCount} rules, ${fmtSize(activeCSS.length)}`,
+        `Active:   ${activeClasses.length} classes (${runtimeActiveClasses.length} runtime, ${precompiledActiveClasses.length} precompiled), ${activeRuleCount} runtime rules, ${fmtSize(activeCSS.length)} runtime CSS`,
       );
       console.log(
-        `Unused:   ${unusedClasses.length} classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
+        `Unused:   ${unusedClasses.length} runtime classes, ${unusedRuleCount} rules, ${fmtSize(unusedCSS.length)}`,
       );
       if (hotClasses.length)
         console.log(
@@ -803,14 +865,21 @@ export const tastyDebug = {
         console.log(
           `@property: ${propData.ruleCount} rules, ${fmtSize(propData.size)}`,
         );
+      if (precompiled.manifestCount)
+        console.log(
+          `Precompiled: ${precompiledActiveClasses.length} active, ${precompiledInactiveClasses.length} inactive, ${precompiledUsedClasses.length}/${precompiledClasses.length} used since reset; ${precompiled.ruleCount} rules, ${fmtSize(precompiled.cssSize)} (${precompiled.manifestCount} ${precompiled.manifestCount === 1 ? 'manifest' : 'manifests'})`,
+        );
       console.log(
-        `Total:    ${totalStyledClasses.length} classes, ${totalRuleCount} rules, ${fmtSize(allCSS.length)}`,
+        `Total:    ${totalStyledClasses.length} classes, ${totalRuleCountWithPrecompiled} rules, ${fmtSize(allCSS.length + precompiled.cssSize)}`,
       );
 
       if (metrics) {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
-        console.log(`Cache:    ${rate}% hit rate (${total} lookups)`);
+        const runtimeHits = metrics.hits - metrics.precompiledHits;
+        console.log(
+          `Lookups:  ${total} (${metrics.precompiledHits} precompiled across ${metrics.precompiledUniqueHits} classes, ${runtimeHits} runtime cache hits, ${metrics.misses} generated; ${rate}% reused)`,
+        );
       }
 
       if (chunkBreakdown.totalChunkTypes > 0) {
@@ -879,26 +948,52 @@ export const tastyDebug = {
     const active = findDomTastyClasses(root);
     const unused = getUnusedClasses(root);
     const metrics = getInjectorMetrics(root);
+    const precompiled = getPrecompiledDebugStats(root);
+    const precompiledSet = new Set(precompiled.classNames);
+    const runtimeActive = active.filter(
+      (className) => !precompiledSet.has(className),
+    );
+    const precompiledActive = active.filter((className) =>
+      precompiledSet.has(className),
+    );
+    const activeSet = new Set(active);
+    const precompiledInactive = sortTastyClasses(
+      precompiled.classNames.filter((className) => !activeSet.has(className)),
+    );
+    const precompiledUsed = sortTastyClasses(
+      getRegistry(root)?.precompiledUsedClasses ?? [],
+    );
 
     // `all` is everything held, not the two bands above: a class that went cold
     // a moment ago is in neither, and it is still taking up a sheet.
     const all = sortTastyClasses(
-      new Set([...active, ...getOwnedClasses(root)]),
+      new Set([...active, ...getOwnedClasses(root), ...precompiled.classNames]),
     );
 
     const status: CacheStatus = {
-      classes: { active, unused, all },
+      classes: {
+        active,
+        unused,
+        all,
+        runtimeActive,
+        precompiledActive,
+        precompiledInactive,
+        precompiledUsed,
+      },
       metrics,
     };
 
     if (!raw) {
       console.group('Cache');
-      console.log(`Active: ${active.length}, Unused: ${unused.length}`);
+      console.log(
+        `Active: ${active.length} (${runtimeActive.length} runtime, ${precompiledActive.length} precompiled), Unused: ${unused.length} runtime, Inactive precompiled: ${precompiledInactive.length}`,
+      );
       if (metrics) {
         const total = metrics.hits + metrics.misses;
         const rate = total > 0 ? ((metrics.hits / total) * 100).toFixed(1) : 0;
+        const runtimeHits = metrics.hits - metrics.precompiledHits;
         console.log(
-          `Hits: ${metrics.hits}, Misses: ${metrics.misses}, Rate: ${rate}%`,
+          `Precompiled: ${metrics.precompiledHits} hits across ${metrics.precompiledUniqueHits} classes, Runtime cache: ${runtimeHits} hits, Generated: ${metrics.misses}, Reuse: ${rate}%`,
         );
       }
       console.groupEnd();

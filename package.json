@@ -87,6 +87,16 @@
       "import": "./dist/ssr/astro-middleware-extract-static.js",
       "default": "./dist/ssr/astro-middleware-extract-static.js"
     },
+    "./precompile": {
+      "types": "./dist/precompile/index.d.ts",
+      "import": "./dist/precompile/index.js",
+      "default": "./dist/precompile/index.js"
+    },
+    "./precompile/register": {
+      "types": "./dist/precompile/register.d.ts",
+      "import": "./dist/precompile/register.js",
+      "default": "./dist/precompile/register.js"
+    },
     "./tasty.config": "./tasty.config.ts"
   },
   "files": [
@@ -163,7 +173,8 @@
     "@babel/types": "^7.24.0",
     "jiti": "^2.6.1",
     "next": ">=14.0.0",
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "@babel/core": {
@@ -176,6 +187,9 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     },
     "jiti": {
@@ -230,13 +244,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.5 kB"
+      "limit": "60.1 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "54.5 kB"
+      "limit": "56.5 kB"
     },
     {
       "name": "static",
@@ -264,7 +278,7 @@
         "path",
         "crypto"
       ],
-      "limit": "49.6 kB"
+      "limit": "50.2 kB"
     }
   ]
 }

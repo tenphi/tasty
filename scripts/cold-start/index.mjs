@@ -17,7 +17,9 @@
  *              be read as a delta against this one.
  *   runtime  — Tasty generates the CSS in the browser, as a client-rendered
  *              application does.
- *   prewarm  — the same, after one throwaway `computeStyles` against a
+ *   precompiled — the CSS ships as a linked catalog stylesheet and the runtime
+ *              only registers its lookup table.
+ *   prewarm  — like `runtime`, after one throwaway `computeStyles` against a
  *              detached root, which pays the library's one-time compile cost
  *              before the first component renders.
  */
@@ -28,6 +30,7 @@ import { chromium } from 'playwright';
 
 import { buildAssets, MODES as ALL_MODES, OUT } from './build.mjs';
 import { buildBaseline } from './baseline.mjs';
+import { buildCatalog } from './catalog.mjs';
 import { CPU_RATES, NETWORK_PROFILES } from './network.mjs';
 
 const args = parseArgs(process.argv.slice(2));
@@ -106,8 +109,8 @@ function parseArgs(argv) {
 }
 
 /**
- * Only `baseline` links a stylesheet, because it is the only page whose CSS is
- * a static asset. The runtime modes have no stylesheet at all until Tasty
+ * `baseline` and `precompiled` link a stylesheet, because both are pages whose
+ * CSS is a static asset. `runtime` and `prewarm` have none at all until Tasty
  * injects one.
  *
  * `mode` reaches this from the query string and is interpolated into markup, so
@@ -117,7 +120,7 @@ const page = (mode) => `<!doctype html>
 <meta charset="utf-8">
 <title>Tasty cold start</title>
 <script type="importmap">{"imports":{"react":"/react.js","react-dom/client":"/react.js","react-dom":"/react.js"}}</script>
-${mode === 'baseline' ? '<link rel="stylesheet" href="/baseline.css">' : ''}
+${mode === 'baseline' ? '<link rel="stylesheet" href="/baseline.css">' : ''}${mode === 'precompiled' ? '<link rel="stylesheet" href="/catalog.css">' : ''}
 <div id="root"></div>
 <script type="module" src="/app-${mode}.js"></script>
 `;
@@ -231,7 +234,11 @@ async function measure(browser, base, { mode, network, cpu }) {
     const fcp = performance
       .getEntriesByType('paint')
       .find((e) => e.name === 'first-contentful-paint');
-    const tasty = res('/tasty.js');
+    // Either bundle — the mode decides which one the page loaded.
+    const tasty =
+      performance
+        .getEntriesByType('resource')
+        .find((e) => /\/tasty(-precompiled)?\.js$/.test(e.name)) ?? null;
     const react = res('/react.js');
     const app =
       performance
@@ -262,6 +269,7 @@ async function measure(browser, base, { mode, network, cpu }) {
       css: css && { start: css.startTime, end: css.responseEnd },
       modulesReady: mark('modules:ready'),
       configure: [mark('configure:start'), mark('configure:end')],
+      catalog: [mark('catalog:start'), mark('catalog:end')],
       prewarm: [mark('prewarm:start'), mark('prewarm:end')],
       renderFirst: [mark('render-first:start'), mark('render-first:end')],
       renderRest: [mark('render-rest:start'), mark('render-rest:end')],
@@ -315,7 +323,13 @@ async function verifyModes(browser, base, modes, sizes) {
     await context.close();
 
     const generated = state.metrics?.misses ?? 0;
-    results[mode] = { generated, transfer: state.transfer, ...state.proof };
+    const hits = state.metrics?.precompiledHits ?? 0;
+    results[mode] = {
+      generated,
+      hits,
+      transfer: state.transfer,
+      ...state.proof,
+    };
 
     if (state.noPaint) {
       throw new Error(`${mode} mode never painted.`);
@@ -325,10 +339,26 @@ async function verifyModes(browser, base, modes, sizes) {
         `${mode} mode rendered ${state.proof?.rendered} of ${COMPONENTS} components.`,
       );
     }
-    if (mode !== 'baseline' && generated === 0) {
+    // A precompiled class name and a runtime one are the same string — both
+    // are `hashString(cacheKey)` — so neither the markup nor the rendered
+    // pixels distinguish them. Only the injector's counters do.
+    if (mode === 'precompiled' && (hits === 0 || generated > 0)) {
       throw new Error(
-        `${mode} mode generated no CSS at runtime, so its numbers are not the runtime path.`,
+        `precompiled mode: ${hits} catalog hits and ${generated} rules generated at runtime. ` +
+          'Every component chunk must come from the catalog, or this column reports the runtime path.',
       );
+    }
+    if (mode === 'runtime' || mode === 'prewarm') {
+      if (generated === 0) {
+        throw new Error(
+          `${mode} mode generated no CSS at runtime, so its numbers are not the runtime path.`,
+        );
+      }
+      if (hits > 0) {
+        throw new Error(
+          `${mode} mode unexpectedly hit a catalog ${hits} times.`,
+        );
+      }
     }
   }
 
@@ -405,6 +435,7 @@ function phases(r) {
     'react execute': span([r.reactEvalStart, r.reactEvalEnd]),
     'tasty execute': span([r.evalStart, r.evalEnd]),
     configure: span(r.configure),
+    'catalog install': span(r.catalog),
     prewarm: span(r.prewarm),
     'render 1st': span(r.renderFirst),
     [`render ${COMPONENTS - 1} more`]: span(r.renderRest),
@@ -417,6 +448,7 @@ function phases(r) {
 // server holding the process alive.
 const sizes = await buildAssets({ components: COMPONENTS });
 const baseline = await buildBaseline({ out: OUT, components: COMPONENTS });
+const catalog = await buildCatalog({ out: OUT, components: COMPONENTS });
 const { server, base } = await serve();
 // The page renders the same fixtures the control was server-rendered from.
 await copyFile(new URL('./fixtures.mjs', import.meta.url), `${OUT}fixtures.js`);
@@ -430,7 +462,10 @@ for (const [name, s] of Object.entries(sizes)) {
   );
 }
 console.log(
-  `  ${'baseline.css'.padEnd(10)} ${(baseline.brotliBytes / 1024).toFixed(1).padStart(5)} KB over the wire (brotli)  ${(baseline.cssBytes / 1024).toFixed(0).padStart(4)} KB decoded, ${baseline.classes} classes\n`,
+  `  ${'baseline.css'.padEnd(10)} ${(baseline.brotliBytes / 1024).toFixed(1).padStart(5)} KB over the wire (brotli)  ${(baseline.cssBytes / 1024).toFixed(0).padStart(4)} KB decoded, ${baseline.classes} classes`,
+);
+console.log(
+  `  ${'catalog.css'.padEnd(10)} ${(catalog.brotliBytes / 1024).toFixed(1).padStart(5)} KB over the wire (brotli)  ${(catalog.cssBytes / 1024).toFixed(0).padStart(4)} KB decoded, ${catalog.chunks} chunks\n`,
 );
 
 const browser = await chromium.launch();
@@ -444,7 +479,10 @@ const { results: verified, background } = await verifyModes(
 console.log(
   `mode check: all render ${COMPONENTS} components at ${background} — ` +
     Object.entries(verified)
-      .map(([m, v]) => `${m} ${v.generated} rules generated`)
+      .map(
+        ([m, v]) =>
+          `${m} ${v.generated} generated${v.hits ? ` / ${v.hits} catalog hits` : ''}`,
+      )
       .join(', ') +
     '\n',
 );

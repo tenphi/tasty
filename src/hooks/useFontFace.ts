@@ -59,7 +59,7 @@ export function useFontFace(
     for (const desc of descriptors) {
       const hash = fontFaceContentHash(family, desc);
       const css = formatFontFaceRule(family, desc);
-      target.collector.collectFontFace(hash, css);
+      target.collector.collectFontFace(hash, css, { source: 'component' });
     }
     return;
   }

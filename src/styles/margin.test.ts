@@ -65,32 +65,6 @@ describe('marginStyle', () => {
     });
   });
 
-  describe('marginBlock and marginInline', () => {
-    it('handles marginBlock (top and bottom)', () => {
-      const result = marginStyle({ marginBlock: '2x' });
-      expect(result).toEqual({
-        margin: '16px 0', // raw unit: 2 * 8px
-      });
-    });
-
-    it('handles marginInline (left and right)', () => {
-      const result = marginStyle({ marginInline: '4x' });
-      expect(result).toEqual({
-        margin: '0 32px', // raw unit: 4 * 8px
-      });
-    });
-
-    it('handles boolean and number values for logical properties', () => {
-      const result = marginStyle({
-        marginBlock: true,
-        marginInline: 8,
-      });
-      expect(result).toEqual({
-        margin: '8px', // all sides equal, optimized to single value
-      });
-    });
-  });
-
   describe('individual direction properties', () => {
     it('handles individual direction properties', () => {
       const result = marginStyle({
@@ -118,42 +92,6 @@ describe('marginStyle', () => {
   });
 
   describe('priority system', () => {
-    it('margin (low) < marginBlock/marginInline (medium)', () => {
-      const result = marginStyle({
-        margin: '1x',
-        marginBlock: '2x',
-        marginInline: '3x',
-      });
-      expect(result).toEqual({
-        margin: '16px 24px', // raw units
-      });
-    });
-
-    it('marginBlock/marginInline (medium) < individual directions (high)', () => {
-      const result = marginStyle({
-        marginBlock: '2x',
-        marginInline: '3x',
-        marginTop: '4x',
-        marginRight: '5x',
-      });
-      expect(result).toEqual({
-        margin: '32px 40px 16px 24px', // raw units
-      });
-    });
-
-    it('complete priority chain: margin < marginBlock/Inline < individual', () => {
-      const result = marginStyle({
-        margin: '1x',
-        marginBlock: '2x',
-        marginInline: '3x',
-        marginTop: '4x',
-        marginRight: '5x',
-      });
-      expect(result).toEqual({
-        margin: '32px 40px 16px 24px', // raw units
-      });
-    });
-
     it('example: margin="1x" marginRight="2x"', () => {
       const result = marginStyle({
         margin: '1x',
@@ -163,23 +101,12 @@ describe('marginStyle', () => {
         margin: '8px 16px 8px 8px', // raw units
       });
     });
-
-    it('example: margin="1x" marginBlock="2x"', () => {
-      const result = marginStyle({
-        margin: '1x',
-        marginBlock: '2x',
-      });
-      expect(result).toEqual({
-        margin: '16px 8px', // raw units
-      });
-    });
   });
 
   describe('edge cases', () => {
     it('handles null and undefined values', () => {
       const result = marginStyle({
         margin: undefined,
-        marginBlock: undefined,
         marginTop: undefined,
       });
       expect(result).toBeNull();
@@ -188,7 +115,6 @@ describe('marginStyle', () => {
     it('handles empty string values', () => {
       const result = marginStyle({
         margin: '',
-        marginBlock: '',
         marginTop: '2x',
       });
       expect(result).toEqual({
@@ -209,11 +135,10 @@ describe('marginStyle', () => {
     it('handles mixed types', () => {
       const result = marginStyle({
         margin: true,
-        marginBlock: 16,
         marginLeft: '3x',
       });
       expect(result).toEqual({
-        margin: '16px 8px 16px 24px', // raw units
+        margin: '8px 8px 8px 24px', // raw units
       });
     });
 
@@ -236,16 +161,6 @@ describe('marginStyle', () => {
       });
       expect(result).toEqual({
         margin: '40px 0 16px 0', // raw units
-      });
-    });
-
-    it('combines directional margin with logical properties', () => {
-      const result = marginStyle({
-        margin: '1x top',
-        marginInline: '3x',
-      });
-      expect(result).toEqual({
-        margin: '8px 24px 0 24px', // raw units
       });
     });
 
@@ -321,15 +236,6 @@ describe('marginStyle', () => {
   });
 
   describe('auto values', () => {
-    it('handles auto values for centering', () => {
-      const result = marginStyle({
-        marginInline: 'auto',
-      });
-      expect(result).toEqual({
-        margin: '0 auto',
-      });
-    });
-
     it('handles mixed auto and specific values', () => {
       const result = marginStyle({
         margin: '1x auto',
@@ -352,9 +258,6 @@ describe('marginStyle', () => {
 
     it('outputs two values when vertical and horizontal are equal', () => {
       expect(marginStyle({ margin: '1x 2x' })).toEqual({
-        margin: '8px 16px', // raw units
-      });
-      expect(marginStyle({ marginBlock: '1x', marginInline: '2x' })).toEqual({
         margin: '8px 16px', // raw units
       });
     });
@@ -390,14 +293,6 @@ describe('marginStyle', () => {
     it('later groups override earlier groups for same direction', () => {
       expect(marginStyle({ margin: '1x, 2x top, 3x top' })).toEqual({
         margin: '24px 8px 8px 8px',
-      });
-    });
-
-    it('multi-group with marginBlock override', () => {
-      expect(
-        marginStyle({ margin: '1x, 2x left right', marginBlock: '3x' }),
-      ).toEqual({
-        margin: '24px 16px',
       });
     });
 

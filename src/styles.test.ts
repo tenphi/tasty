@@ -298,22 +298,9 @@ describe('Tasty style tests', () => {
       top: 'initial',
     });
 
-    // Block/inline props
-    expect(insetStyle({ insetBlock: '10px' })).toEqual({
-      inset: '10px auto',
-    });
-
-    expect(insetStyle({ insetInline: '20px' })).toEqual({
-      inset: 'auto 20px',
-    });
-
-    // Priority: individual > block/inline > inset
+    // Individual physical props override inset inside the physical handler.
     expect(insetStyle({ inset: '0', top: '10px' })).toEqual({
       inset: '10px 0 0 0',
-    });
-
-    expect(insetStyle({ inset: '0', insetBlock: '5px', top: '10px' })).toEqual({
-      inset: '10px 0 5px 0',
     });
 
     // null when no props

@@ -12,16 +12,12 @@ const INSET_CONFIG: DirectionalConfig = {
 
 export function insetStyle({
   inset,
-  insetBlock,
-  insetInline,
   top,
   right,
   bottom,
   left,
 }: {
   inset?: string | number | boolean;
-  insetBlock?: string | number | boolean;
-  insetInline?: string | number | boolean;
   top?: string | number | boolean;
   right?: string | number | boolean;
   bottom?: string | number | boolean;
@@ -29,8 +25,6 @@ export function insetStyle({
 }) {
   return processDirectionalStyle(INSET_CONFIG, {
     main: inset,
-    block: insetBlock,
-    inline: insetInline,
     top,
     right,
     bottom,
@@ -38,12 +32,4 @@ export function insetStyle({
   });
 }
 
-insetStyle.__lookupStyles = [
-  'inset',
-  'insetBlock',
-  'insetInline',
-  'top',
-  'right',
-  'bottom',
-  'left',
-];
+insetStyle.__lookupStyles = ['inset', 'top', 'right', 'bottom', 'left'];

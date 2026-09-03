@@ -72,6 +72,8 @@ export interface StylesInterface extends Omit<
   | 'margin'
   | 'width'
   | 'height'
+  | 'blockSize'
+  | 'inlineSize'
   | 'border'
   | 'transition'
   | 'placeContent'
@@ -82,7 +84,22 @@ export interface StylesInterface extends Omit<
   | 'scrollMarginBottom'
   | 'scrollMarginLeft'
   | 'scrollMarginBlock'
+  | 'scrollMarginBlockStart'
+  | 'scrollMarginBlockEnd'
   | 'scrollMarginInline'
+  | 'scrollMarginInlineStart'
+  | 'scrollMarginInlineEnd'
+  | 'scrollPadding'
+  | 'scrollPaddingTop'
+  | 'scrollPaddingRight'
+  | 'scrollPaddingBottom'
+  | 'scrollPaddingLeft'
+  | 'scrollPaddingBlock'
+  | 'scrollPaddingBlockStart'
+  | 'scrollPaddingBlockEnd'
+  | 'scrollPaddingInline'
+  | 'scrollPaddingInlineStart'
+  | 'scrollPaddingInlineEnd'
 > {
   /**
    * @deprecated Use `flow` style instead.
@@ -280,6 +297,16 @@ export interface StylesInterface extends Omit<
    * - `height={true}` // height: auto
    */
   height?: CSSProperties['height'] | string | boolean;
+  /**
+   * Logical block size with the same enhanced min/max/fixed syntax as `width`.
+   * Emits native `block-size`, `min-block-size`, and `max-block-size` declarations.
+   */
+  blockSize?: CSSProperties['blockSize'] | string | boolean;
+  /**
+   * Logical inline size with the same enhanced min/max/fixed syntax as `width`.
+   * Emits native `inline-size`, `min-inline-size`, and `max-inline-size` declarations.
+   */
+  inlineSize?: CSSProperties['inlineSize'] | string | boolean;
   /**
    * Shorthand for border width, style, and color. Supports directional modifiers and design-system defaults.
    *
@@ -508,7 +535,26 @@ export interface StylesInterface extends Omit<
   scrollMarginBottom?: string | number | boolean;
   scrollMarginLeft?: string | number | boolean;
   scrollMarginBlock?: string | number | boolean;
+  scrollMarginBlockStart?: string | number | boolean;
+  scrollMarginBlockEnd?: string | number | boolean;
   scrollMarginInline?: string | number | boolean;
+  scrollMarginInlineStart?: string | number | boolean;
+  scrollMarginInlineEnd?: string | number | boolean;
+  /**
+   * Shorthand for physical scroll padding. Supports custom units and the same
+   * physical direction modifiers as `padding`.
+   */
+  scrollPadding?: CSSProperties['scrollPadding'] | string | boolean;
+  scrollPaddingTop?: string | number | boolean;
+  scrollPaddingRight?: string | number | boolean;
+  scrollPaddingBottom?: string | number | boolean;
+  scrollPaddingLeft?: string | number | boolean;
+  scrollPaddingBlock?: string | number | boolean;
+  scrollPaddingBlockStart?: string | number | boolean;
+  scrollPaddingBlockEnd?: string | number | boolean;
+  scrollPaddingInline?: string | number | boolean;
+  scrollPaddingInlineStart?: string | number | boolean;
+  scrollPaddingInlineEnd?: string | number | boolean;
   /**
    * Shorthand for `top`, `right`, `bottom`, and `left` offsets. Supports custom units, directional modifiers, and positioning.
    *

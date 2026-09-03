@@ -9,16 +9,12 @@ const SCROLL_MARGIN_CONFIG = {
 
 export function scrollMarginStyle({
   scrollMargin,
-  scrollMarginBlock,
-  scrollMarginInline,
   scrollMarginTop,
   scrollMarginRight,
   scrollMarginBottom,
   scrollMarginLeft,
 }: {
   scrollMargin?: string | number | boolean;
-  scrollMarginBlock?: string | number | boolean;
-  scrollMarginInline?: string | number | boolean;
   scrollMarginTop?: string | number | boolean;
   scrollMarginRight?: string | number | boolean;
   scrollMarginBottom?: string | number | boolean;
@@ -26,8 +22,6 @@ export function scrollMarginStyle({
 }) {
   return processDirectionalStyle(SCROLL_MARGIN_CONFIG, {
     main: scrollMargin,
-    block: scrollMarginBlock,
-    inline: scrollMarginInline,
     top: scrollMarginTop,
     right: scrollMarginRight,
     bottom: scrollMarginBottom,
@@ -41,6 +35,4 @@ scrollMarginStyle.__lookupStyles = [
   'scrollMarginRight',
   'scrollMarginBottom',
   'scrollMarginLeft',
-  'scrollMarginBlock',
-  'scrollMarginInline',
 ];

@@ -89,32 +89,6 @@ describe('paddingStyle', () => {
     });
   });
 
-  describe('paddingBlock and paddingInline', () => {
-    it('handles paddingBlock (top and bottom)', () => {
-      const result = paddingStyle({ paddingBlock: '2x' });
-      expect(result).toEqual({
-        padding: '16px 0', // raw unit: 2 * 8px
-      });
-    });
-
-    it('handles paddingInline (left and right)', () => {
-      const result = paddingStyle({ paddingInline: '4x' });
-      expect(result).toEqual({
-        padding: '0 32px', // raw unit: 4 * 8px
-      });
-    });
-
-    it('handles boolean and number values for logical properties', () => {
-      const result = paddingStyle({
-        paddingBlock: true,
-        paddingInline: 8,
-      });
-      expect(result).toEqual({
-        padding: '8px', // all sides equal, optimized to single value
-      });
-    });
-  });
-
   describe('individual direction properties', () => {
     it('handles individual direction properties', () => {
       const result = paddingStyle({
@@ -142,42 +116,6 @@ describe('paddingStyle', () => {
   });
 
   describe('priority system', () => {
-    it('padding (low) < paddingBlock/paddingInline (medium)', () => {
-      const result = paddingStyle({
-        padding: '1x',
-        paddingBlock: '2x',
-        paddingInline: '3x',
-      });
-      expect(result).toEqual({
-        padding: '16px 24px', // raw units
-      });
-    });
-
-    it('paddingBlock/paddingInline (medium) < individual directions (high)', () => {
-      const result = paddingStyle({
-        paddingBlock: '2x',
-        paddingInline: '3x',
-        paddingTop: '4x',
-        paddingRight: '5x',
-      });
-      expect(result).toEqual({
-        padding: '32px 40px 16px 24px', // raw units
-      });
-    });
-
-    it('complete priority chain: padding < paddingBlock/Inline < individual', () => {
-      const result = paddingStyle({
-        padding: '1x',
-        paddingBlock: '2x',
-        paddingInline: '3x',
-        paddingTop: '4x',
-        paddingRight: '5x',
-      });
-      expect(result).toEqual({
-        padding: '32px 40px 16px 24px', // raw units
-      });
-    });
-
     it('example from requirements: padding="1x" paddingRight="2x"', () => {
       const result = paddingStyle({
         padding: '1x',
@@ -187,23 +125,12 @@ describe('paddingStyle', () => {
         padding: '8px 16px 8px 8px', // raw units
       });
     });
-
-    it('example from requirements: padding="1x" paddingBlock="2x"', () => {
-      const result = paddingStyle({
-        padding: '1x',
-        paddingBlock: '2x',
-      });
-      expect(result).toEqual({
-        padding: '16px 8px', // raw units
-      });
-    });
   });
 
   describe('edge cases', () => {
     it('handles null and undefined values', () => {
       const result = paddingStyle({
         padding: undefined,
-        paddingBlock: undefined,
         paddingTop: undefined,
       });
       expect(result).toBeNull();
@@ -212,7 +139,6 @@ describe('paddingStyle', () => {
     it('handles empty string values', () => {
       const result = paddingStyle({
         padding: '',
-        paddingBlock: '',
         paddingTop: '2x',
       });
       expect(result).toEqual({
@@ -233,11 +159,10 @@ describe('paddingStyle', () => {
     it('handles mixed types', () => {
       const result = paddingStyle({
         padding: true,
-        paddingBlock: 16,
         paddingLeft: '3x',
       });
       expect(result).toEqual({
-        padding: '16px 8px 16px 24px', // raw units
+        padding: '8px 8px 8px 24px', // raw units
       });
     });
   });
@@ -250,16 +175,6 @@ describe('paddingStyle', () => {
       });
       expect(result).toEqual({
         padding: '40px 0 16px 0', // raw units
-      });
-    });
-
-    it('combines directional padding with logical properties', () => {
-      const result = paddingStyle({
-        padding: '1x top',
-        paddingInline: '3x',
-      });
-      expect(result).toEqual({
-        padding: '8px 24px 0 24px', // raw units
       });
     });
 
@@ -328,17 +243,6 @@ describe('paddingStyle', () => {
       });
     });
 
-    it('respects paddingBlock/Inline overrides with longhand', () => {
-      expect(
-        paddingStyle({ padding: '1x longhand', paddingBlock: '2x' }),
-      ).toEqual({
-        'padding-top': '16px',
-        'padding-right': '8px',
-        'padding-bottom': '16px',
-        'padding-left': '8px',
-      });
-    });
-
     it('expands CSS-wide keyword with longhand', () => {
       expect(paddingStyle({ padding: 'inherit longhand' })).toEqual({
         'padding-top': 'inherit',
@@ -372,11 +276,6 @@ describe('paddingStyle', () => {
       expect(paddingStyle({ padding: '1x 2x' })).toEqual({
         padding: '8px 16px', // raw units
       });
-      expect(paddingStyle({ paddingBlock: '1x', paddingInline: '2x' })).toEqual(
-        {
-          padding: '8px 16px', // raw units
-        },
-      );
     });
 
     it('outputs four values when three values differ', () => {
@@ -410,14 +309,6 @@ describe('paddingStyle', () => {
     it('later groups override earlier groups for same direction', () => {
       expect(paddingStyle({ padding: '1x, 2x top, 3x top' })).toEqual({
         padding: '24px 8px 8px 8px',
-      });
-    });
-
-    it('multi-group with paddingBlock override', () => {
-      expect(
-        paddingStyle({ padding: '1x, 2x left right', paddingBlock: '3x' }),
-      ).toEqual({
-        padding: '24px 16px',
       });
     });
 

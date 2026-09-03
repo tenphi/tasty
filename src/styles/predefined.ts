@@ -13,6 +13,7 @@ import type {
 } from '../utils/styles';
 
 import { borderStyle } from './border';
+import { blockSizeStyle } from './blockSize';
 import { colorStyle } from './color';
 import { createStyle } from './createStyle';
 import { displayStyle } from './display';
@@ -22,6 +23,8 @@ import { flowStyle } from './flow';
 import { gapStyle } from './gap';
 import { heightStyle } from './height';
 import { insetStyle } from './inset';
+import { inlineSizeStyle } from './inlineSize';
+import { logicalStyleHandlers } from './logical';
 import { marginStyle } from './margin';
 import { outlineStyle } from './outline';
 import { paddingStyle } from './padding';
@@ -29,6 +32,7 @@ import { placementStyle } from './placement';
 import { presetStyle } from './preset';
 import { radiusStyle } from './radius';
 import { scrollMarginStyle } from './scrollMargin';
+import { scrollPaddingStyle } from './scrollPadding';
 import { scrollbarStyle } from './scrollbar';
 import { shadowStyle } from './shadow';
 import { transitionStyle } from './transition';
@@ -224,6 +228,10 @@ export function predefine() {
     scrollbarStyle,
     fadeStyle,
     insetStyle,
+    blockSizeStyle,
+    inlineSizeStyle,
+    scrollPaddingStyle,
+    ...Object.values(logicalStyleHandlers),
   ].forEach((handler) => defineCustomStyle(handler));
 
   // Capture initial state after all built-in handlers are registered
@@ -538,6 +546,19 @@ function wrapHandler<T extends { __lookupStyles: string[] }>(handler: T): T {
   return wrapped;
 }
 
+function wrapHandlerRecord<
+  T extends Record<string, { __lookupStyles: string[] }>,
+>(handlers: T): T {
+  return Object.fromEntries(
+    Object.entries(handlers).map(([name, handler]) => [
+      name,
+      wrapHandler(handler),
+    ]),
+  ) as T;
+}
+
+const wrappedLogicalStyleHandlers = wrapHandlerRecord(logicalStyleHandlers);
+
 /**
  * Exported object containing wrapped predefined style handlers.
  * Users can import and call these to extend or delegate to built-in behavior.
@@ -562,6 +583,7 @@ function wrapHandler<T extends { __lookupStyles: string[] }>(handler: T): T {
  * ```
  */
 export const styleHandlers = {
+  blockSize: wrapHandler(blockSizeStyle),
   border: wrapHandler(borderStyle),
   color: wrapHandler(colorStyle),
   display: wrapHandler(displayStyle),
@@ -572,6 +594,8 @@ export const styleHandlers = {
   gap: wrapHandler(gapStyle),
   height: wrapHandler(heightStyle),
   inset: wrapHandler(insetStyle),
+  inlineSize: wrapHandler(inlineSizeStyle),
+  ...wrappedLogicalStyleHandlers,
   margin: wrapHandler(marginStyle),
   outline: wrapHandler(outlineStyle),
   padding: wrapHandler(paddingStyle),
@@ -579,6 +603,7 @@ export const styleHandlers = {
   preset: wrapHandler(presetStyle),
   radius: wrapHandler(radiusStyle),
   scrollMargin: wrapHandler(scrollMarginStyle),
+  scrollPadding: wrapHandler(scrollPaddingStyle),
   scrollbar: wrapHandler(scrollbarStyle),
   shadow: wrapHandler(shadowStyle),
   transition: wrapHandler(transitionStyle),

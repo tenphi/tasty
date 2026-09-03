@@ -26,7 +26,7 @@ interface DimensionProps {
 }
 
 /**
- * Creates a dimension style handler for width or height.
+ * Creates a dimension style handler for a physical or logical size.
  *
  * Supports:
  * - Main dimension prop (width/height) with syntax for min/max
@@ -34,7 +34,9 @@ interface DimensionProps {
  *
  * Priority: Individual min/max props override values from main prop syntax
  */
-export function dimensionStyle(name: 'width' | 'height') {
+export function dimensionStyle(
+  name: 'width' | 'height' | 'block-size' | 'inline-size',
+) {
   const minStyle = `min-${name}`;
   const maxStyle = `max-${name}`;
 

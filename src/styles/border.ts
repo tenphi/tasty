@@ -49,6 +49,34 @@ function formatBorderValue(value: BorderValue): string {
   return `${value.width} ${value.style} ${value.color}`;
 }
 
+/** Parse one native border declaration without Tasty's physical-side modifiers. */
+export function parseBorderValue(
+  value: string | number | boolean,
+): string | null {
+  if (value === false) return null;
+  if (value === true) value = '1bw';
+
+  const stringValue =
+    typeof value === 'number' ? `${value}px` : String(value).trim();
+
+  if (!stringValue) return null;
+  if (CSS_WIDE_KEYWORDS.has(stringValue)) return stringValue;
+
+  const group = parseStyle(stringValue).groups[0];
+  if (!group) return null;
+
+  const keyword = extractCSSWideKeyword(group);
+  if (keyword) return keyword;
+
+  return formatBorderValue(
+    processGroup({
+      values: group.values ?? [],
+      mods: group.mods ?? [],
+      colors: group.colors ?? [],
+    }).borderValue,
+  );
+}
+
 /**
  * Border style handler with multi-group support.
  *

@@ -50,6 +50,8 @@ Prefer the Tasty shorthand over its CSS equivalents:
 | `hide: true`                             | `display: 'none'`                                                                     |
 | `flexGrow` / `flexShrink` / `flexBasis`  | `flex`                                                                                |
 
+Use logical declarations when layout must follow writing mode or direction: `blockSize`/`inlineSize`, the `*Block*`/`*Inline*` spacing and border families, and `borderStartStartRadius`/`borderStartEndRadius`/`borderEndStartRadius`/`borderEndEndRadius`. Each is emitted as its native logical CSS declaration. Do not replace `start`/`end` with a physical side, and do not put physical direction modifiers inside a logical value.
+
 The last row goes the other way — longhands over the shorthand — because `flex` is lossy: it resets the components you omit to non-initial values (`flex: '0'` silently sets `flex-basis: 0%`) and cannot express `flexShrink: 0` at all. The longhands also carry separate state maps.
 
 ## 3. Values
@@ -86,7 +88,7 @@ Prefer units over raw pixels: `8px` → `1x` … `64px` → `8x`; `radius: '6px'
 
 ### `true`
 
-`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `fill`, `color`, `fade`, `preset`, `font`, `scrollbar`, `hide`. Anywhere else it is an error.
+`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `fill`, `color`, `fade`, `preset`, `font`, `scrollbar`, `scrollMargin`, `scrollPadding`, and their logical size/spacing/border/radius declarations, plus `hide`. Anywhere else it is an error.
 
 ### `!important`
 
@@ -102,7 +104,7 @@ A value is `[values…] [modifiers…]`, and several groups can be comma-separat
 | `border`                             | the four directions + `solid` `dashed` `dotted` `double` `groove` `ridge` `inset` `outset` `none` `hidden` |
 | `outline`                            | the style keywords above                                                                                   |
 | `radius`                             | `top` `right` `bottom` `left` + shapes `round` `ellipse` `leaf` `backleaf`                                 |
-| `width`, `height`                    | `min` `max` `fixed`                                                                                        |
+| `width`, `height`, `blockSize`, `inlineSize` | `min` `max` `fixed`                                                                                |
 | `flow`                               | `row` `column` `row-reverse` `column-reverse` `wrap` `nowrap` `dense`                                      |
 | `overflow`                           | `visible` `hidden` `scroll` `clip` `auto` `overlay`                                                        |
 | `position`                           | `static` `relative` `absolute` `fixed` `sticky`                                                            |
@@ -118,7 +120,7 @@ Directional modifiers beat placeholder zeros:
 - ❌ `padding: '2x 4x top right'` — a directional group takes one value, so `4x` is dropped → ✅ `padding: '2x top, 4x right'`
 - ❌ `fade: '3x 1x top bottom'` → ✅ `fade: '3x top, 1x bottom'`
 
-Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, `tabSize`, `paddingInline`, `paddingBlock`. `fill` and `color` take a color (plus `none` / `transparent`); `caretColor` and `accentColor` take a color only.
+Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, `tabSize`, and logical padding/margin/inset/scroll declarations. Logical axis shorthands accept one or two values in start/end order. `fill` and `color` take a color (plus `none` / `transparent`); `caretColor` and `accentColor` take a color only.
 
 ### `transition`
 
@@ -214,6 +216,7 @@ The selector must be a string literal and valid CSS. Values must be static — s
 
 - Token, preset, recipe, unit and `@alias` names exist in the project config.
 - Tasty shorthand chosen over CSS longhands; `flexGrow`/`flexShrink`/`flexBasis` over `flex`; `hide: true` over `display: 'none'`.
+- Logical layout keeps native `block`/`inline` and `start`/`end` declarations; no physical direction modifiers in logical values.
 - Colors are `#tokens`, not hex/rgb/oklch/named; `$prop` not `var(--prop)`.
 - Spacing uses `x`/`r`/`bw`/`ow` units; math uses `(…)`, not `calc(…)`.
 - `true` only on the properties that accept it; no `!important`.

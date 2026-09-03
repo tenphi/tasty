@@ -9,16 +9,12 @@ const MARGIN_CONFIG = {
 
 export function marginStyle({
   margin,
-  marginBlock,
-  marginInline,
   marginTop,
   marginRight,
   marginBottom,
   marginLeft,
 }: {
   margin?: string | number | boolean;
-  marginBlock?: string | number | boolean;
-  marginInline?: string | number | boolean;
   marginTop?: string | number | boolean;
   marginRight?: string | number | boolean;
   marginBottom?: string | number | boolean;
@@ -26,8 +22,6 @@ export function marginStyle({
 }) {
   return processDirectionalStyle(MARGIN_CONFIG, {
     main: margin,
-    block: marginBlock,
-    inline: marginInline,
     top: marginTop,
     right: marginRight,
     bottom: marginBottom,
@@ -41,6 +35,4 @@ marginStyle.__lookupStyles = [
   'marginRight',
   'marginBottom',
   'marginLeft',
-  'marginBlock',
-  'marginInline',
 ];

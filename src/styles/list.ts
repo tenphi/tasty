@@ -1,3 +1,14 @@
+import {
+  LOGICAL_BORDER_STYLES,
+  LOGICAL_INSET_STYLES,
+  LOGICAL_MARGIN_STYLES,
+  LOGICAL_PADDING_STYLES,
+  LOGICAL_RADIUS_STYLES,
+  LOGICAL_SCROLL_MARGIN_STYLES,
+  LOGICAL_SCROLL_PADDING_STYLES,
+  LOGICAL_SIZE_STYLES,
+} from './logical-list';
+
 export const BASE_STYLES = [
   'display',
   'font',
@@ -18,15 +29,19 @@ export const POSITION_STYLES = [
   'justifySelf',
   'zIndex',
   'margin',
+  ...LOGICAL_MARGIN_STYLES,
   'inset',
+  ...LOGICAL_INSET_STYLES,
   'position',
   'scrollMargin',
+  ...LOGICAL_SCROLL_MARGIN_STYLES,
+  'scrollPadding',
+  ...LOGICAL_SCROLL_PADDING_STYLES,
 ] as const;
 
 export const BLOCK_INNER_STYLES = [
   'padding',
-  'paddingInline',
-  'paddingBlock',
+  ...LOGICAL_PADDING_STYLES,
   'overflow',
   'scrollbar',
   'textAlign',
@@ -34,7 +49,9 @@ export const BLOCK_INNER_STYLES = [
 
 export const BLOCK_OUTER_STYLES = [
   'border',
+  ...LOGICAL_BORDER_STYLES,
   'radius',
+  ...LOGICAL_RADIUS_STYLES,
   'shadow',
   'outline',
 ] as const;
@@ -55,6 +72,7 @@ export const TEXT_STYLES = [
 export const DIMENSION_STYLES = [
   'width',
   'height',
+  ...LOGICAL_SIZE_STYLES,
   'flexBasis',
   'flexGrow',
   'flexShrink',

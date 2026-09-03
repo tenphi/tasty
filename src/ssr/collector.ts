@@ -32,33 +32,13 @@ import {
   makeKeyframeName,
   validateNamePrefix,
 } from '../utils/name-prefix';
+import { createServerStyleArtifact } from './artifacts';
+import type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
 import { formatRules } from './format-rules';
 
-export type ServerStyleArtifactKind =
-  | 'property'
-  | 'font-face'
-  | 'counter-style'
-  | 'function'
-  | 'raw'
-  | 'global'
-  | 'chunk'
-  | 'keyframes';
-
-export interface ServerStyleArtifact {
-  /** Stable identifier derived from the artifact kind, logical key, and CSS. */
-  id: string;
-  kind: ServerStyleArtifactKind;
-  css: string;
-  /** Zero-based position in the collector's final cascade order. */
-  order: number;
-}
-
-function artifactId(kind: ServerStyleArtifactKind, key: string, css: string) {
-  const content = `${kind}\0${key}\0${css}`;
-  return `${kind}:${hashString(content)}:${content.length.toString(36)}`;
-}
+export type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 
 export class ServerStyleCollector {
   private chunks = new Map<string, string>();
@@ -344,12 +324,9 @@ export class ServerStyleCollector {
       entries: Iterable<[string, string]>,
     ) => {
       for (const [key, css] of entries) {
-        artifacts.push({
-          id: artifactId(kind, key, css),
-          kind,
-          css,
-          order: artifacts.length,
-        });
+        artifacts.push(
+          createServerStyleArtifact(kind, key, css, artifacts.length),
+        );
       }
     };
 

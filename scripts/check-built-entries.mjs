@@ -34,6 +34,7 @@ const entries = [
 ];
 
 const expectedChunks = [
+  'build-config-',
   'config-engine-',
   'css-definitions-',
   'debug-',
@@ -124,6 +125,14 @@ assertGraphExcludes('zero/babel.js', [
   'debug-',
   'react-runtime-',
   'runtime-engine-',
+]);
+assertGraphExcludes('ssr/next-config.js', [
+  'collector-',
+  'debug-',
+  'hydration-',
+  'react-runtime-',
+  'runtime-engine-',
+  'zero-engine-',
 ]);
 assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);
 

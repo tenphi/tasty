@@ -296,6 +296,18 @@
       "path": "dist/ssr/astro-client.js",
       "import": "*",
       "limit": "0.5 kB"
+    },
+    {
+      "name": "Next.js config",
+      "path": "dist/ssr/next-config.js",
+      "import": "{ withTastyNext }",
+      "ignore": [
+        "node:crypto",
+        "node:fs",
+        "node:module",
+        "node:path"
+      ],
+      "limit": "44 kB"
     }
   ]
 }

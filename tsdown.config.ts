@@ -76,6 +76,11 @@ export default defineConfig([
             priority: 95,
           },
           {
+            name: 'build-config',
+            test: (id) => isSourceModule(id, /[\\/]zero[\\/]config\.ts$/),
+            priority: 96,
+          },
+          {
             name: 'hydration',
             test: (id) =>
               isSourceModule(
@@ -125,7 +130,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:(?:functions|keyframes|properties|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules)\.ts|utils[\\/](?:hash|name-prefix)\.ts)$/,
+                /[\\/](?:(?:functions|keyframes|properties|font-face|counter-style)[\\/].+|ssr[\\/](?:artifacts|format-global-rules|format-keyframes|format-property|format-rules)\.ts|utils[\\/](?:hash|name-prefix)\.ts)$/,
               ),
             priority: 75,
           },

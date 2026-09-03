@@ -60,34 +60,6 @@ describe('insetStyle', () => {
     });
   });
 
-  describe('insetBlock and insetInline', () => {
-    it('handles insetBlock', () => {
-      expect(insetStyle({ insetBlock: '1x' })).toEqual({
-        inset: '8px auto',
-      });
-    });
-
-    it('handles insetInline', () => {
-      expect(insetStyle({ insetInline: '2x' })).toEqual({
-        inset: 'auto 16px',
-      });
-    });
-  });
-
-  describe('priority system', () => {
-    it('inset < insetBlock/insetInline < individual', () => {
-      expect(
-        insetStyle({
-          inset: '1x',
-          insetBlock: '2x',
-          top: '3x',
-        }),
-      ).toEqual({
-        inset: '24px 8px 16px 8px',
-      });
-    });
-  });
-
   describe('longhand modifier', () => {
     it('expands inset to individual top/right/bottom/left properties', () => {
       expect(insetStyle({ inset: '0 longhand' })).toEqual({
@@ -148,14 +120,6 @@ describe('insetStyle', () => {
     it('later groups override earlier groups for same direction', () => {
       expect(insetStyle({ inset: '0, 1x top, 2x top' })).toEqual({
         inset: '16px 0 0 0',
-      });
-    });
-
-    it('multi-group with insetBlock override', () => {
-      expect(
-        insetStyle({ inset: '0, 1x left right', insetBlock: '3x' }),
-      ).toEqual({
-        inset: '24px 8px',
       });
     });
 

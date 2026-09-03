@@ -9,16 +9,12 @@ const PADDING_CONFIG = {
 
 export function paddingStyle({
   padding,
-  paddingBlock,
-  paddingInline,
   paddingTop,
   paddingRight,
   paddingBottom,
   paddingLeft,
 }: {
   padding?: string | number | boolean;
-  paddingBlock?: string | number | boolean;
-  paddingInline?: string | number | boolean;
   paddingTop?: string | number | boolean;
   paddingRight?: string | number | boolean;
   paddingBottom?: string | number | boolean;
@@ -26,8 +22,6 @@ export function paddingStyle({
 }) {
   return processDirectionalStyle(PADDING_CONFIG, {
     main: padding,
-    block: paddingBlock,
-    inline: paddingInline,
     top: paddingTop,
     right: paddingRight,
     bottom: paddingBottom,
@@ -41,6 +35,4 @@ paddingStyle.__lookupStyles = [
   'paddingRight',
   'paddingBottom',
   'paddingLeft',
-  'paddingBlock',
-  'paddingInline',
 ];

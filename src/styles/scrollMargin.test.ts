@@ -67,22 +67,6 @@ describe('scrollMarginStyle', () => {
     });
   });
 
-  describe('scrollMarginBlock and scrollMarginInline', () => {
-    it('handles scrollMarginBlock', () => {
-      const result = scrollMarginStyle({ scrollMarginBlock: '1x' });
-      expect(result).toEqual({
-        'scroll-margin': '8px 0',
-      });
-    });
-
-    it('handles scrollMarginInline', () => {
-      const result = scrollMarginStyle({ scrollMarginInline: '4x' });
-      expect(result).toEqual({
-        'scroll-margin': '0 32px',
-      });
-    });
-  });
-
   describe('individual direction properties', () => {
     it('handles individual directions', () => {
       const result = scrollMarginStyle({
@@ -100,44 +84,6 @@ describe('scrollMarginStyle', () => {
       const result = scrollMarginStyle({ scrollMarginTop: 16 });
       expect(result).toEqual({
         'scroll-margin': '16px 0 0 0',
-      });
-    });
-  });
-
-  describe('priority system', () => {
-    it('scrollMargin (low) < scrollMarginBlock/scrollMarginInline (medium)', () => {
-      const result = scrollMarginStyle({
-        scrollMargin: '1x',
-        scrollMarginBlock: '2x',
-        scrollMarginInline: '3x',
-      });
-      expect(result).toEqual({
-        'scroll-margin': '16px 24px',
-      });
-    });
-
-    it('scrollMarginBlock/scrollMarginInline (medium) < individual directions (high)', () => {
-      const result = scrollMarginStyle({
-        scrollMarginBlock: '2x',
-        scrollMarginInline: '3x',
-        scrollMarginTop: '4x',
-        scrollMarginRight: '5x',
-      });
-      expect(result).toEqual({
-        'scroll-margin': '32px 40px 16px 24px',
-      });
-    });
-
-    it('full chain: scrollMargin < block/inline < individual', () => {
-      const result = scrollMarginStyle({
-        scrollMargin: '1x',
-        scrollMarginBlock: '2x',
-        scrollMarginInline: '3x',
-        scrollMarginTop: '4x',
-        scrollMarginRight: '5x',
-      });
-      expect(result).toEqual({
-        'scroll-margin': '32px 40px 16px 24px',
       });
     });
   });

@@ -15,9 +15,9 @@ export interface DirectionalConfig {
   /** Default per-direction init value (e.g. '0', 'auto') */
   defaultInit: string;
   /**
-   * When true, if only individual direction props are set (no shorthand,
-   * no block/inline), output individual CSS properties instead of the
-   * shorthand. Needed by inset for correct CSS cascade with modifiers.
+   * When true, if only individual direction props are set (no shorthand),
+   * output individual CSS properties instead of the shorthand. Needed by
+   * inset for correct CSS cascade with modifiers.
    */
   individualOnly?: boolean;
   /**
@@ -146,8 +146,6 @@ function optimizeShorthand(
 
 interface DirectionalProps {
   main?: string | number | boolean;
-  block?: string | number | boolean;
-  inline?: string | number | boolean;
   top?: string | number | boolean;
   right?: string | number | boolean;
   bottom?: string | number | boolean;
@@ -161,12 +159,10 @@ export function processDirectionalStyle(
   config: DirectionalConfig,
   props: DirectionalProps,
 ): Record<string, string> | null {
-  const { main, block, inline, top, right, bottom, left } = props;
+  const { main, top, right, bottom, left } = props;
 
   if (
     main == null &&
-    block == null &&
-    inline == null &&
     top == null &&
     right == null &&
     bottom == null &&
@@ -188,7 +184,7 @@ export function processDirectionalStyle(
     directionProperty ?? ((dir: Direction) => `${property}-${dir}`);
 
   if (individualOnly) {
-    const onlyIndividualProps = main == null && block == null && inline == null;
+    const onlyIndividualProps = main == null;
 
     if (onlyIndividualProps) {
       const result: Record<string, string> = {};
@@ -272,15 +268,6 @@ export function processDirectionalStyle(
         }
       }
     }
-  }
-
-  if (block != null) {
-    const val = parseSingleValue(block, defaultValue, trueValue);
-    if (val) dirs.top = dirs.bottom = val;
-  }
-  if (inline != null) {
-    const val = parseSingleValue(inline, defaultValue, trueValue);
-    if (val) dirs.left = dirs.right = val;
   }
 
   if (top != null) {

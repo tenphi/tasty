@@ -1,8 +1,17 @@
+import {
+  LOGICAL_BORDER_STYLES,
+  LOGICAL_INSET_STYLES,
+  LOGICAL_MARGIN_STYLES,
+  LOGICAL_PADDING_STYLES,
+  LOGICAL_RADIUS_STYLES,
+  LOGICAL_SIZE_STYLES,
+} from '../styles/logical-list';
+
 /**
  * Chunk names, the built-in chunk style lists, and the style→chunk lookup.
  *
- * This is a **leaf module with no imports**. It exists separately from
- * `definitions.ts` for two reasons:
+ * This module only imports data-only style-name lists. It exists separately
+ * from `definitions.ts` for two reasons:
  *
  * 1. The style handler registry (`styles/predefined.ts`) needs to assign chunk
  *    membership for custom handlers. Reaching for `definitions.ts` would create an
@@ -44,7 +53,9 @@ export const APPEARANCE_CHUNK_STYLES = [
   'color', // colorStyle (independent)
   'opacity', // independent
   'border', // borderStyle (independent)
+  ...LOGICAL_BORDER_STYLES,
   'radius', // radiusStyle (independent)
+  ...LOGICAL_RADIUS_STYLES,
   'outline', // outlineStyle: outline ↔ outlineOffset
   'outlineOffset', // outlineStyle: outline ↔ outlineOffset
   'shadow', // shadowStyle (independent)
@@ -82,29 +93,27 @@ export const FONT_CHUNK_STYLES = [
  * Dimension chunk - sizing and spacing
  *
  * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ paddingStyle: padding, paddingTop/Right/Bottom/Left, paddingBlock/Inline
- * ⚠️ marginStyle: margin, marginTop/Right/Bottom/Left, marginBlock/Inline
+ * ⚠️ paddingStyle: padding, paddingTop/Right/Bottom/Left
+ * ⚠️ marginStyle: margin, marginTop/Right/Bottom/Left
  * ⚠️ widthStyle: width, minWidth, maxWidth
  * ⚠️ heightStyle: height, minHeight, maxHeight
  */
 /** @public */
 export const DIMENSION_CHUNK_STYLES = [
-  // All from paddingStyle handler - MUST stay together
+  // Physical padding handler, followed by independent logical declarations
   'padding',
   'paddingTop',
   'paddingRight',
   'paddingBottom',
   'paddingLeft',
-  'paddingBlock',
-  'paddingInline',
-  // All from marginStyle handler - MUST stay together
+  ...LOGICAL_PADDING_STYLES,
+  // Physical margin handler, followed by independent logical declarations
   'margin',
   'marginTop',
   'marginRight',
   'marginBottom',
   'marginLeft',
-  'marginBlock',
-  'marginInline',
+  ...LOGICAL_MARGIN_STYLES,
   // widthStyle handler - MUST stay together
   'width',
   'minWidth',
@@ -113,6 +122,7 @@ export const DIMENSION_CHUNK_STYLES = [
   'height',
   'minHeight',
   'maxHeight',
+  ...LOGICAL_SIZE_STYLES,
   'flexBasis',
   'flexGrow',
   'flexShrink',
@@ -178,15 +188,14 @@ export const LAYOUT_CHUNK_STYLES = [
  * Position chunk - element positioning
  *
  * Handler dependencies (all styles in each handler MUST stay in this chunk):
- * ⚠️ insetStyle: inset, insetBlock, insetInline, top, right, bottom, left
+ * ⚠️ insetStyle: inset, top, right, bottom, left
  */
 /** @public */
 export const POSITION_CHUNK_STYLES = [
   'position',
-  // All from insetStyle handler - MUST stay together
+  // Physical inset handler, followed by independent logical declarations
   'inset',
-  'insetBlock',
-  'insetInline',
+  ...LOGICAL_INSET_STYLES,
   'top',
   'right',
   'bottom',

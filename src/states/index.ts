@@ -5,7 +5,7 @@
  * See ADVANCED_STATE_MAPPING.md for full specification.
  */
 
-import { hasStylesGenerated } from '../config';
+import { hasStylesGenerated } from '../config-state';
 import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 

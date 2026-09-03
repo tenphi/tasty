@@ -65,6 +65,9 @@ jobs:
       - name: Test-only code check
         run: pnpm check:test-only
 
+      - name: Built entrypoint check
+        run: pnpm check:build
+
       - name: Test
         run: pnpm test
 

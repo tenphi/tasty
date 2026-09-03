@@ -1,6 +1,6 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import type { StyleDetails } from '../parser/types';
-import { isDevEnv } from '../utils/is-dev-env';
+import { warnOnceDev } from '../utils/warnings';
 
 /**
  * If the group contains exactly one value that is a CSS-wide keyword
@@ -55,9 +55,6 @@ export function assignLineSlots(
   };
 }
 
-/** Warning keys already emitted, so each distinct offending value warns once. */
-const emittedWarnings = new Set<string>();
-
 /** A resolved custom-property reference anywhere in a token. */
 const RE_HAS_VAR_REFERENCE = /var\(/;
 
@@ -86,34 +83,6 @@ export function isTokenNameReference(property: string, name: string): boolean {
   );
 
   return true;
-}
-
-/**
- * Emit a style-level warning at most once per `key`. No-op outside dev mode.
- *
- * Style handlers run once per state combination and their results are cached,
- * but the same value can arrive from many components, so dedupe is required.
- *
- * `isDevEnv()` is called lazily rather than captured at module load (the pattern
- * used in `config.ts` and `states/index.ts`) so that tests can enable it with
- * `vi.stubEnv('NODE_ENV', 'development')` — `isDevEnv()` returns `false` for
- * `NODE_ENV=test`, which is why every module-load-gated warning in this repo is
- * currently untestable. The key is registered *before* the dev check, so
- * production pays at most one `isDevEnv()` call per distinct offending value and
- * never touches the console.
- */
-export function warnOnceDev(key: string, message: string): void {
-  if (emittedWarnings.has(key)) return;
-  emittedWarnings.add(key);
-
-  if (!isDevEnv()) return;
-
-  console.warn(`[Tasty] ${message}`);
-}
-
-/** Forget emitted style warnings. Called by `resetConfig()`; test isolation. */
-export function resetStyleWarnings(): void {
-  emittedWarnings.clear();
 }
 
 /**

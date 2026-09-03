@@ -1,12 +1,9 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { filterMods, parseStyle } from '../utils/styles';
 import type { StyleHandler, StyleValue } from '../utils/styles';
+import { warnOnceDev } from '../utils/warnings';
 import { parseBorderValue } from './border';
-import {
-  extractCSSWideKeyword,
-  warnExtraGroupValues,
-  warnOnceDev,
-} from './shared';
+import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
 
 type LogicalValue = string | number | boolean | undefined;
 

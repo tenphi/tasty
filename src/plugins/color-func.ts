@@ -1,6 +1,6 @@
 import { Lru } from '../parser/lru';
-import { warnOnceDev } from '../styles/shared';
 import { isDevEnv } from '../utils/is-dev-env';
+import { warnOnceDev } from '../utils/warnings';
 import type { StyleDetails } from '../parser/types';
 
 const clamp = (value: number, min: number, max: number): number =>

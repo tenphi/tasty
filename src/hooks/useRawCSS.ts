@@ -34,11 +34,13 @@ interface ClientRawCSSState {
   factoryDeps: Map<string, readonly unknown[]>;
 }
 
-const getClientState = createClientState((): ClientRawCSSState => ({
-  entries: new Map(),
-  contentDedup: new Set(),
-  factoryDeps: new Map(),
-}));
+const getClientState = /* @__PURE__ */ createClientState(
+  (): ClientRawCSSState => ({
+    entries: new Map(),
+    contentDedup: new Set(),
+    factoryDeps: new Map(),
+  }),
+);
 
 // Overload 1: Static CSS string
 export function useRawCSS(css: string, options?: UseRawCSSOptions): void;

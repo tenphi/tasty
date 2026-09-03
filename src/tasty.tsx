@@ -1005,4 +1005,4 @@ function tastyElement<
   return _TastyComponent;
 }
 
-export const Element = tasty({});
+export const Element = /* @__PURE__ */ tasty({});

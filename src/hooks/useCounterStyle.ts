@@ -13,7 +13,7 @@ interface UseCounterStyleOptions {
 
 let clientCounterStyleCounter = 0;
 
-const getClientContentToName = createClientState(
+const getClientContentToName = /* @__PURE__ */ createClientState(
   () => new Map<string, string>(),
 );
 

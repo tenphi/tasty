@@ -3,6 +3,7 @@ import { cleanup, render } from '@testing-library/react';
 import { computeStyles } from './compute-styles';
 import { tastyDebug } from './debug';
 import { configure, resetConfig } from './config';
+import { disableDevWarnings, enableDevWarnings } from './test/dev-env';
 import {
   counterStyle,
   destroy,
@@ -47,9 +48,35 @@ describe('tastyDebug', () => {
   });
 
   afterEach(() => {
+    disableDevWarnings();
+    delete window.tastyDebug;
     cleanup();
     destroy();
     resetConfig();
+  });
+
+  describe('installation', () => {
+    it('does not install itself when the module loads in development', async () => {
+      enableDevWarnings();
+      delete window.tastyDebug;
+      vi.resetModules();
+
+      await import('./debug');
+
+      expect(window.tastyDebug).toBeUndefined();
+    });
+
+    it('installs itself explicitly', () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {
+        /* noop */
+      });
+
+      tastyDebug.install();
+
+      expect(window.tastyDebug).toBe(tastyDebug);
+      expect(log).toHaveBeenCalledOnce();
+      log.mockRestore();
+    });
   });
 
   describe('unused classes', () => {

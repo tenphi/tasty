@@ -30,7 +30,7 @@ interface ClientGlobalEntry {
   dispose: () => void;
 }
 
-const getClientGlobalSlots = createClientState(
+const getClientGlobalSlots = /* @__PURE__ */ createClientState(
   () => new Map<string, ClientGlobalEntry>(),
 );
 

@@ -24,21 +24,19 @@ import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
 import { createJiti } from 'jiti';
 
-import {
-  configure,
-  getGlobalFunctions,
-  getGlobalStyles,
-  getGlobalConfigTokens,
-  resetConfig,
-} from '../config';
-import type { Styles, ConfigTokens } from '../styles/types';
+import type { ConfigTokens, RecipeStyles, Styles } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { DEFAULT_ZERO_NAME_PREFIX } from '../utils/name-prefix';
-import { resolveRecipes } from '../utils/resolve-recipes';
+import { resolveRecipesWith } from '../utils/resolve-recipes-core';
 
 import { CSSWriter } from './css-writer';
 import type { TastyZeroConfig } from './babel-types';
 export type { TastyZeroConfig } from './babel-types';
+import {
+  configureZero,
+  functionsForExtraction,
+  resetZeroConfig,
+} from './config';
 import { writerCache, type StaticStyleRegistry } from './writer-cache';
 import {
   extractCounterStyleFromStyles,
@@ -261,9 +259,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     const devMode = resolvedConfig.devMode ?? false;
 
-    if (cached) {
-      resetConfig();
-    }
+    resetZeroConfig();
 
     // Default to the zero-runtime prefix ('ts') unless the user opts out.
     // Using the same `namePrefix` config entry as the runtime keeps the
@@ -274,7 +270,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       ...resolvedConfig,
     };
 
-    configure(finalConfig);
+    const config = configureZero(finalConfig);
     setExtractorNamePrefix(finalConfig.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
 
     const newWriter = new CSSWriter(outputPath, { devMode });
@@ -282,15 +278,14 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     // Emit configured tokens and global styles (file mode only;
     // inject mode handles injection per-file in the post hook).
     if (mode !== 'inject') {
-      const tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
+      const tokenCSS = extractCSSFromStyles(':root', config.normalized.tokens);
       if (tokenCSS) newWriter.add(':root:tokens', tokenCSS);
 
-      const globalStyles = getGlobalStyles();
-      if (globalStyles) {
-        for (const [selector, styles] of Object.entries(globalStyles)) {
-          const css = extractCSSFromStyles(selector, styles);
-          if (css) newWriter.add(`global:${selector}`, css);
-        }
+      for (const [selector, styles] of Object.entries(
+        config.normalized.globalStyles,
+      )) {
+        const css = extractCSSFromStyles(selector, styles);
+        if (css) newWriter.add(`global:${selector}`, css);
       }
     }
 
@@ -298,7 +293,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       writer: newWriter,
       configKey,
       registry: {},
-      config: finalConfig,
+      config,
     });
   }
 
@@ -306,20 +301,21 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   const cssWriter = entry.writer;
   const globalRegistry = entry.registry;
   const config = entry.config;
-  const devMode = config.devMode ?? false;
+  const sourceConfig = config.source;
+  const devMode = sourceConfig.devMode ?? false;
   // When the writer entry was reused from a previous Babel invocation
   // (configChanged=false), make sure the extractor's module-level prefix
   // still matches this build's config — module state can outlive a
   // single configure() call across worker reuse.
-  setExtractorNamePrefix(config.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
+  setExtractorNamePrefix(sourceConfig.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
 
   // Precompute token CSS and global styles CSS for inject mode
   let tokenCSS: string | undefined;
   let globalStylesCSS: Map<string, string> | undefined;
   if (mode === 'inject') {
-    tokenCSS = extractCSSFromStyles(':root', getGlobalConfigTokens());
-    const gs = getGlobalStyles();
-    if (gs) {
+    tokenCSS = extractCSSFromStyles(':root', config.normalized.tokens);
+    const gs = config.normalized.globalStyles;
+    if (Object.keys(gs).length > 0) {
       globalStylesCSS = new Map();
       for (const [selector, styles] of Object.entries(gs)) {
         const css = extractCSSFromStyles(selector, styles);
@@ -416,11 +412,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             cssWriter,
             mode,
             state.sourceFile,
-            config.keyframes,
-            config.autoPropertyTypes,
-            config.fontFaces,
-            config.counterStyles,
-            getGlobalFunctions() ?? undefined,
+            config.normalized.keyframes,
+            sourceConfig.autoPropertyTypes,
+            config.normalized.fontFaces,
+            config.normalized.counterStyles,
+            functionsForExtraction(config),
+            config.normalized.recipes,
           );
         } else if (t.isObjectExpression(firstArg)) {
           // Styles mode: tastyStatic(styles)
@@ -431,11 +428,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state,
             globalRegistry,
             mode,
-            config.keyframes,
-            config.autoPropertyTypes,
-            config.fontFaces,
-            config.counterStyles,
-            getGlobalFunctions() ?? undefined,
+            config.normalized.keyframes,
+            sourceConfig.autoPropertyTypes,
+            config.normalized.fontFaces,
+            config.normalized.counterStyles,
+            functionsForExtraction(config),
+            config.normalized.recipes,
           );
         } else if (t.isIdentifier(firstArg)) {
           // Extension mode: tastyStatic(base, styles)
@@ -446,11 +444,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             state,
             globalRegistry,
             mode,
-            config.keyframes,
-            config.autoPropertyTypes,
-            config.fontFaces,
-            config.counterStyles,
-            getGlobalFunctions() ?? undefined,
+            config.normalized.keyframes,
+            sourceConfig.autoPropertyTypes,
+            config.normalized.fontFaces,
+            config.normalized.counterStyles,
+            functionsForExtraction(config),
+            config.normalized.recipes,
           );
         } else {
           throw path.buildCodeFrameError(
@@ -603,6 +602,7 @@ function handleStylesMode(
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
+  globalRecipes?: Record<string, RecipeStyles>,
 ): void {
   const stylesArg = args[0];
 
@@ -616,7 +616,7 @@ function handleStylesMode(
   const rawStyles = evaluateObjectExpression(stylesArg, path) as Styles;
 
   // Resolve recipes before extraction
-  const styles = resolveRecipes(rawStyles);
+  const styles = resolveRecipesWith(rawStyles, globalRecipes ?? null);
 
   // Extract keyframes (deduplicated by content)
   const { keyframes, nameMap } = extractKeyframesFromStyles(
@@ -692,6 +692,7 @@ function handleExtensionMode(
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
+  globalRecipes?: Record<string, RecipeStyles>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -731,8 +732,9 @@ function handleExtensionMode(
   const overrideStyles = evaluateObjectExpression(stylesArg, path) as Styles;
 
   // Merge styles using mergeStyles, then resolve recipes
-  const mergedStyles = resolveRecipes(
+  const mergedStyles = resolveRecipesWith(
     mergeStyles(baseEntry.styles, overrideStyles),
+    globalRecipes ?? null,
   );
 
   // Extract keyframes (deduplicated by content)
@@ -816,6 +818,7 @@ function handleSelectorMode(
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
+  globalRecipes?: Record<string, RecipeStyles>,
 ): void {
   if (args.length < 2) {
     throw path.buildCodeFrameError(
@@ -842,7 +845,7 @@ function handleSelectorMode(
   const rawStyles = evaluateObjectExpression(stylesArg, path) as Styles;
 
   // Resolve recipes before extraction
-  const styles = resolveRecipes(rawStyles);
+  const styles = resolveRecipesWith(rawStyles, globalRecipes ?? null);
 
   // Extract keyframes (deduplicated by content)
   const { keyframes, nameMap } = extractKeyframesFromStyles(

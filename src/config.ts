@@ -11,30 +11,21 @@
  * reconfigure will emit a warning and be ignored.
  */
 
-import {
-  registerFunctionPolyfill,
-  resetFunctionPolyfills,
-  splitFunctions,
-} from './functions';
+import { resetFunctionPolyfills } from './functions';
+import { applyStyleConfig, normalizeConfig } from './config-normalize';
 import {
   hasStylesGenerated,
   isFunctionsPolyfillEnabled,
   markStylesGeneratedState,
   resetGlobalPolyfillsState,
   resetStylesGeneratedState,
-  setGlobalPolyfillsState,
 } from './config-state';
 import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
 import { clearPipelineCache, renderStyles } from './pipeline';
-import { setGlobalPredefinedStates } from './states';
-import {
-  normalizeHandlerDefinition,
-  registerHandler,
-  resetHandlers,
-} from './styles/predefined';
+import { resetHandlers } from './styles/predefined';
 import {
   registerBaseStyleProps,
   resetBaseStyleProps,
@@ -44,16 +35,11 @@ import { isSelector } from './utils/is-selector';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import { resetStyleWarnings } from './utils/warnings';
 import {
-  CUSTOM_UNITS,
-  getGlobalParseFunctions,
-  getGlobalParser,
-  normalizeColorTokenValue,
   resetGlobalParseFunctions,
   resetGlobalPredefinedTokens,
-  setGlobalPredefinedTokens,
 } from './utils/styles';
 
-import type { FunctionsConfig, ParseFunction } from './functions';
+import type { FunctionsConfig } from './functions';
 import type { ColorSpace } from './utils/color-space';
 
 import type {
@@ -71,7 +57,6 @@ import type { RecipeStyles, ConfigTokens } from './styles/types';
 import type { Styles } from './styles/types';
 import type { StyleHandlerDefinition } from './utils/styles';
 import type { TypographyPreset } from './utils/typography';
-import { generateTypographyTokens } from './utils/typography';
 
 /**
  * Configuration options for the Tasty style system
@@ -1082,23 +1067,6 @@ function setGlobalFunction(
  */
 export { isFunctionsPolyfillEnabled } from './config-state';
 
-/**
- * Set global polyfill toggles (called from configure).
- * Internal use only.
- */
-function setGlobalPolyfills(polyfills: { functions?: boolean }): void {
-  if (hasStylesGenerated()) {
-    warnOnce(
-      'polyfills-after-styles',
-      `[Tasty] Cannot update polyfills after styles have been generated.\n` +
-        `The new polyfill toggles will be ignored.`,
-    );
-    return;
-  }
-
-  setGlobalPolyfillsState(polyfills);
-}
-
 // ============================================================================
 // Global Recipes Management
 // ============================================================================
@@ -1294,252 +1262,24 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     validateNamePrefix(config.namePrefix);
   }
 
-  // Collect merged values from plugins first, then override with direct config
-  let mergedStates: Record<string, string> = {};
-  let mergedUnits: Record<string, string | UnitHandler> = {};
-  let mergedFunctions: FunctionsConfig = {};
-  let mergedHandlers: Record<string, StyleHandlerDefinition> = {};
-  /** Where each handler key came from, so registration warnings can name it. */
-  const handlerSources = new Map<string, string>();
-  let mergedPropHandlers: Record<string, PropHandlerDefinition> = {};
-  /** Where each prop handler key came from, for its warnings. */
-  const propHandlerSources = new Map<string, string>();
-  const mergedBaseStyleProps: string[] = [];
-  let mergedProperties: Record<string, PropertyDefinition> = {};
-  let mergedKeyframes: Record<string, KeyframesSteps> = {};
-  let mergedFontFaces: Record<string, FontFaceInput> = {};
-  let mergedCounterStyles: Record<string, CounterStyleDescriptors> = {};
-  let mergedReplaceTokens: Record<string, string | number | boolean> = {};
-  let mergedConfigTokens: ConfigTokens = {} as ConfigTokens;
-  let mergedRecipes: Record<string, RecipeStyles> = {};
-  let mergedPresets: Record<string, TypographyPreset> = {};
-  const mergedGlobalStyles: Record<string, Styles> = {};
+  const normalized = normalizeConfig(config);
+  const {
+    propHandlers: mergedPropHandlers,
+    propHandlerSources,
+    baseStyleProps: mergedBaseStyleProps,
+    properties: mergedProperties,
+    keyframes: mergedKeyframes,
+    fontFaces: mergedFontFaces,
+    counterStyles: mergedCounterStyles,
+    tokens: mergedConfigTokens,
+    recipes: mergedRecipes,
+    globalStyles: mergedGlobalStyles,
+  } = normalized;
 
-  // Process plugins in order
-  if (config.plugins) {
-    for (const plugin of config.plugins) {
-      if (plugin.states) {
-        mergedStates = { ...mergedStates, ...plugin.states };
-      }
-      if (plugin.units) {
-        mergedUnits = { ...mergedUnits, ...plugin.units };
-      }
-      if (plugin.functions) {
-        mergedFunctions = { ...mergedFunctions, ...plugin.functions };
-      }
-      if (plugin.handlers) {
-        mergedHandlers = { ...mergedHandlers, ...plugin.handlers };
-        for (const key of Object.keys(plugin.handlers)) {
-          handlerSources.set(key, `plugin "${plugin.name}"`);
-        }
-      }
-      if (plugin.propHandlers) {
-        mergedPropHandlers = { ...mergedPropHandlers, ...plugin.propHandlers };
-        for (const key of Object.keys(plugin.propHandlers)) {
-          propHandlerSources.set(key, `plugin "${plugin.name}"`);
-        }
-      }
-      if (plugin.baseStyleProps) {
-        mergedBaseStyleProps.push(...plugin.baseStyleProps);
-      }
-      if (plugin.properties) {
-        mergedProperties = { ...mergedProperties, ...plugin.properties };
-      }
-      if (plugin.keyframes) {
-        mergedKeyframes = { ...mergedKeyframes, ...plugin.keyframes };
-      }
-      if (plugin.fontFaces) {
-        mergedFontFaces = { ...mergedFontFaces, ...plugin.fontFaces };
-      }
-      if (plugin.counterStyles) {
-        mergedCounterStyles = {
-          ...mergedCounterStyles,
-          ...plugin.counterStyles,
-        };
-      }
-      if (plugin.replaceTokens) {
-        mergedReplaceTokens = {
-          ...mergedReplaceTokens,
-          ...plugin.replaceTokens,
-        };
-      }
-      if (plugin.tokens) {
-        mergedConfigTokens = { ...mergedConfigTokens, ...plugin.tokens };
-      }
-      if (plugin.recipes) {
-        mergedRecipes = { ...mergedRecipes, ...plugin.recipes };
-      }
-      if (plugin.presets) {
-        mergedPresets = { ...mergedPresets, ...plugin.presets };
-      }
-      if (plugin.globalStyles) {
-        for (const [sel, styles] of Object.entries(plugin.globalStyles)) {
-          mergedGlobalStyles[sel] = mergedGlobalStyles[sel]
-            ? { ...mergedGlobalStyles[sel], ...styles }
-            : styles;
-        }
-      }
-    }
-  }
+  const functionDefs = applyStyleConfig(config, normalized, warnOnce);
 
-  // Direct config overrides plugins
-  if (config.states) {
-    mergedStates = { ...mergedStates, ...config.states };
-  }
-  if (config.units) {
-    mergedUnits = { ...mergedUnits, ...config.units };
-  }
-  if (config.functions) {
-    mergedFunctions = { ...mergedFunctions, ...config.functions };
-  }
-  if (config.handlers) {
-    mergedHandlers = { ...mergedHandlers, ...config.handlers };
-    for (const key of Object.keys(config.handlers)) {
-      handlerSources.set(key, 'configure()');
-    }
-  }
-  if (config.propHandlers) {
-    mergedPropHandlers = { ...mergedPropHandlers, ...config.propHandlers };
-    for (const key of Object.keys(config.propHandlers)) {
-      propHandlerSources.set(key, 'configure()');
-    }
-  }
-  if (config.baseStyleProps) {
-    mergedBaseStyleProps.push(...config.baseStyleProps);
-  }
-  if (config.properties) {
-    mergedProperties = { ...mergedProperties, ...config.properties };
-  }
-  if (config.keyframes) {
-    mergedKeyframes = { ...mergedKeyframes, ...config.keyframes };
-  }
-  if (config.fontFaces) {
-    mergedFontFaces = { ...mergedFontFaces, ...config.fontFaces };
-  }
-  if (config.counterStyles) {
-    mergedCounterStyles = { ...mergedCounterStyles, ...config.counterStyles };
-  }
-  if (config.replaceTokens) {
-    mergedReplaceTokens = { ...mergedReplaceTokens, ...config.replaceTokens };
-  }
-  if (config.presets) {
-    mergedPresets = { ...mergedPresets, ...config.presets };
-  }
-
-  // Generate typography tokens from presets and merge UNDER explicit tokens
-  if (Object.keys(mergedPresets).length > 0) {
-    const presetTokens = generateTypographyTokens(mergedPresets);
-    mergedConfigTokens = {
-      ...presetTokens,
-      ...mergedConfigTokens,
-    };
-  }
-
-  if (config.tokens) {
-    mergedConfigTokens = { ...mergedConfigTokens, ...config.tokens };
-  }
-  if (config.recipes) {
-    mergedRecipes = { ...mergedRecipes, ...config.recipes };
-  }
-  if (config.globalStyles) {
-    for (const [sel, styles] of Object.entries(config.globalStyles)) {
-      mergedGlobalStyles[sel] = mergedGlobalStyles[sel]
-        ? { ...mergedGlobalStyles[sel], ...styles }
-        : styles;
-    }
-  }
-
-  // Warn on tokens/replaceTokens key conflicts
-  if (devMode) {
-    const tokenKeys = new Set(Object.keys(mergedConfigTokens));
-    for (const key of Object.keys(mergedReplaceTokens)) {
-      if (tokenKeys.has(key)) {
-        warnOnce(
-          `token-conflict-${key}`,
-          `[Tasty] Token "${key}" is defined in both \`tokens\` and \`replaceTokens\`. ` +
-            `\`replaceTokens\` performs parse-time substitution, so the \`tokens\` ` +
-            `CSS custom property will be injected but never used by Tasty styles. ` +
-            `Remove it from one of the two.`,
-        );
-      }
-    }
-  }
-
-  if (config.colorSpace) {
-    warnOnce(
-      'colorSpace-deprecated',
-      '[Tasty] configure({ colorSpace }) no longer has any effect and will be ' +
-        'removed in the next major. Colors are emitted as authored, and opacity ' +
-        "is applied with relative color syntax, which reads a color's channels " +
-        'in the browser. To address channels yourself, write ' +
-        '`oklch(from var(--name-color) l c h)` against the token.',
-    );
-  }
-
-  // Handle predefined states
-  if (Object.keys(mergedStates).length > 0) {
-    setGlobalPredefinedStates(mergedStates);
-  }
-
-  // Handle parser configuration (merge semantics - extend, not replace)
-  const parser = getGlobalParser();
-
-  if (config.parserCacheSize !== undefined) {
-    parser.updateOptions({ cacheSize: config.parserCacheSize });
-  }
-
-  if (Object.keys(mergedUnits).length > 0) {
-    // Merge with existing units
-    const currentUnits = parser.getUnits() ?? CUSTOM_UNITS;
-    parser.setUnits({ ...currentUnits, ...mergedUnits });
-  }
-
-  // Record polyfill toggles before processing functions so we know whether to
-  // register inline closures or emit native @function rules.
-  if (config.polyfills) {
-    setGlobalPolyfills(config.polyfills);
-  }
-
-  // Split the unified `functions` map by value type into parse functions
-  // (bare keys) and declarative CSS @function definitions (`$$` keys).
-  const { parseFuncs, functionDefs } = splitFunctions(
-    mergedFunctions,
-    (key, kind) => {
-      warnOnce(
-        `functions-mismatch-${key}`,
-        kind === 'expected-definition'
-          ? `[Tasty] functions["${key}"]: a "$$"-prefixed key denotes a CSS @function ` +
-              `and expects a definition object, but received a function. Entry ignored.`
-          : `[Tasty] functions["${key}"]: a bare key denotes a parse function and ` +
-              `expects a function value, but received an object. ` +
-              `Did you mean "$$${key}"? Entry ignored.`,
-      );
-    },
-  );
-
-  if (Object.keys(parseFuncs).length > 0) {
-    // Merge with existing parse functions
-    const currentFuncs = getGlobalParseFunctions();
-    const finalFuncs: Record<string, ParseFunction> = {
-      ...currentFuncs,
-      ...parseFuncs,
-    };
-    parser.setFunctions(finalFuncs);
-    // Also update the global registry so customFunction() continues to work
-    Object.assign(currentFuncs, parseFuncs);
-  }
-
-  // Declarative CSS @function definitions. When the polyfill is enabled, compile
-  // each into an inline parse-function closure (and skip native emission);
-  // otherwise store them for eager native @function injection.
-  if (Object.keys(functionDefs).length > 0) {
-    if (isFunctionsPolyfillEnabled()) {
-      for (const [name, definition] of Object.entries(functionDefs)) {
-        registerFunctionPolyfill(name, definition);
-      }
-    } else {
-      setGlobalFunction(functionDefs);
-    }
+  if (!isFunctionsPolyfillEnabled() && Object.keys(functionDefs).length > 0) {
+    setGlobalFunction(functionDefs);
   }
 
   // Handle keyframes
@@ -1562,17 +1302,6 @@ export function configure(config: Partial<TastyConfig> = {}): void {
     setGlobalCounterStyle(mergedCounterStyles);
   }
 
-  // Handle custom handlers
-  if (Object.keys(mergedHandlers).length > 0) {
-    for (const [name, definition] of Object.entries(mergedHandlers)) {
-      const handler = normalizeHandlerDefinition(name, definition);
-      registerHandler(handler, {
-        key: name,
-        source: handlerSources.get(name),
-      });
-    }
-  }
-
   // Handle props middleware
   if (Object.keys(mergedPropHandlers).length > 0) {
     for (const [name, definition] of Object.entries(mergedPropHandlers)) {
@@ -1585,23 +1314,6 @@ export function configure(config: Partial<TastyConfig> = {}): void {
   // Handle promoted base style props
   if (mergedBaseStyleProps.length > 0) {
     registerBaseStyleProps(mergedBaseStyleProps);
-  }
-
-  // Handle replaceTokens (parse-time substitution)
-  if (Object.keys(mergedReplaceTokens).length > 0) {
-    const processedTokens: Record<string, string> = {};
-    for (const [key, value] of Object.entries(mergedReplaceTokens)) {
-      if (key.startsWith('#')) {
-        const normalized = normalizeColorTokenValue(value);
-        if (normalized === null) continue;
-        processedTokens[key] = String(normalized);
-      } else if (value === false) {
-        continue;
-      } else {
-        processedTokens[key] = String(value);
-      }
-    }
-    setGlobalPredefinedTokens(processedTokens);
   }
 
   // Handle tokens (CSS custom properties on :root)

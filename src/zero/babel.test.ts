@@ -283,6 +283,56 @@ const button = tastyStatic({
       expect(css).not.toContain('/* from:');
     });
 
+    it('should normalize plugin config with direct config taking precedence', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const card = tastyStatic({
+  recipe: 'card',
+  animation: 'fade 1s',
+});
+`;
+
+      transformCode(code, {
+        output: outputPath,
+        config: {
+          plugins: [
+            {
+              name: 'theme',
+              tokens: { $space: '4px' },
+              recipes: { card: { padding: '$space' } },
+              keyframes: {
+                fade: { from: { opacity: 0 }, to: { opacity: 1 } },
+              },
+              fontFaces: {
+                Brand: { src: 'url("brand.woff2")' },
+              },
+              counterStyles: {
+                marks: { system: 'cyclic', symbols: '"x"' },
+              },
+              functions: {
+                $$negative: { args: ['$value'], result: '(-1 * $value)' },
+              },
+              globalStyles: { body: { color: 'blue', margin: 0 } },
+            },
+          ],
+          tokens: { $space: '8px' },
+          globalStyles: { body: { color: 'red' } },
+        },
+      });
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      expect(css).toContain('--space: 8px');
+      expect(css).toContain('padding: var(--space)');
+      expect(css).toContain('@keyframes tsk');
+      expect(css).toContain('@font-face');
+      expect(css).toContain('@counter-style marks');
+      expect(css).toContain('@function --negative');
+      expect(css).toContain('body { color: red;');
+      expect(css).toContain('margin: 0px; }');
+    });
+
     it('should include configFile in cache invalidation deps', () => {
       const configPath = path.join(tempDir, 'tasty-zero.config.ts');
       const outputPath1 = path.join(tempDir, 'output1.css');

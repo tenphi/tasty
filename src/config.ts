@@ -25,7 +25,7 @@ import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
-import { clearPipelineCache, isSelector, renderStyles } from './pipeline';
+import { clearPipelineCache, renderStyles } from './pipeline';
 import { setGlobalPredefinedStates } from './states';
 import {
   normalizeHandlerDefinition,
@@ -37,6 +37,7 @@ import {
   resetBaseStyleProps,
 } from './styles/base-props';
 import { isDevEnv } from './utils/is-dev-env';
+import { isSelector } from './utils/is-selector';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
 import { resetStyleWarnings } from './utils/warnings';
 import {

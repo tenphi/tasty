@@ -74,16 +74,25 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:tasty\.tsx|batch-provider\.tsx|hooks[\\/].+|rsc-cache\.ts|compute-styles\.ts|ssr[\\/](?:collect-auto-properties|context)\.ts|utils[\\/](?:filter-base-props|get-display-name|has-keys|is-valid-element-type|merge-styles|mod-attrs|process-tokens|resolve-recipes)\.ts)$/,
+                /[\\/](?:tasty\.tsx|batch-provider\.tsx|hooks[\\/].+|rsc-cache\.ts|compute-styles\.ts|ssr[\\/](?:collect-auto-properties|context)\.ts|utils[\\/](?:filter-base-props|get-display-name|has-keys|is-valid-element-type|mod-attrs|process-tokens)\.ts)$/,
               ),
             priority: 90,
+          },
+          {
+            name: 'shared-utils',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/]utils[\\/](?:is-dev-env|is-selector|merge-styles|warnings)\.ts$/,
+              ),
+            priority: 85,
           },
           {
             name: 'dsl',
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:parser[\\/].+|plugins[\\/].+|utils[\\/](?:color-math|color-space|colors|dotize|function-color|is-dev-env|string|styles|warnings)\.ts)$/,
+                /[\\/](?:parser[\\/].+|plugins[\\/].+|utils[\\/](?:color-math|color-space|colors|dotize|function-color|string|styles)\.ts)$/,
               ),
             priority: 80,
           },
@@ -101,7 +110,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:config\.ts|prop-handlers\.ts|(?:injector|keyframes|properties|functions|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules|ssr-collector-ref)\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|hash|name-prefix|typography)\.ts)$/,
+                /[\\/](?:config\.ts|prop-handlers\.ts|(?:injector|keyframes|properties|functions|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules|ssr-collector-ref)\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|hash|name-prefix|resolve-recipes|typography)\.ts)$/,
               ),
             priority: 60,
           },

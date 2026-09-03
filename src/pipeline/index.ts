@@ -31,6 +31,7 @@ import {
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
+import { isSelector } from '../utils/is-selector';
 import { toSnakeCase } from '../utils/string';
 import type {
   StyleHandler,
@@ -477,12 +478,7 @@ function invokeHandler(
 // Helper Functions
 // ============================================================================
 
-/**
- * Check if a key is a CSS selector
- */
-export function isSelector(key: string): boolean {
-  return key.startsWith('&') || key.startsWith('.') || /^[A-Z]/.test(key);
-}
+export { isSelector } from '../utils/is-selector';
 
 /**
  * Result of processing a selector affix ($) pattern.

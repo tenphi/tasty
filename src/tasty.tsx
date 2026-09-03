@@ -31,8 +31,8 @@ import type {
 } from './types';
 import { getDisplayName } from './utils/get-display-name';
 import { isValidElementType } from './utils/is-valid-element-type';
+import { isSelector } from './utils/is-selector';
 import { mergeStyles } from './utils/merge-styles';
-import { isSelector } from './pipeline';
 import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';

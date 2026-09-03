@@ -11,9 +11,23 @@ import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { createJiti as createJitiType } from 'jiti';
 
-import { configure, resetConfig, type TastyConfig } from '../config';
-import { ServerStyleCollector } from './collector';
+import type { TastyConfig } from '../config';
+import { formatCounterStyleRule } from '../counter-style';
+import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
+import { formatFunctionRule, parseFunctionName } from '../functions';
+import { renderStyles } from '../pipeline';
+import type { StyleResult } from '../pipeline';
+import { DEFAULT_PROPERTIES } from '../properties/defaults';
+import {
+  configureZero,
+  functionsForExtraction,
+  resetZeroConfig,
+} from '../zero/config';
+import { createServerStyleArtifact } from './artifacts';
+import type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 import { findUnsafeCSSResource } from './css-resources';
+import { formatGlobalRules } from './format-global-rules';
+import { formatPropertyCSS } from './format-property';
 
 const ENV_KEY = 'TASTY_NEXT_SHARED_CSS_HREF';
 const packageRequire = createRequire(import.meta.url);
@@ -117,12 +131,71 @@ function loadConfig(
 }
 
 function collectSharedCSS(config: TastyConfig): string {
-  resetConfig();
+  resetZeroConfig();
   try {
-    configure(config);
-    const collector = new ServerStyleCollector();
-    collector.collectInternals();
-    const artifacts = collector.getArtifacts();
+    const resolved = configureZero(config);
+    const { normalized } = resolved;
+    const artifacts: ServerStyleArtifact[] = [];
+    const append = (
+      kind: ServerStyleArtifactKind,
+      key: string,
+      css: string,
+    ) => {
+      if (!css) return;
+
+      artifacts.push(
+        createServerStyleArtifact(kind, key, css, artifacts.length),
+      );
+    };
+
+    for (const [token, definition] of Object.entries({
+      ...DEFAULT_PROPERTIES,
+      ...normalized.properties,
+    })) {
+      append(
+        'property',
+        `__prop:${token}`,
+        formatPropertyCSS(token, definition),
+      );
+    }
+
+    for (const [family, input] of Object.entries(normalized.fontFaces)) {
+      const descriptors = Array.isArray(input) ? input : [input];
+      for (const descriptor of descriptors) {
+        append(
+          'font-face',
+          fontFaceContentHash(family, descriptor),
+          formatFontFaceRule(family, descriptor),
+        );
+      }
+    }
+
+    for (const [name, descriptors] of Object.entries(
+      normalized.counterStyles,
+    )) {
+      append('counter-style', name, formatCounterStyleRule(name, descriptors));
+    }
+
+    for (const [name, definition] of Object.entries(
+      functionsForExtraction(resolved) ?? {},
+    )) {
+      append(
+        'function',
+        parseFunctionName(name),
+        formatFunctionRule(name, definition),
+      );
+    }
+
+    if (Object.keys(normalized.tokens).length > 0) {
+      const rules = renderStyles(normalized.tokens, ':root') as StyleResult[];
+      append('global', '__global:tokens', formatGlobalRules(rules));
+    }
+
+    for (const [selector, styles] of Object.entries(normalized.globalStyles)) {
+      if (Object.keys(styles).length === 0) continue;
+      const rules = renderStyles(styles, selector) as StyleResult[];
+      append('global', `__global:styles:${selector}`, formatGlobalRules(rules));
+    }
 
     for (const artifact of artifacts) {
       const unsafe = findUnsafeCSSResource(artifact.css, false);
@@ -135,7 +208,7 @@ function collectSharedCSS(config: TastyConfig): string {
 
     return artifacts.map(({ css }) => css).join('\n');
   } finally {
-    resetConfig();
+    resetZeroConfig();
   }
 }
 

@@ -70,9 +70,9 @@ describe('withTastyNext', () => {
     });
     const href = result.env?.TASTY_NEXT_SHARED_CSS_HREF;
 
-    expect(href).toMatch(
-      /^\/docs\/assets\/tasty\/tasty\.shared\.[a-f\d]{12}\.css$/,
-    );
+    // Pin the full CSS byte stream: rule ordering and formatting feed the
+    // content-addressed filename and must remain collector-compatible.
+    expect(href).toBe('/docs/assets/tasty/tasty.shared.ef48a3e8fbfe.css');
     expect(result.env?.EXISTING).toBe('yes');
     expect(result.webpack).toBe(existingWebpack);
     expect(await result.headers!()).toEqual([
@@ -106,6 +106,56 @@ describe('withTastyNext', () => {
     // Build-time collection must not leave Tasty configured or locked in the
     // Next config process.
     expect(() => configure({ namePrefix: 'after-' })).not.toThrow();
+  });
+
+  it('includes plugin globals with direct configuration taking precedence', async () => {
+    const outputDir = await makeTempDir();
+    const result = withTastyNext({
+      outputDir,
+      publicPath: '/_tasty',
+      config: {
+        plugins: [
+          {
+            name: 'global-definitions',
+            properties: {
+              '$plugin-size': {
+                syntax: '<length>',
+                inherits: true,
+                initialValue: '2px',
+              },
+            },
+            tokens: { '$plugin-size': '3px' },
+            fontFaces: {
+              Plugin: { src: 'url("/fonts/plugin.woff2")' },
+            },
+            counterStyles: {
+              plugin: { system: 'cyclic', symbols: '"P"' },
+            },
+            functions: {
+              $$plugin: { args: ['$value'], result: '$value' },
+            },
+            globalStyles: {
+              html: { padding: '$plugin-size' },
+            },
+          },
+        ],
+        tokens: { '$plugin-size': '5px' },
+        globalStyles: {
+          html: { color: 'red' },
+        },
+      },
+    })({});
+    const filename = result.env?.TASTY_NEXT_SHARED_CSS_HREF?.split('/').at(-1);
+    const css = await readFile(join(outputDir, filename!), 'utf8');
+
+    expect(css).toContain('@property --plugin-size');
+    expect(css).toContain('--plugin-size: 5px');
+    expect(css).toContain('font-family: "Plugin"');
+    expect(css).toContain('@counter-style plugin');
+    expect(css).toContain('@function --plugin');
+    expect(css).toContain(
+      'html { padding: var(--plugin-size); color: red; --current-color: red; }',
+    );
   });
 
   it('loads a TypeScript config file', async () => {

@@ -95,10 +95,8 @@ export function hasSupportsContradiction(
 export function hasMediaContradiction(
   conditions: ParsedMediaCondition[],
 ): boolean {
-  // Track conditions by their key (condition string) to detect A and NOT A
-  const featureConditions = new Map<string, boolean>(); // key -> isPositive
-  const typeConditions = new Map<string, boolean>(); // mediaType -> isPositive
-  const dimensionConditions = new Map<string, boolean>(); // condition -> isPositive
+  // Track conditions by subtype and value to detect A and NOT A.
+  const polarities = new Map<string, boolean>(); // key -> isPositive
 
   // Track dimension conditions for range contradiction detection (non-negated only)
   const dimensionsByDim = new Map<
@@ -107,64 +105,44 @@ export function hasMediaContradiction(
   >();
 
   for (const cond of conditions) {
-    if (cond.subtype === 'type') {
-      // Type query: check for direct contradiction (print AND NOT print)
-      const key = cond.mediaType || 'all';
-      const existing = typeConditions.get(key);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      typeConditions.set(key, !cond.negated);
-    } else if (cond.subtype === 'feature') {
-      // Feature query: check for direct contradiction
-      const key = cond.condition;
-      const existing = featureConditions.get(key);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      featureConditions.set(key, !cond.negated);
-    } else if (cond.subtype === 'dimension') {
-      // First, check for direct contradiction: (width < 600px) AND NOT (width < 600px)
-      const condKey = cond.condition;
-      const existing = dimensionConditions.get(condKey);
-      if (existing !== undefined && existing !== !cond.negated) {
-        return true; // Contradiction: positive AND negated
-      }
-      dimensionConditions.set(condKey, !cond.negated);
+    const key = `${cond.subtype}|${
+      cond.subtype === 'type' ? cond.mediaType || 'all' : cond.condition
+    }`;
+    const existing = polarities.get(key);
+    if (existing !== undefined && existing !== !cond.negated) {
+      return true;
+    }
+    polarities.set(key, !cond.negated);
 
-      // For range analysis, only consider non-negated conditions
-      // Negated conditions are handled via the direct contradiction check above
-      if (!cond.negated) {
-        const dim = cond.dimension || 'width';
-        let bounds = dimensionsByDim.get(dim);
-        if (!bounds) {
-          bounds = { lowerBound: null, upperBound: null };
-          dimensionsByDim.set(dim, bounds);
-        }
+    // Negated dimensions are handled by the direct contradiction check.
+    if (cond.subtype !== 'dimension' || cond.negated) continue;
 
-        // Track the effective bounds
-        if (cond.lowerBound?.valueNumeric != null) {
-          const value = cond.lowerBound.valueNumeric;
-          if (bounds.lowerBound === null || value > bounds.lowerBound) {
-            bounds.lowerBound = value;
-          }
-        }
-        if (cond.upperBound?.valueNumeric != null) {
-          const value = cond.upperBound.valueNumeric;
-          if (bounds.upperBound === null || value < bounds.upperBound) {
-            bounds.upperBound = value;
-          }
-        }
+    const dim = cond.dimension || 'width';
+    let bounds = dimensionsByDim.get(dim);
+    if (!bounds) {
+      bounds = { lowerBound: null, upperBound: null };
+      dimensionsByDim.set(dim, bounds);
+    }
 
-        // Check for impossible range
-        if (
-          bounds.lowerBound !== null &&
-          bounds.upperBound !== null &&
-          bounds.lowerBound >= bounds.upperBound
-        ) {
-          return true;
-        }
+    if (cond.lowerBound?.valueNumeric != null) {
+      const value = cond.lowerBound.valueNumeric;
+      if (bounds.lowerBound === null || value > bounds.lowerBound) {
+        bounds.lowerBound = value;
       }
+    }
+    if (cond.upperBound?.valueNumeric != null) {
+      const value = cond.upperBound.valueNumeric;
+      if (bounds.upperBound === null || value < bounds.upperBound) {
+        bounds.upperBound = value;
+      }
+    }
+
+    if (
+      bounds.lowerBound !== null &&
+      bounds.upperBound !== null &&
+      bounds.lowerBound >= bounds.upperBound
+    ) {
+      return true;
     }
   }
 
@@ -197,15 +175,15 @@ export function hasContainerStyleContradiction(
     const property = cond.property;
     const value = cond.propertyValue;
 
-    if (!styleQueries.has(property)) {
-      styleQueries.set(property, {
+    let entry = styleQueries.get(property);
+    if (!entry) {
+      entry = {
         hasExistence: false,
         values: new Set(),
         hasNegatedExistence: false,
-      });
+      };
+      styleQueries.set(property, entry);
     }
-
-    const entry = styleQueries.get(property)!;
 
     if (cond.negated) {
       if (value === undefined) {

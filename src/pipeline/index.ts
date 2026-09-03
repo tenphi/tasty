@@ -145,28 +145,18 @@ function runPipeline(
   // Process styles recursively (including nested selectors)
   processStyles(styles, '', parserContext, allRules);
 
-  // Deduplicate rules
+  // Deduplicate and partition in one pass. @starting-style rules must come
+  // after normal rules for the same selector because source order decides
+  // the cascade between their equal-specificity selectors.
   const seen = new Set<string>();
-  const dedupedRules = allRules.filter((rule) => {
-    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}|${rule.startingStyle ? '1' : '0'}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  // @starting-style rules must come AFTER normal rules for the same selector.
-  // They share the same specificity, so source order decides the cascade.
-  // If a @starting-style rule appears before its normal counterpart,
-  // the later normal rule overrides the starting value.
   const normal: CSSRule[] = [];
   const starting: CSSRule[] = [];
 
-  for (const rule of dedupedRules) {
-    if (rule.startingStyle) {
-      starting.push(rule);
-    } else {
-      normal.push(rule);
-    }
+  for (const rule of allRules) {
+    const key = `${rule.selector}|${rule.declarations}|${rule.atRules?.join('|') ?? ''}|${rule.rootPrefix || ''}|${rule.startingStyle ? '1' : '0'}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    (rule.startingStyle ? starting : normal).push(rule);
   }
 
   // Order rules by their cascade order hint (ascending source priority) so
@@ -209,10 +199,14 @@ function processStyles(
   // Separate selector keys from style keys.
   // Skip @keyframes (processed separately) and other @-prefixed keys
   // (predefined states), which are not handler entries.
-  const selectorKeys = keys.filter((key) => isSelector(key));
+  const selectorKeys: string[] = [];
   const styleKeys: string[] = [];
   for (const key of keys) {
-    if (isSelector(key) || key.startsWith('@')) continue;
+    if (isSelector(key)) {
+      selectorKeys.push(key);
+      continue;
+    }
+    if (key.startsWith('@')) continue;
 
     // Reject top-level pseudo-class / pseudo-element keys like ':hover',
     // '::before', ':has(...)'. These are not valid Tasty style keys —
@@ -1125,10 +1119,9 @@ function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
 
   for (const rule of rules) {
     const key = `${rule.selectorSuffix}|${stringifyDeclarations(rule.declarations)}`;
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key)!.push(rule);
+    const group = groups.get(key);
+    if (group) group.push(rule);
+    else groups.set(key, [rule]);
   }
 
   // Merge conditions with OR for each group
@@ -1219,11 +1212,6 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
     .map(([prop, value]) => `${prop}: ${value};`)
     .join(' ');
 
-  // Helper to get root prefix key for grouping
-  const getRootPrefixKey = (variant: SelectorVariant): string => {
-    return rootGroupsToCSS(variant.rootGroups) || '';
-  };
-
   // Group variants by their at-rules + startingStyle (variants with same context can be combined with commas)
   const byAtRules = new Map<
     string,
@@ -1238,10 +1226,11 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   for (const variant of components.variants) {
     const atRules = buildAtRulesFromVariant(variant);
     const startingStyle = variant.startingStyle;
+    const rootPrefix = rootGroupsToCSS(variant.rootGroups);
     const key =
       atRules.sort().join('|||') +
       '###' +
-      getRootPrefixKey(variant) +
+      (rootPrefix || '') +
       '###' +
       (startingStyle ? '1' : '0');
 
@@ -1252,7 +1241,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
       byAtRules.set(key, {
         variants: [variant],
         atRules,
-        rootPrefix: rootGroupsToCSS(variant.rootGroups),
+        rootPrefix,
         startingStyle: startingStyle || undefined,
       });
     }

@@ -128,6 +128,35 @@ describe('SheetManager', () => {
       expect(styleElement.sheet?.cssRules.length).toBe(1);
     });
 
+    it('merges matching rules in declaration order without merging distinct at-rules', () => {
+      const manager = new SheetManager({
+        ...config,
+        forceTextInjection: true,
+      });
+      const registry = manager.getRegistry(document);
+
+      const ruleInfo = manager.insertRule(
+        registry,
+        [
+          createStyleRule('.test', 'color: red;'),
+          createStyleRule('.test', 'background: blue;'),
+          {
+            selector: '.test',
+            declarations: 'opacity: .5;',
+            atRules: ['@media (min-width: 1px)'],
+          },
+        ],
+        'test',
+        document,
+      );
+
+      expect(ruleInfo?.indices).toEqual([0, 1]);
+      expect(registry.sheets[0].textRules).toEqual([
+        '.test { color: red; background: blue; }',
+        '@media (min-width: 1px) { .test { opacity: .5; } }',
+      ]);
+    });
+
     it('should create new sheet when max rules exceeded', () => {
       const configWithLimit = { ...config, maxRulesPerSheet: 2 };
       const manager = new SheetManager(configWithLimit);

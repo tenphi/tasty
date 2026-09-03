@@ -1,4 +1,5 @@
 import {
+  getNamedColorHex,
   getRgbValuesFromRgbaString,
   hexToRgb,
   hslStringToRgb,
@@ -14,6 +15,21 @@ import {
   toTone,
   fromTone,
 } from './color-math';
+
+describe('getNamedColorHex', () => {
+  it('returns the complete CSS named-color table with stable identity and order', () => {
+    const colors = getNamedColorHex();
+
+    expect(colors.size).toBe(148);
+    expect([...colors.keys()].slice(0, 2)).toEqual([
+      'aliceblue',
+      'antiquewhite',
+    ]);
+    expect(colors.get('rebeccapurple')).toBe('#663399');
+    expect(colors.get('yellowgreen')).toBe('#9acd32');
+    expect(getNamedColorHex()).toBe(colors);
+  });
+});
 
 // ============================================================================
 // Gamma transfer functions

@@ -231,13 +231,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "58.5 kB"
+      "limit": "58.3 kB"
     },
     {
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "51.5 kB"
+      "limit": "51 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -255,13 +255,13 @@
       "name": "main (useRawCSS)",
       "path": "dist/index.js",
       "import": "{ useRawCSS }",
-      "limit": "32 kB"
+      "limit": "31.5 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "55.5 kB"
+      "limit": "55.3 kB"
     },
     {
       "name": "static",

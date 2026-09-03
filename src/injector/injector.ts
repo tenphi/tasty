@@ -168,6 +168,34 @@ export class StyleInjector {
     return this.sheetManager;
   }
 
+  /** Register inferable custom properties used by a set of declarations. */
+  private inferProperties(
+    registry: RootRegistry,
+    rules: readonly { declarations?: string }[],
+    root: Document | ShadowRoot,
+  ): void {
+    if (this.config.autoPropertyTypes === false) return;
+
+    const resolver = registry.propertyTypeResolver;
+    const defined = registry.injectedProperties;
+
+    for (const rule of rules) {
+      if (!rule.declarations) continue;
+      resolver.scanDeclarations(
+        rule.declarations,
+        (name) => defined.has(name),
+        (name, syntax, initialValue) => {
+          this.property(name, {
+            syntax,
+            inherits: true,
+            initialValue,
+            root,
+          });
+        },
+      );
+    }
+  }
+
   /**
    * Whether sheet writes should be queued instead of applied immediately.
    *
@@ -475,25 +503,7 @@ export class StyleInjector {
     const applySheetWrite = (): RuleInfo | null => {
       // Auto-register @property for custom properties with inferable types.
       // Colors are detected by --*-color name pattern, numeric types by value.
-      if (this.config.autoPropertyTypes !== false) {
-        const resolver = registry.propertyTypeResolver;
-        const defined = registry.injectedProperties;
-        for (const rule of rulesToInsert) {
-          if (!rule.declarations) continue;
-          resolver.scanDeclarations(
-            rule.declarations,
-            (name) => defined.has(name),
-            (name, syntax, initialValue) => {
-              this.property(name, {
-                syntax,
-                inherits: true,
-                initialValue,
-                root,
-              });
-            },
-          );
-        }
-      }
+      this.inferProperties(registry, rulesToInsert, root);
 
       // Insert rules using existing sheet manager
       const ruleInfo = this.sheetManager.insertRule(
@@ -630,25 +640,7 @@ export class StyleInjector {
     // output, and equal-specificity rules resolve by document order.
     const applyWrite = (): RuleInfo | null => {
       // Auto-register @property for custom properties in global rules
-      if (this.config.autoPropertyTypes !== false) {
-        const resolver = registry.propertyTypeResolver;
-        const defined = registry.injectedProperties;
-        for (const rule of rules) {
-          if (!rule.declarations) continue;
-          resolver.scanDeclarations(
-            rule.declarations,
-            (name) => defined.has(name),
-            (name, syntax, initialValue) => {
-              this.property(name, {
-                syntax,
-                inherits: true,
-                initialValue,
-                root,
-              });
-            },
-          );
-        }
-      }
+      this.inferProperties(registry, rules, root);
 
       const inserted = this.sheetManager.insertGlobalRule(
         registry,

@@ -28,6 +28,52 @@ const supportsConstructableSheets =
     }
   })();
 
+function wrapAtRules(css: string, atRules?: string[]): string {
+  return (
+    atRules?.reduce((wrapped, atRule) => `${atRule} { ${wrapped} }`, css) ?? css
+  );
+}
+
+/** Split a selector list without treating commas inside [] / () / strings as separators. */
+function splitSelectorsSafely(selectorList: string): string[] {
+  const parts: string[] = [];
+  let buffer = '';
+  let squareDepth = 0;
+  let parenDepth = 0;
+  let quote: '"' | "'" | '' = '';
+
+  for (let i = 0; i < selectorList.length; i++) {
+    const char = selectorList[i];
+
+    if (quote) {
+      if (char === quote && selectorList[i - 1] !== '\\') quote = '';
+      buffer += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char as '"' | "'";
+      buffer += char;
+      continue;
+    }
+    if (char === '[') squareDepth++;
+    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (char === '(') parenDepth++;
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+
+    if (char === ',' && squareDepth === 0 && parenDepth === 0) {
+      const part = buffer.trim();
+      if (part) parts.push(part);
+      buffer = '';
+    } else {
+      buffer += char;
+    }
+  }
+
+  const tail = buffer.trim();
+  if (tail) parts.push(tail);
+  return parts;
+}
+
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
   /** Strong set of active roots so background GC can iterate them all */
@@ -296,49 +342,25 @@ export class SheetManager {
 
     try {
       // Group rules by selector, at-rules, and startingStyle to combine declarations
-      const groupedRules: StyleRule[] = [];
-      const groupMap = new Map<
-        string,
-        {
-          idx: number;
-          selector: string;
-          atRules?: string[];
-          startingStyle?: boolean;
-          declarations: string;
-        }
-      >();
+      const groupedRules = new Map<string, StyleRule>();
 
-      const atKey = (at?: string[]) => (at && at.length ? at.join('|') : '');
-
-      flattenedRules.forEach((r) => {
-        const key = `${atKey(r.atRules)}||${r.selector}||${r.startingStyle ? '1' : '0'}`;
-        const existing = groupMap.get(key);
+      for (const rule of flattenedRules) {
+        const key = `${rule.atRules?.join('|') ?? ''}||${rule.selector}||${rule.startingStyle ? '1' : '0'}`;
+        const existing = groupedRules.get(key);
         if (existing) {
           // Append declarations, preserving order
           existing.declarations = existing.declarations
-            ? `${existing.declarations} ${r.declarations}`
-            : r.declarations;
+            ? `${existing.declarations} ${rule.declarations}`
+            : rule.declarations;
         } else {
-          groupMap.set(key, {
-            idx: groupedRules.length,
-            selector: r.selector,
-            atRules: r.atRules,
-            startingStyle: r.startingStyle,
-            declarations: r.declarations,
+          groupedRules.set(key, {
+            selector: rule.selector,
+            atRules: rule.atRules,
+            startingStyle: rule.startingStyle,
+            declarations: rule.declarations,
           });
-          groupedRules.push({ ...r });
         }
-      });
-
-      // Normalize groupedRules from map (with merged declarations)
-      groupMap.forEach((val) => {
-        groupedRules[val.idx] = {
-          selector: val.selector,
-          atRules: val.atRules,
-          startingStyle: val.startingStyle,
-          declarations: val.declarations,
-        } as StyleRule;
-      });
+      }
 
       // Insert grouped rules
       const insertedRuleTexts: string[] = [];
@@ -348,21 +370,21 @@ export class SheetManager {
       let firstInsertedIndex: number | null = null;
       let lastInsertedIndex: number | null = null;
 
-      for (const rule of groupedRules) {
+      const recordInsertion = (index: number): void => {
+        targetSheet.ruleCount++;
+        insertedIndices.push(index);
+        if (firstInsertedIndex == null) firstInsertedIndex = index;
+        lastInsertedIndex = index;
+        currentRuleIndex = index + 1;
+      };
+
+      for (const rule of groupedRules.values()) {
         const declarations = rule.declarations;
         const innerContent = rule.startingStyle
           ? `@starting-style { ${declarations} }`
           : declarations;
         const baseRule = `${rule.selector} { ${innerContent} }`;
-
-        // Wrap with at-rules if present
-        let fullRule = baseRule;
-        if (rule.atRules && rule.atRules.length > 0) {
-          fullRule = rule.atRules.reduce(
-            (css, atRule) => `${atRule} { ${css} }`,
-            baseRule,
-          );
-        }
+        const fullRule = wrapAtRules(baseRule, rule.atRules);
 
         // Insert individual rule
         const styleElement = targetSheet.sheet;
@@ -374,68 +396,17 @@ export class SheetManager {
           const atomicRuleIndex = this.findAvailableRuleIndex(targetSheet);
           const safeIndex = Math.min(Math.max(0, atomicRuleIndex), maxIndex);
 
-          // Helper: split comma-separated selectors safely (ignores commas inside [] () " ')
-          const splitSelectorsSafely = (selectorList: string): string[] => {
-            const parts: string[] = [];
-            let buf = '';
-            let depthSq = 0; // [] depth
-            let depthPar = 0; // () depth
-            let inStr: '"' | "'" | '' = '';
-            for (let i = 0; i < selectorList.length; i++) {
-              const ch = selectorList[i];
-              if (inStr) {
-                if (ch === inStr && selectorList[i - 1] !== '\\') {
-                  inStr = '';
-                }
-                buf += ch;
-                continue;
-              }
-              if (ch === '"' || ch === "'") {
-                inStr = ch as '"' | "'";
-                buf += ch;
-                continue;
-              }
-              if (ch === '[') depthSq++;
-              else if (ch === ']') depthSq = Math.max(0, depthSq - 1);
-              else if (ch === '(') depthPar++;
-              else if (ch === ')') depthPar = Math.max(0, depthPar - 1);
-
-              if (ch === ',' && depthSq === 0 && depthPar === 0) {
-                const part = buf.trim();
-                if (part) parts.push(part);
-                buf = '';
-              } else {
-                buf += ch;
-              }
-            }
-            const tail = buf.trim();
-            if (tail) parts.push(tail);
-            return parts;
-          };
-
           try {
             styleSheet.insertRule(fullRule, safeIndex);
-            // Update sheet ruleCount immediately to prevent concurrent race conditions
-            targetSheet.ruleCount++;
-            insertedIndices.push(safeIndex); // Track this index
-            if (firstInsertedIndex == null) firstInsertedIndex = safeIndex;
-            lastInsertedIndex = safeIndex;
-            currentRuleIndex = safeIndex + 1;
+            recordInsertion(safeIndex);
           } catch (e) {
             // If the browser rejects the combined selector (e.g., vendor pseudo-elements),
             // try to split and insert each selector independently. Skip unsupported ones.
             const selectors = splitSelectorsSafely(rule.selector);
             if (selectors.length > 1) {
-              let anyInserted = false;
               for (const sel of selectors) {
                 const singleBase = `${sel} { ${declarations} }`;
-                let singleRule = singleBase;
-                if (rule.atRules && rule.atRules.length > 0) {
-                  singleRule = rule.atRules.reduce(
-                    (css, atRule) => `${atRule} { ${css} }`,
-                    singleBase,
-                  );
-                }
+                const singleRule = wrapAtRules(singleBase, rule.atRules);
 
                 try {
                   // Calculate index atomically for each individual selector insertion
@@ -443,13 +414,7 @@ export class SheetManager {
                   const atomicIdx = this.findAvailableRuleIndex(targetSheet);
                   const idx = Math.min(Math.max(0, atomicIdx), maxIdx);
                   styleSheet.insertRule(singleRule, idx);
-                  // Update sheet ruleCount immediately
-                  targetSheet.ruleCount++;
-                  insertedIndices.push(idx); // Track this index
-                  if (firstInsertedIndex == null) firstInsertedIndex = idx;
-                  lastInsertedIndex = idx;
-                  currentRuleIndex = idx + 1;
-                  anyInserted = true;
+                  recordInsertion(idx);
                 } catch (singleErr) {
                   // Skip unsupported selector in this engine (e.g., ::-moz-selection in Blink)
                   if (process.env.NODE_ENV !== 'production') {
@@ -460,10 +425,6 @@ export class SheetManager {
                     );
                   }
                 }
-              }
-              // If none inserted, continue without throwing to avoid aborting the whole batch
-              if (!anyInserted) {
-                // noop: all selectors invalid here; safe to skip
               }
             } else {
               // Single selector failed — skip it silently (likely unsupported in this engine).
@@ -494,12 +455,7 @@ export class SheetManager {
           this.trackTextRule(targetSheet, atomicRuleIndex, fullRule);
           styleElement.textContent =
             (styleElement.textContent || '') + '\n' + fullRule;
-          // Update sheet ruleCount immediately
-          targetSheet.ruleCount++;
-          insertedIndices.push(atomicRuleIndex); // Track this index
-          if (firstInsertedIndex == null) firstInsertedIndex = atomicRuleIndex;
-          lastInsertedIndex = atomicRuleIndex;
-          currentRuleIndex = atomicRuleIndex + 1;
+          recordInsertion(atomicRuleIndex);
         }
 
         // Report a detached style element only if there are issues and we're not using forceTextInjection

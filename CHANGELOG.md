@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.8.0
+
+### Minor Changes
+
+- [#295](https://github.com/tenphi/tasty/pull/295) [`cd25c86`](https://github.com/tenphi/tasty/commit/cd25c861860570dde48a77082ea3141284f840fe) Thanks [@tenphi](https://github.com/tenphi)! - Add writing-mode-aware logical category styles for size, padding, margin, inset, scroll spacing, and borders. Each block/inline category supports native start/end behavior, while `blockSize` and `inlineSize` include enhanced min/max sizing.
+
 ## 3.7.0
 
 ### Minor Changes

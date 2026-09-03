@@ -70,15 +70,24 @@ export default defineConfig([
             priority: 100,
           },
           {
-            name: 'zero-engine',
+            name: 'runtime-state',
             test: (id) =>
-              isSourceModule(id, /[\\/]zero[\\/](?:css-writer|extractor)\.ts$/),
-            priority: 95,
+              isSourceModule(
+                id,
+                /[\\/](?:config-resources|ssr[\\/]ssr-collector-ref)\.ts$/,
+              ),
+            priority: 97,
           },
           {
             name: 'build-config',
             test: (id) => isSourceModule(id, /[\\/]zero[\\/]config\.ts$/),
             priority: 96,
+          },
+          {
+            name: 'zero-engine',
+            test: (id) =>
+              isSourceModule(id, /[\\/]zero[\\/](?:css-writer|extractor)\.ts$/),
+            priority: 95,
           },
           {
             name: 'hydration',
@@ -148,7 +157,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /(?:[\\/]src[\\/]config\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|ssr[\\/]ssr-collector-ref\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$)/,
+                /(?:[\\/]src[\\/]config\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$)/,
               ),
             priority: 60,
           },

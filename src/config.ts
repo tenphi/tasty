@@ -18,8 +18,11 @@ import {
 } from './functions';
 import {
   hasStylesGenerated,
+  isFunctionsPolyfillEnabled,
   markStylesGeneratedState,
+  resetGlobalPolyfillsState,
   resetStylesGeneratedState,
+  setGlobalPolyfillsState,
 } from './config-state';
 import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
@@ -568,9 +571,6 @@ let globalCounterStyle: Record<string, CounterStyleDescriptors> | null = null;
 // Global @function storage (null = no functions configured)
 let globalFunction: Record<string, FunctionDefinition> | null = null;
 
-// Global polyfill toggles (null = no polyfills configured)
-let globalPolyfills: { functions?: boolean } | null = null;
-
 // Global properties storage (null = no properties configured)
 let globalProperties: Record<string, PropertyDefinition> | null = null;
 
@@ -597,7 +597,6 @@ const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
 const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
 const GTKEY_FUNCTION = '__tasty_cfg_function__';
-const GTKEY_POLYFILLS = '__tasty_cfg_polyfills__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
 const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
 
@@ -615,7 +614,6 @@ function clearGlobalThisConfig(): void {
   delete g[GTKEY_FONT_FACE];
   delete g[GTKEY_COUNTER_STYLE];
   delete g[GTKEY_FUNCTION];
-  delete g[GTKEY_POLYFILLS];
   delete g[GTKEY_PROPERTIES];
   delete g[GTKEY_GLOBAL_STYLES];
 }
@@ -1082,13 +1080,7 @@ function setGlobalFunction(
  * Whether the CSS `@function` polyfill (inline expansion) is enabled.
  * Reads from globalThis first for cross-module SSR/zero-runtime support.
  */
-export function isFunctionsPolyfillEnabled(): boolean {
-  const polyfills =
-    globalPolyfills ??
-    getFromGlobalThis<{ functions?: boolean }>(GTKEY_POLYFILLS) ??
-    null;
-  return polyfills?.functions === true;
-}
+export { isFunctionsPolyfillEnabled } from './config-state';
 
 /**
  * Set global polyfill toggles (called from configure).
@@ -1104,8 +1096,7 @@ function setGlobalPolyfills(polyfills: { functions?: boolean }): void {
     return;
   }
 
-  globalPolyfills = { ...(globalPolyfills ?? {}), ...polyfills };
-  setOnGlobalThis(GTKEY_POLYFILLS, globalPolyfills);
+  setGlobalPolyfillsState(polyfills);
 }
 
 // ============================================================================
@@ -1717,7 +1708,7 @@ export function resetConfig(): void {
   globalFontFace = null;
   globalCounterStyle = null;
   globalFunction = null;
-  globalPolyfills = null;
+  resetGlobalPolyfillsState();
   globalRecipes = null;
   globalConfigTokens = null;
   globalStyles = null;

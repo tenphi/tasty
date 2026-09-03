@@ -34,12 +34,14 @@ const entries = [
 ];
 
 const expectedChunks = [
+  'css-definitions-',
   'debug-',
   'dsl-',
   'react-runtime-',
   'runtime-engine-',
   'shared-utils-',
   'style-engine-',
+  'zero-engine-',
 ];
 
 function walk(dir, out = []) {
@@ -95,6 +97,11 @@ assertGraphExcludes('static/index.js', [
   'react-runtime-',
   'runtime-engine-',
   'style-engine-',
+]);
+assertGraphExcludes('zero/index.js', [
+  'debug-',
+  'react-runtime-',
+  'runtime-engine-',
 ]);
 assertGraphExcludes('zero/babel.js', ['react-runtime-']);
 

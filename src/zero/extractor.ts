@@ -22,7 +22,7 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
-import { isFunctionsPolyfillEnabled } from '../config';
+import { isFunctionsPolyfillEnabled } from '../config-state';
 import {
   extractLocalFunctions,
   formatFunctionRule,

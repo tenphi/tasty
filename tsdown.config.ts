@@ -76,6 +76,15 @@ export default defineConfig([
             priority: 95,
           },
           {
+            name: 'hydration',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:injector[\\/](?:global-state|types)|ssr[\\/]hydrate)\.ts$/,
+              ),
+            priority: 94,
+          },
+          {
             name: 'config-engine',
             test: (id) =>
               isSourceModule(

@@ -38,6 +38,7 @@ const expectedChunks = [
   'css-definitions-',
   'debug-',
   'dsl-',
+  'hydration-',
   'react-runtime-',
   'runtime-engine-',
   'shared-utils-',
@@ -88,6 +89,21 @@ function assertGraphExcludes(entry, forbiddenPrefixes) {
   }
 }
 
+function assertGraphOnlyLoads(entry, allowedPrefixes) {
+  const graph = collectLocalGraph(entry);
+  const unexpected = graph.find((file) => {
+    if (file === join(distDir, entry)) return false;
+    return !allowedPrefixes.some((prefix) => basename(file).startsWith(prefix));
+  });
+
+  if (unexpected) {
+    throw new Error(
+      `${entry} unexpectedly loads ${basename(unexpected)}; expected only ` +
+        `${allowedPrefixes.join(', ')} chunks.`,
+    );
+  }
+}
+
 for (const entry of entries) {
   await import(new URL(`../dist/${entry}`, import.meta.url));
 }
@@ -109,6 +125,7 @@ assertGraphExcludes('zero/babel.js', [
   'react-runtime-',
   'runtime-engine-',
 ]);
+assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));
 for (const prefix of expectedChunks) {

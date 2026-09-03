@@ -132,6 +132,7 @@
     "version": "changeset version",
     "release": "changeset publish",
     "knip": "knip",
+    "check:build": "node scripts/check-built-entries.mjs",
     "check:test-only": "node scripts/check-test-only-code.mjs",
     "hygiene": "pnpm lint && pnpm format:check && pnpm typecheck",
     "hygiene:fix": "pnpm lint:fix && pnpm format && pnpm typecheck"
@@ -233,6 +234,30 @@
       "limit": "58.5 kB"
     },
     {
+      "name": "main (tasty)",
+      "path": "dist/index.js",
+      "import": "{ tasty }",
+      "limit": "51.5 kB"
+    },
+    {
+      "name": "main (StyleParser)",
+      "path": "dist/index.js",
+      "import": "{ StyleParser }",
+      "limit": "7.5 kB"
+    },
+    {
+      "name": "main (parseColor)",
+      "path": "dist/index.js",
+      "import": "{ parseColor }",
+      "limit": "8 kB"
+    },
+    {
+      "name": "main (useRawCSS)",
+      "path": "dist/index.js",
+      "import": "{ useRawCSS }",
+      "limit": "32 kB"
+    },
+    {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
@@ -242,7 +267,7 @@
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "17.6 kB"
+      "limit": "19 kB"
     },
     {
       "name": "zero",
@@ -253,7 +278,7 @@
         "path",
         "crypto"
       ],
-      "limit": "32.2 kB"
+      "limit": "33.3 kB"
     },
     {
       "name": "babel-plugin",
@@ -264,7 +289,7 @@
         "path",
         "crypto"
       ],
-      "limit": "50.6 kB"
+      "limit": "51.7 kB"
     }
   ]
 }

@@ -1,6 +1,12 @@
 import { defineConfig } from 'tsdown';
+import type { UserConfig } from 'tsdown';
 
-export default defineConfig({
+const isSourceModule = (id: string, pattern: RegExp): boolean =>
+  /[\\/]src[\\/]/.test(id) &&
+  !/\.d\.[cm]?ts(?:$|\?)/.test(id) &&
+  pattern.test(id);
+
+const sharedConfig = {
   entry: {
     index: 'src/index.ts',
     'core/index': 'src/core/index.ts',
@@ -22,7 +28,6 @@ export default defineConfig({
   },
   format: 'esm',
   outDir: 'dist',
-  dts: true,
   external: [
     'fs',
     'path',
@@ -41,5 +46,73 @@ export default defineConfig({
   platform: 'browser',
   target: 'es2022',
   sourcemap: true,
-  clean: true,
-});
+} satisfies UserConfig;
+
+export default defineConfig([
+  {
+    ...sharedConfig,
+    name: 'runtime',
+    dts: false,
+    clean: true,
+    inputOptions: {
+      preserveEntrySignatures: 'allow-extension',
+    },
+    outputOptions: {
+      chunkFileNames: 'chunks/[name]-[hash].js',
+      codeSplitting: {
+        // Keep the published build compact while preserving meaningful
+        // tree-shaking boundaries for consumers that import a narrow API.
+        includeDependenciesRecursively: false,
+        groups: [
+          {
+            name: 'debug',
+            test: (id) => isSourceModule(id, /[\\/]debug\.ts$/),
+            priority: 100,
+          },
+          {
+            name: 'react-runtime',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:tasty\.tsx|batch-provider\.tsx|hooks[\\/].+|rsc-cache\.ts|compute-styles\.ts|ssr[\\/](?:collect-auto-properties|context)\.ts|utils[\\/](?:filter-base-props|get-display-name|has-keys|is-valid-element-type|merge-styles|mod-attrs|process-tokens|resolve-recipes)\.ts)$/,
+              ),
+            priority: 90,
+          },
+          {
+            name: 'dsl',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:parser[\\/].+|plugins[\\/].+|utils[\\/](?:color-math|color-space|colors|dotize|function-color|is-dev-env|string|styles|warnings)\.ts)$/,
+              ),
+            priority: 80,
+          },
+          {
+            name: 'style-engine',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:config-state\.ts|(?:styles|chunks|pipeline|states)[\\/].+|utils[\\/](?:case-converter|selector-transform)\.ts)$/,
+              ),
+            priority: 70,
+          },
+          {
+            name: 'runtime-engine',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:config\.ts|prop-handlers\.ts|(?:injector|keyframes|properties|functions|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules|ssr-collector-ref)\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|hash|name-prefix|typography)\.ts)$/,
+              ),
+            priority: 60,
+          },
+        ],
+      },
+    },
+  },
+  {
+    ...sharedConfig,
+    name: 'declarations',
+    dts: { emitDtsOnly: true },
+    clean: false,
+  },
+]);

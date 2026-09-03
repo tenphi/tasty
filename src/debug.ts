@@ -3,7 +3,6 @@ import { CHUNK_NAMES } from './chunks/definitions';
 import { getNamePrefix } from './config';
 import { flushStyles, getCSSTextForNode, injector } from './injector';
 import type { CacheMetrics, RootRegistry } from './injector/types';
-import { isDevEnv } from './utils/is-dev-env';
 import { tastyClassRegex } from './utils/name-prefix';
 
 declare global {
@@ -961,12 +960,4 @@ function getPageCSS(root: DebugRoot = defaultRoot()): string {
     /* ignore */
   }
   return chunks.join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Auto-install in development
-// ---------------------------------------------------------------------------
-
-if (typeof window !== 'undefined' && isDevEnv()) {
-  tastyDebug.install();
 }

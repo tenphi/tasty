@@ -3,7 +3,7 @@ import { insetStyle } from './inset';
 import { marginStyle } from './margin';
 import { paddingStyle } from './padding';
 import { scrollMarginStyle } from './scrollMargin';
-import { resetStyleWarnings } from './shared';
+import { resetStyleWarnings } from '../utils/warnings';
 
 /**
  * A group that names direction modifiers takes a single value, applied to every

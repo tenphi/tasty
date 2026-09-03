@@ -6,9 +6,7 @@ Runtime CSS inspection and diagnostics for the Tasty styling system. Inspect inj
 
 ## Overview
 
-`tastyDebug` is a diagnostic object that exposes Tasty's runtime CSS state. It is designed for development use but can be manually installed in production for debugging.
-
-In development mode (`isDevEnv()` returns `true`), `tastyDebug` is automatically installed on `window.tastyDebug`. In production, install it manually when needed.
+`tastyDebug` is a diagnostic object that exposes Tasty's runtime CSS state. It is designed for development use and can be installed on `window` explicitly when needed.
 
 All methods **log to the console by default**. Pass `{ raw: true }` to suppress logging and only return data.
 
@@ -19,7 +17,6 @@ All methods **log to the console by default**. Pass `{ raw: true }` to suppress 
 ## Quick Start
 
 ```typescript
-// Auto-installed in dev mode. Otherwise:
 import { tastyDebug } from '@tenphi/tasty';
 tastyDebug.install();
 
@@ -277,7 +274,7 @@ tastyDebug.help();
 
 ### `install(): void`
 
-Attaches `tastyDebug` to `window.tastyDebug`. Called automatically in development mode.
+Attaches `tastyDebug` to `window.tastyDebug`.
 
 ```typescript
 import { tastyDebug } from '@tenphi/tasty';

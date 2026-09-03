@@ -32,11 +32,13 @@ interface ClientKeyframesState {
   factoryDeps: Map<string, FactoryDepsEntry>;
 }
 
-const getClientState = createClientState((): ClientKeyframesState => ({
-  contentToName: new Map(),
-  namedSlots: new Map(),
-  factoryDeps: new Map(),
-}));
+const getClientState = /* @__PURE__ */ createClientState(
+  (): ClientKeyframesState => ({
+    contentToName: new Map(),
+    namedSlots: new Map(),
+    factoryDeps: new Map(),
+  }),
+);
 
 /**
  * Inject CSS @keyframes and return the generated animation name.

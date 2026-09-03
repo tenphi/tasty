@@ -16,6 +16,11 @@ import {
   resetFunctionPolyfills,
   splitFunctions,
 } from './functions';
+import {
+  hasStylesGenerated,
+  markStylesGeneratedState,
+  resetStylesGeneratedState,
+} from './config-state';
 import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
@@ -31,9 +36,9 @@ import {
   registerBaseStyleProps,
   resetBaseStyleProps,
 } from './styles/base-props';
-import { resetStyleWarnings } from './styles/shared';
 import { isDevEnv } from './utils/is-dev-env';
 import { DEFAULT_NAME_PREFIX, validateNamePrefix } from './utils/name-prefix';
+import { resetStyleWarnings } from './utils/warnings';
 import {
   CUSTOM_UNITS,
   getGlobalParseFunctions,
@@ -547,9 +552,6 @@ function warnOnce(key: string, message: string): void {
 // Configuration State
 // ============================================================================
 
-// Track whether styles have been generated (locks configuration)
-let stylesGenerated = false;
-
 // Current configuration (null until first configure() or auto-configured on first use)
 let currentConfig: TastyConfig | null = null;
 
@@ -790,9 +792,7 @@ function createDefaultConfig(isTest?: boolean): TastyConfig {
  * Also injects internal and global properties.
  */
 export function markStylesGenerated(): void {
-  if (stylesGenerated) return; // Already marked, skip
-
-  stylesGenerated = true;
+  if (!markStylesGeneratedState()) return;
 
   // When SSR styles are already in the document, the SSR collector's
   // collectInternals() already rendered tokens, @property, globalStyles,
@@ -869,15 +869,13 @@ export function markStylesGenerated(): void {
 /**
  * Check if styles have been generated (configuration is locked)
  */
-export function hasStylesGenerated(): boolean {
-  return stylesGenerated;
-}
+export { hasStylesGenerated } from './config-state';
 
 /**
  * Reset styles generated flag (for testing only)
  */
 export function resetStylesGenerated(): void {
-  stylesGenerated = false;
+  resetStylesGeneratedState();
   emittedWarnings.clear();
 }
 
@@ -908,7 +906,7 @@ export function getGlobalKeyframes(): Record<string, KeyframesSteps> | null {
  * Internal use only.
  */
 function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'keyframes-after-styles',
       `[Tasty] Cannot update keyframes after styles have been generated.\n` +
@@ -931,7 +929,7 @@ function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
 function setGlobalProperties(
   properties: Record<string, PropertyDefinition>,
 ): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'properties-after-styles',
       `[Tasty] Cannot update properties after styles have been generated.\n` +
@@ -983,7 +981,7 @@ export function getGlobalFontFaces(): Record<string, FontFaceInput> | null {
  * Internal use only.
  */
 function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'fontface-after-styles',
       `[Tasty] Cannot update fontFaces after styles have been generated.\n` +
@@ -1024,7 +1022,7 @@ export function getGlobalCounterStyles(): Record<
 function setGlobalCounterStyle(
   counterStyle: Record<string, CounterStyleDescriptors>,
 ): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'counterstyle-after-styles',
       `[Tasty] Cannot update counterStyles after styles have been generated.\n` +
@@ -1063,7 +1061,7 @@ export function getGlobalFunctions(): Record<
 function setGlobalFunction(
   functions: Record<string, FunctionDefinition>,
 ): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'function-after-styles',
       `[Tasty] Cannot update functions after styles have been generated.\n` +
@@ -1096,7 +1094,7 @@ export function isFunctionsPolyfillEnabled(): boolean {
  * Internal use only.
  */
 function setGlobalPolyfills(polyfills: { functions?: boolean }): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'polyfills-after-styles',
       `[Tasty] Cannot update polyfills after styles have been generated.\n` +
@@ -1134,7 +1132,7 @@ export function getGlobalRecipes(): Record<string, RecipeStyles> | null {
  * Internal use only.
  */
 function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'recipes-after-styles',
       `[Tasty] Cannot update recipes after styles have been generated.\n` +
@@ -1200,7 +1198,7 @@ export function getGlobalConfigTokens(): ConfigTokens | null {
  * Internal use only.
  */
 function setGlobalConfigTokens(styles: ConfigTokens): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'tokens-after-styles',
       `[Tasty] Cannot update tokens after styles have been generated.\n` +
@@ -1236,7 +1234,7 @@ export function getGlobalStyles(): Record<string, Styles> | null {
  * Internal use only.
  */
 function setGlobalStyles(styles: Record<string, Styles>): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'globalStyles-after-styles',
       `[Tasty] Cannot update globalStyles after styles have been generated.\n` +
@@ -1260,7 +1258,7 @@ function setGlobalStyles(styles: Record<string, Styles>): void {
  * Check if configuration is locked (styles have been generated)
  */
 export function isConfigLocked(): boolean {
-  return stylesGenerated;
+  return hasStylesGenerated();
 }
 
 // ============================================================================
@@ -1289,7 +1287,7 @@ export function isConfigLocked(): boolean {
  * ```
  */
 export function configure(config: Partial<TastyConfig> = {}): void {
-  if (stylesGenerated) {
+  if (hasStylesGenerated()) {
     warnOnce(
       'configure-after-styles',
       `[Tasty] Cannot call configure() after styles have been generated.\n` +
@@ -1710,7 +1708,7 @@ export function getGlobalInjector(): StyleInjector {
  * Clears the global injector and allows reconfiguration.
  */
 export function resetConfig(): void {
-  stylesGenerated = false;
+  resetStylesGeneratedState();
   currentConfig = null;
   globalKeyframes = null;
   _hasGlobalKeyframes = false;

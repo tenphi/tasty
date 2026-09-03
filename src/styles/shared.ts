@@ -136,6 +136,7 @@ export function warnExtraGroupValues(
   property: string,
   input: string,
   maxValues: 1 | 2,
+  directionExamples: readonly [string, string] = ['top', 'right'],
 ): void {
   const message =
     maxValues === 2
@@ -145,7 +146,7 @@ export function warnExtraGroupValues(
       : `${property}="${input}": a group that names directions takes a single ` +
         `value, applied to every direction it names. The extra values are ` +
         `ignored — use comma-separated groups instead, ` +
-        `e.g. ${property}="2x top, 4x right".`;
+        `e.g. ${property}="2x ${directionExamples[0]}, 4x ${directionExamples[1]}".`;
 
   warnOnceDev(`extra-values:${property}:${input}`, message);
 }

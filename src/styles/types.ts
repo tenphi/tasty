@@ -83,23 +83,11 @@ export interface StylesInterface extends Omit<
   | 'scrollMarginRight'
   | 'scrollMarginBottom'
   | 'scrollMarginLeft'
-  | 'scrollMarginBlock'
-  | 'scrollMarginBlockStart'
-  | 'scrollMarginBlockEnd'
-  | 'scrollMarginInline'
-  | 'scrollMarginInlineStart'
-  | 'scrollMarginInlineEnd'
   | 'scrollPadding'
   | 'scrollPaddingTop'
   | 'scrollPaddingRight'
   | 'scrollPaddingBottom'
   | 'scrollPaddingLeft'
-  | 'scrollPaddingBlock'
-  | 'scrollPaddingBlockStart'
-  | 'scrollPaddingBlockEnd'
-  | 'scrollPaddingInline'
-  | 'scrollPaddingInlineStart'
-  | 'scrollPaddingInlineEnd'
 > {
   /**
    * @deprecated Use `flow` style instead.
@@ -252,6 +240,10 @@ export interface StylesInterface extends Omit<
    * - `padding={true}` // default padding on all sides
    */
   padding?: CSSProperties['padding'] | string | boolean;
+  /** Logical block-axis padding with `start`/`end` modifiers. */
+  blockPadding?: CSSProperties['paddingBlock'] | string | boolean;
+  /** Logical inline-axis padding with `start`/`end` modifiers. */
+  inlinePadding?: CSSProperties['paddingInline'] | string | boolean;
   /**
    * Shorthand for element margin. Supports custom units, directional modifiers, and design-system-driven defaults.
    *
@@ -266,6 +258,10 @@ export interface StylesInterface extends Omit<
    * - `margin={true}` // default margin on all sides
    */
   margin?: CSSProperties['margin'] | string | boolean;
+  /** Logical block-axis margin with `start`/`end` modifiers. */
+  blockMargin?: CSSProperties['marginBlock'] | string | boolean;
+  /** Logical inline-axis margin with `start`/`end` modifiers. */
+  inlineMargin?: CSSProperties['marginInline'] | string | boolean;
   /**
    * Concise shorthand for setting element width, including min-width and max-width. Supports custom units and advanced sizing keywords.
    *
@@ -328,6 +324,10 @@ export interface StylesInterface extends Omit<
    * custom property directly, name it `$name-color`.
    */
   border?: CSSProperties['border'] | string | boolean;
+  /** Logical block-axis border with `start`/`end` modifiers. */
+  blockBorder?: CSSProperties['borderBlock'] | string | boolean;
+  /** Logical inline-axis border with `start`/`end` modifiers. */
+  inlineBorder?: CSSProperties['borderInline'] | string | boolean;
   /**
    * Powerful shorthand for CSS transitions using semantic names and design tokens. Supports grouped transitions for common UI effects.
    *
@@ -534,12 +534,10 @@ export interface StylesInterface extends Omit<
   scrollMarginRight?: string | number | boolean;
   scrollMarginBottom?: string | number | boolean;
   scrollMarginLeft?: string | number | boolean;
-  scrollMarginBlock?: string | number | boolean;
-  scrollMarginBlockStart?: string | number | boolean;
-  scrollMarginBlockEnd?: string | number | boolean;
-  scrollMarginInline?: string | number | boolean;
-  scrollMarginInlineStart?: string | number | boolean;
-  scrollMarginInlineEnd?: string | number | boolean;
+  /** Logical block-axis scroll margin with `start`/`end` modifiers. */
+  blockScrollMargin?: CSSProperties['scrollMarginBlock'] | string | boolean;
+  /** Logical inline-axis scroll margin with `start`/`end` modifiers. */
+  inlineScrollMargin?: CSSProperties['scrollMarginInline'] | string | boolean;
   /**
    * Shorthand for physical scroll padding. Supports custom units and the same
    * physical direction modifiers as `padding`.
@@ -549,12 +547,10 @@ export interface StylesInterface extends Omit<
   scrollPaddingRight?: string | number | boolean;
   scrollPaddingBottom?: string | number | boolean;
   scrollPaddingLeft?: string | number | boolean;
-  scrollPaddingBlock?: string | number | boolean;
-  scrollPaddingBlockStart?: string | number | boolean;
-  scrollPaddingBlockEnd?: string | number | boolean;
-  scrollPaddingInline?: string | number | boolean;
-  scrollPaddingInlineStart?: string | number | boolean;
-  scrollPaddingInlineEnd?: string | number | boolean;
+  /** Logical block-axis scroll padding with `start`/`end` modifiers. */
+  blockScrollPadding?: CSSProperties['scrollPaddingBlock'] | string | boolean;
+  /** Logical inline-axis scroll padding with `start`/`end` modifiers. */
+  inlineScrollPadding?: CSSProperties['scrollPaddingInline'] | string | boolean;
   /**
    * Shorthand for `top`, `right`, `bottom`, and `left` offsets. Supports custom units, directional modifiers, and positioning.
    *
@@ -583,6 +579,10 @@ export interface StylesInterface extends Omit<
     | 'dock'
     | string
     | CSSProperties['inset'];
+  /** Logical block-axis inset with `start`/`end` modifiers. */
+  blockInset?: CSSProperties['insetBlock'] | string | boolean;
+  /** Logical inline-axis inset with `start`/`end` modifiers. */
+  inlineInset?: CSSProperties['insetInline'] | string | boolean;
   /**
    * Local keyframes definitions for this component.
    * Keys are animation names, values are keyframes step definitions.

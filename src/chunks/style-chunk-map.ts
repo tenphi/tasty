@@ -3,8 +3,9 @@ import {
   LOGICAL_INSET_STYLES,
   LOGICAL_MARGIN_STYLES,
   LOGICAL_PADDING_STYLES,
-  LOGICAL_RADIUS_STYLES,
-  LOGICAL_SIZE_STYLES,
+  LOGICAL_SCROLL_MARGIN_STYLES,
+  LOGICAL_SCROLL_PADDING_STYLES,
+  LOGICAL_SIZE_HANDLER_STYLES,
 } from '../styles/logical-list';
 
 /**
@@ -55,7 +56,6 @@ export const APPEARANCE_CHUNK_STYLES = [
   'border', // borderStyle (independent)
   ...LOGICAL_BORDER_STYLES,
   'radius', // radiusStyle (independent)
-  ...LOGICAL_RADIUS_STYLES,
   'outline', // outlineStyle: outline ↔ outlineOffset
   'outlineOffset', // outlineStyle: outline ↔ outlineOffset
   'shadow', // shadowStyle (independent)
@@ -97,17 +97,19 @@ export const FONT_CHUNK_STYLES = [
  * ⚠️ marginStyle: margin, marginTop/Right/Bottom/Left
  * ⚠️ widthStyle: width, minWidth, maxWidth
  * ⚠️ heightStyle: height, minHeight, maxHeight
+ * ⚠️ blockSizeStyle: blockSize, minBlockSize, maxBlockSize
+ * ⚠️ inlineSizeStyle: inlineSize, minInlineSize, maxInlineSize
  */
 /** @public */
 export const DIMENSION_CHUNK_STYLES = [
-  // Physical padding handler, followed by independent logical declarations
+  // Physical and logical padding handlers
   'padding',
   'paddingTop',
   'paddingRight',
   'paddingBottom',
   'paddingLeft',
   ...LOGICAL_PADDING_STYLES,
-  // Physical margin handler, followed by independent logical declarations
+  // Physical and logical margin handlers
   'margin',
   'marginTop',
   'marginRight',
@@ -122,7 +124,7 @@ export const DIMENSION_CHUNK_STYLES = [
   'height',
   'minHeight',
   'maxHeight',
-  ...LOGICAL_SIZE_STYLES,
+  ...LOGICAL_SIZE_HANDLER_STYLES,
   'flexBasis',
   'flexGrow',
   'flexShrink',
@@ -193,13 +195,16 @@ export const LAYOUT_CHUNK_STYLES = [
 /** @public */
 export const POSITION_CHUNK_STYLES = [
   'position',
-  // Physical inset handler, followed by independent logical declarations
+  // Physical and logical inset handlers
   'inset',
   ...LOGICAL_INSET_STYLES,
   'top',
   'right',
   'bottom',
   'left',
+  // Logical scroll offsets stay separate from the physical handlers
+  ...LOGICAL_SCROLL_MARGIN_STYLES,
+  ...LOGICAL_SCROLL_PADDING_STYLES,
   'zIndex',
   'gridArea',
   'gridColumn',

@@ -2,4 +2,4 @@
 '@tenphi/tasty': minor
 ---
 
-Add native logical size, spacing, inset, scroll, border, and corner handlers. Logical declarations now remain writing-mode-aware, while `blockSize` and `inlineSize` support Tasty's enhanced dimension syntax.
+Add writing-mode-aware logical category styles for size, padding, margin, inset, scroll spacing, and borders. Each block/inline category supports native start/end behavior, while `blockSize` and `inlineSize` include enhanced min/max sizing.

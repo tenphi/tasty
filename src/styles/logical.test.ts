@@ -1,171 +1,208 @@
-import { renderStyles } from '../pipeline';
 import { CHUNK_NAMES, STYLE_TO_CHUNK } from '../chunks/style-chunk-map';
+import { renderStyles } from '../pipeline';
 
 import { blockSizeStyle } from './blockSize';
 import { inlineSizeStyle } from './inlineSize';
-import { STYLE_HANDLER_MAP } from './index';
+import { STYLE_HANDLER_MAP, styleHandlers } from './index';
 import {
   LOGICAL_BORDER_STYLES,
   LOGICAL_INSET_STYLES,
   LOGICAL_MARGIN_STYLES,
   LOGICAL_PADDING_STYLES,
-  LOGICAL_RADIUS_STYLES,
   LOGICAL_SCROLL_MARGIN_STYLES,
   LOGICAL_SCROLL_PADDING_STYLES,
-  LOGICAL_SIZE_STYLES,
+  LOGICAL_SIZE_HANDLER_STYLES,
 } from './logical-list';
 import { logicalStyleHandlers } from './logical';
 
+const LOGICAL_AXIS_STYLES = [
+  ...LOGICAL_PADDING_STYLES,
+  ...LOGICAL_MARGIN_STYLES,
+  ...LOGICAL_INSET_STYLES,
+  ...LOGICAL_SCROLL_MARGIN_STYLES,
+  ...LOGICAL_SCROLL_PADDING_STYLES,
+  ...LOGICAL_BORDER_STYLES,
+] as const;
+
 describe('logical style handlers', () => {
-  it('registers exactly one independent handler per logical declaration', () => {
-    for (const [styleName, handler] of Object.entries(logicalStyleHandlers)) {
+  it('registers one handler per logical style category', () => {
+    for (const styleName of LOGICAL_AXIS_STYLES) {
+      const handler = logicalStyleHandlers[styleName];
+
       expect(handler.__lookupStyles).toEqual([styleName]);
       expect(STYLE_HANDLER_MAP[styleName]).toEqual([handler]);
     }
 
-    expect(blockSizeStyle.__lookupStyles).toEqual(['blockSize']);
-    expect(inlineSizeStyle.__lookupStyles).toEqual(['inlineSize']);
+    expect(blockSizeStyle.__lookupStyles).toEqual([
+      'blockSize',
+      'minBlockSize',
+      'maxBlockSize',
+    ]);
+    expect(inlineSizeStyle.__lookupStyles).toEqual([
+      'inlineSize',
+      'minInlineSize',
+      'maxInlineSize',
+    ]);
+    expect(STYLE_HANDLER_MAP.minBlockSize).toEqual([blockSizeStyle]);
+    expect(STYLE_HANDLER_MAP.maxInlineSize).toEqual([inlineSizeStyle]);
+
+    expect(logicalStyleHandlers).not.toHaveProperty('paddingBlock');
+    expect(logicalStyleHandlers).not.toHaveProperty('borderInlineStart');
+    expect(logicalStyleHandlers).not.toHaveProperty('borderStartStartRadius');
+    expect(styleHandlers.blockPadding.__lookupStyles).toEqual(['blockPadding']);
+    expect(styleHandlers.inlineBorder.__lookupStyles).toEqual(['inlineBorder']);
+    expect(styleHandlers).not.toHaveProperty('paddingBlock');
   });
 
-  it('keeps the shared logical lists aligned with handlers and chunks', () => {
-    const handledNames = [
-      'blockSize',
-      'inlineSize',
-      ...Object.keys(logicalStyleHandlers),
-    ].sort();
-    const listedNames = [
-      ...LOGICAL_SIZE_STYLES,
-      ...LOGICAL_PADDING_STYLES,
-      ...LOGICAL_MARGIN_STYLES,
-      ...LOGICAL_INSET_STYLES,
-      ...LOGICAL_SCROLL_MARGIN_STYLES,
-      ...LOGICAL_SCROLL_PADDING_STYLES,
-      ...LOGICAL_BORDER_STYLES,
-      ...LOGICAL_RADIUS_STYLES,
-    ].sort();
-
-    expect(handledNames).toEqual(listedNames);
+  it('keeps shared category lists aligned with handlers and chunks', () => {
+    expect(Object.keys(logicalStyleHandlers).sort()).toEqual(
+      [...LOGICAL_AXIS_STYLES].sort(),
+    );
 
     for (const name of [
-      ...LOGICAL_SIZE_STYLES,
+      ...LOGICAL_SIZE_HANDLER_STYLES,
       ...LOGICAL_PADDING_STYLES,
       ...LOGICAL_MARGIN_STYLES,
     ]) {
       expect(STYLE_TO_CHUNK.get(name)).toBe(CHUNK_NAMES.DIMENSION);
     }
-    for (const name of LOGICAL_INSET_STYLES) {
+    for (const name of [
+      ...LOGICAL_INSET_STYLES,
+      ...LOGICAL_SCROLL_MARGIN_STYLES,
+      ...LOGICAL_SCROLL_PADDING_STYLES,
+    ]) {
       expect(STYLE_TO_CHUNK.get(name)).toBe(CHUNK_NAMES.POSITION);
     }
-    for (const name of [...LOGICAL_BORDER_STYLES, ...LOGICAL_RADIUS_STYLES]) {
+    for (const name of LOGICAL_BORDER_STYLES) {
       expect(STYLE_TO_CHUNK.get(name)).toBe(CHUNK_NAMES.APPEARANCE);
     }
   });
 
-  it('maps every logical style name to its native kebab-case property', () => {
-    const borderShorthands = new Set([
-      'borderBlock',
-      'borderBlockStart',
-      'borderBlockEnd',
-      'borderInline',
-      'borderInlineStart',
-      'borderInlineEnd',
-    ]);
-
-    for (const [styleName, handler] of Object.entries(logicalStyleHandlers)) {
-      let value = '1x';
-      if (borderShorthands.has(styleName)) value = '1bw solid #red';
-      else if (styleName.endsWith('Width')) value = '1bw';
-      else if (styleName.endsWith('Style')) value = 'solid';
-      else if (styleName.endsWith('Color')) value = '#red';
-      else if (styleName.endsWith('Radius')) value = '1r';
-
-      const cssProperty = styleName.replace(
-        /[A-Z]/g,
-        (letter) => `-${letter.toLowerCase()}`,
-      );
-
-      expect(Object.keys(handler({ [styleName]: value }))).toEqual([
-        cssProperty,
-      ]);
-    }
-  });
-
   it.each([
-    ['paddingBlock', 'padding-block'],
-    ['paddingBlockStart', 'padding-block-start'],
-    ['paddingBlockEnd', 'padding-block-end'],
-    ['paddingInline', 'padding-inline'],
-    ['paddingInlineStart', 'padding-inline-start'],
-    ['paddingInlineEnd', 'padding-inline-end'],
-    ['marginBlock', 'margin-block'],
-    ['marginBlockStart', 'margin-block-start'],
-    ['marginBlockEnd', 'margin-block-end'],
-    ['marginInline', 'margin-inline'],
-    ['marginInlineStart', 'margin-inline-start'],
-    ['marginInlineEnd', 'margin-inline-end'],
-    ['scrollMarginBlock', 'scroll-margin-block'],
-    ['scrollMarginBlockStart', 'scroll-margin-block-start'],
-    ['scrollMarginBlockEnd', 'scroll-margin-block-end'],
-    ['scrollMarginInline', 'scroll-margin-inline'],
-    ['scrollMarginInlineStart', 'scroll-margin-inline-start'],
-    ['scrollMarginInlineEnd', 'scroll-margin-inline-end'],
-    ['scrollPaddingBlock', 'scroll-padding-block'],
-    ['scrollPaddingBlockStart', 'scroll-padding-block-start'],
-    ['scrollPaddingBlockEnd', 'scroll-padding-block-end'],
-    ['scrollPaddingInline', 'scroll-padding-inline'],
-    ['scrollPaddingInlineStart', 'scroll-padding-inline-start'],
-    ['scrollPaddingInlineEnd', 'scroll-padding-inline-end'],
-  ])('emits %s as the native %s declaration', (styleName, cssProperty) => {
-    const handler =
-      logicalStyleHandlers[styleName as keyof typeof logicalStyleHandlers];
+    ['blockPadding', 'padding-block'],
+    ['inlinePadding', 'padding-inline'],
+    ['blockMargin', 'margin-block'],
+    ['inlineMargin', 'margin-inline'],
+    ['blockScrollMargin', 'scroll-margin-block'],
+    ['inlineScrollMargin', 'scroll-margin-inline'],
+    ['blockScrollPadding', 'scroll-padding-block'],
+    ['inlineScrollPadding', 'scroll-padding-inline'],
+  ] as const)('maps %s to %s', (styleName, cssProperty) => {
+    const handler = logicalStyleHandlers[styleName];
 
-    expect(handler({ [styleName]: '1x' })).toEqual({
+    expect(handler({ [styleName]: '1x 2x' })).toEqual({
+      [cssProperty]: '8px 16px',
+    });
+    expect(handler({ [styleName]: true })).toEqual({
       [cssProperty]: '8px',
     });
   });
 
   it.each([
-    ['paddingBlock', 'padding-block'],
-    ['marginInline', 'margin-inline'],
-    ['scrollMarginBlock', 'scroll-margin-block'],
-    ['scrollPaddingInline', 'scroll-padding-inline'],
-  ])('preserves start/end values for the %s axis', (styleName, cssProperty) => {
-    const handler =
-      logicalStyleHandlers[styleName as keyof typeof logicalStyleHandlers];
+    ['blockPadding', 'padding-block'],
+    ['inlineMargin', 'margin-inline'],
+    ['blockScrollMargin', 'scroll-margin-block'],
+    ['inlineScrollPadding', 'scroll-padding-inline'],
+  ] as const)(
+    'supports start/end modifiers for %s',
+    (styleName, cssProperty) => {
+      const handler = logicalStyleHandlers[styleName];
 
-    expect(handler({ [styleName]: '1x 2x' })).toEqual({
-      [cssProperty]: '8px 16px',
-    });
-  });
+      expect(handler({ [styleName]: '1x start, 2x end' })).toEqual({
+        [cssProperty]: '8px 16px',
+      });
+      expect(handler({ [styleName]: '2x end' })).toEqual({
+        [cssProperty]: '0 16px',
+      });
+    },
+  );
 
   it.each([
-    ['insetBlock', 'inset-block'],
-    ['insetBlockStart', 'inset-block-start'],
-    ['insetBlockEnd', 'inset-block-end'],
-    ['insetInline', 'inset-inline'],
-    ['insetInlineStart', 'inset-inline-start'],
-    ['insetInlineEnd', 'inset-inline-end'],
-  ])('emits %s as the native %s declaration', (styleName, cssProperty) => {
-    const handler =
-      logicalStyleHandlers[styleName as keyof typeof logicalStyleHandlers];
+    ['blockInset', 'inset-block'],
+    ['inlineInset', 'inset-inline'],
+  ] as const)(
+    'uses auto for an unspecified %s edge',
+    (styleName, cssProperty) => {
+      const handler = logicalStyleHandlers[styleName];
 
-    expect(handler({ [styleName]: true })).toEqual({ [cssProperty]: '0' });
+      expect(handler({ [styleName]: '2x start' })).toEqual({
+        [cssProperty]: '16px auto',
+      });
+      expect(handler({ [styleName]: true })).toEqual({ [cssProperty]: '0' });
+    },
+  );
+
+  it('supports longhand output without combining logical axes', () => {
+    expect(
+      logicalStyleHandlers.inlinePadding({
+        inlinePadding: '1x start, 2x end longhand',
+      }),
+    ).toEqual({
+      'padding-inline-start': '8px',
+      'padding-inline-end': '16px',
+    });
   });
 
-  it('uses the dimension shorthand syntax for blockSize and inlineSize', () => {
-    expect(blockSizeStyle({ blockSize: '1x 5x 10x' })).toEqual({
-      'min-block-size': '8px',
-      'block-size': '40px',
-      'max-block-size': '80px',
+  it('supports CSS-wide keywords on a whole axis or one edge', () => {
+    expect(
+      logicalStyleHandlers.blockMargin({ blockMargin: 'inherit' }),
+    ).toEqual({ 'margin-block': 'inherit' });
+    expect(
+      logicalStyleHandlers.inlinePadding({
+        inlinePadding: 'inherit start longhand',
+      }),
+    ).toEqual({
+      'padding-inline-start': 'inherit',
+      'padding-inline-end': '0',
     });
-    expect(inlineSizeStyle({ inlineSize: 'fixed 12x' })).toEqual({
+  });
+
+  it('parses one logical border category with start/end modifiers', () => {
+    expect(
+      logicalStyleHandlers.inlineBorder({
+        inlineBorder: '2bw dashed #red',
+      }),
+    ).toEqual({
+      'border-inline': '2px dashed var(--red-color)',
+    });
+    expect(
+      logicalStyleHandlers.blockBorder({
+        blockBorder: '1bw #red, 2bw dashed #blue end',
+      }),
+    ).toEqual({
+      'border-block-start': '1px solid var(--red-color)',
+      'border-block-end': '2px dashed var(--blue-color)',
+    });
+    expect(logicalStyleHandlers.inlineBorder({ inlineBorder: true })).toEqual({
+      'border-inline': '1px solid var(--border-color, currentColor)',
+    });
+  });
+
+  it('uses one size handler for the main, min, and max declarations', () => {
+    expect(
+      blockSizeStyle({
+        blockSize: '1x 5x 10x',
+        minBlockSize: '2x',
+        maxBlockSize: '20x',
+      }),
+    ).toEqual({
+      'min-block-size': '16px',
+      'block-size': '40px',
+      'max-block-size': '160px',
+    });
+    expect(
+      inlineSizeStyle({
+        inlineSize: 'fixed 12x',
+        maxInlineSize: '20x',
+      }),
+    ).toEqual({
       'min-inline-size': '96px',
       'inline-size': '96px',
-      'max-inline-size': '96px',
+      'max-inline-size': '160px',
     });
   });
 
-  it('keeps explicit logical min/max declarations separate and later', () => {
+  it('renders size constraints in one rule with explicit overrides', () => {
     const { rules } = renderStyles({
       blockSize: '1x 5x 10x',
       minBlockSize: '2x',
@@ -173,47 +210,14 @@ describe('logical style handlers', () => {
     });
 
     expect(rules.map((rule) => rule.declarations)).toEqual([
-      'block-size: 40px; min-block-size: 8px; max-block-size: 80px;',
-      'min-block-size: 16px;',
-      'max-block-size: 160px;',
+      'block-size: 40px; min-block-size: 16px; max-block-size: 160px;',
     ]);
   });
 
-  it('parses logical border shorthands with Tasty defaults and colors', () => {
-    expect(
-      logicalStyleHandlers.borderInline({ borderInline: '2bw dashed #red' }),
-    ).toEqual({
-      'border-inline': '2px dashed var(--red-color)',
-    });
-    expect(
-      logicalStyleHandlers.borderBlockStart({ borderBlockStart: true }),
-    ).toEqual({
-      'border-block-start': '1px solid var(--border-color, currentColor)',
-    });
-  });
-
-  it('supports logical border components and corner radii', () => {
-    expect(
-      logicalStyleHandlers.borderInlineWidth({ borderInlineWidth: '1bw 2bw' }),
-    ).toEqual({ 'border-inline-width': '1px 2px' });
-    expect(
-      logicalStyleHandlers.borderBlockColor({
-        borderBlockColor: '#red #blue',
-      }),
-    ).toEqual({
-      'border-block-color': 'var(--red-color) var(--blue-color)',
-    });
-    expect(
-      logicalStyleHandlers.borderStartEndRadius({
-        borderStartEndRadius: true,
-      }),
-    ).toEqual({ 'border-start-end-radius': '6px' });
-  });
-
-  it('keeps state maps independent across logical declarations', () => {
+  it('keeps state maps independent between logical categories', () => {
     const { rules } = renderStyles({
-      paddingBlock: { '': '1x', hovered: '2x' },
-      paddingInline: { '': '3x', pressed: '4x' },
+      blockPadding: { '': '1x', hovered: '2x' },
+      inlinePadding: { '': '3x', pressed: '4x' },
     });
     const css = rules.map((rule) => `${rule.selector}{${rule.declarations}}`);
 
@@ -226,5 +230,16 @@ describe('logical style handlers', () => {
     expect(
       css.every((rule) => !rule.includes('[data-hovered][data-pressed]')),
     ).toBe(true);
+  });
+
+  it('keeps native logical longhands as ordinary CSS properties', () => {
+    const { rules } = renderStyles({
+      paddingInlineStart: '1x',
+      borderStartStartRadius: '2r',
+    });
+    const declarations = rules.map((rule) => rule.declarations);
+
+    expect(declarations).toContain('padding-inline-start: 8px;');
+    expect(declarations).toContain('border-start-start-radius: 12px;');
   });
 });

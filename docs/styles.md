@@ -22,6 +22,7 @@ Use these instead of their raw CSS counterparts:
 | `image` | `backgroundImage` |
 | `padding` (with physical direction modifiers) | `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft` |
 | `margin` (with physical direction modifiers) | `marginTop`, `marginRight`, `marginBottom`, `marginLeft` |
+| Logical block/inline category styles (with `start`/`end` modifiers) | Native logical axis/edge declarations |
 | `width` / `blockSize` / `inlineSize` (with `min`/`max` modifiers) | Their separate min/max declarations when one state map is sufficient |
 | `height` (with `min`/`max` modifiers) | `minHeight`, `maxHeight` |
 | `border` | `borderColor`, `borderWidth`, `borderStyle` |
@@ -125,7 +126,7 @@ A group that names *no* direction keeps plain CSS shorthand order, which is unam
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
-Individual physical props `paddingTop`, `paddingRight`, `paddingBottom`, and `paddingLeft` are supported, but `padding` with modifiers is recommended. Logical declarations such as `paddingBlock` and `paddingInlineStart` remain native logical CSS properties; see [Logical properties](#logical-properties).
+Individual physical props `paddingTop`, `paddingRight`, `paddingBottom`, and `paddingLeft` are supported, but `padding` with modifiers is recommended. Use `blockPadding` or `inlinePadding` for an enhanced logical-axis shorthand; native declarations such as `paddingInlineStart` remain ordinary CSS properties. See [Logical properties](#logical-properties).
 
 ### `margin`
 
@@ -151,7 +152,7 @@ The [one-value-per-directional-group rule](#padding) from `padding` applies here
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
-Individual physical props `marginTop`, `marginRight`, `marginBottom`, and `marginLeft` are supported, but `margin` with modifiers is recommended. Logical declarations such as `marginBlock` and `marginInlineStart` remain native logical CSS properties; see [Logical properties](#logical-properties).
+Individual physical props `marginTop`, `marginRight`, `marginBottom`, and `marginLeft` are supported, but `margin` with modifiers is recommended. Use `blockMargin` or `inlineMargin` for an enhanced logical-axis shorthand; native declarations such as `marginInlineStart` remain ordinary CSS properties. See [Logical properties](#logical-properties).
 
 ### `width`
 
@@ -230,40 +231,40 @@ second to every side they span.
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
-Individual physical props `top`, `right`, `bottom`, and `left` are supported. When only those props are used (without `inset`), individual CSS properties are output for correct cascade behavior with state overrides. Logical declarations such as `insetBlock` and `insetInlineStart` remain native logical CSS properties.
+Individual physical props `top`, `right`, `bottom`, and `left` are supported. When only those props are used (without `inset`), individual CSS properties are output for correct cascade behavior with state overrides. Use `blockInset` or `inlineInset` for logical axes; native declarations such as `insetInlineStart` remain ordinary CSS properties.
 
 ### Logical properties
 
-Tasty has an independent handler for every supported logical declaration. It emits the native CSS property instead of converting it to `top`, `right`, `bottom`, `left`, `width`, or `height`. The browser therefore resolves `block`, `inline`, `start`, and `end` from the element's `writingMode` and `direction`.
+Tasty provides one enhanced handler for each logical axis/category pair. Each handler emits native logical CSS instead of converting values to `top`, `right`, `bottom`, `left`, `width`, or `height`. The browser therefore resolves `block`, `inline`, `start`, and `end` from the element's `writingMode` and `direction`.
 
 ```jsx
 styles: {
   direction: 'rtl',
-  paddingInline: '1x 2x', // inline-start 1x, inline-end 2x
-  borderInlineStart: '1bw solid #accent',
-  insetBlockEnd: 0,
+  inlinePadding: '1x start, 2x end',
+  inlineBorder: '1bw solid #accent start',
+  blockInset: '0 end',
 }
 ```
 
-Axis shorthands take one value for both edges or two values in logical **start/end** order. They do not accept Tasty's physical `top`/`right`/`bottom`/`left` modifiers.
+An axis handler accepts one value for both edges or two values in logical **start/end** order. Use `start` and `end` modifiers, with comma-separated groups for different edge values. Unspecified padding, margin, and scroll edges reset to `0`; unspecified inset edges reset to `auto`. The `longhand` modifier emits the two native start/end declarations.
 
-| Family | Logical declarations |
-|--------|----------------------|
-| Size | `blockSize`, `minBlockSize`, `maxBlockSize`, `inlineSize`, `minInlineSize`, `maxInlineSize` |
-| Padding | `paddingBlock`, `paddingBlockStart`, `paddingBlockEnd`, `paddingInline`, `paddingInlineStart`, `paddingInlineEnd` |
-| Margin | `marginBlock`, `marginBlockStart`, `marginBlockEnd`, `marginInline`, `marginInlineStart`, `marginInlineEnd` |
-| Inset | `insetBlock`, `insetBlockStart`, `insetBlockEnd`, `insetInline`, `insetInlineStart`, `insetInlineEnd` |
-| Scroll margin | `scrollMarginBlock`, `scrollMarginBlockStart`, `scrollMarginBlockEnd`, `scrollMarginInline`, `scrollMarginInlineStart`, `scrollMarginInlineEnd` |
-| Scroll padding | `scrollPaddingBlock`, `scrollPaddingBlockStart`, `scrollPaddingBlockEnd`, `scrollPaddingInline`, `scrollPaddingInlineStart`, `scrollPaddingInlineEnd` |
-| Border shorthands | `borderBlock`, `borderBlockStart`, `borderBlockEnd`, `borderInline`, `borderInlineStart`, `borderInlineEnd` |
-| Border components | `borderBlockWidth`/`Style`/`Color`, `borderInlineWidth`/`Style`/`Color`, and the corresponding `borderBlockStart*`, `borderBlockEnd*`, `borderInlineStart*`, `borderInlineEnd*` longhands |
-| Corners | `borderStartStartRadius`, `borderStartEndRadius`, `borderEndStartRadius`, `borderEndEndRadius` |
+| Category | Block axis | Inline axis |
+|----------|------------|-------------|
+| Size | `blockSize` | `inlineSize` |
+| Padding | `blockPadding` | `inlinePadding` |
+| Margin | `blockMargin` | `inlineMargin` |
+| Inset | `blockInset` | `inlineInset` |
+| Scroll margin | `blockScrollMargin` | `inlineScrollMargin` |
+| Scroll padding | `blockScrollPadding` | `inlineScrollPadding` |
+| Border | `blockBorder` | `inlineBorder` |
 
 `blockSize` and `inlineSize` use the same enhanced one/two/three-value and `min`/`max`/`fixed` syntax as `width`. Separate `minBlockSize`, `maxBlockSize`, `minInlineSize`, and `maxInlineSize` declarations override constraints produced by that shorthand.
 
-Logical border shorthands use the same width/style/color parsing and defaults as `border`, including `1bw`, color tokens, and `true`. Logical radii support Tasty units and default to `1r` for `true`. Logical padding, margin, scroll margin, and scroll padding default to `1x` for `true`; logical inset defaults to `0`.
+`blockBorder` and `inlineBorder` use the same width/style/color parsing and defaults as `border`, including `1bw`, color tokens, and `true`. Logical padding, margin, scroll margin, and scroll padding default to `1x` for `true`; logical inset defaults to `0`.
 
-The physical `scrollMargin` and `scrollPadding` shorthands support the same values and physical direction modifiers as `padding`. Their logical declarations stay separate as listed above.
+Native logical CSS names—such as `paddingInlineStart`, `borderBlockColor`, and `borderStartStartRadius`—remain available as ordinary CSS properties. They support Tasty tokens and units through the normal value parser, but do not get category defaults or directional shorthand behavior.
+
+The physical `scrollMargin` and `scrollPadding` shorthands support the same values and physical direction modifiers as `padding`. Their logical counterparts stay in separate axis handlers.
 
 `writingMode`, `direction`, and `textOrientation` are standard CSS control properties. They use Tasty's normal value parser and need no special handler.
 

@@ -13,7 +13,7 @@
 import { createElement, Fragment, useState, type ReactNode } from 'react';
 import { useServerInsertedHTML } from 'next/navigation';
 
-import { getConfig } from '../config';
+import { getRuntimeConfigState } from '../config-resources';
 import { ServerStyleCollector } from './collector';
 import { getTastySSRContext } from './context';
 import { hydrateTastyClasses } from './hydrate';
@@ -90,7 +90,7 @@ export function TastyRegistry({
     return instance;
   });
   const [streamState] = useState(() => ({ sharedStylesheetFlushed: false }));
-  const nonce = getConfig().nonce;
+  const nonce = getRuntimeConfigState()?.nonce;
 
   useServerInsertedHTML(() => {
     if (!collector) return null;

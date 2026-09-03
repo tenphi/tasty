@@ -8,7 +8,7 @@
  * Import from '@tenphi/tasty/ssr/astro'.
  */
 
-import { getConfig } from '../config';
+import { getRuntimeConfigState } from '../config-resources';
 import { getSSRCollector, runWithCollector } from './async-storage';
 import { createExtractionMetadata, extractAstroCSS } from './astro-extraction';
 import { ServerStyleCollector } from './collector';
@@ -132,7 +132,7 @@ export function tastyMiddleware(options?: TastyMiddlewareOptions) {
       });
     }
 
-    const nonce = getConfig().nonce;
+    const nonce = getRuntimeConfigState()?.nonce;
     const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
     const styleTag = `<style data-tasty-ssr${nonceAttr}>${css}</style>`;
     const metadataTag = extractionMetadata

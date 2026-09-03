@@ -14,6 +14,22 @@
 import { resetFunctionPolyfills } from './functions';
 import { applyStyleConfig, normalizeConfig } from './config-normalize';
 import {
+  getEffectiveProperties,
+  getGlobalConfigTokens,
+  getGlobalCounterStyles,
+  getGlobalFontFaces,
+  getGlobalFunctions,
+  getGlobalStyles,
+  mergeGlobalConfigTokens,
+  mergeGlobalCounterStyles,
+  mergeGlobalFontFaces,
+  mergeGlobalFunctions,
+  mergeGlobalProperties,
+  mergeGlobalStyles,
+  resetConfigResources,
+  setRuntimeConfigState,
+} from './config-resources';
+import {
   hasStylesGenerated,
   isFunctionsPolyfillEnabled,
   markStylesGeneratedState,
@@ -25,7 +41,6 @@ import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
 import { clearPipelineCache, renderStyles } from './pipeline';
-import { DEFAULT_PROPERTIES } from './properties/defaults';
 import { resetHandlers } from './styles/predefined';
 import {
   registerBaseStyleProps,
@@ -58,6 +73,15 @@ import type { RecipeStyles, ConfigTokens } from './styles/types';
 import type { Styles } from './styles/types';
 import type { StyleHandlerDefinition } from './utils/styles';
 import type { TypographyPreset } from './utils/typography';
+
+export {
+  getEffectiveProperties,
+  getGlobalConfigTokens,
+  getGlobalCounterStyles,
+  getGlobalFontFaces,
+  getGlobalFunctions,
+  getGlobalStyles,
+};
 
 /**
  * Configuration options for the Tasty style system
@@ -548,61 +572,8 @@ let currentConfig: TastyConfig | null = null;
 // Global keyframes storage (null = no keyframes configured, empty object checked via hasGlobalKeyframes)
 let globalKeyframes: Record<string, KeyframesSteps> | null = null;
 
-// Global font-face storage (null = no font faces configured)
-let globalFontFace: Record<string, FontFaceInput> | null = null;
-
-// Global counter-style storage (null = no counter styles configured)
-let globalCounterStyle: Record<string, CounterStyleDescriptors> | null = null;
-
-// Global @function storage (null = no functions configured)
-let globalFunction: Record<string, FunctionDefinition> | null = null;
-
-// Global properties storage (null = no properties configured)
-let globalProperties: Record<string, PropertyDefinition> | null = null;
-
 // Global recipes storage (null = no recipes configured)
 let globalRecipes: Record<string, RecipeStyles> | null = null;
-
-// Global token styles storage (injected as :root CSS custom properties)
-let globalConfigTokens: ConfigTokens | null = null;
-
-// Global styles storage (injected as CSS for configured selectors)
-let globalStyles: Record<string, Styles> | null = null;
-
-// ============================================================================
-// Cross-module config sharing via globalThis
-//
-// Frameworks like Astro may load middleware and page components from
-// separate module graphs, creating duplicate module-level state.
-// Config values read by SSR collector's collectInternals() are mirrored
-// to globalThis so they're accessible regardless of which module instance
-// the collector was loaded from.
-// ============================================================================
-
-const GTKEY_TOKENS = '__tasty_cfg_tokens__';
-const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
-const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
-const GTKEY_FUNCTION = '__tasty_cfg_function__';
-const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
-const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
-
-function setOnGlobalThis(key: string, value: unknown): void {
-  (globalThis as Record<string, unknown>)[key] = value;
-}
-
-function getFromGlobalThis<T>(key: string): T | undefined {
-  return (globalThis as Record<string, unknown>)[key] as T | undefined;
-}
-
-function clearGlobalThisConfig(): void {
-  const g = globalThis as Record<string, unknown>;
-  delete g[GTKEY_TOKENS];
-  delete g[GTKEY_FONT_FACE];
-  delete g[GTKEY_COUNTER_STYLE];
-  delete g[GTKEY_FUNCTION];
-  delete g[GTKEY_PROPERTIES];
-  delete g[GTKEY_GLOBAL_STYLES];
-}
 
 // Global injector instance key
 const GLOBAL_INJECTOR_KEY = '__TASTY_GLOBAL_INJECTOR__';
@@ -695,6 +666,11 @@ export function markStylesGenerated(): void {
   }
 
   const injector = getGlobalInjector();
+  const globalFontFaces = getGlobalFontFaces();
+  const globalCounterStyles = getGlobalCounterStyles();
+  const globalFunctions = getGlobalFunctions();
+  const globalTokens = getGlobalConfigTokens();
+  const configuredGlobalStyles = getGlobalStyles();
 
   // Inject all properties (defaults merged with user-configured overrides)
   for (const [token, definition] of Object.entries(getEffectiveProperties())) {
@@ -702,8 +678,8 @@ export function markStylesGenerated(): void {
   }
 
   // Inject global @font-face rules (eagerly — fonts should be available before render)
-  if (globalFontFace && Object.keys(globalFontFace).length > 0) {
-    for (const [family, input] of Object.entries(globalFontFace)) {
+  if (globalFontFaces && Object.keys(globalFontFaces).length > 0) {
+    for (const [family, input] of Object.entries(globalFontFaces)) {
       const descriptors = Array.isArray(input) ? input : [input];
       for (const desc of descriptors) {
         injector.fontFace(family, desc);
@@ -713,34 +689,31 @@ export function markStylesGenerated(): void {
 
   // Inject global @counter-style rules (eagerly, weakly — never override a
   // component-local definition of the same name)
-  if (globalCounterStyle && Object.keys(globalCounterStyle).length > 0) {
-    for (const [name, descriptors] of Object.entries(globalCounterStyle)) {
+  if (globalCounterStyles && Object.keys(globalCounterStyles).length > 0) {
+    for (const [name, descriptors] of Object.entries(globalCounterStyles)) {
       injector.counterStyle(name, descriptors, { weak: true });
     }
   }
 
   // Inject global @function rules (eagerly, weakly — never override a
   // component-local definition of the same name)
-  if (globalFunction && Object.keys(globalFunction).length > 0) {
-    for (const [name, definition] of Object.entries(globalFunction)) {
+  if (globalFunctions && Object.keys(globalFunctions).length > 0) {
+    for (const [name, definition] of Object.entries(globalFunctions)) {
       injector.func(name, definition, { weak: true });
     }
   }
 
   // Inject configured tokens as :root CSS custom properties
-  if (globalConfigTokens && Object.keys(globalConfigTokens).length > 0) {
-    const tokenRules = renderStyles(
-      globalConfigTokens,
-      ':root',
-    ) as StyleResult[];
+  if (globalTokens && Object.keys(globalTokens).length > 0) {
+    const tokenRules = renderStyles(globalTokens, ':root') as StyleResult[];
     if (tokenRules.length > 0) {
       injector.injectGlobal(tokenRules);
     }
   }
 
   // Inject configured global styles
-  if (globalStyles) {
-    for (const [selector, styles] of Object.entries(globalStyles)) {
+  if (configuredGlobalStyles) {
+    for (const [selector, styles] of Object.entries(configuredGlobalStyles)) {
       if (Object.keys(styles).length > 0) {
         const rules = renderStyles(styles, selector) as StyleResult[];
         if (rules.length > 0) {
@@ -822,44 +795,12 @@ function setGlobalProperties(
     );
     return;
   }
-  // Merge against the raw user map, not getEffectiveProperties(), which would
-  // bake DEFAULT_PROPERTIES into it.
-  globalProperties = {
-    ...(globalProperties ?? getFromGlobalThis(GTKEY_PROPERTIES) ?? {}),
-    ...properties,
-  };
-  setOnGlobalThis(GTKEY_PROPERTIES, globalProperties);
-}
-
-/**
- * Get the effective properties: DEFAULT_PROPERTIES merged with user-configured
- * properties. User properties override defaults with matching keys.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getEffectiveProperties(): Record<string, PropertyDefinition> {
-  const props =
-    globalProperties ??
-    getFromGlobalThis<Record<string, PropertyDefinition>>(GTKEY_PROPERTIES);
-  if (!props) return DEFAULT_PROPERTIES;
-  return { ...DEFAULT_PROPERTIES, ...props };
+  mergeGlobalProperties(properties);
 }
 
 // ============================================================================
 // Global Font Face Management
 // ============================================================================
-
-/**
- * Get global font-face configuration.
- * Returns null if no font faces configured.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getGlobalFontFaces(): Record<string, FontFaceInput> | null {
-  return (
-    globalFontFace ??
-    getFromGlobalThis<Record<string, FontFaceInput>>(GTKEY_FONT_FACE) ??
-    null
-  );
-}
 
 /**
  * Set global font faces (called from configure).
@@ -874,31 +815,12 @@ function setGlobalFontFace(fontFace: Record<string, FontFaceInput>): void {
     );
     return;
   }
-  globalFontFace = { ...(getGlobalFontFaces() ?? {}), ...fontFace };
-  setOnGlobalThis(GTKEY_FONT_FACE, globalFontFace);
+  mergeGlobalFontFaces(fontFace);
 }
 
 // ============================================================================
 // Global Counter Style Management
 // ============================================================================
-
-/**
- * Get global counter-style configuration.
- * Returns null if no counter styles configured.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getGlobalCounterStyles(): Record<
-  string,
-  CounterStyleDescriptors
-> | null {
-  return (
-    globalCounterStyle ??
-    getFromGlobalThis<Record<string, CounterStyleDescriptors>>(
-      GTKEY_COUNTER_STYLE,
-    ) ??
-    null
-  );
-}
 
 /**
  * Set global counter styles (called from configure).
@@ -915,29 +837,12 @@ function setGlobalCounterStyle(
     );
     return;
   }
-  globalCounterStyle = { ...(getGlobalCounterStyles() ?? {}), ...counterStyle };
-  setOnGlobalThis(GTKEY_COUNTER_STYLE, globalCounterStyle);
+  mergeGlobalCounterStyles(counterStyle);
 }
 
 // ============================================================================
 // Global Function Management
 // ============================================================================
-
-/**
- * Get global @function configuration.
- * Returns null if no functions configured.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getGlobalFunctions(): Record<
-  string,
-  FunctionDefinition
-> | null {
-  return (
-    globalFunction ??
-    getFromGlobalThis<Record<string, FunctionDefinition>>(GTKEY_FUNCTION) ??
-    null
-  );
-}
 
 /**
  * Set global functions (called from configure).
@@ -954,8 +859,7 @@ function setGlobalFunction(
     );
     return;
   }
-  globalFunction = { ...(getGlobalFunctions() ?? {}), ...functions };
-  setOnGlobalThis(GTKEY_FUNCTION, globalFunction);
+  mergeGlobalFunctions(functions);
 }
 
 // ============================================================================
@@ -1044,17 +948,6 @@ function setGlobalRecipes(recipes: Record<string, RecipeStyles>): void {
 // ============================================================================
 
 /**
- * Get global token styles for :root injection.
- * Returns null if no tokens configured.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getGlobalConfigTokens(): ConfigTokens | null {
-  return (
-    globalConfigTokens ?? getFromGlobalThis<ConfigTokens>(GTKEY_TOKENS) ?? null
-  );
-}
-
-/**
  * Set global token styles (called from configure).
  * Internal use only.
  */
@@ -1067,28 +960,12 @@ function setGlobalConfigTokens(styles: ConfigTokens): void {
     );
     return;
   }
-  globalConfigTokens = globalConfigTokens
-    ? { ...globalConfigTokens, ...styles }
-    : styles;
-  setOnGlobalThis(GTKEY_TOKENS, globalConfigTokens);
+  mergeGlobalConfigTokens(styles);
 }
 
 // ============================================================================
 // Global Styles Management
 // ============================================================================
-
-/**
- * Get configured global styles for injection.
- * Returns null if no global styles configured.
- * Reads from globalThis first for cross-module SSR support.
- */
-export function getGlobalStyles(): Record<string, Styles> | null {
-  return (
-    globalStyles ??
-    getFromGlobalThis<Record<string, Styles>>(GTKEY_GLOBAL_STYLES) ??
-    null
-  );
-}
 
 /**
  * Set configured global styles (called from configure).
@@ -1103,16 +980,7 @@ function setGlobalStyles(styles: Record<string, Styles>): void {
     );
     return;
   }
-  if (globalStyles) {
-    for (const [selector, selectorStyles] of Object.entries(styles)) {
-      globalStyles[selector] = globalStyles[selector]
-        ? { ...globalStyles[selector], ...selectorStyles }
-        : selectorStyles;
-    }
-  } else {
-    globalStyles = { ...styles };
-  }
-  setOnGlobalThis(GTKEY_GLOBAL_STYLES, globalStyles);
+  mergeGlobalStyles(styles);
 }
 
 /**
@@ -1263,6 +1131,7 @@ export function configure(config: Partial<TastyConfig> = {}): void {
 
   // Store the config
   currentConfig = fullConfig;
+  setRuntimeConfigState(fullConfig);
 
   // Create/replace the global injector
   const storage: TastyGlobalStorage =
@@ -1275,10 +1144,12 @@ export function configure(config: Partial<TastyConfig> = {}): void {
  * If not configured, returns default configuration.
  */
 export function getConfig(): TastyConfig {
-  if (!currentConfig) {
-    currentConfig = createDefaultConfig(isTestEnvironment());
-  }
-  return currentConfig;
+  if (currentConfig) return currentConfig;
+
+  const defaultConfig = createDefaultConfig(isTestEnvironment());
+  currentConfig = defaultConfig;
+  setRuntimeConfigState(defaultConfig);
+  return defaultConfig;
 }
 
 /**
@@ -1317,15 +1188,9 @@ export function resetConfig(): void {
   currentConfig = null;
   globalKeyframes = null;
   _hasGlobalKeyframes = false;
-  globalProperties = null;
-  globalFontFace = null;
-  globalCounterStyle = null;
-  globalFunction = null;
   resetGlobalPolyfillsState();
   globalRecipes = null;
-  globalConfigTokens = null;
-  globalStyles = null;
-  clearGlobalThisConfig();
+  resetConfigResources();
   resetGlobalPredefinedTokens();
   resetGlobalParseFunctions();
   resetFunctionPolyfills();

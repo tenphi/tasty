@@ -13,13 +13,13 @@
 
 import {
   getEffectiveProperties,
-  getGlobalStyles,
+  getGlobalConfigTokens,
   getGlobalCounterStyles,
   getGlobalFontFaces,
   getGlobalFunctions,
-  getGlobalConfigTokens,
-  getNamePrefix,
-} from '../config';
+  getGlobalStyles,
+  getRuntimeConfigState,
+} from '../config-resources';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { formatFunctionRule, parseFunctionName } from '../functions';
@@ -27,6 +27,7 @@ import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { hashString } from '../utils/hash';
 import {
+  DEFAULT_NAME_PREFIX,
   makeClassName,
   makeCounterStyleName,
   makeKeyframeName,
@@ -74,7 +75,8 @@ export class ServerStyleCollector {
     if (namePrefix !== undefined) {
       validateNamePrefix(namePrefix);
     }
-    this.namePrefix = namePrefix ?? getNamePrefix();
+    this.namePrefix =
+      namePrefix ?? getRuntimeConfigState()?.namePrefix ?? DEFAULT_NAME_PREFIX;
   }
 
   private generateClassName(cacheKey: string): string {

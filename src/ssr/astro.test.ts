@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { resetConfig } from '../config';
+import { configure, resetConfig } from '../config';
 
+import { getSSRCollector } from './async-storage';
 import { tastyMiddleware } from './astro';
 
 const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -47,6 +48,24 @@ describe('tastyMiddleware', () => {
     const result = await onRequest({}, next);
 
     expect(await result.text()).toBe(html);
+  });
+
+  it('preserves the configured nonce on injected styles', async () => {
+    configure({ nonce: 'astro-nonce' });
+    const onRequest = tastyMiddleware();
+    const next = async () => {
+      getSSRCollector()?.collectRawCSS('test', 'body { color: red; }');
+      return makeResponse(
+        '<html><head></head><body></body></html>',
+        'text/html',
+      );
+    };
+
+    const result = await onRequest({}, next);
+
+    expect(await result.text()).toContain(
+      '<style data-tasty-ssr nonce="astro-nonce">',
+    );
   });
 
   it('passes bodyless responses through untouched', async () => {

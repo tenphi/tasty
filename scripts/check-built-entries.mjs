@@ -42,6 +42,7 @@ const expectedChunks = [
   'hydration-',
   'react-runtime-',
   'runtime-engine-',
+  'runtime-state-',
   'shared-utils-',
   'style-engine-',
   'zero-engine-',
@@ -90,6 +91,19 @@ function assertGraphExcludes(entry, forbiddenPrefixes) {
   }
 }
 
+function assertGraphSizeAtMost(entry, maxBytes) {
+  const bytes = collectLocalGraph(entry).reduce(
+    (total, file) => total + statSync(file).size,
+    0,
+  );
+
+  if (bytes > maxBytes) {
+    throw new Error(
+      `${entry} loads ${bytes} bytes of local JavaScript; expected at most ${maxBytes}.`,
+    );
+  }
+}
+
 function assertGraphOnlyLoads(entry, allowedPrefixes) {
   const graph = collectLocalGraph(entry);
   const unexpected = graph.find((file) => {
@@ -114,17 +128,20 @@ assertGraphExcludes('static/index.js', [
   'dsl-',
   'react-runtime-',
   'runtime-engine-',
+  'runtime-state-',
   'style-engine-',
 ]);
 assertGraphExcludes('zero/index.js', [
   'debug-',
   'react-runtime-',
   'runtime-engine-',
+  'runtime-state-',
 ]);
 assertGraphExcludes('zero/babel.js', [
   'debug-',
   'react-runtime-',
   'runtime-engine-',
+  'runtime-state-',
 ]);
 assertGraphExcludes('ssr/next-config.js', [
   'collector-',
@@ -132,8 +149,24 @@ assertGraphExcludes('ssr/next-config.js', [
   'hydration-',
   'react-runtime-',
   'runtime-engine-',
+  'runtime-state-',
   'zero-engine-',
 ]);
+assertGraphExcludes('ssr/index.js', [
+  'debug-',
+  'react-runtime-',
+  'runtime-engine-',
+  'zero-engine-',
+]);
+assertGraphExcludes('ssr/astro.js', [
+  'debug-',
+  'hydration-',
+  'react-runtime-',
+  'runtime-engine-',
+  'zero-engine-',
+]);
+assertGraphSizeAtMost('ssr/index.js', 405_000);
+assertGraphSizeAtMost('ssr/astro.js', 420_000);
 assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));
@@ -146,9 +179,9 @@ for (const prefix of expectedChunks) {
 }
 
 const emitted = walk(distDir);
-if (emitted.length > 30) {
+if (emitted.length > 31) {
   throw new Error(
-    `Runtime build emitted ${emitted.length} JavaScript files; expected at most 30.`,
+    `Runtime build emitted ${emitted.length} JavaScript files; expected at most 31.`,
   );
 }
 

@@ -461,7 +461,10 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
   };
 }
 
-export function filterMods(mods: string[], allowedMods: string[]): string[] {
+export function filterMods(
+  mods: string[],
+  allowedMods: readonly string[],
+): string[] {
   return mods.filter((mod) => allowedMods.includes(mod));
 }
 

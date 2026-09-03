@@ -1,3 +1,4 @@
+/* eslint-disable tasty/known-property -- published plugin predates these logical category styles */
 import { render } from '@testing-library/react';
 
 import { resetConfig } from './config';
@@ -18,9 +19,8 @@ describe('logical styles in the browser', () => {
       <Box
         styles={{
           direction: 'rtl',
-          paddingInlineStart: '2x',
-          paddingInlineEnd: '1x',
-          paddingBlock: '3x 4x',
+          inlinePadding: '2x start, 1x end',
+          blockPadding: '3x 4x',
         }}
       />,
     ).getByTestId('Box');
@@ -38,10 +38,8 @@ describe('logical styles in the browser', () => {
         styles={{
           writingMode: 'vertical-rl',
           textOrientation: 'upright',
-          paddingBlockStart: '1x',
-          paddingBlockEnd: '2x',
-          paddingInlineStart: '3x',
-          paddingInlineEnd: '4x',
+          blockPadding: '1x start, 2x end',
+          inlinePadding: '3x start, 4x end',
         }}
       />,
     ).getByTestId('Box');
@@ -90,19 +88,20 @@ describe('logical styles in the browser', () => {
     expect(computed(el, 'max-block-size')).toBe('160px');
   });
 
-  it('keeps physical and logical padding in the native CSS cascade', () => {
+  it('keeps native logical longhands available beside category styles', () => {
     const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
 
     const withShorthand = render(
-      <Box styles={{ padding: '1x', paddingInlineStart: '2x' }} />,
+      <Box styles={{ inlinePadding: '1x', paddingInlineStart: '2x' }} />,
     ).container.firstElementChild!;
     expect(computed(withShorthand, 'padding-left')).toBe('16px');
     expect(computed(withShorthand, 'padding-right')).toBe('8px');
 
     const withPhysicalLonghand = render(
-      <Box styles={{ paddingInlineStart: '2x', paddingLeft: '3x' }} />,
+      <Box styles={{ blockPadding: '1x', paddingBlockEnd: '3x' }} />,
     ).container.firstElementChild!;
-    expect(computed(withPhysicalLonghand, 'padding-left')).toBe('24px');
+    expect(computed(withPhysicalLonghand, 'padding-top')).toBe('8px');
+    expect(computed(withPhysicalLonghand, 'padding-bottom')).toBe('24px');
   });
 
   it('maps logical borders and corners in RTL', () => {
@@ -112,7 +111,7 @@ describe('logical styles in the browser', () => {
         styles={{
           direction: 'rtl',
           '#edge': 'rgb(255 0 0)',
-          borderInlineStart: '2bw dashed #edge',
+          inlineBorder: '2bw dashed #edge start',
           borderStartStartRadius: '2r',
         }}
       />,
@@ -121,6 +120,7 @@ describe('logical styles in the browser', () => {
     expect(computed(el, 'border-right-width')).toBe('2px');
     expect(computed(el, 'border-right-style')).toBe('dashed');
     expect(computed(el, 'border-right-color')).toBe('rgb(255, 0, 0)');
+    expect(computed(el, 'border-left-width')).toBe('0px');
     expect(computed(el, 'border-top-right-radius')).toBe('12px');
     expect(computed(el, 'border-top-left-radius')).toBe('0px');
   });
@@ -132,9 +132,9 @@ describe('logical styles in the browser', () => {
         styles={{
           direction: 'rtl',
           position: 'absolute',
-          insetInlineStart: '2x',
-          scrollPaddingInline: '1x 2x',
-          scrollMarginBlockStart: '3x',
+          inlineInset: '2x start',
+          inlineScrollPadding: '1x 2x',
+          blockScrollMargin: '3x start',
         }}
       />,
     ).getByTestId('Box');
@@ -143,5 +143,6 @@ describe('logical styles in the browser', () => {
     expect(computed(el, 'scroll-padding-right')).toBe('8px');
     expect(computed(el, 'scroll-padding-left')).toBe('16px');
     expect(computed(el, 'scroll-margin-top')).toBe('24px');
+    expect(computed(el, 'scroll-margin-bottom')).toBe('0px');
   });
 });

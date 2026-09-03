@@ -18,6 +18,7 @@ import type {
 } from './conditions';
 import {
   and,
+  buildDimensionCondition,
   getConditionUniqueId,
   isCompoundCondition,
   not,
@@ -160,9 +161,10 @@ function stateToCSS(state: StateCondition): CSSComponents {
       );
 
     case 'parent':
-      return parentConditionToVariants(
+      return innerConditionToVariants(
         state.innerCondition,
         state.negated ?? false,
+        'parentGroups',
         state.direct,
       );
 
@@ -353,28 +355,12 @@ function dimensionToMediaParsed(
   },
   negated?: boolean,
 ): ParsedMediaCondition[] {
-  // Build the condition string
-  let condition: string;
-  if (lowerBound && upperBound) {
-    const lowerOp = lowerBound.inclusive ? '<=' : '<';
-    const upperOp = upperBound.inclusive ? '<=' : '<';
-    condition = `(${lowerBound.value} ${lowerOp} ${dimension} ${upperOp} ${upperBound.value})`;
-  } else if (upperBound) {
-    const op = upperBound.inclusive ? '<=' : '<';
-    condition = `(${dimension} ${op} ${upperBound.value})`;
-  } else if (lowerBound) {
-    const op = lowerBound.inclusive ? '>=' : '>';
-    condition = `(${dimension} ${op} ${lowerBound.value})`;
-  } else {
-    condition = `(${dimension})`;
-  }
-
   // For negation, we use CSS `not (condition)` syntax in buildAtRulesFromVariant
   return [
     {
       subtype: 'dimension',
       negated: negated ?? false,
-      condition,
+      condition: buildDimensionCondition(dimension, lowerBound, upperBound),
       dimension,
       lowerBound,
       upperBound,
@@ -403,10 +389,11 @@ function containerToParsed(
     condition = state.rawCondition!;
   } else {
     // Dimension query
-    condition = dimensionToContainerCondition(
+    condition = buildDimensionCondition(
       state.dimension || 'width',
       state.lowerBound,
       state.upperBound,
+      'width',
     );
   }
 
@@ -418,29 +405,6 @@ function containerToParsed(
     property: state.property,
     propertyValue: state.propertyValue,
   };
-}
-
-/**
- * Convert dimension bounds to container query condition (single string)
- * Container queries support "not (condition)", so no need to invert manually
- */
-function dimensionToContainerCondition(
-  dimension: string,
-  lowerBound?: { value: string; inclusive: boolean },
-  upperBound?: { value: string; inclusive: boolean },
-): string {
-  if (lowerBound && upperBound) {
-    const lowerOp = lowerBound.inclusive ? '<=' : '<';
-    const upperOp = upperBound.inclusive ? '<=' : '<';
-    return `(${lowerBound.value} ${lowerOp} ${dimension} ${upperOp} ${upperBound.value})`;
-  } else if (upperBound) {
-    const op = upperBound.inclusive ? '<=' : '<';
-    return `(${dimension} ${op} ${upperBound.value})`;
-  } else if (lowerBound) {
-    const op = lowerBound.inclusive ? '>=' : '>';
-    return `(${dimension} ${op} ${lowerBound.value})`;
-  }
-  return '(width)'; // Fallback
 }
 
 /**
@@ -466,20 +430,21 @@ function collectSelectorConditions(
 /**
  * Convert an inner condition tree into a single SelectorVariant with
  * one SelectorGroup whose branches represent the inner OR alternatives.
- * Shared by @root() and @own().
+ * Shared by @root(), @own(), and @parent().
  *
  * Both positive and negated cases produce one variant with one group.
  * Negation simply sets the `negated` flag, which swaps :is() for :not()
  * in the final CSS output — no De Morgan transformation is needed.
  *
- * This mirrors parentConditionToVariants: OR branches are kept inside
- * a single group and rendered as comma-separated arguments in
- * :is()/:not(), e.g. :root:is([a], [b]) or [el]:not([a], [b]).
+ * OR branches are kept inside a single group and rendered as
+ * comma-separated arguments in :is()/:not(), e.g. :root:is([a], [b]) or
+ * [el]:not([a], [b]). Parent groups additionally retain their combinator.
  */
 function innerConditionToVariants(
   innerCondition: ConditionNode,
   negated: boolean,
-  target: 'rootGroups' | 'ownGroups',
+  target: 'rootGroups' | 'ownGroups' | 'parentGroups',
+  direct = false,
 ): CSSComponents {
   const innerCSS = conditionToCSS(innerCondition);
 
@@ -502,46 +467,11 @@ function innerConditionToVariants(
   }
 
   const v = emptyVariant();
-  v[target].push({ branches, negated });
-
-  return { variants: [v], isImpossible: false };
-}
-
-/**
- * Convert a @parent() inner condition into a single SelectorVariant with
- * one ParentGroup whose branches represent the inner OR alternatives.
- *
- * Both positive and negated cases produce one variant with one group.
- * Negation simply sets the `negated` flag, which swaps :is() for :not()
- * in the final CSS output — no structural transformation is needed.
- */
-function parentConditionToVariants(
-  innerCondition: ConditionNode,
-  negated: boolean,
-  direct: boolean,
-): CSSComponents {
-  const innerCSS = conditionToCSS(innerCondition);
-
-  if (innerCSS.isImpossible || innerCSS.variants.length === 0) {
-    return { variants: [], isImpossible: true };
+  if (target === 'parentGroups') {
+    v.parentGroups.push({ branches, direct, negated });
+  } else {
+    v[target].push({ branches, negated });
   }
-
-  const branches: ParsedSelectorCondition[][] = [];
-
-  for (const innerVariant of innerCSS.variants) {
-    const conditions = collectSelectorConditions(innerVariant);
-
-    if (conditions.length > 0) {
-      branches.push(conditions);
-    }
-  }
-
-  if (branches.length === 0) {
-    return { variants: [emptyVariant()], isImpossible: false };
-  }
-
-  const v = emptyVariant();
-  v.parentGroups.push({ branches, direct, negated });
 
   return { variants: [v], isImpossible: false };
 }
@@ -876,61 +806,31 @@ function dedupeSelectorConditions(
 }
 
 /**
- * Check for modifier contradiction: same attribute with opposite negation
- */
-function hasModifierContradiction(
-  conditions: ParsedModifierCondition[],
-): boolean {
-  const byKey = new Map<string, boolean>(); // base key -> isPositive
-
-  for (const mod of conditions) {
-    const baseKey = mod.value
-      ? `${mod.attribute}${mod.operator || '='}${mod.value}`
-      : mod.attribute;
-    const existing = byKey.get(baseKey);
-    if (existing !== undefined && existing !== !mod.negated) {
-      return true; // Same attribute with opposite negation
-    }
-    byKey.set(baseKey, !mod.negated);
-  }
-  return false;
-}
-
-/**
- * Check for pseudo contradiction: same pseudo with opposite negation
- */
-function hasPseudoContradiction(conditions: ParsedPseudoCondition[]): boolean {
-  const byKey = new Map<string, boolean>(); // pseudo -> isPositive
-
-  for (const pseudo of conditions) {
-    const existing = byKey.get(pseudo.pseudo);
-    if (existing !== undefined && existing !== !pseudo.negated) {
-      return true; // Same pseudo with opposite negation
-    }
-    byKey.set(pseudo.pseudo, !pseudo.negated);
-  }
-  return false;
-}
-
-/**
  * Check for selector condition contradiction (modifier or pseudo with opposite negation).
  * Shared by root, parent, and own conditions.
  */
 function hasSelectorConditionContradiction(
   conditions: ParsedSelectorCondition[],
 ): boolean {
-  const modifiers: ParsedModifierCondition[] = [];
-  const pseudos: ParsedPseudoCondition[] = [];
+  const byKey = new Map<string, boolean>();
 
-  for (const c of conditions) {
-    if ('attribute' in c) {
-      modifiers.push(c);
-    } else {
-      pseudos.push(c);
+  for (const condition of conditions) {
+    const key =
+      'attribute' in condition
+        ? `mod:${
+            condition.value
+              ? `${condition.attribute}${condition.operator || '='}${condition.value}`
+              : condition.attribute
+          }`
+        : `pseudo:${condition.pseudo}`;
+    const existing = byKey.get(key);
+    if (existing !== undefined && existing !== !condition.negated) {
+      return true;
     }
+    byKey.set(key, !condition.negated);
   }
 
-  return hasModifierContradiction(modifiers) || hasPseudoContradiction(pseudos);
+  return false;
 }
 
 /**

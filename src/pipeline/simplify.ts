@@ -23,6 +23,7 @@ import type {
 } from './conditions';
 import {
   and,
+  buildDimensionCondition,
   createOwnCondition,
   createParentCondition,
   createRootCondition,
@@ -227,8 +228,8 @@ function simplifyAnd(children: ConditionNode[]): ConditionNode {
     terms = sortTerms(terms);
 
     // Pass 4: boolean-algebra reductions
-    terms = applyAbsorptionAnd(terms); // A & (A | B) → A
-    terms = applyConsensusAnd(terms); // (A | B) & (A | !B) → A
+    terms = applyAbsorption(terms, 'OR'); // A & (A | B) → A
+    terms = applyPairReduction(terms, 'OR'); // (A | B) & (A | !B) → A
 
     // Pass 5: cross-level contradiction pruning
     // A & OR(!A & X, Y) → A & Y
@@ -322,10 +323,10 @@ function simplifyOr(children: ConditionNode[]): ConditionNode {
   // ─── Pass 4: boolean-algebra reductions ────────────────────────────────
 
   // Apply absorption: A | (A & B) → A
-  terms = applyAbsorptionOr(terms);
+  terms = applyAbsorption(terms, 'AND');
 
   // Apply complementary factoring: (A & B) | (A & !B) → A
-  terms = applyComplementaryFactoring(terms);
+  terms = applyPairReduction(terms, 'AND');
 
   if (terms.length === 0) {
     return falseCondition();
@@ -419,10 +420,11 @@ function hasRangeContradiction(terms: ConditionNode[]): boolean {
 
     if (term.type === 'media' && term.subtype === 'dimension') {
       const key = term.dimension || 'width';
-      if (!mediaByDim.has(key)) {
-        mediaByDim.set(key, { positive: [], negated: [] });
+      let group = mediaByDim.get(key);
+      if (!group) {
+        group = { positive: [], negated: [] };
+        mediaByDim.set(key, group);
       }
-      const group = mediaByDim.get(key)!;
       if (term.negated) {
         group.negated.push(term);
       } else {
@@ -432,10 +434,11 @@ function hasRangeContradiction(terms: ConditionNode[]): boolean {
 
     if (term.type === 'container' && term.subtype === 'dimension') {
       const key = `${term.containerName || '_'}:${term.dimension || 'width'}`;
-      if (!containerByDim.has(key)) {
-        containerByDim.set(key, { positive: [], negated: [] });
+      let group = containerByDim.get(key);
+      if (!group) {
+        group = { positive: [], negated: [] };
+        containerByDim.set(key, group);
       }
-      const group = containerByDim.get(key)!;
       if (term.negated) {
         group.negated.push(term);
       } else {
@@ -920,10 +923,11 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
       !term.negated
     ) {
       const key = term.dimension || 'width';
-      if (!mediaByDim.has(key)) {
-        mediaByDim.set(key, { conditions: [], indices: [] });
+      let group = mediaByDim.get(key);
+      if (!group) {
+        group = { conditions: [], indices: [] };
+        mediaByDim.set(key, group);
       }
-      const group = mediaByDim.get(key)!;
       group.conditions.push(term);
       group.indices.push(index);
     }
@@ -934,10 +938,11 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
       !term.negated
     ) {
       const key = `${term.containerName || '_'}:${term.dimension || 'width'}`;
-      if (!containerByDim.has(key)) {
-        containerByDim.set(key, { conditions: [], indices: [] });
+      let group = containerByDim.get(key);
+      if (!group) {
+        group = { conditions: [], indices: [] };
+        containerByDim.set(key, group);
       }
-      const group = containerByDim.get(key)!;
       group.conditions.push(term);
       group.indices.push(index);
     }
@@ -948,7 +953,7 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
   const mergedTerms: ConditionNode[] = [];
 
   // Merge media conditions
-  for (const [_dim, group] of mediaByDim) {
+  for (const [, group] of mediaByDim) {
     if (group.conditions.length > 1) {
       const merged = mergeMediaRanges(group.conditions);
       if (merged) {
@@ -1072,35 +1077,28 @@ function buildMergedRaw(
   lowerBound?: NumericBound,
   upperBound?: NumericBound,
 ): string {
-  if (lowerBound && upperBound) {
-    const lowerOp = lowerBound.inclusive ? '<=' : '<';
-    const upperOp = upperBound.inclusive ? '<=' : '<';
-    return `@media(${lowerBound.value} ${lowerOp} ${dimension} ${upperOp} ${upperBound.value})`;
-  } else if (upperBound) {
-    const op = upperBound.inclusive ? '<=' : '<';
-    return `@media(${dimension} ${op} ${upperBound.value})`;
-  } else if (lowerBound) {
-    const op = lowerBound.inclusive ? '>=' : '>';
-    return `@media(${dimension} ${op} ${lowerBound.value})`;
-  }
-  return '@media()';
+  return lowerBound || upperBound
+    ? `@media${buildDimensionCondition(dimension, lowerBound, upperBound)}`
+    : '@media()';
 }
 
 // ============================================================================
-// Complementary Factoring
+// Complementary Factoring / Consensus Resolution
 // ============================================================================
 
 /**
- * Apply complementary factoring: (A & B) | (A & !B) → A
+ * Apply either side of the same Boolean reduction:
  *
- * Finds pairs of AND compounds that share all children except one,
- * where the differing child is complementary (X vs !X).
- * Replaces the pair with the common terms.
+ * - Complementary factoring: (A & B) | (A & !B) → A
+ * - Consensus/resolution: (A | B) & (A | !B) → A
  *
  * This is applied iteratively until no more reductions are possible,
- * since factoring can expose further simplification opportunities.
+ * since one reduction can expose another.
  */
-function applyComplementaryFactoring(terms: ConditionNode[]): ConditionNode[] {
+function applyPairReduction(
+  terms: ConditionNode[],
+  childOperator: 'AND' | 'OR',
+): ConditionNode[] {
   let changed = true;
 
   while (changed) {
@@ -1108,15 +1106,15 @@ function applyComplementaryFactoring(terms: ConditionNode[]): ConditionNode[] {
 
     for (let i = 0; i < terms.length; i++) {
       const a = terms[i];
-      if (a.kind !== 'compound' || a.operator !== 'AND') continue;
+      if (a.kind !== 'compound' || a.operator !== childOperator) continue;
 
       for (let j = i + 1; j < terms.length; j++) {
         const b = terms[j];
-        if (b.kind !== 'compound' || b.operator !== 'AND') continue;
+        if (b.kind !== 'compound' || b.operator !== childOperator) continue;
 
-        const factored = tryFactorPair(a.children, b.children);
-        if (factored) {
-          const replacement = simplifyInner(factored);
+        const reduced = tryReducePair(a.children, b.children, childOperator);
+        if (reduced) {
+          const replacement = simplifyInner(reduced);
           terms = [
             ...terms.slice(0, i),
             ...terms.slice(i + 1, j),
@@ -1136,76 +1134,72 @@ function applyComplementaryFactoring(terms: ConditionNode[]): ConditionNode[] {
 }
 
 /**
- * Try to factor two AND children lists.
+ * Reduce a pair of compound child lists using complementary terms.
  *
- * Extracts the common children (by uniqueId). If the remaining
- * (non-common) parts of each side OR to TRUE, the common part alone
- * is sufficient: `(common & restA) | (common & restB) → common`
- * when `restA | restB → TRUE`.
- *
- * Also handles the simpler case where exactly one child is
- * complementary: `[A, B, C]` and `[A, !B, C]` → `AND(A, C)`.
+ * `childOperator` is the operator inside each term. The remaining parts
+ * must collapse under the opposite operator, leaving only their shared
+ * children.
  */
-function tryFactorPair(
+function tryReducePair(
   aChildren: ConditionNode[],
   bChildren: ConditionNode[],
+  childOperator: 'AND' | 'OR',
 ): ConditionNode | null {
   const aIds = aChildren.map((c) => getConditionUniqueId(c));
   const bIds = bChildren.map((c) => getConditionUniqueId(c));
-
-  const bIdSet = new Set(bIds);
   const aIdSet = new Set(aIds);
+  const bIdSet = new Set(bIds);
 
   // Extract common children (present in both by uniqueId)
-  const commonIndicesA: number[] = [];
-  const restIndicesA: number[] = [];
+  const common: ConditionNode[] = [];
+  const restAChildren: ConditionNode[] = [];
   for (let i = 0; i < aIds.length; i++) {
     if (bIdSet.has(aIds[i])) {
-      commonIndicesA.push(i);
+      common.push(aChildren[i]);
     } else {
-      restIndicesA.push(i);
+      restAChildren.push(aChildren[i]);
     }
   }
 
-  const restIndicesB: number[] = [];
+  const restBChildren: ConditionNode[] = [];
   for (let i = 0; i < bIds.length; i++) {
     if (!aIdSet.has(bIds[i])) {
-      restIndicesB.push(i);
+      restBChildren.push(bChildren[i]);
     }
   }
 
   // Must have at least one common child and differing parts on both sides
-  if (commonIndicesA.length === 0) return null;
-  if (restIndicesA.length === 0 && restIndicesB.length === 0) return null;
+  if (common.length === 0) return null;
+  if (restAChildren.length === 0 && restBChildren.length === 0) return null;
 
-  // Build the "rest" conditions for each side
+  const combine = childOperator === 'AND' ? and : or;
+  const identity = childOperator === 'AND' ? trueCondition() : falseCondition();
   const restA =
-    restIndicesA.length === 0
-      ? trueCondition()
-      : restIndicesA.length === 1
-        ? aChildren[restIndicesA[0]]
-        : and(...restIndicesA.map((i) => aChildren[i]));
-
+    restAChildren.length === 0
+      ? identity
+      : restAChildren.length === 1
+        ? restAChildren[0]
+        : combine(...restAChildren);
   const restB =
-    restIndicesB.length === 0
-      ? trueCondition()
-      : restIndicesB.length === 1
-        ? bChildren[restIndicesB[0]]
-        : and(...restIndicesB.map((i) => bChildren[i]));
+    restBChildren.length === 0
+      ? identity
+      : restBChildren.length === 1
+        ? restBChildren[0]
+        : combine(...restBChildren);
+  const expectedKind = childOperator === 'AND' ? 'true' : 'false';
 
-  // Check if restA | restB simplifies to TRUE
+  // Factoring checks restA | restB → TRUE; resolution checks
+  // restA & restB → FALSE.
   const combined = simplifyInner({
     kind: 'compound',
-    operator: 'OR',
+    operator: childOperator === 'AND' ? 'OR' : 'AND',
     children: [restA, restB],
   });
 
-  if (combined.kind !== 'true') {
+  if (combined.kind !== expectedKind) {
     // Direct complement check for compound conditions.
-    // hasTautology only detects leaf-level A/!A pairs, so compound
-    // complements like @hc / !@hc (which expand via De Morgan into
-    // structurally different trees) are missed. Compare the simplified
-    // negation of one rest against the simplified other rest instead.
+    // Leaf-level contradiction/tautology checks can miss complements that
+    // expand via De Morgan into structurally different trees.
     const simplifiedRestB = simplifyInner(restB);
     const negRestA = simplifyInner(not(restA));
 
@@ -1216,16 +1210,7 @@ function tryFactorPair(
     }
   }
 
-  // restA | restB = TRUE → (common & restA) | (common & restB) = common
-  const common = commonIndicesA.map((i) => aChildren[i]);
-
-  if (common.length === 0) {
-    return trueCondition();
-  }
-  if (common.length === 1) {
-    return common[0];
-  }
-  return and(...common);
+  return common.length === 1 ? common[0] : combine(...common);
 }
 
 // ============================================================================
@@ -1300,147 +1285,6 @@ function applyAbsorption(
     }
     return true;
   });
-}
-
-function applyAbsorptionAnd(terms: ConditionNode[]): ConditionNode[] {
-  return applyAbsorption(terms, 'OR');
-}
-
-function applyAbsorptionOr(terms: ConditionNode[]): ConditionNode[] {
-  return applyAbsorption(terms, 'AND');
-}
-
-// ============================================================================
-// Consensus / Resolution (AND dual of complementary factoring)
-// ============================================================================
-
-/**
- * Apply the consensus/resolution rule for AND:
- *   (A | B) & (A | !B) → A
- *
- * This is the dual of complementary factoring in OR context:
- *   (A & B) | (A & !B) → A
- *
- * Extracts common children from two OR terms. If the remaining
- * parts of each side AND to FALSE, the common part alone is
- * sufficient.
- */
-function applyConsensusAnd(terms: ConditionNode[]): ConditionNode[] {
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-
-    for (let i = 0; i < terms.length; i++) {
-      const a = terms[i];
-      if (a.kind !== 'compound' || a.operator !== 'OR') continue;
-
-      for (let j = i + 1; j < terms.length; j++) {
-        const b = terms[j];
-        if (b.kind !== 'compound' || b.operator !== 'OR') continue;
-
-        const resolved = tryResolvePair(a.children, b.children);
-        if (resolved) {
-          const replacement = simplifyInner(resolved);
-          terms = [
-            ...terms.slice(0, i),
-            ...terms.slice(i + 1, j),
-            ...terms.slice(j + 1),
-            replacement,
-          ];
-          changed = true;
-          break;
-        }
-      }
-
-      if (changed) break;
-    }
-  }
-
-  return terms;
-}
-
-/**
- * Try to resolve two OR children lists.
- *
- * Extracts common children (by uniqueId). If the remaining
- * (non-common) parts AND to FALSE, the common part alone
- * is sufficient: `(common | restA) & (common | restB) → common`
- * when `restA & restB → FALSE`.
- */
-function tryResolvePair(
-  aChildren: ConditionNode[],
-  bChildren: ConditionNode[],
-): ConditionNode | null {
-  const aIds = aChildren.map((c) => getConditionUniqueId(c));
-  const bIds = bChildren.map((c) => getConditionUniqueId(c));
-
-  const bIdSet = new Set(bIds);
-  const aIdSet = new Set(aIds);
-
-  const commonIndicesA: number[] = [];
-  const restIndicesA: number[] = [];
-  for (let i = 0; i < aIds.length; i++) {
-    if (bIdSet.has(aIds[i])) {
-      commonIndicesA.push(i);
-    } else {
-      restIndicesA.push(i);
-    }
-  }
-
-  const restIndicesB: number[] = [];
-  for (let i = 0; i < bIds.length; i++) {
-    if (!aIdSet.has(bIds[i])) {
-      restIndicesB.push(i);
-    }
-  }
-
-  if (commonIndicesA.length === 0) return null;
-  if (restIndicesA.length === 0 && restIndicesB.length === 0) return null;
-
-  const restA =
-    restIndicesA.length === 0
-      ? falseCondition()
-      : restIndicesA.length === 1
-        ? aChildren[restIndicesA[0]]
-        : or(...restIndicesA.map((i) => aChildren[i]));
-
-  const restB =
-    restIndicesB.length === 0
-      ? falseCondition()
-      : restIndicesB.length === 1
-        ? bChildren[restIndicesB[0]]
-        : or(...restIndicesB.map((i) => bChildren[i]));
-
-  // Check if restA & restB simplifies to FALSE
-  const combined = simplifyInner({
-    kind: 'compound',
-    operator: 'AND',
-    children: [restA, restB],
-  });
-
-  if (combined.kind !== 'false') {
-    // Direct complement check for compound conditions
-    const simplifiedRestB = simplifyInner(restB);
-    const negRestA = simplifyInner(not(restA));
-
-    if (
-      getConditionUniqueId(negRestA) !== getConditionUniqueId(simplifiedRestB)
-    ) {
-      return null;
-    }
-  }
-
-  // restA & restB = FALSE → (common | restA) & (common | restB) = common
-  const common = commonIndicesA.map((i) => aChildren[i]);
-
-  if (common.length === 0) {
-    return falseCondition();
-  }
-  if (common.length === 1) {
-    return common[0];
-  }
-  return or(...common);
 }
 
 // ============================================================================

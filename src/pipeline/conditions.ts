@@ -172,6 +172,27 @@ export interface FalseCondition {
 export type ConditionNode =
   StateCondition | CompoundCondition | TrueCondition | FalseCondition;
 
+/** Serialize numeric bounds using CSS range syntax. */
+export function buildDimensionCondition(
+  dimension: string,
+  lowerBound?: Pick<NumericBound, 'value' | 'inclusive'>,
+  upperBound?: Pick<NumericBound, 'value' | 'inclusive'>,
+  emptyDimension = dimension,
+): string {
+  if (lowerBound && upperBound) {
+    const lowerOp = lowerBound.inclusive ? '<=' : '<';
+    const upperOp = upperBound.inclusive ? '<=' : '<';
+    return `(${lowerBound.value} ${lowerOp} ${dimension} ${upperOp} ${upperBound.value})`;
+  }
+  if (upperBound) {
+    return `(${dimension} ${upperBound.inclusive ? '<=' : '<'} ${upperBound.value})`;
+  }
+  if (lowerBound) {
+    return `(${dimension} ${lowerBound.inclusive ? '>=' : '>'} ${lowerBound.value})`;
+  }
+  return `(${emptyDimension})`;
+}
+
 // ============================================================================
 // Constructor Functions
 // ============================================================================

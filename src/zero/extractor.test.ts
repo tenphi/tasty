@@ -1,3 +1,4 @@
+import { configure, resetConfig } from '../config';
 import {
   extractCounterStyleFromStyles,
   extractFunctionsFromStyles,
@@ -41,6 +42,8 @@ describe('extractStylesWithChunks', () => {
 });
 
 describe('extractFunctionsFromStyles', () => {
+  afterEach(() => resetConfig());
+
   it('returns empty array when no functions', () => {
     expect(extractFunctionsFromStyles({ display: 'block' })).toEqual([]);
   });
@@ -76,6 +79,20 @@ describe('extractFunctionsFromStyles', () => {
     expect(results.find((r) => r.name === '--shared')!.css).toContain(
       'result: calc(2 * var(--x));',
     );
+  });
+
+  it('shares the configured function-polyfill state with zero extraction', () => {
+    const styles = {
+      '@function': {
+        $$negative: { args: ['$value'], result: '(-1 * $value)' },
+      },
+    };
+
+    configure({ polyfills: { functions: true } });
+    expect(extractFunctionsFromStyles(styles)).toEqual([]);
+
+    resetConfig();
+    expect(extractFunctionsFromStyles(styles)).toHaveLength(1);
   });
 });
 

@@ -70,6 +70,12 @@ export default defineConfig([
             priority: 100,
           },
           {
+            name: 'zero-engine',
+            test: (id) =>
+              isSourceModule(id, /[\\/]zero[\\/](?:css-writer|extractor)\.ts$/),
+            priority: 95,
+          },
+          {
             name: 'react-runtime',
             test: (id) =>
               isSourceModule(
@@ -97,6 +103,15 @@ export default defineConfig([
             priority: 80,
           },
           {
+            name: 'css-definitions',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:(?:functions|keyframes|properties|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules)\.ts|utils[\\/](?:hash|name-prefix)\.ts)$/,
+              ),
+            priority: 75,
+          },
+          {
             name: 'style-engine',
             test: (id) =>
               isSourceModule(
@@ -110,7 +125,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:config\.ts|prop-handlers\.ts|(?:injector|keyframes|properties|functions|font-face|counter-style)[\\/].+|ssr[\\/](?:format-global-rules|format-keyframes|format-property|format-rules|ssr-collector-ref)\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|hash|name-prefix|resolve-recipes|typography)\.ts)$/,
+                /[\\/](?:config\.ts|prop-handlers\.ts|injector[\\/].+|ssr[\\/]ssr-collector-ref\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$/,
               ),
             priority: 60,
           },

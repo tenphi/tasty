@@ -13,10 +13,12 @@ import type {
 } from './conditions';
 import {
   and,
+  buildDimensionCondition,
   createContainerDimensionCondition,
   createMediaDimensionCondition,
   createMediaFeatureCondition,
   createModifierCondition,
+  createOwnCondition,
   createParentCondition,
   falseCondition,
   not,
@@ -1529,6 +1531,56 @@ describe('mergeEntriesByValue with default + same-value state', () => {
 });
 
 describe('conditionToCSS()', () => {
+  describe('dimension condition serialization', () => {
+    it.each([
+      ['width', undefined, undefined, '(width)'],
+      [
+        'height',
+        { value: '320px', inclusive: false },
+        undefined,
+        '(height > 320px)',
+      ],
+      [
+        'inline-size',
+        { value: '20rem', inclusive: true },
+        undefined,
+        '(inline-size >= 20rem)',
+      ],
+      [
+        'block-size',
+        undefined,
+        { value: '50vh', inclusive: false },
+        '(block-size < 50vh)',
+      ],
+      [
+        'width',
+        undefined,
+        { value: '80rem', inclusive: true },
+        '(width <= 80rem)',
+      ],
+      [
+        'inline-size',
+        { value: '20rem', inclusive: false },
+        { value: '80rem', inclusive: true },
+        '(20rem < inline-size <= 80rem)',
+      ],
+    ] as const)(
+      'serializes %s bounds',
+      (dimension, lowerBound, upperBound, expected) => {
+        expect(buildDimensionCondition(dimension, lowerBound, upperBound)).toBe(
+          expected,
+        );
+      },
+    );
+
+    it('preserves the no-bound container fallback', () => {
+      const container = createContainerDimensionCondition('inline-size');
+      const css = conditionToCSS(container);
+
+      expect(css.variants[0].containerConditions[0].condition).toBe('(width)');
+    });
+  });
+
   it('should convert modifier to attribute selector', () => {
     const mod = createModifierCondition('data-hovered');
     const css = conditionToCSS(mod);
@@ -1796,6 +1848,41 @@ describe('conditionToCSS()', () => {
     expect(css.variants[0].rootGroups[0].branches[0]).toHaveLength(2);
   });
 
+  it('should preserve negated OR branches inside @own', () => {
+    const result = parseStateKey('!@own(hovered | focused)', {
+      isSubElement: true,
+    });
+    const css = conditionToCSS(result);
+
+    expect(css.variants).toHaveLength(1);
+    expect(css.variants[0].ownGroups).toHaveLength(1);
+    expect(css.variants[0].ownGroups[0].negated).toBe(true);
+    expect(css.variants[0].ownGroups[0].branches).toHaveLength(2);
+    expect(
+      css.variants[0].ownGroups[0].branches.map((branch) => branch[0]),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ attribute: 'data-hovered' }),
+        expect.objectContaining({ attribute: 'data-focused' }),
+      ]),
+    );
+  });
+
+  it('should return an empty variant for an always-true @own condition', () => {
+    const css = conditionToCSS(createOwnCondition(trueCondition()));
+
+    expect(css.isImpossible).toBe(false);
+    expect(css.variants).toHaveLength(1);
+    expect(css.variants[0].ownGroups).toHaveLength(0);
+  });
+
+  it('should eliminate an impossible @own condition', () => {
+    const css = conditionToCSS(createOwnCondition(falseCondition()));
+
+    expect(css.isImpossible).toBe(true);
+    expect(css.variants).toHaveLength(0);
+  });
+
   it('should convert @supports feature query', () => {
     const result = parseStateKey('@supports(display: grid)');
     const css = conditionToCSS(result);
@@ -1844,6 +1931,36 @@ describe('Integration: Exclusive conditions for media queries', () => {
 
     // Third (default): !(w <= 920px) & !(w <= 1400px) → w > 1400px
     expect(exclusive[2].stateKey).toBe('');
+  });
+});
+
+describe('rule finalization', () => {
+  it('deduplicates expanded selectors while keeping @starting rules last', () => {
+    const result = renderStyles(
+      {
+        Cell: {
+          $: '>, >',
+          opacity: '0',
+        },
+        CellStarting: {
+          $: '> [data-element="Cell"], > [data-element="Cell"]',
+          opacity: { '@starting': '0' },
+        },
+      },
+      '.component',
+    );
+
+    expect(result).toEqual([
+      {
+        selector: '.component > [data-element="Cell"]',
+        declarations: 'opacity: 0;',
+      },
+      {
+        selector: '.component > [data-element="Cell"]',
+        declarations: 'opacity: 0;',
+        startingStyle: true,
+      },
+    ]);
   });
 });
 

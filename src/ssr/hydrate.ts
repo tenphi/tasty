@@ -1,17 +1,16 @@
 /**
  * Client-side cache hydration for SSR/RSC.
  *
- * Pre-populates the client injector's rules map with class names
- * rendered on the server. With hash-based naming, the client derives
- * the same class name from the same cache key, so only the class name
- * list needs to cross the wire — no cache keys or counters.
+ * Registers class names rendered on the server with the client injector. If
+ * the runtime is not initialized yet, registration is deferred until its first
+ * use. With hash-based naming, only the class name list needs to cross the
+ * wire — no cache keys or counters.
  */
 
-import { getGlobalInjector } from '../config';
-import { HYDRATED_RULE_INDEX } from '../injector/types';
+import { hydrateStoredGlobalInjector } from '../injector/global-state';
 
 /**
- * Pre-populate the client-side style registry from the server's class name list.
+ * Hydrate the client-side style registry from the server's class name list.
  *
  * Call this before ReactDOM.hydrateRoot() or ensure it runs before
  * any tasty() component renders on the client.
@@ -28,17 +27,5 @@ export function hydrateTastyClasses(classes?: string[]): void {
 
   if (!classes?.length) return;
 
-  const injector = getGlobalInjector();
-  const registry = injector._sheetManager.getRegistry(document);
-
-  for (const cls of classes) {
-    if (!registry.rules.has(cls)) {
-      registry.rules.set(cls, {
-        className: cls,
-        ruleIndex: HYDRATED_RULE_INDEX,
-        sheetIndex: HYDRATED_RULE_INDEX,
-      });
-      registry.pinCounts.set(cls, 0);
-    }
-  }
+  hydrateStoredGlobalInjector(classes);
 }

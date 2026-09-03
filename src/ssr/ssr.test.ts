@@ -684,22 +684,40 @@ describe('hydrateTastyClasses', () => {
   });
 
   it('pre-populates rules from explicit class list', () => {
-    const className = `t${hashString('APPEARANCE:fill=#purple')}`;
+    const cacheKey = 'APPEARANCE:fill=#purple';
+    const className = `t${hashString(cacheKey)}`;
     hydrateTastyClasses([className]);
 
+    expect((window as any).__TASTY_GLOBAL_INJECTOR__).toBeUndefined();
+    expect(injector.instance.allocateClassName(cacheKey).isNewAllocation).toBe(
+      false,
+    );
     const registry = injector.instance._sheetManager.getRegistry(document);
     expect(registry.rules.has(className)).toBe(true);
     expect(registry.rules.get(className)!.ruleIndex).toBe(-2);
   });
 
   it('reads from window.__TASTY__', () => {
-    const className = `t${hashString('DIMENSION:padding=2x')}`;
+    const cacheKey = 'DIMENSION:padding=2x';
+    const className = `t${hashString(cacheKey)}`;
     (window as any).__TASTY__ = [className];
 
     hydrateTastyClasses();
 
+    expect(injector.instance.allocateClassName(cacheKey).isNewAllocation).toBe(
+      false,
+    );
     const registry = injector.instance._sheetManager.getRegistry(document);
     expect(registry.rules.has(className)).toBe(true);
+  });
+
+  it('registers immediately when the global injector already exists', () => {
+    const instance = injector.instance;
+
+    hydrateTastyClasses(['t-ready']);
+
+    const registry = instance._sheetManager.getRegistry(document);
+    expect(registry.rules.get('t-ready')?.ruleIndex).toBe(-2);
   });
 
   it('inject() treats hydrated entries as already injected', () => {

@@ -290,6 +290,12 @@
         "crypto"
       ],
       "limit": "42.1 kB"
+    },
+    {
+      "name": "astro client",
+      "path": "dist/ssr/astro-client.js",
+      "import": "*",
+      "limit": "0.5 kB"
     }
   ]
 }

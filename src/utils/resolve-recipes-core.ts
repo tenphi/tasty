@@ -224,7 +224,14 @@ export function resolveRecipesWith(
         changed = true;
         result = { ...(styles as Record<string, unknown>) };
       }
-      result[key] = subResolved;
+      // Define an own data property so even an untrusted key cannot invoke an
+      // inherited setter such as Object.prototype.__proto__.
+      Object.defineProperty(result, key, {
+        configurable: true,
+        enumerable: true,
+        value: subResolved,
+        writable: true,
+      });
     }
   }
 

@@ -339,6 +339,21 @@ describe('resolveRecipes', () => {
         Title: 'some-value',
       });
     });
+
+    it('does not alter the output prototype for untrusted style keys', () => {
+      const styles = JSON.parse(
+        '{"__proto__":{"polluted":true},"Title":{"recipe":"card"}}',
+      ) as Styles;
+
+      const result = resolveRecipes(styles);
+
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+      expect(Object.prototype).not.toHaveProperty('polluted');
+      expect(
+        Object.getOwnPropertyDescriptor(result, '__proto__')?.value,
+      ).toEqual({ polluted: true });
+      expect(result.Title).toEqual({ padding: '4x' });
+    });
   });
 
   // ============================================================================

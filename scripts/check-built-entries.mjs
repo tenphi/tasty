@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -38,6 +38,7 @@ const expectedChunks = [
   'dsl-',
   'react-runtime-',
   'runtime-engine-',
+  'shared-utils-',
   'style-engine-',
 ];
 
@@ -50,9 +51,52 @@ function walk(dir, out = []) {
   return out;
 }
 
+function collectLocalGraph(entry) {
+  const seen = new Set();
+
+  function visit(file) {
+    if (seen.has(file)) return;
+    seen.add(file);
+
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(
+      /^(?:import|export)\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']/gm,
+    )) {
+      if (match[1].startsWith('.')) {
+        visit(join(dirname(file), match[1]));
+      }
+    }
+  }
+
+  visit(join(distDir, entry));
+  return [...seen];
+}
+
+function assertGraphExcludes(entry, forbiddenPrefixes) {
+  const graph = collectLocalGraph(entry);
+  const forbidden = graph.find((file) =>
+    forbiddenPrefixes.some((prefix) => basename(file).startsWith(prefix)),
+  );
+
+  if (forbidden) {
+    throw new Error(
+      `${entry} unexpectedly loads ${basename(forbidden)}; keep its module graph isolated.`,
+    );
+  }
+}
+
 for (const entry of entries) {
   await import(new URL(`../dist/${entry}`, import.meta.url));
 }
+
+assertGraphExcludes('static/index.js', [
+  'debug-',
+  'dsl-',
+  'react-runtime-',
+  'runtime-engine-',
+  'style-engine-',
+]);
+assertGraphExcludes('zero/babel.js', ['react-runtime-']);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));
 for (const prefix of expectedChunks) {

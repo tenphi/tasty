@@ -16,10 +16,10 @@
  */
 
 import { getGlobalRecipes } from '../config';
-import { isSelector } from '../pipeline';
 import type { RecipeStyles, Styles } from '../styles/types';
 
 import { isDevEnv } from './is-dev-env';
+import { isSelector } from './is-selector';
 import { mergeStyles } from './merge-styles';
 
 const devMode = isDevEnv();

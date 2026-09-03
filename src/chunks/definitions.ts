@@ -45,7 +45,7 @@
  * ============================================================================
  */
 
-import { isSelector } from '../pipeline';
+import { isSelector } from '../utils/is-selector';
 
 import { CHUNK_NAMES, STYLE_TO_CHUNK } from './style-chunk-map';
 import type { ChunkName } from './style-chunk-map';

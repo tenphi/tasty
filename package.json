@@ -267,7 +267,7 @@
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "19 kB"
+      "limit": "2.1 kB"
     },
     {
       "name": "zero",

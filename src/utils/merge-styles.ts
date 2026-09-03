@@ -1,7 +1,7 @@
-import { isSelector } from '../pipeline';
 import type { Styles, StylesWithoutSelectors } from '../styles/types';
 
 import { isDevEnv } from './is-dev-env';
+import { isSelector } from './is-selector';
 
 const devMode = isDevEnv();
 

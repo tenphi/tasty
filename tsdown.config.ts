@@ -76,6 +76,15 @@ export default defineConfig([
             priority: 95,
           },
           {
+            name: 'config-engine',
+            test: (id) =>
+              isSourceModule(
+                id,
+                /[\\/](?:config-normalize\.ts|utils[\\/](?:resolve-recipes-core|typography)\.ts)$/,
+              ),
+            priority: 93,
+          },
+          {
             name: 'react-runtime',
             test: (id) =>
               isSourceModule(
@@ -125,7 +134,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:config\.ts|prop-handlers\.ts|injector[\\/].+|ssr[\\/]ssr-collector-ref\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$/,
+                /(?:[\\/]src[\\/]config\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|ssr[\\/]ssr-collector-ref\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$)/,
               ),
             priority: 60,
           },

@@ -34,6 +34,7 @@ const entries = [
 ];
 
 const expectedChunks = [
+  'config-engine-',
   'css-definitions-',
   'debug-',
   'dsl-',
@@ -103,7 +104,11 @@ assertGraphExcludes('zero/index.js', [
   'react-runtime-',
   'runtime-engine-',
 ]);
-assertGraphExcludes('zero/babel.js', ['react-runtime-']);
+assertGraphExcludes('zero/babel.js', [
+  'debug-',
+  'react-runtime-',
+  'runtime-engine-',
+]);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));
 for (const prefix of expectedChunks) {

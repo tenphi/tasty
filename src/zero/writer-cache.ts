@@ -8,7 +8,7 @@
 
 import type { CSSWriter } from './css-writer';
 import type { Styles } from '../styles/types';
-import type { TastyZeroConfig } from './babel-types';
+import type { ResolvedZeroConfig } from './config';
 
 /**
  * Registry of static styles keyed by their source identifier.
@@ -26,7 +26,7 @@ export interface WriterCacheEntry {
   writer: CSSWriter;
   configKey: string;
   registry: StaticStyleRegistry;
-  config: TastyZeroConfig;
+  config: ResolvedZeroConfig;
 }
 
 export const writerCache = new Map<string, WriterCacheEntry>();

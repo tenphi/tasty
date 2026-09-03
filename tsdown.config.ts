@@ -112,7 +112,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:tasty\.tsx|batch-provider\.tsx|hooks[\\/].+|rsc-cache\.ts|compute-styles\.ts|ssr[\\/](?:collect-auto-properties|context)\.ts|utils[\\/](?:filter-base-props|get-display-name|has-keys|is-valid-element-type|mod-attrs|process-tokens)\.ts)$/,
+                /[\\/](?:tasty\.tsx|batch-provider\.tsx|hooks[\\/].+|ssr[\\/]context\.ts|utils[\\/](?:get-display-name|is-valid-element-type)\.ts)$/,
               ),
             priority: 90,
           },
@@ -154,10 +154,12 @@ export default defineConfig([
           },
           {
             name: 'runtime-engine',
+            // Hook-free computation and prop helpers belong with the core
+            // runtime so the core entry does not load components and hooks.
             test: (id) =>
               isSourceModule(
                 id,
-                /(?:[\\/]src[\\/]config\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|utils[\\/](?:cache-wrapper|client-state|deps-equal|resolve-recipes|typography)\.ts)$)/,
+                /(?:[\\/]src[\\/](?:config|compute-styles|rsc-cache)\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|ssr[\\/]collect-auto-properties\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|filter-base-props|has-keys|mod-attrs|process-tokens|resolve-recipes|typography)\.ts)$)/,
               ),
             priority: 60,
           },

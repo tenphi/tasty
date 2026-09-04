@@ -84,29 +84,11 @@ const INTERNAL_PSEUDO_PATTERN = /:-internal-[a-z0-9-]+/g;
 // Tokenizer Patterns
 // ============================================================================
 
-/**
- * Pattern for tokenizing state notation.
- * Matches: operators, parentheses, @-prefixed states, value mods, boolean mods,
- * pseudo-classes, class selectors, and attribute selectors.
- *
- * All @-prefixed state groups (@supports, @root, @parent, @own, @(...))
- * and :is/:has/:not/:where pseudo-classes support up to 2 levels of
- * nested parentheses via:
- *   [^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*
- */
-const STATE_TOKEN_PATTERN =
-  /([&|!^])|([()])|(@media:[a-z]+)|(@media\([^)]+\))|(@supports\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@root\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@parent\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@own\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(@starting)|(@[A-Za-z][A-Za-z0-9-]*)|([a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+))|([a-z][a-z0-9-]+)|(:(?:is|has|not|where)\([^()]*(?:\([^()]*(?:\([^)]*\))?[^)]*\))*[^)]*\))|(:[-a-z][a-z0-9-]*(?:\([^)]+\))?)|(\.[a-z][a-z0-9-]+)|(\[[^\]]+\])/gi;
-
-// ============================================================================
-// Token Types
-// ============================================================================
-
-type TokenType = 'AND' | 'OR' | 'NOT' | 'XOR' | 'LPAREN' | 'RPAREN' | 'STATE';
-
-interface Token {
-  type: TokenType;
-  value: string;
-}
+const SIMPLE_MODIFIER_PATTERN = /^[a-z][a-z0-9-]+$/i;
+const FUNCTION_START_PATTERN =
+  /@(?:media|supports|root|parent|own)?\(|:(?:is|has|not|where)\(/iy;
+const SIMPLE_TOKEN_PATTERN =
+  /@media:[a-z]+|@[a-z][a-z0-9-]*|[a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+)|[a-z][a-z0-9-]+|:[-a-z][a-z0-9-]*(?:\([^)]+\))?|\.[a-z][a-z0-9-]+/iy;
 
 // ============================================================================
 // Tokenizer
@@ -115,47 +97,81 @@ interface Token {
 /**
  * Tokenize a state notation string
  */
-function tokenize(stateKey: string): Token[] {
-  const tokens: Token[] = [];
-  let match: RegExpExecArray | null;
+function tokenize(stateKey: string): string[] {
+  const tokens: string[] = [];
+  const source = stateKey.includes(',')
+    ? replaceCommasOutsideParens(stateKey)
+    : stateKey;
 
-  // Replace commas with | outside of parentheses (for compatibility)
-  const normalized = replaceCommasOutsideParens(stateKey);
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
 
-  STATE_TOKEN_PATTERN.lastIndex = 0;
-  while ((match = STATE_TOKEN_PATTERN.exec(normalized)) !== null) {
-    const fullMatch = match[0];
-
-    if (match[1]) {
-      // Operator: &, |, !, ^
-      switch (fullMatch) {
-        case '&':
-          tokens.push({ type: 'AND', value: '&' });
-          break;
-        case '|':
-          tokens.push({ type: 'OR', value: '|' });
-          break;
-        case '!':
-          tokens.push({ type: 'NOT', value: '!' });
-          break;
-        case '^':
-          tokens.push({ type: 'XOR', value: '^' });
-          break;
-      }
-    } else if (match[2]) {
-      // Parenthesis
-      if (fullMatch === '(') {
-        tokens.push({ type: 'LPAREN', value: '(' });
-      } else {
-        tokens.push({ type: 'RPAREN', value: ')' });
-      }
-    } else {
-      // State token (all other capture groups)
-      tokens.push({ type: 'STATE', value: fullMatch });
+    if (
+      ch === '&' ||
+      ch === '|' ||
+      ch === '!' ||
+      ch === '^' ||
+      ch === '(' ||
+      ch === ')'
+    ) {
+      tokens.push(ch);
+      i++;
+      continue;
     }
+
+    FUNCTION_START_PATTERN.lastIndex = i;
+    const functionStart = FUNCTION_START_PATTERN.exec(source);
+    if (functionStart) {
+      const open = FUNCTION_START_PATTERN.lastIndex - 1;
+      const isMedia = ch === '@' && functionStart[0].length === 7;
+      const mediaClose = isMedia ? source.indexOf(')', open + 1) : -1;
+      const end = isMedia
+        ? mediaClose > open + 1
+          ? mediaClose + 1
+          : -1
+        : findBalancedEnd(source, open);
+      if (end !== -1) {
+        tokens.push(source.slice(i, end));
+        i = end;
+        continue;
+      }
+    }
+
+    if (ch === '[') {
+      const end = source.indexOf(']', i + 1);
+      if (end > i + 1) {
+        tokens.push(source.slice(i, end + 1));
+        i = end + 1;
+        continue;
+      }
+    }
+
+    SIMPLE_TOKEN_PATTERN.lastIndex = i;
+    const simple = SIMPLE_TOKEN_PATTERN.exec(source);
+    if (simple) {
+      tokens.push(simple[0]);
+      i = SIMPLE_TOKEN_PATTERN.lastIndex;
+      continue;
+    }
+
+    i++;
   }
 
   return tokens;
+}
+
+/** Return the index after a balanced function, preserving the two-level limit. */
+function findBalancedEnd(source: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '(') {
+      if (++depth > 3) return -1;
+    } else if (source[i] === ')' && --depth === 0) {
+      return i + 1;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -185,11 +201,11 @@ function replaceCommasOutsideParens(str: string): string {
  * Parser state
  */
 class Parser {
-  private tokens: Token[];
+  private tokens: string[];
   private pos = 0;
   private options: ParseStateKeyOptions;
 
-  constructor(tokens: Token[], options: ParseStateKeyOptions) {
+  constructor(tokens: string[], options: ParseStateKeyOptions) {
     this.tokens = tokens;
     this.options = options;
   }
@@ -201,17 +217,9 @@ class Parser {
     return this.parseExpression();
   }
 
-  private current(): Token | undefined {
-    return this.tokens[this.pos];
-  }
-
-  private advance(): Token | undefined {
-    return this.tokens[this.pos++];
-  }
-
-  private match(type: TokenType): boolean {
-    if (this.current()?.type === type) {
-      this.advance();
+  private match(token: string): boolean {
+    if (this.tokens[this.pos] === token) {
+      this.pos++;
       return true;
     }
     return false;
@@ -228,8 +236,8 @@ class Parser {
   private parseAnd(): ConditionNode {
     let left = this.parseOr();
 
-    while (this.current()?.type === 'AND') {
-      this.advance();
+    while (this.tokens[this.pos] === '&') {
+      this.pos++;
       const right = this.parseOr();
       left = and(left, right);
     }
@@ -240,8 +248,8 @@ class Parser {
   private parseOr(): ConditionNode {
     let left = this.parseXor();
 
-    while (this.current()?.type === 'OR') {
-      this.advance();
+    while (this.tokens[this.pos] === '|') {
+      this.pos++;
       const right = this.parseXor();
       left = or(left, right);
     }
@@ -253,8 +261,8 @@ class Parser {
     let left = this.parseUnary();
     let operandCount = 1;
 
-    while (this.current()?.type === 'XOR') {
-      this.advance();
+    while (this.tokens[this.pos] === '^') {
+      this.pos++;
       const right = this.parseUnary();
       operandCount++;
 
@@ -274,7 +282,7 @@ class Parser {
   }
 
   private parseUnary(): ConditionNode {
-    if (this.match('NOT')) {
+    if (this.match('!')) {
       const operand = this.parseUnary();
       return not(operand);
     }
@@ -283,17 +291,19 @@ class Parser {
 
   private parsePrimary(): ConditionNode {
     // Handle parentheses
-    if (this.match('LPAREN')) {
+    if (this.match('(')) {
       const expr = this.parseExpression();
-      this.match('RPAREN'); // Consume closing paren (lenient if missing)
+      this.match(')'); // Consume closing paren (lenient if missing)
       return expr;
     }
 
     // Handle state tokens
-    const token = this.current();
-    if (token?.type === 'STATE') {
-      this.advance();
-      return this.parseStateToken(token.value);
+    const token = this.tokens[this.pos];
+    // Every operator/group token is one character; every state token emitted by
+    // tokenize() is at least two characters long.
+    if (token && token.length > 1) {
+      this.pos++;
+      return this.parseStateToken(token);
     }
 
     // Fallback for empty/invalid - return TRUE
@@ -419,7 +429,7 @@ class Parser {
     }
 
     // Boolean modifier (e.g., hovered, disabled)
-    return this.parseBooleanModifier(value);
+    return createBooleanModifier(value);
   }
 
   /**
@@ -818,19 +828,6 @@ class Parser {
       raw,
     );
   }
-
-  /**
-   * Parse boolean modifier (e.g., hovered, disabled)
-   */
-  private parseBooleanModifier(raw: string): ConditionNode {
-    return createModifierCondition(
-      `data-${camelToKebab(raw)}`,
-      undefined,
-      '=',
-      false,
-      raw,
-    );
-  }
 }
 
 // ============================================================================
@@ -848,6 +845,16 @@ function parseNumericValue(value: string): number | null {
   return null;
 }
 
+function createBooleanModifier(raw: string): ConditionNode {
+  return createModifierCondition(
+    `data-${camelToKebab(raw)}`,
+    undefined,
+    '=',
+    false,
+    raw,
+  );
+}
+
 // ============================================================================
 // Main Export
 // ============================================================================
@@ -860,11 +867,10 @@ export function parseStateKey(
   options: ParseStateKeyOptions = {},
 ): ConditionNode {
   // Handle empty/default state
-  if (!stateKey || !stateKey.trim()) {
-    return trueCondition();
-  }
+  if (!stateKey) return trueCondition();
 
   const trimmed = stateKey.trim();
+  if (!trimmed) return trueCondition();
 
   // Build cache key including local predefined states (they affect parsing)
   // Global predefined states are set once at initialization and don't change
@@ -906,10 +912,9 @@ export function parseStateKey(
     }
   }
 
-  // Tokenize and parse
-  const tokens = tokenize(trimmed);
-  const parser = new Parser(tokens, options);
-  const result = parser.parse();
+  const result = SIMPLE_MODIFIER_PATTERN.test(trimmed)
+    ? createBooleanModifier(trimmed)
+    : new Parser(tokenize(trimmed), options).parse();
 
   // Cache result
   parseCache.set(cacheKey, result);

@@ -17,8 +17,13 @@ function makeComplexPool(n: number): string[] {
   );
 }
 
+function makeValuePool(n: number): string[] {
+  return Array.from({ length: n }, (_, i) => `variant-${i}=value-${i}`);
+}
+
 const simplePool = makeSimplePool(POOL_SIZE);
 const complexPool = makeComplexPool(POOL_SIZE);
+const valuePool = makeValuePool(POOL_SIZE);
 
 parseStateKey(':hover');
 parseStateKey(
@@ -42,6 +47,19 @@ describe('parseStateKey', () => {
   bench('simple key (cached)', () => {
     parseStateKey(':hover');
   });
+
+  bench(
+    'value modifier (cold)',
+    () => {
+      parseStateKey(valuePool[idx++ % POOL_SIZE]);
+    },
+    {
+      setup() {
+        clearParseCache();
+        idx = 0;
+      },
+    },
+  );
 
   bench(
     'complex key (cold)',

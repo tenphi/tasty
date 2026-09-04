@@ -1,5 +1,3 @@
-const DOMPropNames = new Set(['id']);
-
 const BasePropNames = new Set([
   'role',
   'as',
@@ -20,16 +18,14 @@ const BasePropNames = new Set([
   'tabIndex',
 ]);
 
-const ignoreEventPropsNames = new Set([
+const eventRe = /^on[A-Z].+$/;
+const ignoredEventProps = new Set([
   'onPress',
   'onHoverStart',
   'onHoverEnd',
   'onPressStart',
   'onPressEnd',
 ]);
-
-const propRe = /^((data-).*)$/;
-const eventRe = /^on[A-Z].+$/;
 
 interface PropsFilterOptions {
   // @deprecated
@@ -50,18 +46,15 @@ export function filterBaseProps<T extends object>(
   const { propNames, eventProps } = opts;
   const filteredProps: Partial<T> = {};
 
-  for (const prop in props) {
+  for (const prop of Object.keys(props) as (keyof T & string)[]) {
     if (
-      Object.prototype.hasOwnProperty.call(props, prop) &&
-      (DOMPropNames.has(prop) ||
-        BasePropNames.has(prop) ||
-        // Always preserve any ARIA attributes to maintain accessibility support.
-        prop.startsWith('aria-') ||
-        (eventProps &&
-          eventRe.test(prop) &&
-          !ignoreEventPropsNames.has(prop)) ||
-        propNames?.has(prop) ||
-        propRe.test(prop))
+      prop === 'id' ||
+      BasePropNames.has(prop) ||
+      // Always preserve any ARIA attributes to maintain accessibility support.
+      prop.startsWith('aria-') ||
+      (eventProps && eventRe.test(prop) && !ignoredEventProps.has(prop)) ||
+      propNames?.has(prop) ||
+      prop.startsWith('data-')
     ) {
       filteredProps[prop] = props[prop];
     }

@@ -76,33 +76,3 @@ export const makeEmptyDetails = (): StyleDetails => ({
   all: [],
   parts: [],
 });
-
-export const finalizePart = (p: StyleDetailsPart): StyleDetailsPart => {
-  p.output = p.all.join(' ');
-  return p;
-};
-
-/**
- * Aggregate parts into a StyleDetails group.
- * Combines all parts' arrays into group-level arrays for backward compatibility.
- */
-export const finalizeGroup = (
-  d: StyleDetails,
-  parts: StyleDetailsPart[],
-): StyleDetails => {
-  // Store parts
-  d.parts = parts;
-
-  // Aggregate all parts into group-level arrays
-  for (const part of parts) {
-    d.mods.push(...part.mods);
-    d.values.push(...part.values);
-    d.colors.push(...part.colors);
-    d.all.push(...part.all);
-  }
-
-  // Join parts' outputs with ' / ' for the group output
-  d.output = parts.map((p) => p.output).join(' / ');
-
-  return d;
-};

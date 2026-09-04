@@ -227,6 +227,23 @@ describe('StyleProcessor', () => {
     expect(result.groups[0].values[2]).toBe('max-content');
   });
 
+  test('keeps the backward-compatible empty group shape', () => {
+    const result = parser.process('');
+
+    expect(result.output).toBe('');
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].parts).toHaveLength(1);
+    expect(result.groups[0].all).toEqual([]);
+  });
+
+  test('ignores parentheses and separators inside quoted strings', () => {
+    const result = parser.process('"(not / a, group" 2x');
+
+    expect(result.output).toBe('"(not / a, group" 16px');
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].parts).toHaveLength(1);
+  });
+
   test('caches results', () => {
     const a = parser.process('2x 3cr');
     const b = parser.process('2x 3cr');
@@ -596,6 +613,7 @@ describe('StyleProcessor', () => {
     const res = parser.process(expr);
 
     expect(res.groups[0].values).toEqual(['blur(10px)']);
+    expect(parser.process('"quoted"tail("').output).toBe('');
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();

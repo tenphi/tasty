@@ -2,7 +2,6 @@ type TokenCallback = (
   token: string,
   isComma: boolean,
   isSlash: boolean,
-  precedingChar: string | null,
 ) => void;
 
 const isWhitespace = (ch: string | undefined): boolean =>
@@ -10,7 +9,6 @@ const isWhitespace = (ch: string | undefined): boolean =>
 
 export function scan(src: string, cb: TokenCallback) {
   let depth = 0;
-  let inUrl = false;
   let inQuote: string | 0 = 0;
   let start = 0;
   let i = 0;
@@ -23,12 +21,11 @@ export function scan(src: string, cb: TokenCallback) {
     pendingSlash = false;
 
     if (start < i) {
-      const prevChar = start > 0 ? src[start - 1] : null;
-      cb(src.slice(start, i), isComma, actualSlash, prevChar);
+      cb(src.slice(start, i), isComma, actualSlash);
     } else if (isComma) {
-      cb('', true, false, null); // empty token followed by comma => group break.
+      cb('', true, false); // empty token followed by comma => group break.
     } else if (actualSlash) {
-      cb('', false, true, null); // empty token followed by slash => part break.
+      cb('', false, true); // empty token followed by slash => part break.
     }
     start = i + 1;
   };
@@ -46,23 +43,15 @@ export function scan(src: string, cb: TokenCallback) {
       continue;
     }
 
-    // paren & url tracking (not inside quotes)
+    // Parenthesis tracking keeps separators inside any function together.
     if (ch === '(') {
-      // detect url(
-      if (!depth) {
-        const maybe = src.slice(Math.max(0, i - 3), i + 1);
-        if (maybe === 'url(') inUrl = true;
-      }
       depth++;
       continue;
     }
     if (ch === ')') {
-      depth = Math.max(0, depth - 1);
-      if (inUrl && depth === 0) inUrl = false;
+      if (depth) depth--;
       continue;
     }
-
-    if (inUrl) continue; // inside url(...) treat everything as part of token
 
     if (!depth) {
       if (ch === ',') {

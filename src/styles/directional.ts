@@ -1,9 +1,17 @@
 import type { StyleDetails } from '../parser/types';
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
+import { parseStyle } from '../utils/styles';
 import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
 
-type Direction = (typeof DIRECTIONS)[number];
+type Direction = 'top' | 'right' | 'bottom' | 'left';
+
+const DIRECTION_TOP = 1;
+const DIRECTION_RIGHT = 2;
+const DIRECTION_BOTTOM = 4;
+const DIRECTION_LEFT = 8;
+const DIRECTION_MASK = 15;
+const DIRECTION_LONGHAND = 16;
+const DIRECTION_SPAN = 32;
 
 export interface DirectionalConfig {
   /** CSS property name (e.g. 'padding', 'margin', 'inset', 'scroll-margin') */
@@ -55,42 +63,50 @@ function parseSingleValue(
   return values[0] || defaultValue;
 }
 
-function extractGroupData(
-  group: StyleDetails,
-  property: string,
-  defaultValue: string,
+function directionModFlags(
+  mods: string[],
   spanModifiers?: readonly string[],
-): {
-  values: string[];
-  directions: Direction[];
-  span: boolean;
-} {
-  const { values = [], mods = [] } = group;
-  const directions = filterMods(mods, DIRECTIONS) as Direction[];
-  const span = !!spanModifiers?.some((mod) => mods.includes(mod));
+): number {
+  let flags = 0;
 
-  // A group that names directions carries one value — two with a span modifier.
-  // Guarded inline so the valid path costs a single comparison.
-  if (directions.length > 0 && values.length > (span ? 2 : 1)) {
-    warnExtraGroupValues(property, group.input, span ? 2 : 1);
+  for (const mod of mods) {
+    if (mod === 'top') flags |= DIRECTION_TOP;
+    else if (mod === 'right') flags |= DIRECTION_RIGHT;
+    else if (mod === 'bottom') flags |= DIRECTION_BOTTOM;
+    else if (mod === 'left') flags |= DIRECTION_LEFT;
+    else if (mod === 'longhand') flags |= DIRECTION_LONGHAND;
   }
 
-  return {
-    values: values.length ? values : [defaultValue],
-    directions,
-    span,
-  };
+  if (spanModifiers) {
+    for (const spanModifier of spanModifiers) {
+      if (mods.includes(spanModifier)) {
+        flags |= DIRECTION_SPAN;
+        break;
+      }
+    }
+  }
+
+  return flags;
 }
 
 function applyGroup(
   dirs: Record<Direction, string>,
-  values: string[],
-  directions: Direction[],
-  span = false,
+  group: StyleDetails,
+  modFlags: number,
+  property: string,
+  defaultValue: string,
 ): void {
-  if (!values.length) return;
+  const values = group.values.length ? group.values : [defaultValue];
+  const directions = modFlags & DIRECTION_MASK;
+  const span = modFlags & DIRECTION_SPAN;
 
-  if (directions.length === 0) {
+  // A group that names directions carries one value — two with a span modifier.
+  // Guarded inline so the valid path costs a single comparison.
+  if (directions && values.length > (span ? 2 : 1)) {
+    warnExtraGroupValues(property, group.input, span ? 2 : 1);
+  }
+
+  if (!directions) {
     // No direction named — plain CSS shorthand order (1-4 values). Unambiguous,
     // so it keeps working: `padding: '1x 2x'` is block 1x / inline 2x.
     dirs.top = values[0];
@@ -103,7 +119,7 @@ function applyGroup(
 
   // A group that names directions has one meaningful value, applied to every
   // named direction: `padding: '2x top, 4x right'`, not `'2x 4x top right'`.
-  // Extra values were reported by extractGroupData and are ignored here.
+  // Extra values were reported above and are ignored here.
   const value = values[0];
 
   // Span first so an explicitly named direction always wins over the value it
@@ -113,19 +129,16 @@ function applyGroup(
     // sides by 4x. Without a second value the span reuses the edge's own value.
     const spanValue = values[1] ?? value;
 
-    for (const dir of directions) {
-      // The two sides perpendicular to `dir` are its neighbours in DIRECTIONS
-      // (top -> left/right, right -> top/bottom, ...).
-      const d = DIRECTIONS.indexOf(dir);
-
-      dirs[DIRECTIONS[(d + 1) % 4] as Direction] = spanValue;
-      dirs[DIRECTIONS[(d + 3) % 4] as Direction] = spanValue;
-    }
+    if (directions & DIRECTION_TOP) dirs.right = dirs.left = spanValue;
+    if (directions & DIRECTION_RIGHT) dirs.top = dirs.bottom = spanValue;
+    if (directions & DIRECTION_BOTTOM) dirs.right = dirs.left = spanValue;
+    if (directions & DIRECTION_LEFT) dirs.top = dirs.bottom = spanValue;
   }
 
-  for (const dir of directions) {
-    dirs[dir] = value;
-  }
+  if (directions & DIRECTION_TOP) dirs.top = value;
+  if (directions & DIRECTION_RIGHT) dirs.right = value;
+  if (directions & DIRECTION_BOTTOM) dirs.bottom = value;
+  if (directions & DIRECTION_LEFT) dirs.left = value;
 }
 
 function optimizeShorthand(
@@ -236,33 +249,24 @@ export function processDirectionalStyle(
           const groups = processed.groups ?? [];
 
           for (const group of groups) {
-            if (group.mods.includes('longhand')) {
-              useLonghand = true;
-            }
+            const modFlags = directionModFlags(group.mods, spanModifiers);
+            if (modFlags & DIRECTION_LONGHAND) useLonghand = true;
 
             const kw = extractCSSWideKeyword(group);
 
             if (kw) {
-              const groupDirs = filterMods(
-                group.mods,
-                DIRECTIONS,
-              ) as Direction[];
+              const directions = modFlags & DIRECTION_MASK;
 
-              if (groupDirs.length === 0) {
+              if (!directions) {
                 dirs.top = dirs.right = dirs.bottom = dirs.left = kw;
               } else {
-                for (const dir of groupDirs) {
-                  dirs[dir] = kw;
-                }
+                if (directions & DIRECTION_TOP) dirs.top = kw;
+                if (directions & DIRECTION_RIGHT) dirs.right = kw;
+                if (directions & DIRECTION_BOTTOM) dirs.bottom = kw;
+                if (directions & DIRECTION_LEFT) dirs.left = kw;
               }
             } else {
-              const { values, directions, span } = extractGroupData(
-                group,
-                property,
-                defaultValue,
-                spanModifiers,
-              );
-              applyGroup(dirs, values, directions, span);
+              applyGroup(dirs, group, modFlags, property, defaultValue);
             }
           }
         }

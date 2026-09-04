@@ -117,8 +117,8 @@ describe('ambiguous multi-value directional groups', () => {
     });
 
     it('warns for padding with dock, which has no span modifiers', () => {
-      // `dock` is inset-only: `filterMods` drops it from the directions and
-      // PADDING_CONFIG declares no `spanModifiers`, so `4x` is just extra.
+      // `dock` is inset-only: PADDING_CONFIG declares no `spanModifiers`, so
+      // the handler ignores it and treats `4x` as an extra directional value.
       expect(paddingStyle({ padding: '2x 4x bottom dock' })).toEqual({
         padding: '0 0 16px 0',
       });

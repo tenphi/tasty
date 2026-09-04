@@ -166,10 +166,10 @@ assertGraphExcludes('ssr/astro.js', [
   'zero-engine-',
 ]);
 assertGraphExcludes('core/index.js', ['react-runtime-']);
-assertGraphSizeAtMost('index.js', 558_900);
-assertGraphSizeAtMost('core/index.js', 522_000);
-assertGraphSizeAtMost('ssr/index.js', 374_150);
-assertGraphSizeAtMost('ssr/astro.js', 388_560);
+assertGraphSizeAtMost('index.js', 559_150);
+assertGraphSizeAtMost('core/index.js', 522_150);
+assertGraphSizeAtMost('ssr/index.js', 374_850);
+assertGraphSizeAtMost('ssr/astro.js', 389_260);
 assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));

@@ -465,7 +465,13 @@ export function filterMods(
   mods: string[],
   allowedMods: readonly string[],
 ): string[] {
-  return mods.filter((mod) => allowedMods.includes(mod));
+  const filtered: string[] = [];
+
+  for (const mod of mods) {
+    if (allowedMods.includes(mod)) filtered.push(mod);
+  }
+
+  return filtered;
 }
 
 // ============================================================================

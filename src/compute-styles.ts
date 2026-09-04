@@ -54,7 +54,6 @@ import {
   filterUsedKeyframes,
   hasLocalKeyframes,
   mergeKeyframes,
-  referencesAnimation,
   resolveKeyframesNames,
   replaceAnimationNames,
 } from './keyframes';
@@ -346,26 +345,39 @@ function applyKeyframeNames(
     return { animations: [], rules: ruleset, cacheKey: baseKey };
   }
 
-  // Whole tokens only, so `crossfade` is not a use of `fade`.
+  const usedNames = new Set<string>();
+  let rules: StyleResult[] | undefined;
+
+  for (let i = 0; i < ruleset.length; i++) {
+    const rule = ruleset[i];
+    const declarations = replaceAnimationNames(
+      rule.declarations,
+      keyframeNames,
+      usedNames,
+    );
+
+    if (declarations !== rule.declarations) {
+      rules ??= ruleset.slice();
+      rules[i] = { ...rule, declarations };
+    }
+  }
+
+  // Keep definition order for ownership bookkeeping. The cache fragment below
+  // is sorted independently so class names stay order-insensitive.
   const animations = [...keyframeNames.keys()].filter((authored) =>
-    ruleset.some((rule) => referencesAnimation(rule.declarations, authored)),
+    usedNames.has(authored),
   );
 
   if (animations.length === 0) {
     return { animations, rules: ruleset, cacheKey: baseKey };
   }
 
-  const rules = ruleset.map((rule) => ({
-    ...rule,
-    declarations: replaceAnimationNames(rule.declarations, keyframeNames),
-  }));
-
   const cacheKey = `${baseKey}\u0000kf:${animations
     .map((authored) => `${authored}=${keyframeNames.get(authored)}`)
     .sort()
     .join(',')}`;
 
-  return { animations, rules, cacheKey };
+  return { animations, rules: rules ?? ruleset, cacheKey };
 }
 
 /**

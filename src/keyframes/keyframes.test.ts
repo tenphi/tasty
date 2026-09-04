@@ -11,6 +11,13 @@ import {
   replaceAnimationNames,
 } from './index';
 
+function replaceNames(
+  declarations: string,
+  nameMap: Map<string, string>,
+): string {
+  return replaceAnimationNames(declarations, nameMap, new Set());
+}
+
 describe('Keyframes Utilities', () => {
   describe('hasLocalKeyframes', () => {
     it('should return false when no @keyframes defined', () => {
@@ -162,25 +169,51 @@ describe('Keyframes Utilities', () => {
         new Set(['bounce']),
       );
     });
+
+    it('should find a name after every shorthand keyword', () => {
+      const styles: Styles = {
+        animation:
+          '1s ease-in 200ms 2 reverse both paused fadeIn, 2s steps(4) slideIn',
+      };
+      expect(extractAnimationNamesFromStyles(styles)).toEqual(
+        new Set(['fadeIn', 'slideIn']),
+      );
+    });
+
+    it('should collect nested animation names without duplicates', () => {
+      const styles: Styles = {
+        animation: 'fadeIn 300ms',
+        Label: {
+          animationName: {
+            '': 'fadeIn',
+            hovered: 'pulse',
+          },
+          Content: { animation: 'pulse 1s' },
+        },
+      };
+      expect(extractAnimationNamesFromStyles(styles)).toEqual(
+        new Set(['fadeIn', 'pulse']),
+      );
+    });
   });
 
   describe('replaceAnimationNames', () => {
     it('should return original when nameMap is empty', () => {
       const declarations = 'animation: fadeIn 300ms;';
       const nameMap = new Map<string, string>();
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(declarations);
+      expect(replaceNames(declarations, nameMap)).toBe(declarations);
     });
 
     it('should return original when no animation property', () => {
       const declarations = 'padding: 10px; color: red;';
       const nameMap = new Map([['fadeIn', 'k0']]);
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(declarations);
+      expect(replaceNames(declarations, nameMap)).toBe(declarations);
     });
 
     it('should replace animation name', () => {
       const declarations = 'animation: fadeIn 300ms ease-in;';
       const nameMap = new Map([['fadeIn', 'k0']]);
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(
+      expect(replaceNames(declarations, nameMap)).toBe(
         'animation: k0 300ms ease-in;',
       );
     });
@@ -188,9 +221,7 @@ describe('Keyframes Utilities', () => {
     it('should replace animation-name', () => {
       const declarations = 'animation-name: pulse;';
       const nameMap = new Map([['pulse', 'k1']]);
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(
-        'animation-name: k1;',
-      );
+      expect(replaceNames(declarations, nameMap)).toBe('animation-name: k1;');
     });
 
     it('should replace multiple animation names', () => {
@@ -199,7 +230,7 @@ describe('Keyframes Utilities', () => {
         ['fadeIn', 'k0'],
         ['slideIn', 'k1'],
       ]);
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(
+      expect(replaceNames(declarations, nameMap)).toBe(
         'animation: k0 1s, k1 2s;',
       );
     });
@@ -208,15 +239,45 @@ describe('Keyframes Utilities', () => {
       const declarations = 'animation: fadeIn 300ms;';
       const nameMap = new Map([['fadeIn', 'fadeIn']]);
       // Should return original (no modification needed)
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(declarations);
+      expect(replaceNames(declarations, nameMap)).toBe(declarations);
     });
 
     it('should preserve other declarations', () => {
       const declarations = 'padding: 10px; animation: fadeIn 1s; color: red;';
       const nameMap = new Map([['fadeIn', 'k0']]);
-      expect(replaceAnimationNames(declarations, nameMap)).toBe(
+      expect(replaceNames(declarations, nameMap)).toBe(
         'padding: 10px; animation: k0 1s; color: red;',
       );
+    });
+
+    it('should collect whole referenced names while replacing', () => {
+      const declarations =
+        'color: unused; animation: crossfade 1s, fade 2s; animation-name: pulse;';
+      const nameMap = new Map([
+        ['fade', 'k0'],
+        ['pulse', 'pulse'],
+        ['cross', 'k2'],
+        ['unused', 'k2'],
+      ]);
+      const usedNames = new Set<string>();
+
+      expect(replaceAnimationNames(declarations, nameMap, usedNames)).toBe(
+        'color: unused; animation: crossfade 1s, k0 2s; animation-name: pulse;',
+      );
+      expect(usedNames).toEqual(new Set(['fade', 'pulse']));
+    });
+
+    it('should collect references before chained replacements', () => {
+      const usedNames = new Set<string>();
+      const nameMap = new Map([
+        ['fade', 'slide'],
+        ['slide', 'k1'],
+      ]);
+
+      expect(
+        replaceAnimationNames('animation: fade 1s;', nameMap, usedNames),
+      ).toBe('animation: k1 1s;');
+      expect(usedNames).toEqual(new Set(['fade']));
     });
   });
 

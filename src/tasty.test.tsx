@@ -155,6 +155,16 @@ describe('tasty() API', () => {
     expect(container).toMatchTastySnapshot();
   });
 
+  it('should ignore empty instance styles', () => {
+    const StyledBlock = tasty({ styles: { color: '#black' } });
+    const { container, rerender } = render(<StyledBlock />);
+    const className = container.firstElementChild?.className;
+
+    rerender(<StyledBlock styles={{}} />);
+
+    expect(container.firstElementChild?.className).toBe(className);
+  });
+
   it('should support variants', () => {
     const StyledBlock = tasty({
       styles: { color: '#clear' },
@@ -497,6 +507,16 @@ describe('tasty() API', () => {
 
     expect(input.checked).toBe(true);
     expect(input.getAttribute('data-checked')).toBe('');
+  });
+
+  it('should map isHidden prop to hidden + data-hidden', () => {
+    const Element = tasty({ as: 'div' });
+
+    const { container } = render(<Element isHidden qa="hidden" />);
+    const element = getByTestId(container, 'hidden') as HTMLDivElement;
+
+    expect(element.hidden).toBe(true);
+    expect(element.getAttribute('data-hidden')).toBe('');
   });
 });
 

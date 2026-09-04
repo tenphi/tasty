@@ -158,6 +158,27 @@ export function applyStyleConfig(
   return functionDefs;
 }
 
+/** Merge an optional configuration record into an accumulated record. */
+function mergeRecord<T extends object>(target: T, source?: Partial<T>): T {
+  return source ? { ...target, ...source } : target;
+}
+
+/** Merge a named extension record and retain where each winning entry came from. */
+function mergeSourcedRecord<T>(
+  target: Record<string, T>,
+  source: Record<string, T> | undefined,
+  sources: Map<string, string>,
+  pluginName?: string,
+): Record<string, T> {
+  if (!source) return target;
+
+  const label =
+    pluginName === undefined ? 'configure()' : `plugin "${pluginName}"`;
+  for (const key of Object.keys(source)) sources.set(key, label);
+
+  return { ...target, ...source };
+}
+
 export function normalizeConfig(
   config: Partial<TastyConfig>,
 ): NormalizedConfig {
@@ -180,75 +201,57 @@ export function normalizeConfig(
   const globalStyles: Record<string, Styles> = {};
 
   for (const plugin of config.plugins ?? []) {
-    if (plugin.states) states = { ...states, ...plugin.states };
-    if (plugin.units) units = { ...units, ...plugin.units };
-    if (plugin.functions) functions = { ...functions, ...plugin.functions };
-    if (plugin.handlers) {
-      handlers = { ...handlers, ...plugin.handlers };
-      for (const key of Object.keys(plugin.handlers)) {
-        handlerSources.set(key, `plugin "${plugin.name}"`);
-      }
-    }
-    if (plugin.propHandlers) {
-      propHandlers = { ...propHandlers, ...plugin.propHandlers };
-      for (const key of Object.keys(plugin.propHandlers)) {
-        propHandlerSources.set(key, `plugin "${plugin.name}"`);
-      }
-    }
+    states = mergeRecord(states, plugin.states);
+    units = mergeRecord(units, plugin.units);
+    functions = mergeRecord(functions, plugin.functions);
+    handlers = mergeSourcedRecord(
+      handlers,
+      plugin.handlers,
+      handlerSources,
+      plugin.name,
+    );
+    propHandlers = mergeSourcedRecord(
+      propHandlers,
+      plugin.propHandlers,
+      propHandlerSources,
+      plugin.name,
+    );
     if (plugin.baseStyleProps) baseStyleProps.push(...plugin.baseStyleProps);
-    if (plugin.properties) {
-      properties = { ...properties, ...plugin.properties };
-    }
-    if (plugin.keyframes) keyframes = { ...keyframes, ...plugin.keyframes };
-    if (plugin.fontFaces) fontFaces = { ...fontFaces, ...plugin.fontFaces };
-    if (plugin.counterStyles) {
-      counterStyles = { ...counterStyles, ...plugin.counterStyles };
-    }
-    if (plugin.replaceTokens) {
-      replaceTokens = { ...replaceTokens, ...plugin.replaceTokens };
-    }
-    if (plugin.tokens) tokens = { ...tokens, ...plugin.tokens };
-    if (plugin.recipes) recipes = { ...recipes, ...plugin.recipes };
-    if (plugin.presets) presets = { ...presets, ...plugin.presets };
-    if (plugin.globalStyles) {
-      mergeGlobalStyles(globalStyles, plugin.globalStyles);
-    }
+    properties = mergeRecord(properties, plugin.properties);
+    keyframes = mergeRecord(keyframes, plugin.keyframes);
+    fontFaces = mergeRecord(fontFaces, plugin.fontFaces);
+    counterStyles = mergeRecord(counterStyles, plugin.counterStyles);
+    replaceTokens = mergeRecord(replaceTokens, plugin.replaceTokens);
+    tokens = mergeRecord(tokens, plugin.tokens);
+    recipes = mergeRecord(recipes, plugin.recipes);
+    presets = mergeRecord(presets, plugin.presets);
+    mergeGlobalStyles(globalStyles, plugin.globalStyles);
   }
 
-  if (config.states) states = { ...states, ...config.states };
-  if (config.units) units = { ...units, ...config.units };
-  if (config.functions) functions = { ...functions, ...config.functions };
-  if (config.handlers) {
-    handlers = { ...handlers, ...config.handlers };
-    for (const key of Object.keys(config.handlers)) {
-      handlerSources.set(key, 'configure()');
-    }
-  }
-  if (config.propHandlers) {
-    propHandlers = { ...propHandlers, ...config.propHandlers };
-    for (const key of Object.keys(config.propHandlers)) {
-      propHandlerSources.set(key, 'configure()');
-    }
-  }
+  states = mergeRecord(states, config.states);
+  units = mergeRecord(units, config.units);
+  functions = mergeRecord(functions, config.functions);
+  handlers = mergeSourcedRecord(handlers, config.handlers, handlerSources);
+  propHandlers = mergeSourcedRecord(
+    propHandlers,
+    config.propHandlers,
+    propHandlerSources,
+  );
   if (config.baseStyleProps) baseStyleProps.push(...config.baseStyleProps);
-  if (config.properties) properties = { ...properties, ...config.properties };
-  if (config.keyframes) keyframes = { ...keyframes, ...config.keyframes };
-  if (config.fontFaces) fontFaces = { ...fontFaces, ...config.fontFaces };
-  if (config.counterStyles) {
-    counterStyles = { ...counterStyles, ...config.counterStyles };
-  }
-  if (config.replaceTokens) {
-    replaceTokens = { ...replaceTokens, ...config.replaceTokens };
-  }
-  if (config.presets) presets = { ...presets, ...config.presets };
+  properties = mergeRecord(properties, config.properties);
+  keyframes = mergeRecord(keyframes, config.keyframes);
+  fontFaces = mergeRecord(fontFaces, config.fontFaces);
+  counterStyles = mergeRecord(counterStyles, config.counterStyles);
+  replaceTokens = mergeRecord(replaceTokens, config.replaceTokens);
+  presets = mergeRecord(presets, config.presets);
 
   if (Object.keys(presets).length > 0) {
     tokens = { ...generateTypographyTokens(presets), ...tokens };
   }
 
-  if (config.tokens) tokens = { ...tokens, ...config.tokens };
-  if (config.recipes) recipes = { ...recipes, ...config.recipes };
-  if (config.globalStyles) mergeGlobalStyles(globalStyles, config.globalStyles);
+  tokens = mergeRecord(tokens, config.tokens);
+  recipes = mergeRecord(recipes, config.recipes);
+  mergeGlobalStyles(globalStyles, config.globalStyles);
 
   return {
     states,
@@ -272,8 +275,10 @@ export function normalizeConfig(
 
 function mergeGlobalStyles(
   target: Record<string, Styles>,
-  source: Record<string, Styles>,
+  source?: Record<string, Styles>,
 ): void {
+  if (!source) return;
+
   for (const [selector, styles] of Object.entries(source)) {
     target[selector] = target[selector]
       ? { ...target[selector], ...styles }

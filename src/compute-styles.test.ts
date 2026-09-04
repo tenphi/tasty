@@ -2,6 +2,47 @@ import { configure, resetConfig } from './config';
 import { computeStyles } from './compute-styles';
 import { destroy, getCSSText } from './injector';
 import { ServerStyleCollector } from './ssr/collector';
+import type { Styles } from './styles/types';
+
+function createAncillaryStyles(): Styles {
+  return {
+    '@property': {
+      '$compute-progress': {
+        syntax: '<number>',
+        inherits: false,
+        initialValue: '0',
+      },
+    },
+    '@font-face': {
+      'Compute Styles Test': [
+        {
+          src: 'url("/compute-regular.woff2") format("woff2")',
+          fontWeight: 400,
+        },
+        {
+          src: 'url("/compute-bold.woff2") format("woff2")',
+          fontWeight: 700,
+        },
+      ],
+    },
+    '@counter-style': {
+      'compute-dashes': {
+        system: 'cyclic',
+        symbols: '"\u2014"',
+        suffix: '" "',
+      },
+    },
+    '@keyframes': {
+      'compute-fade': {
+        from: { opacity: 0 },
+        to: { opacity: 1 },
+      },
+    },
+    animation: 'compute-fade 1s',
+    opacity: '$compute-progress',
+    '$compute-offset': '10px',
+  };
+}
 
 describe('computeStyles with root option', () => {
   let host: HTMLDivElement;
@@ -151,6 +192,60 @@ describe('computeStyles @function handling', () => {
     // Local definition wins
     expect(css).toContain('result: calc(2 * var(--x));');
     expect(css).not.toContain('result: var(--x);');
+  });
+});
+
+describe('computeStyles ancillary resources', () => {
+  beforeEach(() => resetConfig());
+
+  afterEach(() => {
+    destroy();
+    resetConfig();
+  });
+
+  it('injects local resources once into the requested root', () => {
+    configure({ forceTextInjection: true });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const styles = createAncillaryStyles();
+
+    try {
+      computeStyles(styles, { root: shadowRoot });
+      computeStyles(styles, { root: shadowRoot });
+
+      const css = getCSSText({ root: shadowRoot });
+      expect(css.match(/@property --compute-progress/g)).toHaveLength(1);
+      expect(css.match(/@font-face/g)).toHaveLength(2);
+      expect(css).toContain('/compute-regular.woff2');
+      expect(css).toContain('/compute-bold.woff2');
+      expect(css.match(/@counter-style compute-dashes/g)).toHaveLength(1);
+      expect(css.match(/@keyframes compute-fade-[a-z0-9]+/g)).toHaveLength(1);
+
+      const documentCSS = getCSSText();
+      expect(documentCSS).not.toContain('--compute-progress');
+      expect(documentCSS).not.toContain('compute-dashes');
+    } finally {
+      destroy(shadowRoot);
+      host.remove();
+    }
+  });
+
+  it('collects local resources once for SSR', () => {
+    const collector = new ServerStyleCollector();
+    const styles = createAncillaryStyles();
+
+    computeStyles(styles, { ssrCollector: collector });
+    computeStyles(styles, { ssrCollector: collector });
+
+    const css = collector.getCSS();
+    expect(css.match(/@property --compute-progress/g)).toHaveLength(1);
+    expect(css.match(/@property --compute-offset/g)).toHaveLength(1);
+    expect(css.match(/@font-face/g)).toHaveLength(2);
+    expect(css).toContain('/compute-regular.woff2');
+    expect(css).toContain('/compute-bold.woff2');
+    expect(css.match(/@counter-style compute-dashes/g)).toHaveLength(1);
+    expect(css.match(/@keyframes compute-fade-[a-z0-9]+/g)).toHaveLength(1);
   });
 });
 

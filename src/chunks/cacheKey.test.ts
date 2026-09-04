@@ -11,6 +11,60 @@ function chunksOf(styles: Styles): [string, string[]][] {
 }
 
 describe('generateChunkCacheKey', () => {
+  it('preserves the cache-key wire format', () => {
+    const styles = { display: 'flex', flow: 'column' } as Styles;
+
+    expect(generateChunkCacheKey(styles, 'display', ['display', 'flow'])).toBe(
+      'display\0display:"flex"\0flow:"column"',
+    );
+  });
+
+  it('preserves the local-state prefix format', () => {
+    const styles = {
+      '@active': ':hover',
+      color: { '': '#text', '@active': '#primary' },
+    } as unknown as Styles;
+
+    expect(generateChunkCacheKey(styles, 'appearance', ['color'])).toBe(
+      '[states:@active=:hover]\0appearance\0color:{"":"#text","@active":"#primary"}',
+    );
+  });
+
+  it('captures top-level values before serializing nested values', () => {
+    const reads: string[] = [];
+    const nested = Object.defineProperty({}, 'value', {
+      enumerable: true,
+      get() {
+        reads.push('nested');
+        return 'a';
+      },
+    });
+    const styles = Object.defineProperties(
+      {},
+      {
+        first: {
+          enumerable: true,
+          get() {
+            reads.push('first');
+            return nested;
+          },
+        },
+        second: {
+          enumerable: true,
+          get() {
+            reads.push('second');
+            return 'b';
+          },
+        },
+      },
+    ) as Styles;
+
+    generateChunkCacheKey(styles, 'misc', ['first', 'second']);
+
+    expect(reads.slice(0, 2)).toEqual(['first', 'second']);
+    expect(reads.indexOf('nested')).toBeGreaterThan(1);
+  });
+
   it('is stable across repeat calls with the same styles object', () => {
     const styles = { display: 'flex', padding: '2x' } as Styles;
     const [[chunkName, styleKeys]] = chunksOf(styles).filter(([, keys]) =>

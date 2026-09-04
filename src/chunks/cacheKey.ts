@@ -64,8 +64,7 @@ function isEntryFresh(
 
   for (let i = 0, at = 0; i < length; i++, at += 2) {
     const key = styleKeys[i];
-    if (snapshot[at] !== key) return false;
-    if (styles[key] !== snapshot[at + 1]) return false;
+    if (snapshot[at] !== key || styles[key] !== snapshot[at + 1]) return false;
   }
 
   return true;
@@ -77,12 +76,7 @@ function isEntryFresh(
  * Uses a WeakMap cache for object values to avoid re-serializing the same references.
  */
 function stableStringify(value: unknown): string {
-  if (value === null) {
-    return 'null';
-  }
-  if (value === undefined) {
-    return 'undefined';
-  }
+  if (value === null || value === undefined) return String(value);
   if (typeof value !== 'object') {
     return JSON.stringify(value);
   }
@@ -95,66 +89,18 @@ function stableStringify(value: unknown): string {
     result = '[' + value.map(stableStringify).join(',') + ']';
   } else {
     const obj = value as Record<string, unknown>;
-    const sortedKeys = Object.keys(obj).sort();
-    const parts: string[] = [];
-    for (const key of sortedKeys) {
+    result = '{';
+    for (const key of Object.keys(obj).sort()) {
       if (obj[key] !== undefined) {
-        parts.push(`${JSON.stringify(key)}:${stableStringify(obj[key])}`);
+        if (result.length > 1) result += ',';
+        result += `${JSON.stringify(key)}:${stableStringify(obj[key])}`;
       }
     }
-    result = '{' + parts.join(',') + '}';
+    result += '}';
   }
 
   _stableStringifyCache.set(value as object, result);
   return result;
-}
-
-function computeChunkCacheKey(
-  styles: Styles,
-  chunkName: string,
-  snapshot: unknown[],
-): string {
-  // Start with chunk name for namespace separation
-  const parts: string[] = [chunkName];
-
-  // styleKeys are already sorted by categorizeStyleKeys
-  let chunkStylesStr = '';
-
-  // Reading from the snapshot rather than from `styles` guarantees the key and
-  // the values a memo entry validates against are the same values.
-  for (let at = 0; at < snapshot.length; at += 2) {
-    const value = snapshot[at + 1];
-    if (value !== undefined) {
-      // Use stable stringify for consistent serialization regardless of key order
-      const serialized = stableStringify(value);
-      parts.push(`${snapshot[at] as string}:${serialized}`);
-      chunkStylesStr += serialized;
-    }
-  }
-
-  // Extract local predefined states from the full styles object
-  const localStates = extractLocalPredefinedStates(styles);
-
-  // Only include local predefined states that are actually referenced in this chunk
-  if (Object.keys(localStates).length > 0) {
-    const referencedStates = extractPredefinedStateRefs(chunkStylesStr);
-    const relevantLocalStates: string[] = [];
-
-    for (const stateName of referencedStates) {
-      if (localStates[stateName]) {
-        relevantLocalStates.push(`${stateName}=${localStates[stateName]}`);
-      }
-    }
-
-    // Add relevant local states to the cache key (sorted for stability)
-    if (relevantLocalStates.length > 0) {
-      relevantLocalStates.sort();
-      parts.unshift(`[states:${relevantLocalStates.join('|')}]`);
-    }
-  }
-
-  // Use null character as separator (safe, not in JSON output)
-  return parts.join('\0');
 }
 
 /**
@@ -202,7 +148,36 @@ export function generateChunkCacheKey(
     snapshot[at + 1] = styles[styleKey];
   }
 
-  const key = computeChunkCacheKey(styles, chunkName, snapshot);
+  // Serialize only after every top-level value is captured, preserving the
+  // observable read order for accessor-backed style objects.
+  let key = chunkName;
+  let chunkStylesStr = '';
+
+  for (let at = 0; at < snapshot.length; at += 2) {
+    const value = snapshot[at + 1];
+    if (value !== undefined) {
+      const serialized = stableStringify(value);
+      key += `\0${snapshot[at] as string}:${serialized}`;
+      chunkStylesStr += serialized;
+    }
+  }
+
+  const localStates = extractLocalPredefinedStates(styles);
+
+  if (Object.keys(localStates).length > 0) {
+    const relevantLocalStates: string[] = [];
+
+    for (const stateName of extractPredefinedStateRefs(chunkStylesStr)) {
+      if (localStates[stateName]) {
+        relevantLocalStates.push(`${stateName}=${localStates[stateName]}`);
+      }
+    }
+
+    if (relevantLocalStates.length > 0) {
+      relevantLocalStates.sort();
+      key = `[states:${relevantLocalStates.join('|')}]\0${key}`;
+    }
+  }
 
   if (reusable) {
     if (perStyles === undefined) {

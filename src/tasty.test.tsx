@@ -431,6 +431,47 @@ describe('tasty() API', () => {
     expect(input.getAttribute('data-disabled')).toBe('');
   });
 
+  it('should preserve explicit data attributes for sub-element is* props', () => {
+    const FormElement = tasty({ elements: { Input: 'input' } });
+
+    const { getByTestId } = render(
+      <FormElement>
+        <FormElement.Input isDisabled data-disabled="custom" qa="input" />
+      </FormElement>,
+    );
+
+    const input = getByTestId('input') as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(input).toHaveAttribute('data-disabled', 'custom');
+  });
+
+  it('should preserve native boolean attributes on sub-elements', () => {
+    const FormElement = tasty({ elements: { Input: 'input' } });
+
+    const { getByTestId, rerender } = render(
+      <FormElement>
+        <FormElement.Input disabled checked hidden readOnly qa="input" />
+      </FormElement>,
+    );
+
+    const input = getByTestId('input');
+    expect(input).toHaveAttribute('disabled');
+    expect(input).toHaveAttribute('checked');
+    expect(input).toHaveAttribute('hidden');
+    expect(input).toHaveAttribute('data-disabled', '');
+    expect(input).toHaveAttribute('data-checked', '');
+    expect(input).toHaveAttribute('data-hidden', '');
+
+    rerender(
+      <FormElement>
+        <FormElement.Input disabled isDisabled={false} qa="input" />
+      </FormElement>,
+    );
+
+    expect(input).not.toHaveAttribute('disabled');
+    expect(input).not.toHaveAttribute('data-disabled');
+  });
+
   it('should allow qa and qaVal override in sub-elements', () => {
     const Element = tasty({
       elements: {
@@ -517,6 +558,49 @@ describe('tasty() API', () => {
 
     expect(element.hidden).toBe(true);
     expect(element.getAttribute('data-hidden')).toBe('');
+  });
+
+  it('should mirror native boolean attributes to data attributes', () => {
+    const Checkbox = tasty({ as: 'input' });
+
+    const { getByTestId, rerender } = render(
+      <Checkbox disabled checked hidden readOnly qa="input" />,
+    );
+
+    const input = getByTestId('input');
+    expect(input).toHaveAttribute('data-disabled', '');
+    expect(input).toHaveAttribute('data-checked', '');
+    expect(input).toHaveAttribute('data-hidden', '');
+
+    rerender(
+      <Checkbox
+        disabled
+        checked
+        hidden
+        readOnly
+        data-disabled="custom"
+        data-checked="custom"
+        data-hidden="custom"
+        qa="input"
+      />,
+    );
+
+    expect(input).toHaveAttribute('data-disabled', 'custom');
+    expect(input).toHaveAttribute('data-checked', 'custom');
+    expect(input).toHaveAttribute('data-hidden', 'custom');
+  });
+
+  it('should merge user and generated class names without extra whitespace', () => {
+    const Plain = tasty({});
+    const Styled = tasty({ styles: { display: 'block' } });
+
+    const plain = render(<Plain className="custom" />).container
+      .firstElementChild!;
+    const styled = render(<Styled className="custom" />).container
+      .firstElementChild!;
+
+    expect(plain.className).toBe('custom');
+    expect(styled.className).toMatch(/^custom t\w+$/);
   });
 });
 

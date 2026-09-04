@@ -18,11 +18,15 @@ describe('SheetManager', () => {
     };
     sheetManager = new SheetManager(config);
 
-    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+    document.head
+      .querySelectorAll('[data-tasty], [data-tasty-raw]')
+      .forEach((el) => el.remove());
   });
 
   afterEach(() => {
-    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+    document.head
+      .querySelectorAll('[data-tasty], [data-tasty-raw]')
+      .forEach((el) => el.remove());
   });
 
   describe('getRegistry', () => {
@@ -89,6 +93,27 @@ describe('SheetManager', () => {
 
       const styleElement = sheet.sheet;
       expect(styleElement.nonce).toBe('test-nonce');
+    });
+  });
+
+  describe('shared style element creation', () => {
+    it('applies the configured nonce and raw marker to raw CSS', () => {
+      const manager = new SheetManager({
+        ...config,
+        nonce: 'raw-nonce',
+      });
+      manager.getRegistry(document);
+
+      const result = manager.injectRawCSS('.raw { color: red; }', document);
+      const style = document.head.querySelector<HTMLStyleElement>(
+        'style[data-tasty-raw]',
+      );
+
+      expect(style?.nonce).toBe('raw-nonce');
+      expect(style?.textContent).toContain('.raw { color: red; }');
+
+      result.dispose();
+      manager.cleanup(document);
     });
   });
 
@@ -649,6 +674,29 @@ describe('SheetManager', () => {
 
       const newRegistry = manager.getRegistry(document);
       expect(newRegistry).not.toBe(registry);
+    });
+
+    it('prunes every disconnected shadow root in one pass', () => {
+      const manager = new SheetManager(config);
+      const hosts = [
+        document.createElement('div'),
+        document.createElement('div'),
+      ];
+      const roots = hosts.map((host) => {
+        document.body.appendChild(host);
+        const root = host.attachShadow({ mode: 'open' });
+        const registry = manager.getRegistry(root);
+        manager.createSheet(registry, root);
+        return root;
+      });
+
+      hosts.forEach((host) => host.remove());
+      manager.pruneDisconnectedRoots();
+
+      expect([...manager.getActiveRoots()]).toEqual([]);
+      expect(roots.every((root) => root.adoptedStyleSheets.length === 0)).toBe(
+        true,
+      );
     });
   });
 });

@@ -74,6 +74,17 @@ function splitSelectorsSafely(selectorList: string): string[] {
   return parts;
 }
 
+function rulesToCSS(sheet: CSSStyleSheet): string {
+  return Array.from(sheet.cssRules, (rule) => rule.cssText).join('\n');
+}
+
+function rawBlocksToCSS(blocks: Map<string, RawCSSInfo>): string {
+  return [...blocks.values()]
+    .sort((a, b) => a.startOffset - b.startOffset)
+    .map((block) => block.css)
+    .join('\n');
+}
+
 export class SheetManager {
   private rootRegistries = new WeakMap<Document | ShadowRoot, RootRegistry>();
   /** Strong set of active roots so background GC can iterate them all */
@@ -228,14 +239,10 @@ export class SheetManager {
 
   /** Remove registries for ShadowRoots whose host has been detached from the DOM. */
   pruneDisconnectedRoots(): void {
-    const toPrune: (Document | ShadowRoot)[] = [];
     for (const root of this.activeRoots) {
       if (root !== document && !(root as ShadowRoot).host?.isConnected) {
-        toPrune.push(root);
+        this.cleanup(root);
       }
-    }
-    for (const root of toPrune) {
-      this.cleanup(root);
     }
   }
 
@@ -288,7 +295,10 @@ export class SheetManager {
   /**
    * Create a style element and append to document
    */
-  private createStyleElement(root: Document | ShadowRoot): HTMLStyleElement {
+  private createStyleElement(
+    root: Document | ShadowRoot,
+    attribute = 'data-tasty',
+  ): HTMLStyleElement {
     const style =
       (root as Document).createElement?.('style') ||
       document.createElement('style');
@@ -297,19 +307,17 @@ export class SheetManager {
       style.nonce = this.config.nonce;
     }
 
-    style.setAttribute('data-tasty', '');
+    style.setAttribute(attribute, '');
 
-    // Append to head or shadow root
-    if ('head' in root && root.head) {
-      root.head.appendChild(style);
-    } else if ('appendChild' in root) {
-      root.appendChild(style);
-    } else {
-      document.head.appendChild(style);
-    }
+    // Documents inject into their head; shadow roots accept the style directly.
+    ('head' in root && root.head ? root.head : root).appendChild(style);
 
     // Verify it was actually added - log only if there's a problem and we're not using forceTextInjection
-    if (!style.isConnected && !this.config.forceTextInjection) {
+    if (
+      attribute === 'data-tasty' &&
+      !style.isConnected &&
+      !this.config.forceTextInjection
+    ) {
       console.error(
         '[Tasty] SheetManager: style element failed to connect to the DOM.',
         {
@@ -322,6 +330,17 @@ export class SheetManager {
     return style;
   }
 
+  /** Append a rule to a text-mode sheet while preserving its index mirror. */
+  private appendTextRule(
+    sheet: SheetInfo,
+    ruleIndex: number,
+    ruleText: string,
+  ): void {
+    this.trackTextRule(sheet, ruleIndex, ruleText);
+    const style = sheet.sheet!;
+    style.textContent = (style.textContent || '') + '\n' + ruleText;
+  }
+
   /**
    * Insert CSS rules as a single block
    */
@@ -332,7 +351,7 @@ export class SheetManager {
     root: Document | ShadowRoot,
   ): RuleInfo | null {
     // Find or create a sheet with available space
-    let targetSheet = this.findAvailableSheet(registry, root);
+    let targetSheet = this.findAvailableSheet(registry);
 
     if (!targetSheet) {
       targetSheet = this.createSheet(registry, root);
@@ -452,9 +471,7 @@ export class SheetManager {
           // Calculate index atomically for textContent insertion too
           const atomicRuleIndex = this.findAvailableRuleIndex(targetSheet);
           // Record the text so `deleteRule` can rebuild the element without it
-          this.trackTextRule(targetSheet, atomicRuleIndex, fullRule);
-          styleElement.textContent =
-            (styleElement.textContent || '') + '\n' + fullRule;
+          this.appendTextRule(targetSheet, atomicRuleIndex, fullRule);
           recordInsertion(atomicRuleIndex);
         }
 
@@ -554,7 +571,7 @@ export class SheetManager {
     startIdx: number,
     endIdx: number,
     deleteCount: number,
-    deletedRuleInfo: RuleInfo,
+    deletedRuleInfo: RuleInfo | null,
     deletedIndices?: number[],
   ): void {
     try {
@@ -645,6 +662,7 @@ export class SheetManager {
           : [];
 
       const styleSheet = this.getCSSSheet(sheet);
+      const indices = ruleInfo.indices;
 
       if (sheet.textMode) {
         // Text mode: splice the rules out of the tracked texts and rewrite the
@@ -652,8 +670,8 @@ export class SheetManager {
         // reparses the sheet, so a CSSOM delete would be undone anyway.
         let targetIndices: number[];
 
-        if (ruleInfo.indices && ruleInfo.indices.length > 0) {
-          targetIndices = ruleInfo.indices;
+        if (indices?.length) {
+          targetIndices = indices;
         } else {
           // FALLBACK: range-based deletion, mirroring the CSSOM path below
           const startIdx = Math.max(0, ruleInfo.ruleIndex);
@@ -692,9 +710,9 @@ export class SheetManager {
         const rules = styleSheet.cssRules;
 
         // Use exact indices if available, otherwise fall back to range
-        if (ruleInfo.indices && ruleInfo.indices.length > 0) {
+        if (indices?.length) {
           // NEW: Delete using exact tracked indices
-          const sortedIndices = [...ruleInfo.indices].sort((a, b) => b - a); // Sort descending
+          const sortedIndices = [...indices].sort((a, b) => b - a); // Sort descending
           const deletedIndices: number[] = [];
 
           for (const idx of sortedIndices) {
@@ -778,10 +796,7 @@ export class SheetManager {
   /**
    * Find a sheet with available space or return null
    */
-  private findAvailableSheet(
-    registry: RootRegistry,
-    _root: Document | ShadowRoot,
-  ): SheetInfo | null {
+  private findAvailableSheet(registry: RootRegistry): SheetInfo | null {
     const maxRules = this.config.maxRulesPerSheet;
 
     if (!maxRules) {
@@ -878,7 +893,6 @@ export class SheetManager {
     if (selected.length === 0) return 0;
 
     const deleted = new Set<string>();
-    let cleanedUpCount = 0;
     let totalCssSize = 0;
     let totalRulesDeleted = 0;
 
@@ -902,14 +916,13 @@ export class SheetManager {
         totalRulesDeleted += ruleInfo.cssText.length;
       }
 
-      if (!rulesBySheet.has(sheetIndex)) {
-        rulesBySheet.set(sheetIndex, []);
-      }
-      rulesBySheet.get(sheetIndex)!.push({ className, ruleInfo });
+      const rules = rulesBySheet.get(sheetIndex);
+      if (rules) rules.push({ className, ruleInfo });
+      else rulesBySheet.set(sheetIndex, [{ className, ruleInfo }]);
     }
 
     // Delete rules from each sheet (in reverse order to preserve indices)
-    for (const [_sheetIndex, rulesInSheet] of rulesBySheet) {
+    for (const rulesInSheet of rulesBySheet.values()) {
       // Sort by rule index in descending order for safe deletion
       rulesInSheet.sort((a, b) => b.ruleInfo.ruleIndex - a.ruleInfo.ruleIndex);
 
@@ -972,7 +985,6 @@ export class SheetManager {
           }
         }
         deleted.add(className);
-        cleanedUpCount++;
       }
     }
 
@@ -990,18 +1002,18 @@ export class SheetManager {
     // Update metrics
     if (registry.metrics) {
       registry.metrics.bulkCleanups++;
-      registry.metrics.stylesCleanedUp += cleanedUpCount;
+      registry.metrics.stylesCleanedUp += deleted.size;
 
       // Add detailed cleanup stats to history
       registry.metrics.cleanupHistory.push({
         timestamp: cleanupStartTime,
-        classesDeleted: cleanedUpCount,
+        classesDeleted: deleted.size,
         cssSize: totalCssSize,
         rulesDeleted: totalRulesDeleted,
       });
     }
 
-    return cleanedUpCount;
+    return deleted.size;
   }
 
   /**
@@ -1020,19 +1032,9 @@ export class SheetManager {
    */
   private readSheetCSS(sheetInfo: SheetInfo): string | null {
     try {
-      if (sheetInfo.constructableSheet) {
-        const rules = Array.from(sheetInfo.constructableSheet.cssRules);
-        return rules.map((rule) => rule.cssText).join('\n');
-      }
-
-      if (sheetInfo.sheet) {
-        const styleElement = sheetInfo.sheet;
-        if (styleElement.textContent) return styleElement.textContent;
-        if (styleElement.sheet) {
-          const rules = Array.from(styleElement.sheet.cssRules);
-          return rules.map((rule) => rule.cssText).join('\n');
-        }
-      }
+      if (sheetInfo.sheet?.textContent) return sheetInfo.sheet.textContent;
+      const sheet = this.getCSSSheet(sheetInfo);
+      if (sheet) return rulesToCSS(sheet);
     } catch (error) {
       console.warn('[Tasty] Failed to read CSS from sheet:', error);
     }
@@ -1151,7 +1153,6 @@ export class SheetManager {
 
           Object.entries(props).forEach(([prop, val]) => {
             if (val == null || val === '') return;
-
             if (Array.isArray(val)) {
               // Multiple values for the same property -> emit in order
               val.forEach((v) => {
@@ -1188,7 +1189,7 @@ export class SheetManager {
     name: string,
     root: Document | ShadowRoot,
   ): { info: KeyframesInfo; declarations: string } | null {
-    let targetSheet = this.findAvailableSheet(registry, root);
+    let targetSheet = this.findAvailableSheet(registry);
     if (!targetSheet) {
       targetSheet = this.createSheet(registry, root);
     }
@@ -1211,9 +1212,7 @@ export class SheetManager {
       } else if (targetSheet.sheet) {
         // Keyframes share the sheet's rule-index sequence, so their text has to
         // be tracked too or every later index desyncs
-        this.trackTextRule(targetSheet, ruleIndex, fullRule);
-        targetSheet.sheet.textContent =
-          (targetSheet.sheet.textContent || '') + '\n' + fullRule;
+        this.appendTextRule(targetSheet, ruleIndex, fullRule);
       }
 
       targetSheet.ruleCount++;
@@ -1243,42 +1242,30 @@ export class SheetManager {
     try {
       const styleSheet = this.getCSSSheet(sheet);
 
-      // Adjust indices for all other rules in the same sheet.
-      // This is critical - when a keyframe rule is deleted, all rules
-      // with higher indices shift down by 1
-      const adjustIndices = () =>
-        this.adjustIndicesAfterDeletion(
-          registry,
-          info.sheetIndex,
-          info.ruleIndex,
-          info.ruleIndex,
-          1,
-          // Create a dummy RuleInfo to satisfy the function signature
-          {
-            className: '',
-            ruleIndex: info.ruleIndex,
-            sheetIndex: info.sheetIndex,
-          } as RuleInfo,
-          [info.ruleIndex],
-        );
-
       if (sheet.textMode) {
-        const deleted = this.deleteTextRules(sheet, [info.ruleIndex]);
-
-        if (deleted.length > 0) {
-          sheet.ruleCount = Math.max(0, sheet.ruleCount - 1);
-          adjustIndices();
-        }
-      } else if (styleSheet) {
+        if (!this.deleteTextRules(sheet, [info.ruleIndex]).length) return;
+      } else {
         if (
-          info.ruleIndex >= 0 &&
-          info.ruleIndex < styleSheet.cssRules.length
+          !styleSheet ||
+          info.ruleIndex < 0 ||
+          info.ruleIndex >= styleSheet.cssRules.length
         ) {
-          styleSheet.deleteRule(info.ruleIndex);
-          sheet.ruleCount = Math.max(0, sheet.ruleCount - 1);
-          adjustIndices();
+          return;
         }
+        styleSheet.deleteRule(info.ruleIndex);
       }
+
+      sheet.ruleCount = Math.max(0, sheet.ruleCount - 1);
+      // Deleting one keyframe shifts every later rule index down by one.
+      this.adjustIndicesAfterDeletion(
+        registry,
+        info.sheetIndex,
+        info.ruleIndex,
+        info.ruleIndex,
+        1,
+        null,
+        [info.ruleIndex],
+      );
     } catch (error) {
       console.warn('[Tasty] Failed to delete keyframes:', error);
     }
@@ -1385,24 +1372,7 @@ export class SheetManager {
     let styleElement = this.rawStyleElements.get(root);
 
     if (!styleElement) {
-      styleElement =
-        (root as Document).createElement?.('style') ||
-        document.createElement('style');
-
-      if (this.config.nonce) {
-        styleElement.nonce = this.config.nonce;
-      }
-
-      styleElement.setAttribute('data-tasty-raw', '');
-
-      // Append to head or shadow root
-      if ('head' in root && root.head) {
-        root.head.appendChild(styleElement);
-      } else if ('appendChild' in root) {
-        root.appendChild(styleElement);
-      } else {
-        document.head.appendChild(styleElement);
-      }
+      styleElement = this.createStyleElement(root, 'data-tasty-raw');
 
       this.rawStyleElements.set(root, styleElement);
       this.rawCSSBlocks.set(root, new Map());
@@ -1441,34 +1411,20 @@ export class SheetManager {
 
       // Rebuild full text and apply via replaceSync
       this.rebuildRawAdoptedSheet(root as ShadowRoot);
+    } else {
+      const styleElement = this.getOrCreateRawStyleElement(root);
+      const blocksMap = this.rawCSSBlocks.get(root)!;
+      const currentContent = styleElement.textContent || '';
+      const cssWithNewline = (currentContent ? '\n' : '') + css;
 
-      return {
-        dispose: () => {
-          this.disposeRawCSS(id, root);
-        },
-      };
+      styleElement.textContent = currentContent + cssWithNewline;
+      blocksMap.set(id, {
+        id,
+        css,
+        startOffset: currentContent.length,
+        endOffset: currentContent.length + cssWithNewline.length,
+      });
     }
-
-    const styleElement = this.getOrCreateRawStyleElement(root);
-    const blocksMap = this.rawCSSBlocks.get(root)!;
-
-    // Calculate offsets
-    const currentContent = styleElement.textContent || '';
-    const startOffset = currentContent.length;
-    const cssWithNewline = (currentContent ? '\n' : '') + css;
-    const endOffset = startOffset + cssWithNewline.length;
-
-    // Append CSS
-    styleElement.textContent = currentContent + cssWithNewline;
-
-    // Track the block
-    const info: RawCSSInfo = {
-      id,
-      css,
-      startOffset,
-      endOffset,
-    };
-    blocksMap.set(id, info);
 
     return {
       dispose: () => {
@@ -1485,15 +1441,7 @@ export class SheetManager {
     const blocksMap = this.rawCSSBlocks.get(root);
     if (!sheet || !blocksMap) return;
 
-    if (blocksMap.size === 0) {
-      sheet.replaceSync('');
-      return;
-    }
-
-    const blocks = Array.from(blocksMap.values());
-    blocks.sort((a, b) => a.startOffset - b.startOffset);
-    const allCSS = blocks.map((b) => b.css).join('\n');
-    sheet.replaceSync(allCSS);
+    sheet.replaceSync(rawBlocksToCSS(blocksMap));
   }
 
   /**
@@ -1501,12 +1449,7 @@ export class SheetManager {
    */
   private disposeRawCSS(id: string, root: Document | ShadowRoot): void {
     const blocksMap = this.rawCSSBlocks.get(root);
-    if (!blocksMap) return;
-
-    const info = blocksMap.get(id);
-    if (!info) return;
-
-    blocksMap.delete(id);
+    if (!blocksMap?.delete(id)) return;
 
     // Adopted mode: rebuild via replaceSync
     if (this.isAdoptedMode(root)) {
@@ -1619,9 +1562,7 @@ export class SheetManager {
     if (this.isAdoptedMode(root)) {
       const blocksMap = this.rawCSSBlocks.get(root);
       if (!blocksMap || blocksMap.size === 0) return '';
-      const blocks = Array.from(blocksMap.values());
-      blocks.sort((a, b) => a.startOffset - b.startOffset);
-      return blocks.map((b) => b.css).join('\n');
+      return rawBlocksToCSS(blocksMap);
     }
 
     const styleElement = this.rawStyleElements.get(root);

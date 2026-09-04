@@ -361,7 +361,7 @@ function buildChunkBreakdown(root: DebugRoot = defaultRoot()): ChunkBreakdown {
     if (!byChunk[chunk])
       byChunk[chunk] = { classes: [], cssSize: 0, ruleCount: 0 };
     byChunk[chunk].classes.push(className);
-    const css = injector.instance.getCSSTextForClasses([className], { root });
+    const css = cssTextForClasses([className], root);
     byChunk[chunk].cssSize += css.length;
     byChunk[chunk].ruleCount += countRules(css);
   }
@@ -406,6 +406,7 @@ function getGlobalTypeCSS(
   if (!root || !registry) return { css: '', ruleCount: 0, size: 0 };
 
   const chunks: string[] = [];
+  const sheetManager = injector.instance._sheetManager;
   let rc = 0;
 
   if (type === 'raw') {
@@ -413,7 +414,6 @@ function getGlobalTypeCSS(
     // prefix scan below never sees them — and their rules are counted from the
     // parsed sheet, since one raw block is one string but any number of rules.
     const css = injector.instance.getRawCSSText({ root });
-    const sheetManager = injector.instance._sheetManager;
 
     return {
       css: prettifyCSS(css),
@@ -426,8 +426,8 @@ function getGlobalTypeCSS(
     for (const [, entry] of registry.keyframesCache) {
       const info = entry.info;
       const sheetInfo = registry.sheets[info.sheetIndex];
-      const sm = injector.instance._sheetManager;
-      const ss = sheetInfo && sm ? sm.getCSSSheet(sheetInfo) : null;
+      const ss =
+        sheetInfo && sheetManager ? sheetManager.getCSSSheet(sheetInfo) : null;
       if (ss && info.ruleIndex < ss.cssRules.length) {
         const rule = ss.cssRules[info.ruleIndex];
         if (rule) {
@@ -444,8 +444,8 @@ function getGlobalTypeCSS(
     for (const [key, ri] of registry.globalRules) {
       if (!key.startsWith(prefix)) continue;
       const sheetInfo = registry.sheets[ri.sheetIndex];
-      const sm = injector.instance._sheetManager;
-      const ss = sheetInfo && sm ? sm.getCSSSheet(sheetInfo) : null;
+      const ss =
+        sheetInfo && sheetManager ? sheetManager.getCSSSheet(sheetInfo) : null;
       if (ss) {
         const start = Math.max(0, ri.ruleIndex);
         const end = Math.min(
@@ -535,6 +535,22 @@ const CHUNK_ORDER = [
   CHUNK_NAMES.SUBCOMPONENTS,
 ];
 
+function logChunkEntries(breakdown: ChunkBreakdown): void {
+  for (const name of CHUNK_ORDER) {
+    const data = breakdown.byChunk[name];
+    if (data)
+      console.log(
+        `  ${name}: ${data.classes.length} cls, ${data.ruleCount} rules, ${fmtSize(data.cssSize)}`,
+      );
+  }
+  for (const [name, data] of Object.entries(breakdown.byChunk)) {
+    if (!CHUNK_ORDER.includes(name as (typeof CHUNK_ORDER)[number]))
+      console.log(
+        `  ${name}: ${data.classes.length} cls, ${data.ruleCount} rules, ${fmtSize(data.cssSize)}`,
+      );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // tastyDebug API
 // ---------------------------------------------------------------------------
@@ -565,7 +581,7 @@ export const tastyDebug = {
             '[Tasty] source CSS not available (requires dev mode or TASTY_DEBUG=true). Falling back to live CSSOM.',
           );
         }
-        css = injector.instance.getCSSTextForClasses([target], { root });
+        css = cssTextForClasses([target], root);
       }
     } else if (source && Array.isArray(target)) {
       const src = getSourceCssForClasses(target, root);
@@ -577,7 +593,7 @@ export const tastyDebug = {
             '[Tasty] source CSS not available. Falling back to live CSSOM.',
           );
         }
-        css = injector.instance.getCSSTextForClasses(target, { root });
+        css = cssTextForClasses(target, root);
       }
     } else if (typeof target === 'string') {
       if (target === 'all') {
@@ -588,20 +604,20 @@ export const tastyDebug = {
         return css; // already prettified
       } else if (target === 'active') {
         const active = findDomTastyClasses(root);
-        css = injector.instance.getCSSTextForClasses(active, { root });
+        css = cssTextForClasses(active, root);
       } else if (target === 'unused') {
         const unused = getUnusedClasses(root);
-        css = injector.instance.getCSSTextForClasses(unused, { root });
+        css = cssTextForClasses(unused, root);
       } else if (target === 'page') {
         css = getPageCSS(root);
       } else if (classRegex.test(target)) {
-        css = injector.instance.getCSSTextForClasses([target], { root });
+        css = cssTextForClasses([target], root);
       } else {
         const el = (root as Document).querySelector?.(target);
         if (el) css = getCSSTextForNode(el, { root });
       }
     } else if (Array.isArray(target)) {
-      css = injector.instance.getCSSTextForClasses(target, { root });
+      css = cssTextForClasses(target, root);
     } else if (target instanceof Element) {
       css = getCSSTextForNode(target, { root });
     }
@@ -816,19 +832,7 @@ export const tastyDebug = {
         console.groupCollapsed(
           `Chunks (${chunkBreakdown.totalChunkTypes} types, ${chunkBreakdown.totalClasses} classes)`,
         );
-        for (const name of CHUNK_ORDER) {
-          const d = chunkBreakdown.byChunk[name];
-          if (d)
-            console.log(
-              `  ${name}: ${d.classes.length} cls, ${d.ruleCount} rules, ${fmtSize(d.cssSize)}`,
-            );
-        }
-        for (const [name, d] of Object.entries(chunkBreakdown.byChunk)) {
-          if (!CHUNK_ORDER.includes(name as (typeof CHUNK_ORDER)[number]))
-            console.log(
-              `  ${name}: ${d.classes.length} cls, ${d.ruleCount} rules, ${fmtSize(d.cssSize)}`,
-            );
-        }
+        logChunkEntries(chunkBreakdown);
         console.groupEnd();
       }
 
@@ -853,19 +857,7 @@ export const tastyDebug = {
       console.group(
         `Chunks (${breakdown.totalChunkTypes} types, ${breakdown.totalClasses} classes)`,
       );
-      for (const name of CHUNK_ORDER) {
-        const d = breakdown.byChunk[name];
-        if (d)
-          console.log(
-            `  ${name}: ${d.classes.length} cls, ${d.ruleCount} rules, ${fmtSize(d.cssSize)}`,
-          );
-      }
-      for (const [name, d] of Object.entries(breakdown.byChunk)) {
-        if (!CHUNK_ORDER.includes(name as (typeof CHUNK_ORDER)[number]))
-          console.log(
-            `  ${name}: ${d.classes.length} cls, ${d.ruleCount} rules, ${fmtSize(d.cssSize)}`,
-          );
-      }
+      logChunkEntries(breakdown);
       console.groupEnd();
     }
 

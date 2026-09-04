@@ -192,6 +192,16 @@ describe('parseStateKey()', () => {
     }
   });
 
+  it('handles long malformed function input without regex backtracking', () => {
+    const result = parseStateKey(`@supports((${"'".repeat(100_000)}`);
+
+    expect(result).toMatchObject({
+      kind: 'state',
+      type: 'pseudo',
+      pseudo: '@supports',
+    });
+  });
+
   it('should parse AND operator', () => {
     const result = parseStateKey('hovered & disabled');
     expect(result.kind).toBe('compound');

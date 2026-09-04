@@ -105,6 +105,14 @@ describe('transitionStyle', () => {
           'opacity var(--opacity-transition, var(--transition)) step-start',
       });
     });
+
+    it('handles step-end without duration', () => {
+      const result = transitionStyle({ transition: 'opacity step-end' });
+      expect(result).toEqual({
+        transition:
+          'opacity var(--opacity-transition, var(--transition)) step-end',
+      });
+    });
   });
 
   describe('multiple transitions', () => {
@@ -134,6 +142,40 @@ describe('transitionStyle', () => {
           'border-radius 0.3s ease-out',
         ].join(', '),
       });
+    });
+
+    it('keeps commas inside easing functions within their transition', () => {
+      expect(
+        transitionStyle({
+          transition:
+            'opacity 0.2s cubic-bezier(0.1, 0.2, 0.3, 1), transform 0.3s',
+        }),
+      ).toEqual({
+        transition: [
+          'opacity 0.2s cubic-bezier(0.1, 0.2, 0.3, 1)',
+          'transform 0.3s',
+        ].join(', '),
+      });
+    });
+
+    it('recognizes steps() and linear() easing functions', () => {
+      expect(
+        transitionStyle({
+          transition:
+            'opacity 0.2s steps(4, jump-end), color 0.3s linear(0, 1)',
+        }),
+      ).toEqual({
+        transition: [
+          'opacity 0.2s steps(4, jump-end)',
+          'color 0.3s linear(0, 1)',
+        ].join(', '),
+      });
+    });
+
+    it('does not treat prefixed easing keywords as easing', () => {
+      expect(
+        transitionStyle({ transition: 'opacity ease-in-invalid' }),
+      ).toEqual({ transition: 'opacity ease-in-invalid' });
     });
   });
 
@@ -214,6 +256,22 @@ describe('transitionStyle', () => {
           'background-color 0.5s ease-out',
           'background-image 0.5s ease-out',
           '--tasty-second-fill-color 0.5s ease-out',
+        ].join(', '),
+      });
+    });
+
+    it('preserves first insertion order when a later semantic overlaps', () => {
+      expect(transitionStyle({ transition: 'fill 0.2s, theme 0.5s' })).toEqual({
+        transition: [
+          'background-color 0.5s',
+          'background-image 0.5s',
+          '--tasty-second-fill-color 0.5s',
+          'color 0.5s',
+          'box-shadow 0.5s',
+          'border 0.5s',
+          'border-radius 0.5s',
+          'outline 0.5s',
+          'opacity 0.5s',
         ].join(', '),
       });
     });

@@ -72,15 +72,9 @@ const MAP: Record<string, string[]> = {
 
 const DEFAULT_EASING = 'linear';
 
-const EASING_KEYWORDS = new Set([
-  'ease',
-  'ease-in',
-  'ease-out',
-  'ease-in-out',
-  'linear',
-  'step-start',
-  'step-end',
-]);
+const EASING_KEYWORDS = new Set(
+  'ease ease-in ease-out ease-in-out linear step-start step-end'.split(' '),
+);
 
 function isEasing(token: string): boolean {
   return (
@@ -98,13 +92,6 @@ function getTiming(name: string): string {
   return `var(${varName}, var(--transition))`;
 }
 
-type TransitionEntry = [
-  name: string,
-  easing: string | undefined,
-  timing: string | undefined,
-  delay: string | undefined,
-];
-
 export function transitionStyle({ transition }: { transition?: string }) {
   if (!transition) return null;
 
@@ -113,76 +100,50 @@ export function transitionStyle({ transition }: { transition?: string }) {
   }
 
   const processed = parseStyle(transition);
-  const tokens: string[] = [];
-  processed.groups.forEach((g, idx) => {
-    tokens.push(...g.all);
-    if (idx < processed.groups.length - 1) tokens.push(',');
-  });
+  const map: Record<string, string> = {};
 
-  if (tokens.length === 0) return null;
-
-  let tempTransition: string[] = [];
-  const transitions: string[][] = [];
-
-  tokens.forEach((token) => {
-    if (token === ',') {
-      if (tempTransition.length) {
-        transitions.push(tempTransition);
-        tempTransition = [];
-      }
-    } else {
-      tempTransition.push(token);
-    }
-  });
-
-  if (tempTransition.length) {
-    transitions.push(tempTransition);
-  }
-
-  const map: Record<string, TransitionEntry> = {};
-
-  transitions.forEach((transition) => {
-    const name = transition[0];
+  for (const group of processed.groups) {
+    const tokens = group.all;
+    const name = tokens[0];
 
     // The name doubles as the property to transition and as the timing token, so
     // a reference cannot stand in for it.
-    if (isTokenNameReference('transition', name)) return;
+    if (!name || isTokenNameReference('transition', name)) continue;
 
     let timing: string | undefined;
     let easing: string | undefined;
     let delay: string | undefined;
 
-    if (transition[1] && isEasing(transition[1])) {
-      easing = transition[1];
-      delay = transition[2];
+    if (tokens[1] && isEasing(tokens[1])) {
+      easing = tokens[1];
+      delay = tokens[2];
     } else {
-      timing = transition[1];
-      easing = transition[2];
-      delay = transition[3];
+      timing = tokens[1];
+      easing = tokens[2];
+      delay = tokens[3];
     }
 
-    const styles = MAP[name] || [name];
+    let value = timing || getTiming(name);
+    if (easing || delay) {
+      value += ` ${easing || DEFAULT_EASING}`;
+    }
+    if (delay) {
+      value += ` ${delay}`;
+    }
 
-    styles.forEach((style) => {
-      map[style] = [name, easing, timing, delay];
-    });
-  });
+    const styles = MAP[name];
+    if (styles) {
+      for (const style of styles) map[style] = value;
+    } else {
+      map[name] = value;
+    }
+  }
 
   // Every entry may have been rejected as a reference-named transition.
-  if (Object.keys(map).length === 0) return null;
-
   const result = Object.entries(map)
-    .map(([style, [name, easing, timing, delay]]) => {
-      let value = `${style} ${timing || getTiming(name)}`;
-      if (easing || delay) {
-        value += ` ${easing || DEFAULT_EASING}`;
-      }
-      if (delay) {
-        value += ` ${delay}`;
-      }
-      return value;
-    })
+    .map(([style, value]) => `${style} ${value}`)
     .join(', ');
+  if (!result) return null;
 
   return { transition: result };
 }

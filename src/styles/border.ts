@@ -30,7 +30,7 @@ function processGroup(group: GroupData): {
   const directions = filterMods(mods, DIRECTIONS) as Direction[];
   const typeMods = filterMods(mods, BORDER_STYLES as unknown as string[]);
 
-  const slots = assignLineSlots(values, typeMods[0], colors?.[0]);
+  const slots = assignLineSlots(values, typeMods[0], colors[0]);
 
   const width = values[0] || 'var(--border-width)';
   const style = slots.style || 'solid';
@@ -47,6 +47,16 @@ function processGroup(group: GroupData): {
  */
 function formatBorderValue(value: BorderValue): string {
   return `${value.width} ${value.style} ${value.color}`;
+}
+
+function expandBorder(value: string): Record<string, string> {
+  const styles: Record<string, string> = {};
+
+  for (const dir of DIRECTIONS) {
+    styles[`border-${dir}`] = value;
+  }
+
+  return styles;
 }
 
 /** Parse one native border declaration without Tasty's physical-side modifiers. */
@@ -68,13 +78,7 @@ export function parseBorderValue(
   const keyword = extractCSSWideKeyword(group);
   if (keyword) return keyword;
 
-  return formatBorderValue(
-    processGroup({
-      values: group.values ?? [],
-      mods: group.mods ?? [],
-      colors: group.colors ?? [],
-    }).borderValue,
-  );
+  return formatBorderValue(processGroup(group).borderValue);
 }
 
 /**
@@ -106,11 +110,11 @@ export function borderStyle({
   }
 
   const processed = parseStyle(strBorder);
-  const groups = processed.groups ?? [];
+  const groups = processed.groups;
 
   if (!groups.length) return null;
 
-  const useLonghand = groups.some((g) => (g.mods ?? []).includes('longhand'));
+  const useLonghand = groups.some((g) => g.mods.includes('longhand'));
 
   // Single group - use original logic for backward compatibility
   if (groups.length === 1) {
@@ -119,70 +123,49 @@ export function borderStyle({
 
     if (keyword) {
       if (useLonghand) {
-        return Object.fromEntries(
-          DIRECTIONS.map((dir) => [`border-${dir}`, keyword]),
-        );
+        return expandBorder(keyword);
       }
 
       return { border: keyword };
     }
 
-    const { directions, borderValue } = processGroup({
-      values: group.values ?? [],
-      mods: group.mods ?? [],
-      colors: group.colors ?? [],
-    });
+    const { directions, borderValue } = processGroup(group);
 
     const styleValue = formatBorderValue(borderValue);
 
     if (!directions.length) {
       if (useLonghand) {
-        return Object.fromEntries(
-          DIRECTIONS.map((dir) => [`border-${dir}`, styleValue]),
-        );
+        return expandBorder(styleValue);
       }
 
       return { border: styleValue };
     }
 
     const zeroValue = `0 ${borderValue.style} ${borderValue.color}`;
+    const styles: Record<string, string> = {};
 
-    return DIRECTIONS.reduce(
-      (styles, dir) => {
-        if (directions.includes(dir)) {
-          styles[`border-${dir}`] = styleValue;
-        } else {
-          styles[`border-${dir}`] = zeroValue;
-        }
-        return styles;
-      },
-      {} as Record<string, string>,
-    );
+    for (const dir of DIRECTIONS) {
+      styles[`border-${dir}`] = directions.includes(dir)
+        ? styleValue
+        : zeroValue;
+    }
+
+    return styles;
   }
 
   // Multi-group - process groups in order, later groups override earlier
   // Track whether any group specifies directions
   let hasAnyDirections = false;
 
-  // Build a map of direction -> border value
-  // Start with undefined (no border set)
-  const directionMap: Record<Direction, BorderValue | null> = {
-    top: null,
-    right: null,
-    bottom: null,
-    left: null,
-  };
+  // Build a map of direction -> border value. Missing entries have no border.
+  const directionMap: Partial<Record<Direction, BorderValue>> = {};
 
   // Track the last "all directions" value for fallback
   let allDirectionsValue: BorderValue | null = null;
 
   // Process groups in order (first to last)
   for (const group of groups) {
-    const { directions, borderValue } = processGroup({
-      values: group.values ?? [],
-      mods: group.mods ?? [],
-      colors: group.colors ?? [],
-    });
+    const { directions, borderValue } = processGroup(group);
 
     if (directions.length === 0) {
       // No specific directions - applies to all
@@ -206,9 +189,7 @@ export function borderStyle({
     const formatted = formatBorderValue(allDirectionsValue);
 
     if (useLonghand) {
-      return Object.fromEntries(
-        DIRECTIONS.map((dir) => [`border-${dir}`, formatted]),
-      );
+      return expandBorder(formatted);
     }
 
     return { border: formatted };
@@ -216,6 +197,9 @@ export function borderStyle({
 
   // Otherwise, output individual border-* properties
   const result: Record<string, string> = {};
+  const fallbackStyle = allDirectionsValue?.style || 'solid';
+  const fallbackColor =
+    allDirectionsValue?.color || 'var(--border-color, currentColor)';
 
   for (const dir of DIRECTIONS) {
     const value = directionMap[dir];
@@ -224,12 +208,7 @@ export function borderStyle({
     } else {
       // No border for this direction - set to 0
       // Use the last all-directions value for style/color consistency, or defaults
-      const fallback = allDirectionsValue || {
-        width: '0',
-        style: 'solid',
-        color: 'var(--border-color, currentColor)',
-      };
-      result[`border-${dir}`] = `0 ${fallback.style} ${fallback.color}`;
+      result[`border-${dir}`] = `0 ${fallbackStyle} ${fallbackColor}`;
     }
   }
 

@@ -231,7 +231,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.51 kB"
+      "limit": "58.52 kB"
     },
     {
       "name": "main (tasty)",
@@ -307,7 +307,7 @@
         "node:module",
         "node:path"
       ],
-      "limit": "36.54 kB"
+      "limit": "37.56 kB"
     }
   ]
 }

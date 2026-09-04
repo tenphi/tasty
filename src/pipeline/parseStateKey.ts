@@ -106,7 +106,6 @@ type TokenType = 'AND' | 'OR' | 'NOT' | 'XOR' | 'LPAREN' | 'RPAREN' | 'STATE';
 interface Token {
   type: TokenType;
   value: string;
-  raw: string;
 }
 
 // ============================================================================
@@ -131,28 +130,28 @@ function tokenize(stateKey: string): Token[] {
       // Operator: &, |, !, ^
       switch (fullMatch) {
         case '&':
-          tokens.push({ type: 'AND', value: '&', raw: fullMatch });
+          tokens.push({ type: 'AND', value: '&' });
           break;
         case '|':
-          tokens.push({ type: 'OR', value: '|', raw: fullMatch });
+          tokens.push({ type: 'OR', value: '|' });
           break;
         case '!':
-          tokens.push({ type: 'NOT', value: '!', raw: fullMatch });
+          tokens.push({ type: 'NOT', value: '!' });
           break;
         case '^':
-          tokens.push({ type: 'XOR', value: '^', raw: fullMatch });
+          tokens.push({ type: 'XOR', value: '^' });
           break;
       }
     } else if (match[2]) {
       // Parenthesis
       if (fullMatch === '(') {
-        tokens.push({ type: 'LPAREN', value: '(', raw: fullMatch });
+        tokens.push({ type: 'LPAREN', value: '(' });
       } else {
-        tokens.push({ type: 'RPAREN', value: ')', raw: fullMatch });
+        tokens.push({ type: 'RPAREN', value: ')' });
       }
     } else {
       // State token (all other capture groups)
-      tokens.push({ type: 'STATE', value: fullMatch, raw: fullMatch });
+      tokens.push({ type: 'STATE', value: fullMatch });
     }
   }
 
@@ -169,15 +168,10 @@ function replaceCommasOutsideParens(str: string): string {
   for (const char of str) {
     if (char === '(') {
       depth++;
-      result += char;
     } else if (char === ')') {
       depth--;
-      result += char;
-    } else if (char === ',' && depth === 0) {
-      result += '|';
-    } else {
-      result += char;
     }
+    result += char === ',' && depth === 0 ? '|' : char;
   }
 
   return result;
@@ -204,8 +198,7 @@ class Parser {
     if (this.tokens.length === 0) {
       return trueCondition();
     }
-    const result = this.parseExpression();
-    return result;
+    return this.parseExpression();
   }
 
   private current(): Token | undefined {
@@ -503,16 +496,18 @@ class Parser {
     if (rangeMatch) {
       const [, lowerValue, lowerOp, dimension, upperOp, upperValue] =
         rangeMatch;
+      const lower = lowerValue.trim();
+      const upper = upperValue.trim();
       return {
         dimension,
         lowerBound: {
-          value: lowerValue.trim(),
-          valueNumeric: parseNumericValue(lowerValue.trim()),
+          value: lower,
+          valueNumeric: parseNumericValue(lower),
           inclusive: lowerOp === '<=',
         },
         upperBound: {
-          value: upperValue.trim(),
-          valueNumeric: parseNumericValue(upperValue.trim()),
+          value: upper,
+          valueNumeric: parseNumericValue(upper),
           inclusive: upperOp === '<=',
         },
       };
@@ -524,13 +519,14 @@ class Parser {
     );
     if (simpleMatch) {
       const [, dimension, operator, value] = simpleMatch;
-      const numeric = parseNumericValue(value.trim());
+      const trimmedValue = value.trim();
+      const numeric = parseNumericValue(trimmedValue);
 
       if (operator === '<' || operator === '<=') {
         return {
           dimension,
           upperBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: operator === '<=',
           },
@@ -539,7 +535,7 @@ class Parser {
         return {
           dimension,
           lowerBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: operator === '>=',
           },
@@ -549,12 +545,12 @@ class Parser {
         return {
           dimension,
           lowerBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: true,
           },
           upperBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: true,
           },
@@ -568,14 +564,15 @@ class Parser {
     );
     if (reversedMatch) {
       const [, value, operator, dimension] = reversedMatch;
-      const numeric = parseNumericValue(value.trim());
+      const trimmedValue = value.trim();
+      const numeric = parseNumericValue(trimmedValue);
 
       // Reverse the operator
       if (operator === '<' || operator === '<=') {
         return {
           dimension,
           lowerBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: operator === '<=',
           },
@@ -584,7 +581,7 @@ class Parser {
         return {
           dimension,
           upperBound: {
-            value: value.trim(),
+            value: trimmedValue,
             valueNumeric: numeric,
             inclusive: operator === '>=',
           },
@@ -625,11 +622,11 @@ class Parser {
    */
   private parseParentState(raw: string): ConditionNode {
     const content = raw.slice(8, -1);
-    if (!content.trim()) {
+    let condition = content.trim();
+    if (!condition) {
       return trueCondition();
     }
 
-    let condition = content.trim();
     let direct = false;
 
     const lastCommaIdx = condition.lastIndexOf(',');

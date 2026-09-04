@@ -46,8 +46,23 @@ function makeComplexPool(n: number): Styles[] {
   }));
 }
 
+function makeMixedOrPool(n: number): Styles[] {
+  return Array.from({ length: n }, (_, i) => ({
+    display: {
+      '': 'block',
+      '@supports(display: grid) & hovered': 'grid',
+      '@media(w < 700px) | focused': i % 2 ? 'flex' : 'inline-flex',
+    },
+    color: {
+      '': '#text',
+      '@supports(container-type: scroll-state) & @(scroll-state(scrolled: block-end))': `#text-${i}`,
+    },
+  }));
+}
+
 const simplePool = makeSimplePool(POOL_SIZE);
 const complexPool = makeComplexPool(POOL_SIZE);
+const mixedOrPool = makeMixedOrPool(POOL_SIZE);
 
 const cachedComplexStyles: Styles = {
   padding: {
@@ -87,6 +102,19 @@ describe('renderStyles', () => {
     'complex state map (cold)',
     () => {
       renderStyles(complexPool[idx++ % POOL_SIZE]);
+    },
+    {
+      setup() {
+        clearAllCaches();
+        idx = 0;
+      },
+    },
+  );
+
+  bench(
+    'mixed OR state map (cold)',
+    () => {
+      renderStyles(mixedOrPool[idx++ % POOL_SIZE]);
     },
     {
       setup() {

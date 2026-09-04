@@ -755,53 +755,6 @@ export function expandExclusiveOrs(
 }
 
 /**
- * Check if a condition involves at-rules (media, container, supports, starting)
- */
-function hasAtRuleContext(node: ConditionNode): boolean {
-  if (node.kind === 'true' || node.kind === 'false') {
-    return false;
-  }
-
-  if (node.kind === 'state') {
-    // These condition types generate at-rules
-    return (
-      node.type === 'media' ||
-      node.type === 'container' ||
-      node.type === 'supports' ||
-      node.type === 'starting'
-    );
-  }
-
-  if (node.kind === 'compound') {
-    return node.children.some(hasAtRuleContext);
-  }
-
-  return false;
-}
-
-/**
- * Check if a condition involves an `@supports` query.
- *
- * `@supports` is feature detection: anything ANDed with it (e.g. a
- * `@container scroll-state(...)` query that only exists when
- * `container-type: scroll-state` is supported) becomes *unknown* — not
- * simply false — when the feature is absent. So a negated supports branch
- * must be emitted first (as the bare "feature unsupported" fallback) and
- * every other negated branch must nest inside the supported scope.
- */
-function hasSupportsContext(node: ConditionNode): boolean {
-  if (node.kind === 'state') {
-    return node.type === 'supports';
-  }
-
-  if (node.kind === 'compound') {
-    return node.children.some(hasSupportsContext);
-  }
-
-  return false;
-}
-
-/**
  * Rank an OR branch for exclusive expansion ordering. Lower rank is
  * processed first (becomes the more "outer" / less-constrained branch):
  *   0 — branch involves `@supports` (feature-detection guard)
@@ -809,8 +762,25 @@ function hasSupportsContext(node: ConditionNode): boolean {
  *   2 — branch is pure selector context (modifiers / pseudos)
  */
 function orBranchRank(node: ConditionNode): 0 | 1 | 2 {
-  if (hasSupportsContext(node)) return 0;
-  if (hasAtRuleContext(node)) return 1;
+  if (node.kind === 'state') {
+    if (node.type === 'supports') return 0;
+    if (
+      node.type === 'media' ||
+      node.type === 'container' ||
+      node.type === 'starting'
+    ) {
+      return 1;
+    }
+  } else if (node.kind === 'compound') {
+    let rank: 0 | 1 | 2 = 2;
+    for (const child of node.children) {
+      const childRank = orBranchRank(child);
+      if (childRank === 0) return 0;
+      if (childRank === 1) rank = 1;
+    }
+    return rank;
+  }
+
   return 2;
 }
 
@@ -839,7 +809,7 @@ function orBranchRank(node: ConditionNode): 0 | 1 | 2 {
 function sortOrBranchesForExpansion(
   branches: ConditionNode[],
 ): ConditionNode[] {
-  return [...branches].sort((a, b) => orBranchRank(a) - orBranchRank(b));
+  return branches.sort((a, b) => orBranchRank(a) - orBranchRank(b));
 }
 
 /**

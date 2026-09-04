@@ -27,23 +27,11 @@ const KEYFRAMES_KEY = '@keyframes';
  * - Start with a letter, underscore, or hyphen (but not a digit or CSS keyword)
  * - Not be CSS keywords: none, initial, inherit, unset, revert
  */
-const CSS_KEYWORDS = new Set([
-  'none',
-  'initial',
-  'inherit',
-  'unset',
-  'revert',
-  'auto',
-  'normal',
-  'running',
-  'paused',
-]);
-
-/**
- * Pattern to match animation name at the start of an animation value.
- * Must start with letter, underscore, or hyphen (not digit).
- */
-const ANIMATION_NAME_PATTERN = /^([a-zA-Z_-][a-zA-Z0-9_-]*)/;
+const NON_NAME_KEYWORDS = new Set(
+  'none initial inherit unset revert auto normal running paused reverse alternate alternate-reverse forwards backwards both ease linear ease-in ease-out ease-in-out step-start step-end'.split(
+    ' ',
+  ),
+);
 
 // ============================================================================
 // Extraction Functions
@@ -102,48 +90,19 @@ export function mergeKeyframes(
  * - "300ms ease-in" → null (no name, just duration/timing)
  */
 function extractAnimationNameFromValue(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
+  for (const part of value.trim().split(/\s+/)) {
+    const lower = part.toLowerCase();
+    if (NON_NAME_KEYWORDS.has(lower)) continue;
 
-  // Split by whitespace and find the first valid animation name
-  const parts = trimmed.split(/\s+/);
-
-  for (const part of parts) {
-    // Skip CSS keywords
-    if (CSS_KEYWORDS.has(part.toLowerCase())) continue;
-
-    // Skip time values (e.g., 300ms, 1s, 0.5s)
-    if (/^-?[\d.]+m?s$/i.test(part)) continue;
-
-    // Skip iteration counts (e.g., infinite, 3)
-    if (part === 'infinite' || /^\d+$/.test(part)) continue;
-
-    // Skip direction values
+    // Skip time values, iteration counts, and timing functions with arguments.
     if (
-      ['normal', 'reverse', 'alternate', 'alternate-reverse'].includes(
-        part.toLowerCase(),
-      )
+      part === 'infinite' ||
+      /^(?:-?[\d.]+m?s|\d+|(?:cubic-bezier|steps)\()/i.test(part)
     )
       continue;
-
-    // Skip fill-mode values
-    if (['forwards', 'backwards', 'both'].includes(part.toLowerCase()))
-      continue;
-
-    // Skip play-state values
-    if (['running', 'paused'].includes(part.toLowerCase())) continue;
-
-    // Skip timing functions (ease, linear, ease-in, etc., or cubic-bezier/steps)
-    if (
-      /^(ease|linear|ease-in|ease-out|ease-in-out|step-start|step-end)$/i.test(
-        part,
-      )
-    )
-      continue;
-    if (/^(cubic-bezier|steps)\(/i.test(part)) continue;
 
     // Check if it looks like a valid animation name
-    const match = ANIMATION_NAME_PATTERN.exec(part);
+    const match = /^([a-zA-Z_-][a-zA-Z0-9_-]*)/.exec(part);
     if (match) {
       return match[1];
     }
@@ -158,20 +117,11 @@ function extractAnimationNameFromValue(value: string): string | null {
  *
  * Example: "fadeIn 300ms, slideIn 500ms ease-out" → ["fadeIn", "slideIn"]
  */
-function extractAnimationNamesFromAnimationValue(value: string): string[] {
-  const names: string[] = [];
-
-  // Split by comma for multiple animations
-  const animations = value.split(',');
-
-  for (const animation of animations) {
+function collectAnimationNamesFromValue(value: string, names: Set<string>) {
+  for (const animation of value.split(',')) {
     const name = extractAnimationNameFromValue(animation);
-    if (name && !names.includes(name)) {
-      names.push(name);
-    }
+    if (name) names.add(name);
   }
-
-  return names;
 }
 
 /**
@@ -182,9 +132,7 @@ function extractAnimationNamesFromStyleValue(
   names: Set<string>,
 ): void {
   if (typeof value === 'string') {
-    for (const name of extractAnimationNamesFromAnimationValue(value)) {
-      names.add(name);
-    }
+    collectAnimationNamesFromValue(value, names);
   } else if (Array.isArray(value)) {
     // Responsive array
     for (const v of value) {
@@ -198,6 +146,31 @@ function extractAnimationNamesFromStyleValue(
   }
 }
 
+function collectAnimationNamesFromStyles(
+  styles: Styles,
+  names: Set<string>,
+): void {
+  if ('animation' in styles) {
+    extractAnimationNamesFromStyleValue(styles.animation, names);
+  }
+
+  if ('animationName' in styles) {
+    extractAnimationNamesFromStyleValue(styles.animationName, names);
+  }
+
+  for (const [key, value] of Object.entries(styles)) {
+    if (key === '$' || key === KEYFRAMES_KEY) continue;
+
+    if (
+      (key.startsWith('&') || key.startsWith('.') || /^[A-Z]/.test(key)) &&
+      value &&
+      typeof value === 'object'
+    ) {
+      collectAnimationNamesFromStyles(value as Styles, names);
+    }
+  }
+}
+
 /**
  * Extract all animation names referenced in styles.
  * Scans 'animation' and 'animationName' properties including in state mappings.
@@ -205,51 +178,10 @@ function extractAnimationNamesFromStyleValue(
  */
 export function extractAnimationNamesFromStyles(styles: Styles): Set<string> {
   const names = new Set<string>();
-
-  // Check animation property
-  if ('animation' in styles) {
-    extractAnimationNamesFromStyleValue(styles.animation, names);
-  }
-
-  // Check animationName property
-  if ('animationName' in styles) {
-    extractAnimationNamesFromStyleValue(styles.animationName, names);
-  }
-
-  // Check nested selectors (sub-elements)
-  for (const [key, value] of Object.entries(styles)) {
-    // Skip non-selector keys and special keys
-    if (key === '$' || key === KEYFRAMES_KEY) continue;
-
-    // Check if it's a selector (starts with &, ., or uppercase)
-    if (
-      (key.startsWith('&') || key.startsWith('.') || /^[A-Z]/.test(key)) &&
-      value &&
-      typeof value === 'object'
-    ) {
-      // Recursively extract from nested styles
-      const nestedNames = extractAnimationNamesFromStyles(value as Styles);
-      for (const name of nestedNames) {
-        names.add(name);
-      }
-    }
-  }
-
+  collectAnimationNamesFromStyles(styles, names);
   return names;
 }
 
-// ============================================================================
-// Name Replacement
-// ============================================================================
-
-/**
- * Replace animation names in CSS declarations with injected names.
- * Optimized to avoid regex creation - uses simple string replacement.
- *
- * @param declarations CSS declarations string
- * @param nameMap Map from original name to injected name (only contains names that differ)
- * @returns Updated declarations string
- */
 /**
  * The name a local `@keyframes` block is emitted under.
  *
@@ -283,42 +215,16 @@ export function resolveKeyframesNames(
   return names;
 }
 
-/**
- * Whether `declarations` names `animation` as an animation to run.
- *
- * Only `animation` and `animation-name` values count, and only whole tokens
- * within them: an animation called `crossfade` does not use keyframes called
- * `fade`. Same parsing as `replaceAnimationNames`, so the two agree on what
- * counts as a reference.
- */
-export function referencesAnimation(
-  declarations: string,
-  animation: string,
-): boolean {
-  if (!declarations.includes('animation')) return false;
-
-  for (const part of declarations.split(';')) {
-    const colonIdx = part.indexOf(':');
-    if (colonIdx === -1) continue;
-
-    const prop = part.slice(0, colonIdx).trim().toLowerCase();
-    if (prop !== 'animation' && prop !== 'animation-name') continue;
-
-    const value = part.slice(colonIdx + 1);
-    if (replaceWord(value, animation, '\u0000') !== value) return true;
-  }
-
-  return false;
-}
-
+/** Replace local animation names and collect the definitions each rule uses. */
 export function replaceAnimationNames(
   declarations: string,
   nameMap: Map<string, string>,
+  usedNames: Set<string>,
 ): string {
   // Fast path: no animation properties
-  if (!declarations.includes('animation')) return declarations;
+  if (nameMap.size === 0 || !declarations.includes('animation'))
+    return declarations;
 
-  // Parse and replace
   const parts = declarations.split(';');
   let modified = false;
 
@@ -333,12 +239,15 @@ export function replaceAnimationNames(
       const prefix = part.slice(0, colonIdx + 1);
       let value = part.slice(colonIdx + 1);
 
-      // Replace each animation name using simple word replacement
+      for (const original of nameMap.keys()) {
+        if (findWord(value, original) !== -1) usedNames.add(original);
+      }
+
       for (const [original, injected] of nameMap) {
-        // Simple word boundary replacement without regex
-        const newValue = replaceWord(value, original, injected);
-        if (newValue !== value) {
-          value = newValue;
+        if (original === injected) continue;
+        const next = replaceWord(value, original, injected);
+        if (next !== value) {
+          value = next;
           modified = true;
         }
       }
@@ -357,25 +266,30 @@ function replaceWord(str: string, word: string, replacement: string): string {
   let result = str;
   let idx = 0;
 
-  while ((idx = result.indexOf(word, idx)) !== -1) {
-    // Check word boundaries
-    const before = idx === 0 ? ' ' : result[idx - 1];
-    const after =
-      idx + word.length >= result.length ? ' ' : result[idx + word.length];
-
-    const isWordBoundaryBefore = !/[a-zA-Z0-9_-]/.test(before);
-    const isWordBoundaryAfter = !/[a-zA-Z0-9_-]/.test(after);
-
-    if (isWordBoundaryBefore && isWordBoundaryAfter) {
-      result =
-        result.slice(0, idx) + replacement + result.slice(idx + word.length);
-      idx += replacement.length;
-    } else {
-      idx += word.length;
-    }
+  while ((idx = findWord(result, word, idx)) !== -1) {
+    result =
+      result.slice(0, idx) + replacement + result.slice(idx + word.length);
+    idx += replacement.length;
   }
 
   return result;
+}
+
+function findWord(str: string, word: string, from = 0): number {
+  let idx = from;
+
+  while ((idx = str.indexOf(word, idx)) !== -1) {
+    const before = idx === 0 ? ' ' : str[idx - 1];
+    const end = idx + word.length;
+    const after = end === str.length ? ' ' : str[end];
+
+    if (!/[\w-]/.test(before + after)) {
+      return idx;
+    }
+    idx = end;
+  }
+
+  return -1;
 }
 
 // ============================================================================

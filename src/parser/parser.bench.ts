@@ -26,9 +26,28 @@ function makeMixedPool(n: number): string[] {
   );
 }
 
+function makeLayeredPool(n: number): string[] {
+  return Array.from(
+    { length: n },
+    (_, i) =>
+      `url("/img-${i},x.png") no-repeat center / ${i + 10}px ${i + 20}px, ` +
+      `linear-gradient(45deg, #shade-${i}, transparent)`,
+  );
+}
+
+function makeGroupedPool(n: number): string[] {
+  return Array.from(
+    { length: n },
+    (_, i) =>
+      `${i}px solid #border-${i} / ${i + 1}px dashed #accent-${i}, ${i + 2}px`,
+  );
+}
+
 const valuePool = makeValuePool(POOL_SIZE);
 const colorPool = makeColorPool(POOL_SIZE);
 const mixedPool = makeMixedPool(POOL_SIZE);
+const layeredPool = makeLayeredPool(POOL_SIZE);
+const groupedPool = makeGroupedPool(POOL_SIZE);
 
 parseStyle('2x 4x');
 
@@ -67,6 +86,32 @@ describe('parseStyle', () => {
     'mixed values (cold)',
     () => {
       parseStyle(mixedPool[idx++ % POOL_SIZE]);
+    },
+    {
+      setup() {
+        getGlobalParser().clearCache();
+        idx = 0;
+      },
+    },
+  );
+
+  bench(
+    'layered functions (cold)',
+    () => {
+      parseStyle(layeredPool[idx++ % POOL_SIZE]);
+    },
+    {
+      setup() {
+        getGlobalParser().clearCache();
+        idx = 0;
+      },
+    },
+  );
+
+  bench(
+    'comma and slash groups (cold)',
+    () => {
+      parseStyle(groupedPool[idx++ % POOL_SIZE]);
     },
     {
       setup() {

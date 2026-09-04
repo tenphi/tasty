@@ -123,7 +123,7 @@ export function classify(
   // and skip it. This avoids cases like `drop-shadow(` that are missing a
   // closing parenthesis (e.g., a user-typo in CSS). We count paren depth while
   // ignoring everything inside string literals to avoid false positives.
-  {
+  if (token.includes('(')) {
     let depth = 0;
     let inQuote: string | 0 = 0;
     for (let i = 0; i < token.length; i++) {
@@ -140,7 +140,7 @@ export function classify(
       }
 
       if (ch === '(') depth++;
-      else if (ch === ')') depth = Math.max(0, depth - 1);
+      else if (ch === ')' && depth) depth--;
     }
 
     if (depth !== 0) {

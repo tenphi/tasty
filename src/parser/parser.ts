@@ -9,13 +9,7 @@ import type {
   StyleDetails,
   StyleDetailsPart,
 } from './types';
-import {
-  Bucket,
-  finalizeGroup,
-  finalizePart,
-  makeEmptyDetails,
-  makeEmptyPart,
-} from './types';
+import { Bucket, makeEmptyDetails, makeEmptyPart } from './types';
 
 export class StyleParser {
   private cache: Lru<string, ProcessedStyle>;
@@ -45,22 +39,14 @@ export class StyleParser {
       // If the previous token was a url(...) value, merge this token into it so that
       // background layer segments like "url(img) no-repeat center/cover" are kept
       // as a single value entry.
-      const mergeIntoPrevUrl = () => {
-        const lastIdx = currentPart.values.length - 1;
-        currentPart.values[lastIdx] += ` ${processed}`;
-        const lastAllIdx = currentPart.all.length - 1;
-        currentPart.all[lastAllIdx] += ` ${processed}`;
-      };
-
       const prevIsUrlValue =
         currentPart.values.length > 0 &&
         currentPart.values[currentPart.values.length - 1].startsWith('url(');
 
       if (prevIsUrlValue) {
         // Extend the existing url(...) value regardless of current bucket.
-        mergeIntoPrevUrl();
-        // Additionally, for non-value buckets we need to remove their own storage.
-        // So early return.
+        currentPart.values[currentPart.values.length - 1] += ` ${processed}`;
+        currentPart.all[currentPart.all.length - 1] += ` ${processed}`;
         return;
       }
 
@@ -83,34 +69,43 @@ export class StyleParser {
       currentPart.all.push(processed);
     };
 
-    const endPart = () => {
+    const endPart = (reset = true) => {
       // Only add non-empty parts
       if (currentPart.all.length > 0) {
-        finalizePart(currentPart);
+        currentPart.output = currentPart.all.join(' ');
         parts.push(currentPart);
       }
-      currentPart = makeEmptyPart();
+      if (reset) currentPart = makeEmptyPart();
     };
 
-    const endGroup = () => {
-      endPart(); // finalize last part
+    const endGroup = (reset = true) => {
+      endPart(reset); // finalize last part
 
       // Ensure at least one part exists (even if empty) for backward compat
       if (parts.length === 0) {
         parts.push(makeEmptyPart());
-        finalizePart(parts[0]);
       }
 
-      finalizeGroup(currentGroup, parts);
+      currentGroup.parts = parts;
+      for (const part of parts) {
+        currentGroup.mods.push(...part.mods);
+        currentGroup.values.push(...part.values);
+        currentGroup.colors.push(...part.colors);
+        currentGroup.all.push(...part.all);
+      }
+      currentGroup.output =
+        parts.length === 1
+          ? parts[0].output
+          : parts.map((part) => part.output).join(' / ');
       groups.push(currentGroup);
 
-      // Reset for next group
-      currentGroup = makeEmptyDetails();
-      parts = [];
-      currentPart = makeEmptyPart();
+      if (reset) {
+        currentGroup = makeEmptyDetails();
+        parts = [];
+      }
     };
 
-    scan(stripped, (tok, isComma, isSlash, _prevChar) => {
+    scan(stripped, (tok, isComma, isSlash) => {
       if (tok) {
         // Accumulate raw token into currentGroup.input
         if (currentGroup.input) {
@@ -129,9 +124,13 @@ export class StyleParser {
     });
 
     // push final group if not already
-    if (currentPart.all.length || parts.length || !groups.length) endGroup();
+    if (currentPart.all.length || parts.length || !groups.length)
+      endGroup(false);
 
-    const output = groups.map((g) => g.output).join(', ');
+    const output =
+      groups.length === 1
+        ? groups[0].output
+        : groups.map((group) => group.output).join(', ');
     const result: ProcessedStyle = { output, groups };
     Object.freeze(result);
     this.cache.set(key, result);

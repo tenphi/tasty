@@ -300,4 +300,19 @@ describe('tastyDebug', () => {
       expect(tastyDebug.summary({ raw: true }).rawRuleCount).toBe(1);
     });
   });
+
+  describe('CSS formatting', () => {
+    it('splits selector lists without splitting functional selectors', () => {
+      injectGlobal([
+        {
+          selector: ':is(.format-a, .format-b), .format-c',
+          declarations: 'color: red',
+        },
+      ]);
+
+      const css = tastyDebug.css('global', { raw: true });
+
+      expect(css).toContain(':is(.format-a, .format-b),\n.format-c {');
+    });
+  });
 });

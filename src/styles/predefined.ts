@@ -103,40 +103,18 @@ function addStyleHandler(name: string, handler: AnyStyleHandler): void {
   (STYLE_HANDLER_MAP[name] ??= []).push(handler);
 }
 
-// Store initial handler state for reset functionality
-let initialHandlerMapSnapshot: StyleHandlerMap | null = null;
-
-/**
- * Capture a snapshot of the current STYLE_HANDLER_MAP.
- * Called after predefine() to preserve built-in handler state.
- */
-function captureInitialHandlerState(): void {
-  initialHandlerMapSnapshot = {};
-  for (const key of Object.keys(STYLE_HANDLER_MAP)) {
-    // Shallow copy the array - handlers themselves are immutable
-    initialHandlerMapSnapshot[key] = [...STYLE_HANDLER_MAP[key]];
-  }
-}
-
 /**
  * Reset STYLE_HANDLER_MAP to the initial built-in state.
  * Called by resetConfig() to restore handlers after tests.
  */
 export function resetHandlers(): void {
-  if (!initialHandlerMapSnapshot) {
-    // predefine() hasn't been called yet, nothing to reset
-    return;
-  }
-
-  // Clear current map
   for (const key of Object.keys(STYLE_HANDLER_MAP)) {
     delete STYLE_HANDLER_MAP[key];
   }
 
-  // Restore initial state
-  for (const key of Object.keys(initialHandlerMapSnapshot)) {
-    STYLE_HANDLER_MAP[key] = [...initialHandlerMapSnapshot[key]];
-  }
+  // Replay the canonical registration list instead of retaining a duplicate
+  // snapshot of every handler array for the lifetime of the module.
+  predefine();
 }
 
 function defineCustomStyle(handler: AnyStyleHandler): void {
@@ -206,9 +184,6 @@ export function predefine() {
     ...Object.values(logicalStyleHandlers),
   ].forEach((handler) => defineCustomStyle(handler));
 
-  // Capture initial state after all built-in handlers are registered
-  captureInitialHandlerState();
-
   return STYLE_HANDLER_MAP;
 }
 
@@ -264,8 +239,8 @@ export function normalizeHandlerDefinition(
     );
   }
 
-  // Validate handler in dev mode
-  validateHandler(keyName, handler, lookupStyles);
+  // Validate lookup styles in dev mode
+  validateLookupStyles(keyName, lookupStyles);
 
   // Wrap the handler to avoid mutation issues when the same function
   // is reused for multiple handler definitions. Each registration
@@ -277,21 +252,10 @@ export function normalizeHandlerDefinition(
 }
 
 /**
- * Validate a handler definition in development mode.
+ * Validate a handler's lookup styles in development mode.
  */
-function validateHandler(
-  name: string,
-  handler: RawStyleHandler,
-  lookupStyles: string[],
-): void {
+function validateLookupStyles(name: string, lookupStyles: string[]): void {
   if (!devMode) return;
-
-  if (typeof handler !== 'function') {
-    console.warn(
-      `[Tasty] Handler "${name}" is not a function. ` +
-        'Handlers must be functions that return CSSMap, CSSMap[], or null.',
-    );
-  }
 
   if (
     !lookupStyles ||

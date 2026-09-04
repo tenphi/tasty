@@ -300,6 +300,28 @@ describe('Style Handlers Configuration', () => {
       // Verify custom handler is removed (elevation is not a built-in style)
       expect(STYLE_HANDLER_MAP['elevation']).toBeUndefined();
     });
+
+    it('should rebuild the same registry on repeated resets', () => {
+      resetHandlers();
+      const snapshot = Object.fromEntries(
+        Object.entries(STYLE_HANDLER_MAP).map(([name, handlers]) => [
+          name,
+          handlers.map((handler) => handler.__lookupStyles),
+        ]),
+      );
+
+      resetHandlers();
+      resetHandlers();
+
+      expect(
+        Object.fromEntries(
+          Object.entries(STYLE_HANDLER_MAP).map(([name, handlers]) => [
+            name,
+            handlers.map((handler) => handler.__lookupStyles),
+          ]),
+        ),
+      ).toEqual(snapshot);
+    });
   });
 
   describe('resetConfig integration', () => {

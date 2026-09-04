@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   getNamedColorHex,
   getRgbValuesFromRgbaString,
@@ -27,6 +29,11 @@ describe('getNamedColorHex', () => {
     ]);
     expect(colors.get('rebeccapurple')).toBe('#663399');
     expect(colors.get('yellowgreen')).toBe('#9acd32');
+    expect(
+      createHash('sha256')
+        .update(JSON.stringify([...colors]))
+        .digest('hex'),
+    ).toBe('2949c59aab6154988afb83744b954bd58146a06ada4d53831e6720ee01f64d0c');
     expect(getNamedColorHex()).toBe(colors);
   });
 });

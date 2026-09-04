@@ -15,15 +15,16 @@
 // ============================================================================
 
 type Vec3 = [number, number, number];
+type Vec2 = [number, number];
 
 // ============================================================================
 // Conversion Matrices
 // ============================================================================
 
-const OKLab_to_LMS_M: Vec3[] = [
-  [1.0, 0.3963377773761749, 0.2158037573099136],
-  [1.0, -0.1055613458156586, -0.0638541728258133],
-  [1.0, -0.0894841775298119, -1.2914855480194092],
+const OKLab_to_LMS_ab: Vec2[] = [
+  [0.3963377773761749, 0.2158037573099136],
+  [-0.1055613458156586, -0.0638541728258133],
+  [-0.0894841775298119, -1.2914855480194092],
 ];
 
 const LMS_to_linear_sRGB_M: Vec3[] = [
@@ -55,8 +56,11 @@ const OKLab_to_linear_sRGB_coefficients: [
 // Linear Algebra Helpers
 // ============================================================================
 
-const dotXY = (a: [number, number], b: [number, number]): number =>
-  a[0] * b[0] + a[1] * b[1];
+const dotXY = (vector: Vec2, x: number, y: number): number =>
+  vector[0] * x + vector[1] * y;
+
+const dotXYZ = (matrix: Vec3, x: number, y: number, z: number): number =>
+  matrix[0] * x + matrix[1] * y + matrix[2] * z;
 
 // ============================================================================
 // sRGB Gamma <-> Linear
@@ -200,16 +204,14 @@ const linearSrgbToOklab = (rgb: Vec3): Vec3 => {
 const computeMaxSaturationOKLC = (a: number, b: number): number => {
   const okCoeff = OKLab_to_linear_sRGB_coefficients;
   const lmsToRgb = LMS_to_linear_sRGB_M;
-  const tmp2: [number, number] = [a, b];
-  const tmp3: Vec3 = [0, a, b];
 
   let chnlCoeff: number[];
   let chnlLMS: Vec3;
 
-  if (dotXY(okCoeff[0][0], tmp2) > 1) {
+  if (dotXY(okCoeff[0][0], a, b) > 1) {
     chnlCoeff = okCoeff[0][1];
     chnlLMS = lmsToRgb[0];
-  } else if (dotXY(okCoeff[1][0], tmp2) > 1) {
+  } else if (dotXY(okCoeff[1][0], a, b) > 1) {
     chnlCoeff = okCoeff[1][1];
     chnlLMS = lmsToRgb[1];
   } else {
@@ -222,12 +224,9 @@ const computeMaxSaturationOKLC = (a: number, b: number): number => {
 
   let sat = k0 + k1 * a + k2 * b + k3 * (a * a) + k4 * a * b;
 
-  const dotYZ = (mat: Vec3, vec: Vec3): number =>
-    mat[1] * vec[1] + mat[2] * vec[2];
-
-  const kl = dotYZ(OKLab_to_LMS_M[0], tmp3);
-  const km = dotYZ(OKLab_to_LMS_M[1], tmp3);
-  const ks = dotYZ(OKLab_to_LMS_M[2], tmp3);
+  const kl = dotXY(OKLab_to_LMS_ab[0], a, b);
+  const km = dotXY(OKLab_to_LMS_ab[1], a, b);
+  const ks = dotXY(OKLab_to_LMS_ab[2], a, b);
 
   const l_ = 1.0 + sat * kl;
   const m_ = 1.0 + sat * km;
@@ -277,15 +276,8 @@ const findGamutIntersectionOKLCH = (
   cusp: [number, number],
 ): number => {
   const lmsToRgb = LMS_to_linear_sRGB_M;
-  const tmp3: Vec3 = [0, a, b];
-  const floatMax = Number.MAX_VALUE;
 
   let t: number;
-
-  const dotYZ = (mat: Vec3, vec: Vec3): number =>
-    mat[1] * vec[1] + mat[2] * vec[2];
-  const dotXYZ = (vec: Vec3, x: number, y: number, z: number): number =>
-    vec[0] * x + vec[1] * y + vec[2] * z;
 
   if ((l1 - l0) * cusp[1] - (cusp[0] - l0) * c1 <= 0.0) {
     const denom = c1 * cusp[0] + cusp[1] * (l0 - l1);
@@ -297,9 +289,9 @@ const findGamutIntersectionOKLCH = (
     const dl = l1 - l0;
     const dc = c1;
 
-    const kl = dotYZ(OKLab_to_LMS_M[0], tmp3);
-    const km = dotYZ(OKLab_to_LMS_M[1], tmp3);
-    const ks = dotYZ(OKLab_to_LMS_M[2], tmp3);
+    const kl = dotXY(OKLab_to_LMS_ab[0], a, b);
+    const km = dotXY(OKLab_to_LMS_ab[1], a, b);
+    const ks = dotXY(OKLab_to_LMS_ab[2], a, b);
 
     const ldt_ = dl + dc * kl;
     const mdt_ = dl + dc * km;
@@ -324,32 +316,15 @@ const findGamutIntersectionOKLCH = (
     const mdt2 = 6 * mdt_ * mdt_ * m_;
     const sdt2 = 6 * sdt_ * sdt_ * s_;
 
-    const r_ = dotXYZ(lmsToRgb[0], l, m, s) - 1;
-    const r1 = dotXYZ(lmsToRgb[0], ldt, mdt, sdt);
-    const r2 = dotXYZ(lmsToRgb[0], ldt2, mdt2, sdt2);
-
-    const ur = r1 / (r1 * r1 - 0.5 * r_ * r2);
-    let tr = -r_ * ur;
-
-    const g_ = dotXYZ(lmsToRgb[1], l, m, s) - 1;
-    const g1 = dotXYZ(lmsToRgb[1], ldt, mdt, sdt);
-    const g2 = dotXYZ(lmsToRgb[1], ldt2, mdt2, sdt2);
-
-    const ug = g1 / (g1 * g1 - 0.5 * g_ * g2);
-    let tg = -g_ * ug;
-
-    const b_ = dotXYZ(lmsToRgb[2], l, m, s) - 1;
-    const b1 = dotXYZ(lmsToRgb[2], ldt, mdt, sdt);
-    const b2 = dotXYZ(lmsToRgb[2], ldt2, mdt2, sdt2);
-
-    const ub = b1 / (b1 * b1 - 0.5 * b_ * b2);
-    let tb = -b_ * ub;
-
-    tr = ur >= 0.0 ? tr : floatMax;
-    tg = ug >= 0.0 ? tg : floatMax;
-    tb = ub >= 0.0 ? tb : floatMax;
-
-    t += Math.min(tr, Math.min(tg, tb));
+    let correction = Number.MAX_VALUE;
+    for (const matrix of lmsToRgb) {
+      const value = dotXYZ(matrix, l, m, s) - 1;
+      const slope = dotXYZ(matrix, ldt, mdt, sdt);
+      const slope2 = dotXYZ(matrix, ldt2, mdt2, sdt2);
+      const u = slope / (slope * slope - 0.5 * value * slope2);
+      if (u >= 0) correction = Math.min(correction, -value * u);
+    }
+    t += correction;
   }
 
   return t;
@@ -598,159 +573,23 @@ let _namedColorHex: Map<string, string> | null = null;
 
 export function getNamedColorHex(): Map<string, string> {
   if (_namedColorHex) return _namedColorHex;
-  _namedColorHex = new Map(
-    Object.entries({
-      aliceblue: '#f0f8ff',
-      antiquewhite: '#faebd7',
-      aqua: '#00ffff',
-      aquamarine: '#7fffd4',
-      azure: '#f0ffff',
-      beige: '#f5f5dc',
-      bisque: '#ffe4c4',
-      black: '#000000',
-      blanchedalmond: '#ffebcd',
-      blue: '#0000ff',
-      blueviolet: '#8a2be2',
-      brown: '#a52a2a',
-      burlywood: '#deb887',
-      cadetblue: '#5f9ea0',
-      chartreuse: '#7fff00',
-      chocolate: '#d2691e',
-      coral: '#ff7f50',
-      cornflowerblue: '#6495ed',
-      cornsilk: '#fff8dc',
-      crimson: '#dc143c',
-      cyan: '#00ffff',
-      darkblue: '#00008b',
-      darkcyan: '#008b8b',
-      darkgoldenrod: '#b8860b',
-      darkgray: '#a9a9a9',
-      darkgreen: '#006400',
-      darkgrey: '#a9a9a9',
-      darkkhaki: '#bdb76b',
-      darkmagenta: '#8b008b',
-      darkolivegreen: '#556b2f',
-      darkorange: '#ff8c00',
-      darkorchid: '#9932cc',
-      darkred: '#8b0000',
-      darksalmon: '#e9967a',
-      darkseagreen: '#8fbc8f',
-      darkslateblue: '#483d8b',
-      darkslategray: '#2f4f4f',
-      darkslategrey: '#2f4f4f',
-      darkturquoise: '#00ced1',
-      darkviolet: '#9400d3',
-      deeppink: '#ff1493',
-      deepskyblue: '#00bfff',
-      dimgray: '#696969',
-      dimgrey: '#696969',
-      dodgerblue: '#1e90ff',
-      firebrick: '#b22222',
-      floralwhite: '#fffaf0',
-      forestgreen: '#228b22',
-      fuchsia: '#ff00ff',
-      gainsboro: '#dcdcdc',
-      ghostwhite: '#f8f8ff',
-      gold: '#ffd700',
-      goldenrod: '#daa520',
-      gray: '#808080',
-      green: '#008000',
-      greenyellow: '#adff2f',
-      grey: '#808080',
-      honeydew: '#f0fff0',
-      hotpink: '#ff69b4',
-      indianred: '#cd5c5c',
-      indigo: '#4b0082',
-      ivory: '#fffff0',
-      khaki: '#f0e68c',
-      lavender: '#e6e6fa',
-      lavenderblush: '#fff0f5',
-      lawngreen: '#7cfc00',
-      lemonchiffon: '#fffacd',
-      lightblue: '#add8e6',
-      lightcoral: '#f08080',
-      lightcyan: '#e0ffff',
-      lightgoldenrodyellow: '#fafad2',
-      lightgray: '#d3d3d3',
-      lightgreen: '#90ee90',
-      lightgrey: '#d3d3d3',
-      lightpink: '#ffb6c1',
-      lightsalmon: '#ffa07a',
-      lightseagreen: '#20b2aa',
-      lightskyblue: '#87cefa',
-      lightslategray: '#778899',
-      lightslategrey: '#778899',
-      lightsteelblue: '#b0c4de',
-      lightyellow: '#ffffe0',
-      lime: '#00ff00',
-      limegreen: '#32cd32',
-      linen: '#faf0e6',
-      magenta: '#ff00ff',
-      maroon: '#800000',
-      mediumaquamarine: '#66cdaa',
-      mediumblue: '#0000cd',
-      mediumorchid: '#ba55d3',
-      mediumpurple: '#9370db',
-      mediumseagreen: '#3cb371',
-      mediumslateblue: '#7b68ee',
-      mediumspringgreen: '#00fa9a',
-      mediumturquoise: '#48d1cc',
-      mediumvioletred: '#c71585',
-      midnightblue: '#191970',
-      mintcream: '#f5fffa',
-      mistyrose: '#ffe4e1',
-      moccasin: '#ffe4b5',
-      navajowhite: '#ffdead',
-      navy: '#000080',
-      oldlace: '#fdf5e6',
-      olive: '#808000',
-      olivedrab: '#6b8e23',
-      orange: '#ffa500',
-      orangered: '#ff4500',
-      orchid: '#da70d6',
-      palegoldenrod: '#eee8aa',
-      palegreen: '#98fb98',
-      paleturquoise: '#afeeee',
-      palevioletred: '#db7093',
-      papayawhip: '#ffefd5',
-      peachpuff: '#ffdab9',
-      peru: '#cd853f',
-      pink: '#ffc0cb',
-      plum: '#dda0dd',
-      powderblue: '#b0e0e6',
-      purple: '#800080',
-      rebeccapurple: '#663399',
-      red: '#ff0000',
-      rosybrown: '#bc8f8f',
-      royalblue: '#4169e1',
-      saddlebrown: '#8b4513',
-      salmon: '#fa8072',
-      sandybrown: '#f4a460',
-      seagreen: '#2e8b57',
-      seashell: '#fff5ee',
-      sienna: '#a0522d',
-      silver: '#c0c0c0',
-      skyblue: '#87ceeb',
-      slateblue: '#6a5acd',
-      slategray: '#708090',
-      slategrey: '#708090',
-      snow: '#fffafa',
-      springgreen: '#00ff7f',
-      steelblue: '#4682b4',
-      tan: '#d2b48c',
-      teal: '#008080',
-      thistle: '#d8bfd8',
-      tomato: '#ff6347',
-      turquoise: '#40e0d0',
-      violet: '#ee82ee',
-      wheat: '#f5deb3',
-      white: '#ffffff',
-      whitesmoke: '#f5f5f5',
-      yellow: '#ffff00',
-      yellowgreen: '#9acd32',
-    }),
-  );
-  return _namedColorHex;
+
+  // The second string stores one six-digit value for every space-separated
+  // name in the first. The table checksum test keeps the packed columns in
+  // lockstep while avoiding an object literal in every runtime bundle.
+  const names =
+    'aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen'.split(
+      ' ',
+    );
+  const hex =
+    'f0f8fffaebd700ffff7fffd4f0fffff5f5dcffe4c4000000ffebcd0000ff8a2be2a52a2adeb8875f9ea07fff00d2691eff7f506495edfff8dcdc143c00ffff00008b008b8bb8860ba9a9a9006400a9a9a9bdb76b8b008b556b2fff8c009932cc8b0000e9967a8fbc8f483d8b2f4f4f2f4f4f00ced19400d3ff149300bfff6969696969691e90ffb22222fffaf0228b22ff00ffdcdcdcf8f8ffffd700daa520808080008000adff2f808080f0fff0ff69b4cd5c5c4b0082fffff0f0e68ce6e6fafff0f57cfc00fffacdadd8e6f08080e0fffffafad2d3d3d390ee90d3d3d3ffb6c1ffa07a20b2aa87cefa778899778899b0c4deffffe000ff0032cd32faf0e6ff00ff80000066cdaa0000cdba55d39370db3cb3717b68ee00fa9a48d1ccc71585191970f5fffaffe4e1ffe4b5ffdead000080fdf5e68080006b8e23ffa500ff4500da70d6eee8aa98fb98afeeeedb7093ffefd5ffdab9cd853fffc0cbdda0ddb0e0e6800080663399ff0000bc8f8f4169e18b4513fa8072f4a4602e8b57fff5eea0522dc0c0c087ceeb6a5acd708090708090fffafa00ff7f4682b4d2b48c008080d8bfd8ff634740e0d0ee82eef5deb3fffffff5f5f5ffff009acd32';
+  const colors = new Map<string, string>();
+
+  for (let i = 0; i < names.length; i++) {
+    colors.set(names[i], `#${hex.slice(i * 6, i * 6 + 6)}`);
+  }
+
+  return (_namedColorHex = colors);
 }
 
 // ============================================================================

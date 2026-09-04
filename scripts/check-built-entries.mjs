@@ -166,8 +166,8 @@ assertGraphExcludes('ssr/astro.js', [
   'zero-engine-',
 ]);
 assertGraphExcludes('core/index.js', ['react-runtime-']);
-assertGraphSizeAtMost('index.js', 565_395);
-assertGraphSizeAtMost('core/index.js', 528_475);
+assertGraphSizeAtMost('index.js', 564_375);
+assertGraphSizeAtMost('core/index.js', 527_455);
 assertGraphSizeAtMost('ssr/index.js', 379_560);
 assertGraphSizeAtMost('ssr/astro.js', 393_970);
 assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);

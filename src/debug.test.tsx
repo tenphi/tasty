@@ -302,7 +302,7 @@ describe('tastyDebug', () => {
   });
 
   describe('CSS formatting', () => {
-    it('splits selector lists without splitting functional selectors', () => {
+    it('keeps selector lists intact and indents declarations', () => {
       injectGlobal([
         {
           selector: ':is(.format-a, .format-b), .format-c',
@@ -312,7 +312,24 @@ describe('tastyDebug', () => {
 
       const css = tastyDebug.css('global', { raw: true });
 
-      expect(css).toContain(':is(.format-a, .format-b),\n.format-c {');
+      expect(css).toContain(':is(.format-a, .format-b), .format-c {');
+      expect(css).toContain('\n  color: red;\n}');
+    });
+
+    it('indents nested rules', () => {
+      injectRawCSS('@media (width > 0) { .format-nested { color: red; } }');
+
+      expect(tastyDebug.css('all', { raw: true })).toContain(
+        '@media (width > 0) {\n  .format-nested {\n    color: red;\n  }\n}',
+      );
+    });
+
+    it('normalizes compact blocks and terminates their declarations', () => {
+      injectRawCSS('.format-compact{color:red}');
+
+      expect(tastyDebug.css('all', { raw: true })).toContain(
+        '.format-compact {\n  color:red;\n}',
+      );
     });
   });
 });

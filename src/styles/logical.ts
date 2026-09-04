@@ -3,6 +3,14 @@ import { filterMods, parseStyle } from '../utils/styles';
 import type { StyleHandler, StyleValue } from '../utils/styles';
 import { warnOnceDev } from '../utils/warnings';
 import { parseBorderValue } from './border';
+import {
+  LOGICAL_BORDER_STYLES,
+  LOGICAL_INSET_STYLES,
+  LOGICAL_MARGIN_STYLES,
+  LOGICAL_PADDING_STYLES,
+  LOGICAL_SCROLL_MARGIN_STYLES,
+  LOGICAL_SCROLL_PADDING_STYLES,
+} from './logical-list';
 import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
 
 type LogicalValue = string | number | boolean | undefined;
@@ -17,6 +25,10 @@ interface LogicalAxisConfig<Name extends string> {
   trueValue: string;
   defaultInit: string;
 }
+
+type LogicalHandlerMap<Names extends readonly string[]> = {
+  [Name in Names[number]]: StyleHandler<Partial<Record<Name, LogicalValue>>>;
+};
 
 /**
  * Create one enhanced handler for one logical axis/category pair.
@@ -173,78 +185,68 @@ function logicalBorderStyle<const Name extends string>(
   return handler;
 }
 
+function logicalAxisStyles<const Names extends readonly [string, string]>(
+  styleNames: Names,
+  cssProperty: string,
+  defaultValue: string,
+  trueValue: string,
+  defaultInit: string,
+): LogicalHandlerMap<Names> {
+  return Object.fromEntries(
+    styleNames.map((styleName, index) => [
+      styleName,
+      logicalAxisStyle({
+        styleName,
+        cssProperty: `${cssProperty}-${index ? 'inline' : 'block'}`,
+        defaultValue,
+        trueValue,
+        defaultInit,
+      }),
+    ]),
+  ) as LogicalHandlerMap<Names>;
+}
+
+function logicalBorderStyles<const Names extends readonly [string, string]>(
+  styleNames: Names,
+): LogicalHandlerMap<Names> {
+  return Object.fromEntries(
+    styleNames.map((styleName, index) => [
+      styleName,
+      logicalBorderStyle(styleName, `border-${index ? 'inline' : 'block'}`),
+    ]),
+  ) as LogicalHandlerMap<Names>;
+}
+
 /** One handler per logical axis/category; native CSS longhands stay ordinary. */
 export const logicalStyleHandlers = {
-  blockPadding: logicalAxisStyle({
-    styleName: 'blockPadding',
-    cssProperty: 'padding-block',
-    defaultValue: 'var(--gap)',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  inlinePadding: logicalAxisStyle({
-    styleName: 'inlinePadding',
-    cssProperty: 'padding-inline',
-    defaultValue: 'var(--gap)',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  blockMargin: logicalAxisStyle({
-    styleName: 'blockMargin',
-    cssProperty: 'margin-block',
-    defaultValue: 'var(--gap)',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  inlineMargin: logicalAxisStyle({
-    styleName: 'inlineMargin',
-    cssProperty: 'margin-inline',
-    defaultValue: 'var(--gap)',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  blockInset: logicalAxisStyle({
-    styleName: 'blockInset',
-    cssProperty: 'inset-block',
-    defaultValue: '0',
-    trueValue: '0',
-    defaultInit: 'auto',
-  }),
-  inlineInset: logicalAxisStyle({
-    styleName: 'inlineInset',
-    cssProperty: 'inset-inline',
-    defaultValue: '0',
-    trueValue: '0',
-    defaultInit: 'auto',
-  }),
-  blockScrollMargin: logicalAxisStyle({
-    styleName: 'blockScrollMargin',
-    cssProperty: 'scroll-margin-block',
-    defaultValue: '0',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  inlineScrollMargin: logicalAxisStyle({
-    styleName: 'inlineScrollMargin',
-    cssProperty: 'scroll-margin-inline',
-    defaultValue: '0',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  blockScrollPadding: logicalAxisStyle({
-    styleName: 'blockScrollPadding',
-    cssProperty: 'scroll-padding-block',
-    defaultValue: '0',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  inlineScrollPadding: logicalAxisStyle({
-    styleName: 'inlineScrollPadding',
-    cssProperty: 'scroll-padding-inline',
-    defaultValue: '0',
-    trueValue: '1x',
-    defaultInit: '0',
-  }),
-  blockBorder: logicalBorderStyle('blockBorder', 'border-block'),
-  inlineBorder: logicalBorderStyle('inlineBorder', 'border-inline'),
+  ...logicalAxisStyles(
+    LOGICAL_PADDING_STYLES,
+    'padding',
+    'var(--gap)',
+    '1x',
+    '0',
+  ),
+  ...logicalAxisStyles(
+    LOGICAL_MARGIN_STYLES,
+    'margin',
+    'var(--gap)',
+    '1x',
+    '0',
+  ),
+  ...logicalAxisStyles(LOGICAL_INSET_STYLES, 'inset', '0', '0', 'auto'),
+  ...logicalAxisStyles(
+    LOGICAL_SCROLL_MARGIN_STYLES,
+    'scroll-margin',
+    '0',
+    '1x',
+    '0',
+  ),
+  ...logicalAxisStyles(
+    LOGICAL_SCROLL_PADDING_STYLES,
+    'scroll-padding',
+    '0',
+    '1x',
+    '0',
+  ),
+  ...logicalBorderStyles(LOGICAL_BORDER_STYLES),
 } as const;

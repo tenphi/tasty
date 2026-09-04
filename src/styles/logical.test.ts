@@ -55,9 +55,7 @@ describe('logical style handlers', () => {
   });
 
   it('keeps shared category lists aligned with handlers and chunks', () => {
-    expect(Object.keys(logicalStyleHandlers).sort()).toEqual(
-      [...LOGICAL_AXIS_STYLES].sort(),
-    );
+    expect(Object.keys(logicalStyleHandlers)).toEqual(LOGICAL_AXIS_STYLES);
 
     for (const name of [
       ...LOGICAL_SIZE_HANDLER_STYLES,

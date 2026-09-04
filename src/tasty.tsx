@@ -30,10 +30,10 @@ import type {
   Tokens,
 } from './types';
 import { getDisplayName } from './utils/get-display-name';
+import { hasKeys } from './utils/has-keys';
 import { isValidElementType } from './utils/is-valid-element-type';
 import { isSelector } from './utils/is-selector';
 import { mergeStyles } from './utils/merge-styles';
-import { hasKeys } from './utils/has-keys';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
 import { getConfig } from './config';
@@ -41,26 +41,19 @@ import { touch } from './injector';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
-/**
- * Mapping of is* properties to their corresponding HTML attributes
- */
-const IS_PROPERTIES_MAP = {
-  isDisabled: 'disabled',
-  isHidden: 'hidden',
-  isChecked: 'checked',
-} as const;
-
-/**
- * Precalculated entries for performance optimization
- */
-const IS_PROPERTIES_ENTRIES = Object.entries(IS_PROPERTIES_MAP);
+/** is* properties and their corresponding HTML attributes. */
+const IS_PROPERTIES = [
+  ['isDisabled', 'disabled'],
+  ['isHidden', 'hidden'],
+  ['isChecked', 'checked'],
+] as const;
 
 /**
  * Helper function to handle is* properties consistently
  * Transforms is* props to HTML attributes and adds corresponding data-* attributes
  */
 function handleIsProperties(props: Record<string, unknown>) {
-  for (const [isProperty, targetAttribute] of IS_PROPERTIES_ENTRIES) {
+  for (const [isProperty, targetAttribute] of IS_PROPERTIES) {
     if (isProperty in props) {
       props[targetAttribute] = props[isProperty];
       delete props[isProperty];
@@ -604,28 +597,24 @@ function tastyWrap<
     ...defaultProps
   } = (options ?? {}) as TastyProps<K, V, E, P, M, TP>;
 
-  const propsWithStyles = ['styles'].concat(
-    Object.keys(defaultProps).filter((prop) => prop.endsWith('Styles')),
-  );
+  const propsWithStyles = ['styles'];
+  for (const prop of Object.keys(defaultProps)) {
+    if (prop.endsWith('Styles')) propsWithStyles.push(prop);
+  }
 
   const _WrappedComponent = forwardRef<any, any>((props, ref) => {
     const { as, element, ...restProps } = props as Record<string, unknown>;
 
-    const mergedStylesMap = propsWithStyles.reduce(
-      (map, prop) => {
-        const restValue = (restProps as any)[prop];
-        const defaultValue = (defaultProps as any)[prop];
+    const mergedStylesMap: Record<string, unknown> = {};
+    for (const prop of propsWithStyles) {
+      const restValue = (restProps as any)[prop];
+      const defaultValue = (defaultProps as any)[prop];
 
-        if (restValue != null && defaultValue != null) {
-          (map as any)[prop] = mergeStyles(defaultValue, restValue);
-        } else {
-          (map as any)[prop] = restValue ?? defaultValue;
-        }
-
-        return map;
-      },
-      {} as Record<string, unknown>,
-    );
+      mergedStylesMap[prop] =
+        restValue != null && defaultValue != null
+          ? mergeStyles(defaultValue, restValue)
+          : (restValue ?? defaultValue);
+    }
 
     const elementProps = {
       ...(defaultProps as unknown as Record<string, unknown>),
@@ -699,16 +688,15 @@ function tastyElement<
       }
     }
 
-    const variantEntries = Object.entries(variants) as [string, Styles][];
-    variantStylesMap = variantEntries.reduce(
-      (map, [variant, variantStyles]) => {
-        map[variant] = extensionStyles
-          ? mergeStyles(baseStyles, variantStyles, extensionStyles)
-          : mergeStyles(baseStyles, variantStyles);
-        return map;
-      },
-      {} as Record<string, Styles | undefined>,
-    );
+    variantStylesMap = {};
+    for (const [variant, variantStyles] of Object.entries(variants) as [
+      string,
+      Styles,
+    ][]) {
+      variantStylesMap[variant] = extensionStyles
+        ? mergeStyles(baseStyles, variantStyles, extensionStyles)
+        : mergeStyles(baseStyles, variantStyles);
+    }
     // Ensure 'default' variant always exists
     if (!variantStylesMap['default']) {
       variantStylesMap['default'] = defaultStyles;
@@ -719,7 +707,7 @@ function tastyElement<
     qa: defaultQa,
     qaVal: defaultQaVal,
     ...otherDefaultProps
-  } = defaultProps ?? {};
+  } = defaultProps;
 
   // Fixed at factory-creation time — no dependency on global config.
   const ownPropsToCheck: readonly string[] = styleProps
@@ -792,7 +780,7 @@ function tastyElement<
         theme?: string;
       };
 
-    let styles = rawStyles;
+    const styles = rawStyles;
 
     let propStyles: Styles | null = null;
 
@@ -815,10 +803,6 @@ function tastyElement<
         (propStyles as any)[key] = value;
         delete (otherProps as any)[key];
       }
-    }
-
-    if (!styles || (styles && !hasKeys(styles as Record<string, unknown>))) {
-      styles = undefined as unknown as Styles;
     }
 
     let propMods: Record<string, ModValue> | undefined;
@@ -854,7 +838,7 @@ function tastyElement<
 
     const hasInstanceStyles =
       styles && hasKeys(styles as Record<string, unknown>);
-    const hasPropStyles = propStyles && hasKeys(propStyles);
+    const hasPropStyles = !!propStyles;
 
     const allStyles =
       hasInstanceStyles || hasPropStyles
@@ -988,16 +972,13 @@ function tastyElement<
 
   // Attach sub-element components if elements are defined
   if (elements) {
-    const subElements = Object.entries(elements).reduce(
-      (acc, [name, definition]) => {
-        acc[name] = createSubElement(
-          name,
-          definition as SubElementDefinition<keyof JSX.IntrinsicElements>,
-        );
-        return acc;
-      },
-      {} as Record<string, ForwardRefExoticComponent<any>>,
-    );
+    const subElements: Record<string, ForwardRefExoticComponent<any>> = {};
+    for (const [name, definition] of Object.entries(elements)) {
+      subElements[name] = createSubElement(
+        name,
+        definition as SubElementDefinition<keyof JSX.IntrinsicElements>,
+      );
+    }
 
     return Object.assign(_TastyComponent, subElements);
   }

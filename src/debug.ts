@@ -163,14 +163,13 @@ function findDomTastyClasses(root: DebugRoot = defaultRoot()): string[] {
   const classes = new Set<string>();
   const elements = (root as Document).querySelectorAll?.('[class]') || [];
   const classRegex = tastyClassRegex(getNamePrefix());
-  elements.forEach((el) => {
-    const attr = el.getAttribute('class');
-    if (attr) {
-      for (const cls of attr.split(/\s+/)) {
-        if (classRegex.test(cls)) classes.add(cls);
-      }
+  for (const element of elements) {
+    const attribute = element.getAttribute('class');
+    if (!attribute) continue;
+    for (const className of attribute.split(/\s+/)) {
+      if (classRegex.test(className)) classes.add(className);
     }
-  });
+  }
   return sortTastyClasses(classes);
 }
 
@@ -245,11 +244,13 @@ function prettifyCSS(css: string): string {
   let depth = 0;
   const indent = () => '  '.repeat(depth);
 
-  let normalized = css.replace(/\s+/g, ' ').trim();
-  // Ensure braces are surrounded by spaces for splitting
-  normalized = normalized.replace(/\s*\{\s*/g, ' { ');
-  normalized = normalized.replace(/\s*\}\s*/g, ' } ');
-  normalized = normalized.replace(/;\s*/g, '; ');
+  // Ensure braces are surrounded by spaces for splitting.
+  const normalized = css
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replaceAll('{', ' { ')
+    .replaceAll('}', ' } ')
+    .replaceAll(';', '; ');
 
   const tokens = normalized.split(/\s+/);
   let buf = '';
@@ -261,7 +262,7 @@ function prettifyCSS(css: string): string {
       if (header) {
         // Split comma-separated selectors onto their own lines
         // but only if the comma is outside parentheses
-        const parts = splitOutsideParens(header, ',');
+        const parts = splitOutsideParens(header);
         if (parts.length > 1) {
           out.push(
             parts
@@ -308,8 +309,8 @@ function prettifyCSS(css: string): string {
     .trim();
 }
 
-/** Split `str` by `sep` only when not inside parentheses */
-function splitOutsideParens(str: string, sep: string): string[] {
+/** Split `str` by commas only when not inside parentheses. */
+function splitOutsideParens(str: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let start = 0;
@@ -317,9 +318,9 @@ function splitOutsideParens(str: string, sep: string): string[] {
     const ch = str[i];
     if (ch === '(') depth++;
     else if (ch === ')') depth--;
-    else if (depth === 0 && str.startsWith(sep, i)) {
+    else if (depth === 0 && ch === ',') {
       parts.push(str.slice(start, i));
-      start = i + sep.length;
+      start = i + 1;
     }
   }
   parts.push(str.slice(start));
@@ -358,22 +359,25 @@ function buildChunkBreakdown(root: DebugRoot = defaultRoot()): ChunkBreakdown {
   const byChunk: ChunkBreakdown['byChunk'] = {};
   for (const [cacheKey, className] of registry.cacheKeyToClassName) {
     const chunk = extractChunkName(cacheKey) || 'unknown';
-    if (!byChunk[chunk])
-      byChunk[chunk] = { classes: [], cssSize: 0, ruleCount: 0 };
-    byChunk[chunk].classes.push(className);
+    const entry = (byChunk[chunk] ??= {
+      classes: [],
+      cssSize: 0,
+      ruleCount: 0,
+    });
+    entry.classes.push(className);
     const css = cssTextForClasses([className], root);
-    byChunk[chunk].cssSize += css.length;
-    byChunk[chunk].ruleCount += countRules(css);
+    entry.cssSize += css.length;
+    entry.ruleCount += countRules(css);
   }
 
-  for (const entry of Object.values(byChunk)) {
+  const entries = Object.values(byChunk);
+  for (const entry of entries) {
     entry.classes = sortTastyClasses(entry.classes);
   }
 
-  const totalClasses = Object.values(byChunk).reduce(
-    (s, e) => s + e.classes.length,
-    0,
-  );
+  const totalClasses = entries.reduce((sum, entry) => {
+    return sum + entry.classes.length;
+  }, 0);
   return {
     byChunk,
     totalChunkTypes: Object.keys(byChunk).length,
@@ -401,6 +405,7 @@ const GLOBAL_RULE_PREFIXES = {
 function getGlobalTypeCSS(
   type: keyof typeof GLOBAL_RULE_PREFIXES | 'raw' | 'keyframes',
   root: DebugRoot = defaultRoot(),
+  includeCSS = true,
 ): { css: string; ruleCount: number; size: number } {
   const registry = getRegistry(root);
   if (!root || !registry) return { css: '', ruleCount: 0, size: 0 };
@@ -416,7 +421,7 @@ function getGlobalTypeCSS(
     const css = injector.instance.getRawCSSText({ root });
 
     return {
-      css: prettifyCSS(css),
+      css: includeCSS ? prettifyCSS(css) : '',
       ruleCount: sheetManager?.getRawRuleCount(root) ?? 0,
       size: css.length,
     };
@@ -469,7 +474,11 @@ function getGlobalTypeCSS(
   }
 
   const raw = chunks.join('\n');
-  return { css: prettifyCSS(raw), ruleCount: rc, size: raw.length };
+  return {
+    css: includeCSS ? prettifyCSS(raw) : '',
+    ruleCount: rc,
+    size: raw.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -731,33 +740,34 @@ export const tastyDebug = {
     const activeRuleCount = countRules(activeCSS);
     const unusedRuleCount = countRules(unusedCSS);
 
-    const globalData = getGlobalTypeCSS('global', root);
-    const rawData = getGlobalTypeCSS('raw', root);
-    const kfData = getGlobalTypeCSS('keyframes', root);
-    const propData = getGlobalTypeCSS('property', root);
+    const globalData = getGlobalTypeCSS('global', root, false);
+    const rawData = getGlobalTypeCSS('raw', root, false);
+    const kfData = getGlobalTypeCSS('keyframes', root, false);
+    const propData = getGlobalTypeCSS('property', root, false);
     // Folded into the global line rather than given their own: they are all
     // at-rules injected once and kept forever, and leaving them out of the
     // total is what made it not a total.
     const atRuleData = (
       ['fontFace', 'counterStyle', 'function'] as const
     ).reduce(
-      (all, type) => {
-        const data = getGlobalTypeCSS(type, root);
-        return {
-          css: data.css ? `${all.css}\n${data.css}`.trim() : all.css,
-          ruleCount: all.ruleCount + data.ruleCount,
-          size: all.size + data.size,
-        };
+      (total, type) => {
+        const data = getGlobalTypeCSS(type, root, false);
+        total.ruleCount += data.ruleCount;
+        total.size += data.size;
+        return total;
       },
-      { css: '', ruleCount: 0, size: 0 },
+      { ruleCount: 0, size: 0 },
     );
+
+    const hotRuleCount = countRules(hotCSS);
+    const globalRuleCount = globalData.ruleCount + atRuleData.ruleCount;
+    const globalCSSSize = globalData.size + atRuleData.size;
 
     const totalRuleCount =
       activeRuleCount +
       unusedRuleCount +
-      countRules(hotCSS) +
-      globalData.ruleCount +
-      atRuleData.ruleCount +
+      hotRuleCount +
+      globalRuleCount +
       rawData.ruleCount +
       kfData.ruleCount +
       propData.ruleCount;
@@ -773,14 +783,14 @@ export const tastyDebug = {
       totalStyledClasses,
       activeCSSSize: activeCSS.length,
       unusedCSSSize: unusedCSS.length,
-      globalCSSSize: globalData.size + atRuleData.size,
+      globalCSSSize,
       rawCSSSize: rawData.size,
       keyframesCSSSize: kfData.size,
       propertyCSSSize: propData.size,
       totalCSSSize: allCSS.length,
       activeRuleCount,
       unusedRuleCount,
-      globalRuleCount: globalData.ruleCount + atRuleData.ruleCount,
+      globalRuleCount,
       rawRuleCount: rawData.ruleCount,
       keyframesRuleCount: kfData.ruleCount,
       propertyRuleCount: propData.ruleCount,
@@ -801,10 +811,10 @@ export const tastyDebug = {
       );
       if (hotClasses.length)
         console.log(
-          `Held:     ${hotClasses.length} classes, ${countRules(hotCSS)} rules, ${fmtSize(hotCSS.length)} (not rendered, not yet collectable)`,
+          `Held:     ${hotClasses.length} classes, ${hotRuleCount} rules, ${fmtSize(hotCSS.length)} (not rendered, not yet collectable)`,
         );
       console.log(
-        `Global:   ${globalData.ruleCount + atRuleData.ruleCount} rules, ${fmtSize(globalData.size + atRuleData.size)}`,
+        `Global:   ${globalRuleCount} rules, ${fmtSize(globalCSSSize)}`,
       );
       if (rawData.ruleCount)
         console.log(

@@ -231,7 +231,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.34 kB"
+      "limit": "57.3 kB"
     },
     {
       "name": "main (tasty)",
@@ -261,7 +261,7 @@
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "54.3 kB"
+      "limit": "54.27 kB"
     },
     {
       "name": "static",

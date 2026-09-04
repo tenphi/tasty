@@ -66,7 +66,6 @@ type       DimensionStyleProps
 value      DIRECTIONS
 value      DISPLAY_CHUNK_STYLES
 type       DisposeFunction
-value      dotize
 value      Element
 type       ElementsDefinition
 type       ExtraBaseStyleProps
@@ -348,7 +347,6 @@ type       DimensionStyleProps
 value      DIRECTIONS
 value      DISPLAY_CHUNK_STYLES
 type       DisposeFunction
-value      dotize
 type       ExtraBaseStyleProps
 value      filterBaseProps
 value      filterMods

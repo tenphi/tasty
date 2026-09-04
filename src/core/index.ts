@@ -129,7 +129,6 @@ export type {
   StyleValueStateMap,
 } from '../utils/styles';
 export * from '../utils/mod-attrs';
-export * from '../utils/dotize';
 export * from '../utils/merge-styles';
 export { resolveRecipes } from '../utils/resolve-recipes';
 export * from '../utils/process-tokens';

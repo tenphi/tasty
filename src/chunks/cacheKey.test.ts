@@ -10,6 +10,54 @@ function chunksOf(styles: Styles): [string, string[]][] {
   ][];
 }
 
+describe('categorizeStyleKeys', () => {
+  it('orders chunks and their keys deterministically', () => {
+    const forward = chunksOf({
+      zIndex: 1,
+      color: '#text',
+      width: '10x',
+      border: '1bw solid #border',
+      display: 'flex',
+    } as Styles);
+    const reverse = chunksOf({
+      display: 'flex',
+      border: '1bw solid #border',
+      width: '10x',
+      color: '#text',
+      zIndex: 1,
+    } as Styles);
+
+    expect(forward).toEqual(reverse);
+    expect(forward).toEqual([
+      ['appearance', ['border', 'color']],
+      ['dimension', ['width']],
+      ['display', ['display']],
+      ['position', ['zIndex']],
+    ]);
+  });
+
+  it('groups selectors separately and skips non-style helper keys', () => {
+    expect(
+      chunksOf({
+        $: '& > *',
+        '@keyframes': {},
+        '@property': {},
+        '@font-face': {},
+        '@counter-style': {},
+        '@function': {},
+        recipe: 'card',
+        '@active': ':hover',
+        customStyle: 'value',
+        '& > span': { color: '#text' },
+        Icon: { color: '#icon' },
+      } as unknown as Styles),
+    ).toEqual([
+      ['misc', ['@active', 'customStyle']],
+      ['subcomponents', ['& > span', 'Icon']],
+    ]);
+  });
+});
+
 describe('generateChunkCacheKey', () => {
   it('preserves the cache-key wire format', () => {
     const styles = { display: 'flex', flow: 'column' } as Styles;

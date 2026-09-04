@@ -1,6 +1,6 @@
 import { predefine, styleHandlers } from './predefined';
 
-const { STYLE_HANDLER_MAP } = predefine();
+const STYLE_HANDLER_MAP = predefine();
 
 export { STYLE_HANDLER_MAP, styleHandlers };
 export * from './createStyle';

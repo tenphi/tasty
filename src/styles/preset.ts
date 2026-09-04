@@ -12,6 +12,8 @@ const PRESET_MODIFIERS = new Set([
   'normal',
 ]);
 
+const SANS_FONT = 'var(--font-sans, var(--font-sans-fallback))';
+
 /**
  * Convert a value to CSS, handling numbers as pixels for numeric properties
  */
@@ -24,48 +26,38 @@ function toCSS(
     return isNumeric ? `${value}px` : String(value);
   }
   // Parse through style parser to handle custom units like 1x, 2r, etc.
-  const processed = parseStyle(String(value));
+  const processed = parseStyle(value);
   // A `$name-color` reference lands in the color bucket, not `values`, so the
   // fallback still has to substitute custom properties rather than emit the
   // raw DSL.
-  return (
-    processed.groups[0]?.values[0] || resolveCustomProperties(String(value))
-  );
+  return processed.groups[0]?.values[0] || resolveCustomProperties(value);
 }
 
 function setCSSValue(
   styles: CSSMap,
   styleName: string,
   presetName: string,
-  { varOnly, cssOnly }: { varOnly?: boolean; cssOnly?: boolean } = {},
+  mode?: 'var' | 'css',
 ) {
-  const value = (() => {
-    if (CSS_WIDE_KEYWORDS.has(presetName)) {
-      return presetName;
-    }
+  let value = presetName;
 
-    const defaultValue = `var(--default-${styleName}${
-      styleName === 'font-family'
-        ? ', var(--font-sans, var(--font-sans-fallback))'
-        : ''
-    })`;
-    const fontSuffix =
-      styleName === 'font-family'
-        ? ', var(--font-sans, var(--font-sans-fallback))'
-        : '';
+  if (!CSS_WIDE_KEYWORDS.has(presetName)) {
+    const fontSuffix = styleName === 'font-family' ? `, ${SANS_FONT}` : '';
+
+    const defaultValue = `var(--default-${styleName}${fontSuffix})`;
 
     if (presetName === 'default') {
-      return `${defaultValue}${fontSuffix}`;
+      value = `${defaultValue}${fontSuffix}`;
     } else {
-      return `var(--${presetName}-${styleName}, ${defaultValue})${fontSuffix}`;
+      value = `var(--${presetName}-${styleName}, ${defaultValue})${fontSuffix}`;
     }
-  })();
+  }
 
-  if (!cssOnly) {
+  if (mode !== 'css') {
     styles[`--${styleName}`] = value;
   }
 
-  if (!varOnly) {
+  if (mode !== 'var') {
     styles[styleName] = value;
   }
 }
@@ -109,10 +101,10 @@ function resolveFontFamily(
   }
 
   if (font === true) {
-    return 'var(--font-sans, var(--font-sans-fallback))';
+    return SANS_FONT;
   }
 
-  return `${resolveCustomProperties(font)}, var(--font-sans, var(--font-sans-fallback))`;
+  return `${resolveCustomProperties(font)}, ${SANS_FONT}`;
 }
 
 /**
@@ -181,44 +173,37 @@ export function presetStyle({
         : nameToken || 'inherit';
 
     const modTokens = isModOnly ? nameTokens : (modPart?.all ?? []);
-    const activeMods = new Set<string>();
-    for (const tok of modTokens) {
-      if (PRESET_MODIFIERS.has(tok)) {
-        activeMods.add(tok);
-      }
-    }
-
-    const isStrong = activeMods.has('strong') || activeMods.has('bold');
-    const isItalic = activeMods.has('italic');
-    const isIcon = activeMods.has('icon');
-    const isTight = activeMods.has('tight');
-    const isNormal = activeMods.has('normal');
+    const isStrong = modTokens.includes('strong') || modTokens.includes('bold');
+    const isItalic = modTokens.includes('italic');
+    const isIcon = modTokens.includes('icon');
+    const isTight = modTokens.includes('tight');
+    const isNormal = modTokens.includes('normal');
 
     // Set preset values for properties not explicitly overridden
     if (fontSize == null) {
-      setCSSValue(styles, 'font-size', name, { cssOnly: true });
+      setCSSValue(styles, 'font-size', name, 'css');
     }
     if (lineHeight == null) {
-      setCSSValue(styles, 'line-height', name, { cssOnly: true });
+      setCSSValue(styles, 'line-height', name, 'css');
     }
     if (letterSpacing == null) {
-      setCSSValue(styles, 'letter-spacing', name, { cssOnly: true });
+      setCSSValue(styles, 'letter-spacing', name, 'css');
     }
     if (fontWeight == null) {
-      setCSSValue(styles, 'font-weight', name, { cssOnly: true });
+      setCSSValue(styles, 'font-weight', name, 'css');
     }
     if (fontStyle == null) {
-      setCSSValue(styles, 'font-style', name, { cssOnly: true });
+      setCSSValue(styles, 'font-style', name, 'css');
     }
     if (textTransform == null) {
-      setCSSValue(styles, 'text-transform', name, { cssOnly: true });
+      setCSSValue(styles, 'text-transform', name, 'css');
     }
     if (fontFamily == null && font == null) {
-      setCSSValue(styles, 'font-family', name, { cssOnly: true });
+      setCSSValue(styles, 'font-family', name, 'css');
     }
 
-    setCSSValue(styles, 'bold-font-weight', name, { varOnly: true });
-    setCSSValue(styles, 'icon-size', name, { varOnly: true });
+    setCSSValue(styles, 'bold-font-weight', name, 'var');
+    setCSSValue(styles, 'icon-size', name, 'var');
 
     if (isStrong) {
       styles['font-weight'] = 'var(--bold-font-weight)';

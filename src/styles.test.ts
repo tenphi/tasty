@@ -491,6 +491,30 @@ describe('Tasty style tests', () => {
     );
   });
 
+  it('should apply every recognized preset modifier and ignore extras', () => {
+    expect(
+      presetStyle({
+        preset: 't3 / unknown strong italic icon tight normal extra',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        'font-weight': 'var(--bold-font-weight)',
+        'font-style': 'italic',
+        'font-size': 'var(--icon-size)',
+        'line-height': 'normal',
+      }),
+    );
+  });
+
+  it('should share the sans fallback across preset and direct font output', () => {
+    expect(presetStyle({ font: true })).toEqual({
+      'font-family': 'var(--font-sans, var(--font-sans-fallback))',
+    });
+    expect(presetStyle({ font: 'Inter' })).toEqual({
+      'font-family': 'Inter, var(--font-sans, var(--font-sans-fallback))',
+    });
+  });
+
   it('should handle flow styles', () => {
     expect(flowStyle({ flow: 'row nowrap' })).toEqual(null);
   });

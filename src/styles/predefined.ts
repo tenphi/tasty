@@ -99,6 +99,10 @@ type StyleHandlerMap = Record<string, AnyStyleHandler[]>;
 
 const STYLE_HANDLER_MAP: StyleHandlerMap = {};
 
+function addStyleHandler(name: string, handler: AnyStyleHandler): void {
+  (STYLE_HANDLER_MAP[name] ??= []).push(handler);
+}
+
 // Store initial handler state for reset functionality
 let initialHandlerMapSnapshot: StyleHandlerMap | null = null;
 
@@ -135,35 +139,9 @@ export function resetHandlers(): void {
   }
 }
 
-function defineCustomStyle(
-  names: string[] | AnyStyleHandler,
-  handler?: RawStyleHandler,
-) {
-  let handlerWithLookup: AnyStyleHandler;
-
-  if (typeof names === 'function') {
-    handlerWithLookup = names;
-    names = handlerWithLookup.__lookupStyles;
-  } else if (handler) {
-    handlerWithLookup = Object.assign(handler, {
-      __lookupStyles: names,
-    }) as AnyStyleHandler;
-  } else {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[Tasty] incorrect custom style definition:', names);
-    }
-    return;
-  }
-
-  if (Array.isArray(names)) {
-    // just to pass type checking
-    names.forEach((name) => {
-      if (!STYLE_HANDLER_MAP[name]) {
-        STYLE_HANDLER_MAP[name] = [];
-      }
-
-      STYLE_HANDLER_MAP[name].push(handlerWithLookup);
-    });
+function defineCustomStyle(handler: AnyStyleHandler): void {
+  for (const name of handler.__lookupStyles) {
+    addStyleHandler(name, handler);
   }
 }
 
@@ -176,13 +154,7 @@ function defineStyleAlias(
   cssStyleName?: string,
   converter?: ConverterHandler,
 ) {
-  const styleHandler = createStyle(styleName, cssStyleName, converter);
-
-  if (!STYLE_HANDLER_MAP[styleName]) {
-    STYLE_HANDLER_MAP[styleName] = [];
-  }
-
-  STYLE_HANDLER_MAP[styleName].push(styleHandler);
+  addStyleHandler(styleName, createStyle(styleName, cssStyleName, converter));
 }
 
 export function predefine() {
@@ -237,7 +209,7 @@ export function predefine() {
   // Capture initial state after all built-in handlers are registered
   captureInitialHandlerState();
 
-  return { STYLE_HANDLER_MAP, defineCustomStyle, defineStyleAlias };
+  return STYLE_HANDLER_MAP;
 }
 
 // ============================================================================
@@ -522,12 +494,7 @@ export function registerHandler(
 
   // Register the new handler under its lookup styles
   for (const styleName of lookupStyles) {
-    const existing = STYLE_HANDLER_MAP[styleName];
-    if (existing) {
-      existing.push(handler);
-    } else {
-      STYLE_HANDLER_MAP[styleName] = [handler];
-    }
+    addStyleHandler(styleName, handler);
   }
 }
 

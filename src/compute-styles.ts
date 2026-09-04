@@ -36,12 +36,10 @@ import type { FontFaceDescriptors, KeyframesSteps } from './injector/types';
 import {
   extractLocalCounterStyle,
   formatCounterStyleRule,
-  hasLocalCounterStyle,
 } from './counter-style';
 import {
   extractLocalFunctions,
   formatFunctionRule,
-  hasLocalFunctions,
   parseFunctionName,
   registerLocalFunctionPolyfills,
 } from './functions';
@@ -49,7 +47,6 @@ import {
   extractLocalFontFace,
   fontFaceContentHash,
   formatFontFaceRule,
-  hasLocalFontFace,
 } from './font-face';
 import {
   extractAnimationNamesFromStyles,
@@ -61,14 +58,14 @@ import {
   resolveKeyframesNames,
   replaceAnimationNames,
 } from './keyframes';
-import type { RenderResult, StyleResult } from './pipeline';
+import type { StyleResult } from './pipeline';
 import {
   flushPendingCSS,
   getRSCCache,
   rscAllocateClassName,
 } from './rsc-cache';
 import type { RSCStyleCache } from './rsc-cache';
-import { extractLocalProperties, hasLocalProperties } from './properties';
+import { extractLocalProperties } from './properties';
 import { collectAutoInferredProperties } from './ssr/collect-auto-properties';
 import type { ServerStyleCollector } from './ssr/collector';
 import { formatKeyframesCSS } from './ssr/format-keyframes';
@@ -99,11 +96,9 @@ export interface ComputeStylesOptions {
 }
 
 interface ProcessedChunk {
-  name: string;
-  styleKeys: string[];
-  cacheKey: string;
-  renderResult: RenderResult;
   className: string;
+  /** Rules retained only on the SSR path for automatic property inference. */
+  rules?: StyleResult[];
   /** Local animations this chunk runs, by their authored names. */
   animations?: string[];
 }
@@ -115,37 +110,20 @@ const EMPTY_RESULT: ComputeStylesResult = { className: '' };
 // ---------------------------------------------------------------------------
 
 /**
- * Mark internals as emitted for this RSC request.
- *
- * Internals (tokens, @property, @font-face, @counter-style) are emitted
- * exclusively by the SSR collector via ServerStyleCollector.collectInternals().
- * The SSR path is reliable because TastyRegistry is always present as a
- * client component in the root layout, guaranteeing SSR runs for every page.
- *
- * Previously this function also emitted internals and coordinated with SSR
- * via a globalThis flag, but that flag leaked across requests in the same
- * Node.js process, causing pages without RSC-rendered tasty components
- * (e.g. the playground route) to lose all token CSS.
- */
-function collectInternalsRSC(rscCache: RSCStyleCache): string {
-  if (rscCache.internalsEmitted) return '';
-  rscCache.internalsEmitted = true;
-
-  return '';
-}
-
-/**
  * Collect per-component ancillary CSS (keyframes, @property, font-face,
  * counter-style) for RSC mode.
  */
-function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
+function collectAncillaryRSC(
+  rscCache: RSCStyleCache,
+  styles: Styles,
+  usedKf: Record<string, KeyframesSteps> | null,
+  keyframeNames: Map<string, string> | null,
+): string {
   const parts: string[] = [];
 
-  const usedKf = getUsedKeyframes(styles);
-  const rscKeyframeNames = usedKf ? resolveKeyframesNames(usedKf) : null;
-  if (usedKf && rscKeyframeNames) {
+  if (usedKf && keyframeNames) {
     for (const [authored, steps] of Object.entries(usedKf)) {
-      const name = rscKeyframeNames.get(authored) as string;
+      const name = keyframeNames.get(authored) as string;
       const key = `__kf:${name}`;
       if (!rscCache.emittedKeys.has(key)) {
         rscCache.emittedKeys.add(key);
@@ -154,53 +132,47 @@ function collectAncillaryRSC(rscCache: RSCStyleCache, styles: Styles): string {
     }
   }
 
-  if (hasLocalProperties(styles)) {
-    const localProperties = extractLocalProperties(styles);
-    if (localProperties) {
-      for (const [token, definition] of Object.entries(localProperties)) {
-        const key = `__prop:${token}`;
+  const localProperties = extractLocalProperties(styles);
+  if (localProperties) {
+    for (const [token, definition] of Object.entries(localProperties)) {
+      const key = `__prop:${token}`;
+      if (!rscCache.emittedKeys.has(key)) {
+        rscCache.emittedKeys.add(key);
+        const css = formatPropertyCSS(token, definition);
+        if (css) parts.push(css);
+      }
+    }
+  }
+
+  const localFontFace = extractLocalFontFace(styles);
+  if (localFontFace) {
+    for (const [family, input] of Object.entries(localFontFace)) {
+      const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+        ? input
+        : [input];
+      for (const desc of descriptors) {
+        const hash = fontFaceContentHash(family, desc);
+        const key = `__ff:${hash}`;
         if (!rscCache.emittedKeys.has(key)) {
           rscCache.emittedKeys.add(key);
-          const css = formatPropertyCSS(token, definition);
-          if (css) parts.push(css);
+          parts.push(formatFontFaceRule(family, desc));
         }
       }
     }
   }
 
-  if (hasLocalFontFace(styles)) {
-    const localFontFace = extractLocalFontFace(styles);
-    if (localFontFace) {
-      for (const [family, input] of Object.entries(localFontFace)) {
-        const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-          ? input
-          : [input];
-        for (const desc of descriptors) {
-          const hash = fontFaceContentHash(family, desc);
-          const key = `__ff:${hash}`;
-          if (!rscCache.emittedKeys.has(key)) {
-            rscCache.emittedKeys.add(key);
-            parts.push(formatFontFaceRule(family, desc));
-          }
-        }
+  const localCounterStyle = extractLocalCounterStyle(styles);
+  if (localCounterStyle) {
+    for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+      const key = `__cs:${name}:${JSON.stringify(descriptors)}`;
+      if (!rscCache.emittedKeys.has(key)) {
+        rscCache.emittedKeys.add(key);
+        parts.push(formatCounterStyleRule(name, descriptors));
       }
     }
   }
 
-  if (hasLocalCounterStyle(styles)) {
-    const localCounterStyle = extractLocalCounterStyle(styles);
-    if (localCounterStyle) {
-      for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        const key = `__cs:${name}:${JSON.stringify(descriptors)}`;
-        if (!rscCache.emittedKeys.has(key)) {
-          rscCache.emittedKeys.add(key);
-          parts.push(formatCounterStyleRule(name, descriptors));
-        }
-      }
-    }
-  }
-
-  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled()) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -235,8 +207,9 @@ function computeStylesRSC(
   const pendingCSS = flushPendingCSS(rscCache);
   if (pendingCSS) cssParts.push(pendingCSS);
 
-  const internalsCSS = collectInternalsRSC(rscCache);
-  if (internalsCSS) cssParts.push(internalsCSS);
+  // Global internals are emitted by the SSR collector. This marker only keeps
+  // the RSC request state aligned with that collector-owned lifecycle.
+  rscCache.internalsEmitted = true;
 
   for (const [chunkName, chunkStyleKeys] of chunkMap) {
     if (chunkStyleKeys.length === 0) continue;
@@ -272,7 +245,12 @@ function computeStylesRSC(
     }
   }
 
-  const ancillaryCSS = collectAncillaryRSC(rscCache, styles);
+  const ancillaryCSS = collectAncillaryRSC(
+    rscCache,
+    styles,
+    rscUsedKf,
+    rscKeyframeNames,
+  );
   if (ancillaryCSS) cssParts.push(ancillaryCSS);
 
   if (classNames.length === 0) return EMPTY_RESULT;
@@ -333,7 +311,7 @@ function processChunkSSR(
   const renderResult = renderStylesForChunk(styles, chunkName, styleKeys);
   if (renderResult.rules.length === 0) return null;
 
-  const { animations, rules, cacheKey } = applyKeyframeNames(
+  const { rules, cacheKey } = applyKeyframeNames(
     renderResult.rules,
     baseKey,
     keyframeNames,
@@ -343,23 +321,10 @@ function processChunkSSR(
 
   if (isNewAllocation) {
     collector.collectChunk(cacheKey, className, rules);
-    return {
-      name: chunkName,
-      styleKeys,
-      cacheKey,
-      renderResult: { ...renderResult, rules },
-      className,
-      animations,
-    };
+    return { className, rules };
   }
 
-  return {
-    name: chunkName,
-    styleKeys,
-    cacheKey,
-    renderResult: { rules: [] },
-    className,
-  };
+  return { className, rules: [] };
 }
 
 /**
@@ -446,10 +411,6 @@ function processChunkSync(
   });
 
   return {
-    name: chunkName,
-    styleKeys,
-    cacheKey: injectKey,
-    renderResult: { ...renderResult, rules },
     className,
     animations,
   };
@@ -462,39 +423,33 @@ function injectAncillarySync(
   styles: Styles,
   root?: Document | ShadowRoot,
 ): void {
-  if (hasLocalProperties(styles)) {
-    const localProperties = extractLocalProperties(styles);
-    if (localProperties) {
-      for (const [token, definition] of Object.entries(localProperties)) {
-        property(token, { ...definition, root });
+  const localProperties = extractLocalProperties(styles);
+  if (localProperties) {
+    for (const [token, definition] of Object.entries(localProperties)) {
+      property(token, { ...definition, root });
+    }
+  }
+
+  const localFontFace = extractLocalFontFace(styles);
+  if (localFontFace) {
+    for (const [family, input] of Object.entries(localFontFace)) {
+      const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+        ? input
+        : [input];
+      for (const desc of descriptors) {
+        fontFace(family, desc, { root });
       }
     }
   }
 
-  if (hasLocalFontFace(styles)) {
-    const localFontFace = extractLocalFontFace(styles);
-    if (localFontFace) {
-      for (const [family, input] of Object.entries(localFontFace)) {
-        const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-          ? input
-          : [input];
-        for (const desc of descriptors) {
-          fontFace(family, desc, { root });
-        }
-      }
+  const localCounterStyle = extractLocalCounterStyle(styles);
+  if (localCounterStyle) {
+    for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+      counterStyle(name, descriptors, { root });
     }
   }
 
-  if (hasLocalCounterStyle(styles)) {
-    const localCounterStyle = extractLocalCounterStyle(styles);
-    if (localCounterStyle) {
-      for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        counterStyle(name, descriptors, { root });
-      }
-    }
-  }
-
-  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled()) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -511,58 +466,52 @@ function collectAncillarySSR(
   collector: ServerStyleCollector,
   styles: Styles,
   chunks: ProcessedChunk[],
+  usedKf: Record<string, KeyframesSteps> | null,
+  keyframeNames: Map<string, string> | null,
 ): void {
-  const usedKf = getUsedKeyframes(styles);
-  if (usedKf) {
+  if (usedKf && keyframeNames) {
     // Emitted under the resolved name, so two different `fade` definitions are
     // two rules rather than one deduplicated by name — and so the client
     // agrees about which one a class animates.
-    const names = resolveKeyframesNames(usedKf);
     for (const [authored, steps] of Object.entries(usedKf)) {
-      const name = names.get(authored) as string;
+      const name = keyframeNames.get(authored) as string;
       collector.collectKeyframes(name, formatKeyframesCSS(name, steps));
     }
   }
 
-  if (hasLocalProperties(styles)) {
-    const localProperties = extractLocalProperties(styles);
-    if (localProperties) {
-      for (const [token, definition] of Object.entries(localProperties)) {
-        const css = formatPropertyCSS(token, definition);
-        if (css) {
-          collector.collectProperty(token, css);
-        }
+  const localProperties = extractLocalProperties(styles);
+  if (localProperties) {
+    for (const [token, definition] of Object.entries(localProperties)) {
+      const css = formatPropertyCSS(token, definition);
+      if (css) {
+        collector.collectProperty(token, css);
       }
     }
   }
 
-  if (hasLocalFontFace(styles)) {
-    const localFontFace = extractLocalFontFace(styles);
-    if (localFontFace) {
-      for (const [family, input] of Object.entries(localFontFace)) {
-        const descriptors: FontFaceDescriptors[] = Array.isArray(input)
-          ? input
-          : [input];
-        for (const desc of descriptors) {
-          const hash = fontFaceContentHash(family, desc);
-          const css = formatFontFaceRule(family, desc);
-          collector.collectFontFace(hash, css);
-        }
+  const localFontFace = extractLocalFontFace(styles);
+  if (localFontFace) {
+    for (const [family, input] of Object.entries(localFontFace)) {
+      const descriptors: FontFaceDescriptors[] = Array.isArray(input)
+        ? input
+        : [input];
+      for (const desc of descriptors) {
+        const hash = fontFaceContentHash(family, desc);
+        const css = formatFontFaceRule(family, desc);
+        collector.collectFontFace(hash, css);
       }
     }
   }
 
-  if (hasLocalCounterStyle(styles)) {
-    const localCounterStyle = extractLocalCounterStyle(styles);
-    if (localCounterStyle) {
-      for (const [name, descriptors] of Object.entries(localCounterStyle)) {
-        const css = formatCounterStyleRule(name, descriptors);
-        collector.collectCounterStyle(name, css);
-      }
+  const localCounterStyle = extractLocalCounterStyle(styles);
+  if (localCounterStyle) {
+    for (const [name, descriptors] of Object.entries(localCounterStyle)) {
+      const css = formatCounterStyleRule(name, descriptors);
+      collector.collectCounterStyle(name, css);
     }
   }
 
-  if (!isFunctionsPolyfillEnabled() && hasLocalFunctions(styles)) {
+  if (!isFunctionsPolyfillEnabled()) {
     const localFunctions = extractLocalFunctions(styles);
     if (localFunctions) {
       for (const [name, definition] of Object.entries(localFunctions)) {
@@ -573,7 +522,7 @@ function collectAncillarySSR(
   }
 
   if (getConfig().autoPropertyTypes !== false) {
-    const allRules = chunks.flatMap((c) => c.renderResult.rules);
+    const allRules = chunks.flatMap((chunk) => chunk.rules ?? []);
     if (allRules.length > 0) {
       collectAutoInferredProperties(allRules, collector, styles);
     }
@@ -612,7 +561,7 @@ export function computeStyles(
 
   // @function polyfill: register local definitions as inline closures BEFORE
   // any chunk is rendered, so call sites in this component expand to plain CSS.
-  if (isFunctionsPolyfillEnabled() && hasLocalFunctions(resolved)) {
+  if (isFunctionsPolyfillEnabled()) {
     registerLocalFunctionPolyfills(resolved);
   }
 
@@ -643,7 +592,7 @@ export function computeStyles(
       if (chunk) chunks.push(chunk);
     }
 
-    collectAncillarySSR(collector, resolved, chunks);
+    collectAncillarySSR(collector, resolved, chunks, ssrKf, ssrKeyframeNames);
   } else if (typeof document === 'undefined') {
     // RSC path: render CSS to strings for inline <style> emission
     return computeStylesRSC(resolved, chunkMap, stableStyles);

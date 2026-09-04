@@ -231,13 +231,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "58 kB"
+      "limit": "57.9 kB"
     },
     {
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "50.4 kB"
+      "limit": "50.3 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -255,13 +255,13 @@
       "name": "main (useRawCSS)",
       "path": "dist/index.js",
       "import": "{ useRawCSS }",
-      "limit": "31.4 kB"
+      "limit": "31.3 kB"
     },
     {
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "55 kB"
+      "limit": "54.9 kB"
     },
     {
       "name": "static",
@@ -289,7 +289,7 @@
         "path",
         "crypto"
       ],
-      "limit": "41 kB"
+      "limit": "40.8 kB"
     },
     {
       "name": "astro client",
@@ -307,7 +307,7 @@
         "node:module",
         "node:path"
       ],
-      "limit": "37 kB"
+      "limit": "36.9 kB"
     }
   ]
 }

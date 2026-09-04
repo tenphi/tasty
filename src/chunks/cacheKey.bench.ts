@@ -56,6 +56,9 @@ function toEntry(styles: Styles): Entry {
 const pool: Entry[] = Array.from({ length: POOL_SIZE }, (_, i) =>
   toEntry(makeStyles(i)),
 );
+const localStatePool: Styles[] = Array.from({ length: POOL_SIZE }, (_, i) =>
+  makeStylesWithLocalStates(i),
+);
 
 // One stable object, the shape a `tasty({ styles })` definition produces.
 const warm = toEntry(makeStyles(0));
@@ -89,6 +92,20 @@ function freshCopy(): Entry {
     chunks: entry.chunks,
   };
 }
+
+describe('categorizeStyleKeys', () => {
+  bench('typical component styles', () => {
+    categorizeStyleKeys(
+      pool[idx++ % POOL_SIZE].styles as Record<string, unknown>,
+    );
+  });
+
+  bench('component styles with local states', () => {
+    categorizeStyleKeys(
+      localStatePool[idx++ % POOL_SIZE] as Record<string, unknown>,
+    );
+  });
+});
 
 describe('generateChunkCacheKey', () => {
   bench('all chunks (fresh styles object every call)', () => {

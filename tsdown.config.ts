@@ -130,7 +130,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /[\\/](?:parser[\\/].+|plugins[\\/].+|utils[\\/](?:color-math|color-space|colors|dotize|function-color|string|styles)\.ts)$/,
+                /[\\/](?:parser[\\/].+|plugins[\\/].+|utils[\\/](?:color-math|color-space|colors|function-color|string|styles)\.ts)$/,
               ),
             priority: 80,
           },

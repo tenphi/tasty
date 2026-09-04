@@ -87,13 +87,6 @@ const CHUNK_ORDER: readonly string[] = [
   CHUNK_NAMES.SUBCOMPONENTS,
 ] as const;
 
-/**
- * Map from chunk name to its priority index for sorting.
- */
-const _CHUNK_PRIORITY = new Map<string, number>(
-  CHUNK_ORDER.map((name, index) => [name, index]),
-);
-
 // ============================================================================
 // Chunk Info Interface
 // ============================================================================
@@ -123,9 +116,8 @@ export function categorizeStyleKeys(
 ): Map<string, string[]> {
   // First pass: collect keys into chunks (unordered)
   const chunkData: Record<string, string[]> = {};
-  const keys = Object.keys(styles);
 
-  for (const key of keys) {
+  for (const key of Object.keys(styles)) {
     // Skip the $ helper key (used for selector combinators)
     // Skip @keyframes and @property (processed separately in useStyles)
     // Skip recipe (resolved before pipeline by resolveRecipes)
@@ -141,20 +133,11 @@ export function categorizeStyleKeys(
       continue;
     }
 
-    if (isSelector(key)) {
-      // All selectors go into the subcomponents chunk
-      if (!chunkData[CHUNK_NAMES.SUBCOMPONENTS]) {
-        chunkData[CHUNK_NAMES.SUBCOMPONENTS] = [];
-      }
-      chunkData[CHUNK_NAMES.SUBCOMPONENTS].push(key);
-    } else {
-      // Look up the chunk for this style, default to misc
-      const chunkName = STYLE_TO_CHUNK.get(key) ?? CHUNK_NAMES.MISC;
-      if (!chunkData[chunkName]) {
-        chunkData[chunkName] = [];
-      }
-      chunkData[chunkName].push(key);
-    }
+    // All selectors share their own chunk; unknown styles fall back to misc.
+    const chunkName = isSelector(key)
+      ? CHUNK_NAMES.SUBCOMPONENTS
+      : (STYLE_TO_CHUNK.get(key) ?? CHUNK_NAMES.MISC);
+    (chunkData[chunkName] ??= []).push(key);
   }
 
   // Second pass: build ordered Map based on CHUNK_ORDER
@@ -162,9 +145,10 @@ export function categorizeStyleKeys(
 
   // Add chunks in priority order
   for (const chunkName of CHUNK_ORDER) {
-    if (chunkData[chunkName] && chunkData[chunkName].length > 0) {
+    const styleKeys = chunkData[chunkName];
+    if (styleKeys?.length) {
       // Sort keys within chunk for consistent cache key generation
-      orderedChunks.set(chunkName, chunkData[chunkName].sort());
+      orderedChunks.set(chunkName, styleKeys.sort());
     }
   }
 

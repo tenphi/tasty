@@ -7,6 +7,14 @@ const devMode = isDevEnv();
 
 const INHERIT_VALUE = '@inherit';
 
+function warnMissingInherit(key: string): void {
+  if (devMode) {
+    console.warn(
+      `[Tasty] @inherit used for state '${key}' that does not exist in the parent style map. Entry skipped.`,
+    );
+  }
+}
+
 /**
  * Check if a value is a state map (object, not array).
  */
@@ -70,50 +78,29 @@ function resolveExtendMode(
   parentMap: Record<string, unknown>,
   childMap: Record<string, unknown>,
 ): Record<string, unknown> {
-  const inheritKeys = new Set<string>();
-  const removeKeys = new Set<string>();
-  const overrideKeys = new Map<string, unknown>();
-
-  for (const key of Object.keys(childMap)) {
-    const val = childMap[key];
-    if (val === INHERIT_VALUE) {
-      if (key in parentMap) {
-        inheritKeys.add(key);
-      } else if (devMode) {
-        console.warn(
-          `[Tasty] @inherit used for state '${key}' that does not exist in the parent style map. Entry skipped.`,
-        );
-      }
-    } else if (val === null) {
-      removeKeys.add(key);
-    } else if (key in parentMap) {
-      overrideKeys.set(key, val);
-    }
-  }
-
   // 1. Parent entries in order (skip removed, skip repositioned, apply overrides)
   const result: Record<string, unknown> = {};
+  const childKeys = Object.keys(childMap);
+  const childKeySet = new Set(childKeys);
   for (const key of Object.keys(parentMap)) {
-    if (removeKeys.has(key)) continue;
-    if (inheritKeys.has(key)) continue;
-    if (overrideKeys.has(key)) {
-      result[key] = overrideKeys.get(key);
-    } else {
+    if (!childKeySet.has(key)) {
       result[key] = parentMap[key];
+      continue;
     }
+    const childValue = childMap[key];
+    if (childValue === null || childValue === INHERIT_VALUE) continue;
+    result[key] = childValue;
   }
 
   // 2. Append new + repositioned entries in child declaration order
-  for (const key of Object.keys(childMap)) {
-    if (inheritKeys.has(key)) {
-      result[key] = parentMap[key];
-    } else if (
-      !removeKeys.has(key) &&
-      !overrideKeys.has(key) &&
-      // Skip @inherit for keys that weren't in the parent (already warned above)
-      childMap[key] !== INHERIT_VALUE
-    ) {
-      result[key] = childMap[key];
+  for (const key of childKeys) {
+    const value = childMap[key];
+    if (value === INHERIT_VALUE) {
+      if (key in parentMap) {
+        result[key] = parentMap[key];
+      } else warnMissingInherit(key);
+    } else if (value !== null && !(key in parentMap)) {
+      result[key] = value;
     }
   }
 
@@ -134,11 +121,7 @@ function resolveReplaceMode(
     if (val === INHERIT_VALUE) {
       if (key in parentMap) {
         result[key] = parentMap[key];
-      } else if (devMode) {
-        console.warn(
-          `[Tasty] @inherit used for state '${key}' that does not exist in the parent style map. Entry skipped.`,
-        );
-      }
+      } else warnMissingInherit(key);
     } else if (val !== null) {
       result[key] = val;
     }

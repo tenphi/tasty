@@ -231,13 +231,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "57.1 kB"
+      "limit": "57.07 kB"
     },
     {
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "49.68 kB"
+      "limit": "49.6 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -261,13 +261,13 @@
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "54.15 kB"
+      "limit": "54.11 kB"
     },
     {
       "name": "static",
       "path": "dist/static/index.js",
       "import": "*",
-      "limit": "2.1 kB"
+      "limit": "1.08 kB"
     },
     {
       "name": "zero",

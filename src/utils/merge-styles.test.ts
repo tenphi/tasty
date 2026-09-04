@@ -150,6 +150,40 @@ describe('mergeStyles', () => {
       expect((result.fill as any)['']).toBe('#white #primary');
     });
 
+    it('should preserve an explicitly undefined state override', () => {
+      const result = mergeStyles(parentStyles, {
+        fill: {
+          hovered: undefined,
+        },
+      } as Styles);
+
+      expect(Object.keys(result.fill as object)).toEqual([
+        '',
+        'hovered',
+        'pressed',
+        'disabled',
+      ]);
+      expect('hovered' in (result.fill as object)).toBe(true);
+      expect((result.fill as any).hovered).toBeUndefined();
+    });
+
+    it('should not treat inherited child keys as overrides', () => {
+      const inherited = vi.fn(() => null);
+      const child = Object.assign(
+        Object.create({
+          get hovered() {
+            return inherited();
+          },
+        }),
+        { custom: '#custom' },
+      );
+      const result = mergeStyles(parentStyles, { fill: child } as Styles);
+
+      expect(inherited).not.toHaveBeenCalled();
+      expect((result.fill as any).hovered).toBe('#white #primary-text');
+      expect((result.fill as any).custom).toBe('#custom');
+    });
+
     it('should remove a state with null', () => {
       const result = mergeStyles(parentStyles, {
         fill: {

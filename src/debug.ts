@@ -234,7 +234,7 @@ function getOwnedClasses(root: DebugRoot = defaultRoot()): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// prettifyCSS — readable output for nested at-rules & comma selectors
+// prettifyCSS — readable output for nested rules
 // ---------------------------------------------------------------------------
 
 function prettifyCSS(css: string): string {
@@ -242,89 +242,32 @@ function prettifyCSS(css: string): string {
 
   const out: string[] = [];
   let depth = 0;
-  const indent = () => '  '.repeat(depth);
 
-  // Ensure braces are surrounded by spaces for splitting.
-  const normalized = css
+  const lines = css
     .replace(/\s+/g, ' ')
     .trim()
-    .replaceAll('{', ' { ')
-    .replaceAll('}', ' } ')
-    .replaceAll(';', '; ');
+    .replaceAll(' {', '{')
+    .replaceAll('{', ' {\n')
+    .replaceAll('}', '\n}\n')
+    .replaceAll(';', ';\n')
+    .split('\n');
 
-  const tokens = normalized.split(/\s+/);
-  let buf = '';
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
 
-  for (const t of tokens) {
-    if (t === '{') {
-      // buf contains the selector / at-rule header
-      const header = buf.trim();
-      if (header) {
-        // Split comma-separated selectors onto their own lines
-        // but only if the comma is outside parentheses
-        const parts = splitOutsideParens(header);
-        if (parts.length > 1) {
-          out.push(
-            parts
-              .map((p, idx) =>
-                idx === 0
-                  ? `${indent()}${p.trim()},`
-                  : `${indent()}${p.trim()}${idx < parts.length - 1 ? ',' : ''}`,
-              )
-              .join('\n') + ' {',
-          );
-        } else {
-          out.push(`${indent()}${header} {`);
-        }
-      } else {
-        out.push(`${indent()}{`);
-      }
-      depth++;
-      buf = '';
-    } else if (t === '}') {
-      // Flush any trailing declarations
-      if (buf.trim()) {
-        for (const decl of buf.split(';').filter((s) => s.trim())) {
-          out.push(`${indent()}${decl.trim()};`);
-        }
-        buf = '';
+    if (line === '}') {
+      const last = out.at(-1);
+      if (last && !/[;{}]$/.test(last)) {
+        out[out.length - 1] += ';';
       }
       depth = Math.max(0, depth - 1);
-      out.push(`${indent()}}`);
-    } else if (t.endsWith(';')) {
-      buf += ` ${t}`;
-      const full = buf.trim();
-      if (full) out.push(`${indent()}${full}`);
-      buf = '';
-    } else {
-      buf += ` ${t}`;
     }
+    out.push(`${'  '.repeat(depth)}${line}`);
+    if (line.endsWith('{')) depth++;
   }
-  if (buf.trim()) out.push(buf.trim());
 
-  return out
-    .filter((l) => l.trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-/** Split `str` by commas only when not inside parentheses. */
-function splitOutsideParens(str: string): string[] {
-  const parts: string[] = [];
-  let depth = 0;
-  let start = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    if (ch === '(') depth++;
-    else if (ch === ')') depth--;
-    else if (depth === 0 && ch === ',') {
-      parts.push(str.slice(start, i));
-      start = i + 1;
-    }
-  }
-  parts.push(str.slice(start));
-  return parts;
+  return out.join('\n');
 }
 
 // ---------------------------------------------------------------------------

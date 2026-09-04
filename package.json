@@ -237,7 +237,7 @@
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "49.7 kB"
+      "limit": "49.68 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -278,7 +278,7 @@
         "path",
         "crypto"
       ],
-      "limit": "31.29 kB"
+      "limit": "31.25 kB"
     },
     {
       "name": "babel-plugin",
@@ -289,7 +289,7 @@
         "path",
         "crypto"
       ],
-      "limit": "40.25 kB"
+      "limit": "40.2 kB"
     },
     {
       "name": "astro client",

@@ -62,24 +62,16 @@ const BUILTIN_STATES = new Set([
   '@inherit',
 ]);
 
-// Reserved prefixes that are built-in.
-// Must stay in sync with BUILTIN_STATES above: that list gates exact names,
-// this one gates prefixes (see isCustomStateKey).
-const RESERVED_PREFIXES = [
-  '@media',
-  '@root',
-  '@parent',
-  '@own',
-  '@(',
-  '@starting',
-  '@keyframes',
-  '@property',
-  '@font-face',
-  '@counter-style',
-  '@function',
-  '@supports',
-  '@inherit',
-];
+const PREDEFINED_STATE_NAME_PATTERN = /^@[A-Za-z][A-Za-z0-9-]*$/;
+
+function isReservedStateName(name: string): boolean {
+  return (
+    name === '@media' ||
+    name === '@root' ||
+    name === '@parent' ||
+    name === '@own'
+  );
+}
 
 // Global predefined states storage
 let globalPredefinedStates: Record<string, string> = {};
@@ -116,9 +108,11 @@ export function setGlobalPredefinedStates(
   }
 
   // Validate state names
-  for (const [name, value] of Object.entries(states)) {
+  for (const name of Object.keys(states)) {
+    const value = states[name];
+
     // Check for valid name format
-    if (!/^@[A-Za-z][A-Za-z0-9-]*$/.test(name)) {
+    if (!PREDEFINED_STATE_NAME_PATTERN.test(name)) {
       warnOnce(
         `invalid-state-name:${name}`,
         `[Tasty] Invalid predefined state name '${name}'. Must start with '@' followed by a letter.`,
@@ -135,17 +129,9 @@ export function setGlobalPredefinedStates(
       continue;
     }
 
-    // Check for reserved prefixes (but only exact matches, not user-defined states like @mobile)
-    // Reserved prefixes are: @media, @root, @parent, @own, @(
-    // A user state like @mobile should NOT be blocked
-    const isReservedPrefix =
-      name === '@media' ||
-      name === '@root' ||
-      name === '@parent' ||
-      name === '@own' ||
-      name.startsWith('@(');
-
-    if (isReservedPrefix) {
+    // Reserve bare built-in function names without blocking user-defined names
+    // that merely share their prefixes (for example, @media-query).
+    if (isReservedStateName(name)) {
       warnOnce(
         `reserved-prefix:${name}`,
         `[Tasty] Cannot define predefined state '${name}'. This prefix is reserved for built-in functionality.`,
@@ -199,17 +185,18 @@ export function clearGlobalPredefinedStates(): void {
  * Matches @name that is NOT followed by ( or : and is a complete word
  * Uses word boundary and negative lookahead
  */
-const PREDEFINED_STATE_PATTERN = /@([A-Za-z][A-Za-z0-9-]*)(?![A-Za-z0-9-:(])/g;
+const PREDEFINED_STATE_PATTERN = /@[A-Za-z][A-Za-z0-9-]*(?![A-Za-z0-9-:(])/g;
 
 /**
  * Extract predefined state references from a string
  */
 export function extractPredefinedStateRefs(value: string): string[] {
-  const matches = value.matchAll(PREDEFINED_STATE_PATTERN);
+  const matches = value.match(PREDEFINED_STATE_PATTERN);
+  if (!matches) return [];
+
   const refs: string[] = [];
 
-  for (const match of matches) {
-    const stateName = '@' + match[1];
+  for (const stateName of matches) {
     // Skip built-in states (@starting) and duplicates
     // Note: @media, @root, @own are always followed by '(' so the regex
     // negative lookahead (?![A-Za-z0-9-:(]) already excludes them
@@ -225,30 +212,11 @@ export function extractPredefinedStateRefs(value: string): string[] {
  * Check if a state key is a predefined state reference
  */
 export function isPredefinedStateRef(stateKey: string): boolean {
-  if (!stateKey.startsWith('@')) return false;
-  if (BUILTIN_STATES.has(stateKey)) return false;
-
-  // Check if it's NOT a built-in prefix
-  for (const prefix of RESERVED_PREFIXES) {
-    if (stateKey === prefix || stateKey.startsWith(prefix)) {
-      // Check if it's exactly @media, @root, @parent, @own, or starts with @( or @media(
-      if (
-        stateKey === '@media' ||
-        stateKey.startsWith('@media(') ||
-        stateKey.startsWith('@media:')
-      ) {
-        return false;
-      }
-      if (stateKey === '@root' || stateKey.startsWith('@root(')) return false;
-      if (stateKey === '@parent' || stateKey.startsWith('@parent('))
-        return false;
-      if (stateKey === '@own' || stateKey.startsWith('@own(')) return false;
-      if (stateKey.startsWith('@(')) return false;
-    }
-  }
-
-  // Must match the predefined state pattern
-  return /^@[A-Za-z][A-Za-z0-9-]*$/.test(stateKey);
+  return (
+    PREDEFINED_STATE_NAME_PATTERN.test(stateKey) &&
+    !BUILTIN_STATES.has(stateKey) &&
+    !isReservedStateName(stateKey)
+  );
 }
 
 const _localStatesCache = new WeakMap<object, Record<string, string>>();
@@ -274,43 +242,31 @@ export function extractLocalPredefinedStates(
 
   const localStates: Record<string, string> = {};
 
-  for (const [key, value] of Object.entries(styles)) {
-    // Check if it's a predefined state definition (starts with @, has string value)
-    if (key.startsWith('@') && typeof value === 'string') {
-      // Validate name format - must be @[letter][letters/numbers/dashes]*
-      if (!/^@[A-Za-z][A-Za-z0-9-]*$/.test(key)) {
-        continue; // Skip invalid names silently (might be something else)
-      }
+  for (const key of Object.keys(styles)) {
+    const value = styles[key];
 
-      // Skip built-in states
-      if (BUILTIN_STATES.has(key)) {
-        continue;
-      }
-
-      // Skip reserved prefixes
-      if (
-        key === '@media' ||
-        key === '@root' ||
-        key === '@parent' ||
-        key === '@own' ||
-        key.startsWith('@(')
-      ) {
-        continue;
-      }
-
-      // Check for cross-references (predefined states cannot reference each other)
-      const crossRefs = extractPredefinedStateRefs(value);
-      if (crossRefs.length > 0) {
-        warnOnce(
-          `local-cross-ref:${key}`,
-          `[Tasty] Predefined state '${key}' references another predefined state '${crossRefs[0]}'.\n` +
-            `Predefined states cannot reference each other. Use the full definition instead.`,
-        );
-        continue;
-      }
-
-      localStates[key] = value;
+    if (
+      typeof value !== 'string' ||
+      key[0] !== '@' ||
+      !PREDEFINED_STATE_NAME_PATTERN.test(key) ||
+      BUILTIN_STATES.has(key) ||
+      isReservedStateName(key)
+    ) {
+      continue;
     }
+
+    // Check for cross-references (predefined states cannot reference each other)
+    const crossRefs = extractPredefinedStateRefs(value);
+    if (crossRefs.length > 0) {
+      warnOnce(
+        `local-cross-ref:${key}`,
+        `[Tasty] Predefined state '${key}' references another predefined state '${crossRefs[0]}'.\n` +
+          `Predefined states cannot reference each other. Use the full definition instead.`,
+      );
+      continue;
+    }
+
+    localStates[key] = value;
   }
 
   _localStatesCache.set(styles as object, localStates);
@@ -329,7 +285,7 @@ export function createStateParserContext(
 
   return {
     localPredefinedStates: localStates,
-    globalPredefinedStates: getGlobalPredefinedStates(),
+    globalPredefinedStates,
     isSubElement,
   };
 }
@@ -342,15 +298,10 @@ export function resolvePredefinedState(
   stateKey: string,
   ctx: StateParserContext,
 ): string | null {
-  // Check local first (higher priority)
-  if (ctx.localPredefinedStates[stateKey]) {
-    return ctx.localPredefinedStates[stateKey];
-  }
-
-  // Then check global
-  if (ctx.globalPredefinedStates[stateKey]) {
-    return ctx.globalPredefinedStates[stateKey];
-  }
+  // Check local first (higher priority), then global.
+  const resolved =
+    ctx.localPredefinedStates[stateKey] || ctx.globalPredefinedStates[stateKey];
+  if (resolved) return resolved;
 
   // Not found - emit warning
   warnOnce(
@@ -413,22 +364,15 @@ export function normalizeStateKey(stateKey: string): {
  * w -> width, h -> height, is -> inline-size, bs -> block-size
  */
 export function expandDimensionShorthands(condition: string): string {
-  // Replace dimension shorthands (only when they appear as standalone words)
-  let result = condition;
-
-  // w -> width (but not part of other words)
-  result = result.replace(/\bw\b/g, 'width');
-
-  // h -> height
-  result = result.replace(/\bh\b/g, 'height');
-
-  // is -> inline-size
-  result = result.replace(/\bis\b/g, 'inline-size');
-
-  // bs -> block-size
-  result = result.replace(/\bbs\b/g, 'block-size');
-
-  return result;
+  return condition.replace(/\b(?:w|h|is|bs)\b/g, (dimension) =>
+    dimension === 'w'
+      ? 'width'
+      : dimension === 'h'
+        ? 'height'
+        : dimension === 'is'
+          ? 'inline-size'
+          : 'block-size',
+  );
 }
 
 /**
@@ -436,9 +380,10 @@ export function expandDimensionShorthands(condition: string): string {
  */
 export function expandTastyUnits(value: string): string {
   // Match number followed by 'x' unit (tasty gap unit)
-  return value.replace(/(\d+(?:\.\d+)?)\s*x\b/g, (_, num) => {
-    return `calc(var(--gap) * ${num})`;
-  });
+  return value.replace(
+    /(\d+(?:\.\d+)?)\s*x\b/g,
+    (_, num) => `calc(var(--gap) * ${num})`,
+  );
 }
 
 /**

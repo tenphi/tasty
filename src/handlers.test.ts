@@ -94,6 +94,25 @@ describe('Style Handlers Configuration', () => {
     });
   });
 
+  it('registers every built-in handler under each declared lookup style', () => {
+    for (const [styleName, handlers] of Object.entries(STYLE_HANDLER_MAP)) {
+      for (const handler of handlers) {
+        expect(handler.__lookupStyles).toContain(styleName);
+      }
+    }
+
+    for (const handler of Object.values(styleHandlers)) {
+      for (const styleName of handler.__lookupStyles) {
+        expect(
+          STYLE_HANDLER_MAP[styleName]?.some(
+            (registered) =>
+              registered.__lookupStyles === handler.__lookupStyles,
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
   describe('registerHandler', () => {
     it('should replace existing handlers for lookup styles', () => {
       // Get the original handler count

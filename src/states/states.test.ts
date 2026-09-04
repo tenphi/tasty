@@ -305,8 +305,16 @@ describe('Advanced State Mapping', () => {
       });
 
       it('should not expand partial matches', () => {
-        expect(expandDimensionShorthands('width < 920px')).toBe(
-          'width < 920px',
+        expect(
+          expandDimensionShorthands(
+            'width height inline-size block-size wrist this basic',
+          ),
+        ).toBe('width height inline-size block-size wrist this basic');
+      });
+
+      it('should expand every shorthand in one condition', () => {
+        expect(expandDimensionShorthands('w > 1px and h > is and bs')).toBe(
+          'width > 1px and height > inline-size and block-size',
         );
       });
     });
@@ -375,15 +383,26 @@ describe('Advanced State Mapping', () => {
         expect(isPredefinedStateRef('@mobile')).toBe(true);
         expect(isPredefinedStateRef('@dark')).toBe(true);
         expect(isPredefinedStateRef('@compact-mode')).toBe(true);
+        expect(isPredefinedStateRef('@media-query')).toBe(true);
+        expect(isPredefinedStateRef('@rooted')).toBe(true);
+        expect(isPredefinedStateRef('@parental')).toBe(true);
+        expect(isPredefinedStateRef('@owned')).toBe(true);
       });
 
       it('should return false for built-in states', () => {
+        expect(isPredefinedStateRef('@media')).toBe(false);
+        expect(isPredefinedStateRef('@root')).toBe(false);
+        expect(isPredefinedStateRef('@parent')).toBe(false);
+        expect(isPredefinedStateRef('@own')).toBe(false);
         expect(isPredefinedStateRef('@starting')).toBe(false);
+        expect(isPredefinedStateRef('@supports')).toBe(false);
         expect(isPredefinedStateRef('@media(w < 920px)')).toBe(false);
+        expect(isPredefinedStateRef('@media:print')).toBe(false);
         expect(isPredefinedStateRef('@root(dark)')).toBe(false);
         expect(isPredefinedStateRef('@parent(hovered)')).toBe(false);
         expect(isPredefinedStateRef('@own(hovered)')).toBe(false);
         expect(isPredefinedStateRef('@(w < 600px)')).toBe(false);
+        expect(isPredefinedStateRef('@bad.name')).toBe(false);
       });
     });
 
@@ -449,6 +468,20 @@ describe('Advanced State Mapping', () => {
       expect(states['@mobile']).toBe('@media(w < 920px)');
       expect(states['@dark']).toBe('@root(theme=dark)');
     });
+
+    it('should reserve bare built-in names but allow shared prefixes', () => {
+      setGlobalPredefinedStates({
+        '@media': 'hovered',
+        '@root': 'focused',
+        '@media-query': '@media(w < 920px)',
+        '@rooted': '@root(theme=dark)',
+      });
+
+      expect(getGlobalPredefinedStates()).toEqual({
+        '@media-query': '@media(w < 920px)',
+        '@rooted': '@root(theme=dark)',
+      });
+    });
   });
 
   describe('extractLocalPredefinedStates', () => {
@@ -474,6 +507,22 @@ describe('Advanced State Mapping', () => {
       const localStates = extractLocalPredefinedStates(styles);
       expect(localStates['@mobile']).toBe('@media(w < 920px)');
       expect(Object.keys(localStates)).toHaveLength(1);
+    });
+
+    it('should only extract own valid names', () => {
+      const styles = Object.assign(
+        Object.create({ '@inherited': '@media(w < 300px)' }),
+        {
+          '@media': 'hovered',
+          '@media-query': '@media(w < 920px)',
+          '@rooted': '@root(theme=dark)',
+        },
+      );
+
+      expect(extractLocalPredefinedStates(styles)).toEqual({
+        '@media-query': '@media(w < 920px)',
+        '@rooted': '@root(theme=dark)',
+      });
     });
   });
 

@@ -2,6 +2,7 @@ import { resetConfig } from './config';
 import type * as RSCModule from './rsc-cache';
 import type { RSCStyleCache } from './rsc-cache';
 import type { Styles } from './styles/types';
+import { tasty } from './tasty';
 
 const { rscCache } = vi.hoisted(() => ({
   rscCache: {
@@ -78,5 +79,36 @@ describe('computeStyles RSC ancillary resources', () => {
 
     expect(second.className).toBe(first.className);
     expect(second.css).toBeUndefined();
+  });
+
+  it('forwards generated CSS through the tasty component RSC wrapper', () => {
+    const Box = tasty({ styles: { display: 'flex' } });
+    const render = (
+      Box as unknown as {
+        render: (props: object, ref: null) => unknown;
+      }
+    ).render;
+    const tree = render({}, null) as {
+      props: {
+        children: [
+          {
+            type: unknown;
+            props: {
+              'data-tasty-rsc'?: string;
+              dangerouslySetInnerHTML?: { __html: string };
+            };
+          },
+          { props: { className?: string } },
+        ];
+      };
+    };
+    const [style, element] = tree.props.children;
+
+    expect(style.type).toBe('style');
+    expect(style.props['data-tasty-rsc']).toBe('');
+    expect(style.props.dangerouslySetInnerHTML?.__html).toMatch(
+      /display:\s*flex/,
+    );
+    expect(element.props.className).toBeTruthy();
   });
 });

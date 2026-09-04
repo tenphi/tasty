@@ -8,10 +8,7 @@ import type {
   RefAttributes,
 } from 'react';
 import { createElement, forwardRef, Fragment } from 'react';
-import type {
-  ComputeStylesOptions,
-  ComputeStylesResult,
-} from './compute-styles';
+import type { ComputeStylesOptions } from './compute-styles';
 import { computeStyles } from './compute-styles';
 import type { PropHandlerProps } from './prop-handlers';
 import { propHandlerRegistry } from './prop-handlers';
@@ -41,30 +38,27 @@ import { touch } from './injector';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
-/** is* properties and their corresponding HTML attributes. */
-const IS_PROPERTIES = [
-  ['isDisabled', 'disabled'],
-  ['isHidden', 'hidden'],
-  ['isChecked', 'checked'],
-] as const;
-
-/**
- * Helper function to handle is* properties consistently
- * Transforms is* props to HTML attributes and adds corresponding data-* attributes
- */
-function handleIsProperties(props: Record<string, unknown>) {
-  for (const [isProperty, targetAttribute] of IS_PROPERTIES) {
-    if (isProperty in props) {
-      props[targetAttribute] = props[isProperty];
-      delete props[isProperty];
-    }
-
-    // Add data-* attribute if target attribute is truthy and doesn't already exist
-    const dataAttribute = `data-${targetAttribute}`;
-    if (!(dataAttribute in props) && props[targetAttribute]) {
-      props[dataAttribute] = '';
-    }
+/** Transform one is* prop to its HTML and matching data attributes. */
+function handleIsProperty(
+  props: Record<string, unknown>,
+  isProperty: string,
+  targetAttribute: string,
+  dataAttribute: string,
+) {
+  if (isProperty in props) {
+    props[targetAttribute] = props[isProperty];
+    delete props[isProperty];
   }
+
+  if (!(dataAttribute in props) && props[targetAttribute]) {
+    props[dataAttribute] = '';
+  }
+}
+
+function handleIsProperties(props: Record<string, unknown>) {
+  handleIsProperty(props, 'isDisabled', 'disabled', 'data-disabled');
+  handleIsProperty(props, 'isHidden', 'hidden', 'data-hidden');
+  handleIsProperty(props, 'isChecked', 'checked', 'data-checked');
 }
 
 /**
@@ -132,9 +126,9 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
       ...htmlProps,
       className,
       style: mergedStyle,
-      isDisabled,
-      isHidden,
-      isChecked,
+      isDisabled: isDisabled ?? (htmlProps as Record<string, unknown>).disabled,
+      isHidden: isHidden ?? (htmlProps as Record<string, unknown>).hidden,
+      isChecked: isChecked ?? (htmlProps as Record<string, unknown>).checked,
       ref,
     } as Record<string, unknown>;
 
@@ -850,23 +844,25 @@ function tastyElement<
     // the RSC inline-style paths are per-request, so every request must
     // call computeStyles() to ensure CSS is actually collected/emitted.
     const useFactoryCache = typeof document !== 'undefined';
-    let stylesResult: ComputeStylesResult;
-    if (
-      useFactoryCache &&
-      allStyles === baseStyles &&
-      classNameCache.has(allStyles)
-    ) {
-      stylesResult = { className: classNameCache.get(allStyles)! };
-      touch(stylesResult.className);
+    let generatedClassName =
+      useFactoryCache && allStyles === baseStyles
+        ? classNameCache.get(allStyles)
+        : undefined;
+    let rscCSS: string | undefined;
+
+    if (generatedClassName !== undefined) {
+      touch(generatedClassName);
     } else {
-      stylesResult = computeStyles(
+      const result = computeStyles(
         allStyles,
         !useFactoryCache && allStyles === baseStyles
           ? STABLE_STYLES
           : undefined,
       );
+      generatedClassName = result.className;
+      rscCSS = result.css;
       if (useFactoryCache && allStyles === baseStyles) {
-        classNameCache.set(allStyles, stylesResult.className);
+        classNameCache.set(allStyles, generatedClassName);
       }
     }
 
@@ -914,12 +910,12 @@ function tastyElement<
       >;
     }
 
-    const finalClassName = [
-      (userClassName as string) || '',
-      stylesResult.className,
-    ]
-      .filter(Boolean)
-      .join(' ');
+    let finalClassName = generatedClassName;
+    if (userClassName) {
+      finalClassName = finalClassName
+        ? `${userClassName} ${finalClassName}`
+        : userClassName;
+    }
 
     const elementProps = {
       'data-element': (element as string | undefined) || defaultElement,
@@ -948,7 +944,7 @@ function tastyElement<
     // RSC mode: wrap element with inline <style> tag.
     // Class names are extracted from these tags on the client via
     // the doubled-specificity pattern (.tXXX.tXXX), so no <script> is needed.
-    if (stylesResult.css) {
+    if (rscCSS) {
       const nonce = getConfig().nonce;
 
       return createElement(
@@ -957,7 +953,7 @@ function tastyElement<
         createElement('style', {
           'data-tasty-rsc': '',
           nonce,
-          dangerouslySetInnerHTML: { __html: stylesResult.css },
+          dangerouslySetInnerHTML: { __html: rscCSS },
         }),
         el,
       );

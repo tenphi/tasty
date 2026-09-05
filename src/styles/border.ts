@@ -1,5 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
+import { DIRECTIONS, parseStyle } from '../utils/styles';
 import { BORDER_STYLES } from './const';
 import { assignLineSlots, extractCSSWideKeyword } from './shared';
 
@@ -17,29 +17,39 @@ interface BorderValue {
   color: string;
 }
 
+interface ProcessedBorderGroup extends BorderValue {
+  modFlags: number;
+}
+
 /**
- * Process a single group and return border values for its directions.
- * @returns Object with directions as keys and border values, or null for "all directions"
+ * Process a single group and return its directional flags and border value.
  */
-function processGroup(group: GroupData): {
-  directions: Direction[];
-  borderValue: BorderValue;
-} {
+function processGroup(group: GroupData): ProcessedBorderGroup {
   const { values, mods, colors } = group;
+  let modFlags = 0;
+  let lineStyle: string | undefined;
 
-  const directions = filterMods(mods, DIRECTIONS) as Direction[];
-  const typeMods = filterMods(mods, BORDER_STYLES as unknown as string[]);
+  for (const mod of mods) {
+    if (mod === 'top') modFlags |= 1;
+    else if (mod === 'right') modFlags |= 2;
+    else if (mod === 'bottom') modFlags |= 4;
+    else if (mod === 'left') modFlags |= 8;
+    else if (mod === 'longhand') modFlags |= 16;
+    else if (
+      lineStyle === undefined &&
+      (BORDER_STYLES as readonly string[]).includes(mod)
+    ) {
+      lineStyle = mod;
+    }
+  }
 
-  const slots = assignLineSlots(values, typeMods[0], colors[0]);
+  const slots = assignLineSlots(values, lineStyle, colors[0]);
 
   const width = values[0] || 'var(--border-width)';
   const style = slots.style || 'solid';
   const color = slots.color || 'var(--border-color, currentColor)';
 
-  return {
-    directions,
-    borderValue: { width, style, color },
-  };
+  return { modFlags, width, style, color };
 }
 
 /**
@@ -78,7 +88,7 @@ export function parseBorderValue(
   const keyword = extractCSSWideKeyword(group);
   if (keyword) return keyword;
 
-  return formatBorderValue(processGroup(group).borderValue);
+  return formatBorderValue(processGroup(group));
 }
 
 /**
@@ -114,26 +124,27 @@ export function borderStyle({
 
   if (!groups.length) return null;
 
-  const useLonghand = groups.some((g) => g.mods.includes('longhand'));
-
   // Single group - use original logic for backward compatibility
   if (groups.length === 1) {
     const group = groups[0];
     const keyword = extractCSSWideKeyword(group);
 
     if (keyword) {
-      if (useLonghand) {
+      if (group.mods.includes('longhand')) {
         return expandBorder(keyword);
       }
 
       return { border: keyword };
     }
 
-    const { directions, borderValue } = processGroup(group);
+    const borderValue = processGroup(group);
+    const { modFlags } = borderValue;
+    const directionFlags = modFlags & 15;
+    const useLonghand = modFlags & 16;
 
     const styleValue = formatBorderValue(borderValue);
 
-    if (!directions.length) {
+    if (!directionFlags) {
       if (useLonghand) {
         return expandBorder(styleValue);
       }
@@ -144,10 +155,10 @@ export function borderStyle({
     const zeroValue = `0 ${borderValue.style} ${borderValue.color}`;
     const styles: Record<string, string> = {};
 
-    for (const dir of DIRECTIONS) {
-      styles[`border-${dir}`] = directions.includes(dir)
-        ? styleValue
-        : zeroValue;
+    for (let i = 0; i < DIRECTIONS.length; i++) {
+      const dir = DIRECTIONS[i];
+      styles[`border-${dir}`] =
+        directionFlags & (1 << i) ? styleValue : zeroValue;
     }
 
     return styles;
@@ -156,6 +167,7 @@ export function borderStyle({
   // Multi-group - process groups in order, later groups override earlier
   // Track whether any group specifies directions
   let hasAnyDirections = false;
+  let useLonghand = false;
 
   // Build a map of direction -> border value. Missing entries have no border.
   const directionMap: Partial<Record<Direction, BorderValue>> = {};
@@ -165,9 +177,12 @@ export function borderStyle({
 
   // Process groups in order (first to last)
   for (const group of groups) {
-    const { directions, borderValue } = processGroup(group);
+    const borderValue = processGroup(group);
+    const { modFlags } = borderValue;
+    const directionFlags = modFlags & 15;
+    if (modFlags & 16) useLonghand = true;
 
-    if (directions.length === 0) {
+    if (!directionFlags) {
       // No specific directions - applies to all
       allDirectionsValue = borderValue;
       // Set all directions
@@ -177,8 +192,10 @@ export function borderStyle({
     } else {
       // Specific directions - override only those
       hasAnyDirections = true;
-      for (const dir of directions) {
-        directionMap[dir] = borderValue;
+      for (let i = 0; i < DIRECTIONS.length; i++) {
+        if (directionFlags & (1 << i)) {
+          directionMap[DIRECTIONS[i]] = borderValue;
+        }
       }
     }
   }

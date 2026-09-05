@@ -49,11 +49,30 @@ describe('borderStyle', () => {
     expect(result['border-left']).toContain('0');
   });
 
+  it.each(['top', 'right', 'bottom', 'left'])(
+    'maps the %s modifier to its physical side',
+    (direction) => {
+      const result = borderStyle({ border: `2bw ${direction}` });
+
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        expect(result[`border-${side}`]).toContain(
+          side === direction ? '2px' : '0',
+        );
+      }
+    },
+  );
+
   it('handles complete border definition', () => {
     const result = borderStyle({ border: '2bw dashed #purple' });
     expect(result.border).toContain('2px');
     expect(result.border).toContain('dashed');
     expect(result.border).toContain('var(--purple-color)');
+  });
+
+  it('keeps the first recognized line-style modifier', () => {
+    expect(borderStyle({ border: '1bw dashed solid' }).border).toContain(
+      'dashed',
+    );
   });
 
   describe('CSS-wide keywords', () => {

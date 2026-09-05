@@ -13,7 +13,9 @@ const PHYSICAL_DIRECTIONS = '1x, 2x top bottom, 3x left';
 const LOGICAL_SHORTHAND = '1x 2x';
 const LOGICAL_DIRECTIONS = '1x, 2x start, 3x end longhand';
 const LOGICAL_BORDER = '1bw solid #red, 2bw dashed #blue end';
-const PHYSICAL_BORDER = '1bw solid #red, 2bw dashed #blue top bottom';
+const PHYSICAL_BORDER = '2bw dashed #purple';
+const PHYSICAL_BORDER_DIRECTIONS = '2bw dashed #purple top bottom';
+const PHYSICAL_BORDER_GROUPS = '1bw solid #red, 2bw dashed #blue top bottom';
 const FADE = '3x top, 1x bottom';
 const DOCKED_INSET = '2x 4x bottom dock';
 
@@ -31,6 +33,8 @@ function warmParserCache(): void {
   });
   logicalStyleHandlers.blockBorder({ blockBorder: LOGICAL_BORDER });
   borderStyle({ border: PHYSICAL_BORDER });
+  borderStyle({ border: PHYSICAL_BORDER_DIRECTIONS });
+  borderStyle({ border: PHYSICAL_BORDER_GROUPS });
   fadeStyle({ fade: FADE });
   insetStyle({ inset: DOCKED_INSET });
 }
@@ -93,9 +97,25 @@ describe('style handlers with cached parsing', () => {
   );
 
   bench(
-    'physical border groups',
+    'physical border shorthand',
     () => {
       borderStyle({ border: PHYSICAL_BORDER });
+    },
+    { setup: warmParserCache },
+  );
+
+  bench(
+    'physical border directions',
+    () => {
+      borderStyle({ border: PHYSICAL_BORDER_DIRECTIONS });
+    },
+    { setup: warmParserCache },
+  );
+
+  bench(
+    'physical border groups',
+    () => {
+      borderStyle({ border: PHYSICAL_BORDER_GROUPS });
     },
     { setup: warmParserCache },
   );

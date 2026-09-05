@@ -213,7 +213,7 @@
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "jiti": "^2.6.1",
-    "knip": "^5.61.3",
+    "knip": "^6.33.0",
     "next": "^16.0.0",
     "playwright": "^1.62.1",
     "prettier": "^3.9.6",

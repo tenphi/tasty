@@ -17,18 +17,21 @@ interface DisplayStyleProps {
  * - `clip / 2` — multi-line clip (2 lines)
  * - `true` or `initial` — reset to initial
  */
-function processTextOverflow(
+function applyTextOverflow(
+  result: Record<string, string | number>,
   textOverflow: string | boolean,
   whiteSpace?: string,
-): Record<string, string | number> | null {
+): void {
   if (textOverflow === true || textOverflow === 'initial') {
-    return { 'text-overflow': 'initial' };
+    result['text-overflow'] = 'initial';
+
+    return;
   }
 
   const processed = parseStyle(String(textOverflow));
   const group = processed.groups[0];
 
-  if (!group) return null;
+  if (!group) return;
 
   const { parts } = group;
   const modePart = parts[0];
@@ -37,7 +40,7 @@ function processTextOverflow(
   const hasEllipsis = modePart?.mods.includes('ellipsis');
   const hasClip = modePart?.mods.includes('clip');
 
-  if (!hasEllipsis && !hasClip) return null;
+  if (!hasEllipsis && !hasClip) return;
 
   let clamp = 1;
 
@@ -49,10 +52,8 @@ function processTextOverflow(
     }
   }
 
-  const result: Record<string, string | number> = {
-    overflow: 'hidden',
-    'text-overflow': hasEllipsis ? 'ellipsis' : 'clip',
-  };
+  result['overflow'] = 'hidden';
+  result['text-overflow'] = hasEllipsis ? 'ellipsis' : 'clip';
 
   if (clamp === 1) {
     result['white-space'] = whiteSpace || 'nowrap';
@@ -63,8 +64,6 @@ function processTextOverflow(
     result['line-clamp'] = clamp;
     result['white-space'] = whiteSpace || 'initial';
   }
-
-  return result;
 }
 
 /**
@@ -85,7 +84,7 @@ export function displayStyle({
 }: DisplayStyleProps) {
   const result: Record<string, string | number> = {};
 
-  // Resolved once up front: `processTextOverflow` emits `whiteSpace` as the
+  // Resolved once up front: `applyTextOverflow` emits `whiteSpace` as the
   // clamp's `white-space` too, so substituting only at the branch below would
   // still leak the raw reference through the truncation path.
   const whiteSpaceValue = whiteSpace
@@ -93,9 +92,7 @@ export function displayStyle({
     : whiteSpace;
 
   if (textOverflow != null && textOverflow !== false) {
-    const textResult = processTextOverflow(textOverflow, whiteSpaceValue);
-
-    if (textResult) Object.assign(result, textResult);
+    applyTextOverflow(result, textOverflow, whiteSpaceValue);
   }
 
   if (overflow && !result['overflow']) {
@@ -111,11 +108,12 @@ export function displayStyle({
     result['display'] = resolveCustomProperties(display);
   }
 
-  if (Object.keys(result).length === 0) {
-    return null;
-  }
-
-  return result;
+  return result['text-overflow'] ||
+    result['overflow'] ||
+    result['white-space'] ||
+    result['display']
+    ? result
+    : null;
 }
 
 displayStyle.__lookupStyles = [

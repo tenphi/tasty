@@ -3,6 +3,7 @@ import { bench, describe } from 'vitest';
 import { getGlobalParser } from '../utils/styles';
 
 import { borderStyle } from './border';
+import { displayStyle } from './display';
 import { fadeStyle } from './fade';
 import { insetStyle } from './inset';
 import { outlineStyle } from './outline';
@@ -20,6 +21,7 @@ const PHYSICAL_BORDER_GROUPS = '1bw solid #red, 2bw dashed #blue top bottom';
 const FADE = '3x top, 1x bottom';
 const OUTLINE = '2ow dashed #purple / 1x';
 const DOCKED_INSET = '2x 4x bottom dock';
+const MULTILINE_TEXT_OVERFLOW = 'ellipsis / 3';
 
 function warmParserCache(): void {
   const parser = getGlobalParser();
@@ -40,6 +42,7 @@ function warmParserCache(): void {
   fadeStyle({ fade: FADE });
   outlineStyle({ outline: OUTLINE });
   insetStyle({ inset: DOCKED_INSET });
+  displayStyle({ textOverflow: MULTILINE_TEXT_OVERFLOW });
 }
 
 describe('style handlers with cached parsing', () => {
@@ -147,6 +150,16 @@ describe('style handlers with cached parsing', () => {
     'docked inset',
     () => {
       insetStyle({ inset: DOCKED_INSET });
+    },
+    {
+      setup: warmParserCache,
+    },
+  );
+
+  bench(
+    'multiline text overflow',
+    () => {
+      displayStyle({ textOverflow: MULTILINE_TEXT_OVERFLOW });
     },
     {
       setup: warmParserCache,

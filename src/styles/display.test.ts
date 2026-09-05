@@ -108,6 +108,24 @@ describe('displayStyle', () => {
         'line-clamp': 2,
       });
     });
+
+    it('preserves declaration insertion order', () => {
+      const result = displayStyle({ textOverflow: 'ellipsis / 3' });
+
+      expect(Object.keys(result!)).toEqual([
+        'overflow',
+        'text-overflow',
+        'display',
+        '-webkit-box-orient',
+        '-webkit-line-clamp',
+        'line-clamp',
+        'white-space',
+      ]);
+    });
+
+    it('ignores an unsupported mode', () => {
+      expect(displayStyle({ textOverflow: 'unsupported' })).toBeNull();
+    });
   });
 
   describe('textOverflow - reset', () => {

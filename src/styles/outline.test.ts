@@ -31,6 +31,12 @@ describe('outlineStyle', () => {
       });
     });
 
+    it('keeps the first recognized line style', () => {
+      expect(outlineStyle({ outline: '2px dashed solid' })).toEqual({
+        outline: '2px dashed var(--outline-color)',
+      });
+    });
+
     it('handles width, style and color', () => {
       const result = outlineStyle({ outline: '2px dashed #red' });
       expect(result).toEqual({
@@ -146,6 +152,12 @@ describe('outlineStyle', () => {
       const result = outlineStyle({ outlineOffset: '4px' });
       expect(result).toEqual({
         'outline-offset': '4px',
+      });
+    });
+
+    it('preserves an empty outlineOffset value', () => {
+      expect(outlineStyle({ outlineOffset: '' })).toEqual({
+        'outline-offset': '',
       });
     });
 

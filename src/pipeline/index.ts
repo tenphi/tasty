@@ -297,23 +297,23 @@ function processHandlerQueue(
   parserContext: StateParserContext,
   allRules: CSSRule[],
 ): void {
-  for (const { handler, styleMap } of handlerQueue) {
+  for (const { handler, styleMap, hasStateMap } of handlerQueue) {
     const lookupStyles = handler.__lookupStyles;
 
-    // Stages 0–3: build exclusive conditions for each style this handler
-    // depends on (extractCompoundStates → parse → mergeEntriesByValue →
-    // expandOrConditions → buildExclusiveConditions → expandExclusiveOrs).
-    const exclusiveByStyle = buildExclusivesForHandler(
-      lookupStyles,
-      styleMap,
-      parserContext,
-    );
-
-    // Stage 4: Compute all valid state combinations
-    const stateSnapshots = computeStateCombinations(
-      exclusiveByStyle,
-      lookupStyles,
-    );
+    // State-free handlers have exactly one unconditional snapshot. Avoid the
+    // exclusive-condition and Cartesian-product pipeline in this common case.
+    const stateSnapshots = hasStateMap
+      ? computeStateCombinations(
+          buildExclusivesForHandler(lookupStyles, styleMap, parserContext),
+          lookupStyles,
+        )
+      : [
+          {
+            condition: trueCondition(),
+            values: styleMap as Record<string, StyleValue>,
+            order: 0,
+          },
+        ];
 
     // Stage 5: Call handler for each snapshot
     const computedRules = invokeHandler(
@@ -989,8 +989,12 @@ function normalizeSelectorSuffix(suffix: string): string {
 function buildHandlerQueue(
   styleKeys: string[],
   styles: Styles,
-): { handler: StyleHandler; styleMap: StyleMap }[] {
-  const queue: { handler: StyleHandler; styleMap: StyleMap }[] = [];
+): { handler: StyleHandler; styleMap: StyleMap; hasStateMap: boolean }[] {
+  const queue: {
+    handler: StyleHandler;
+    styleMap: StyleMap;
+    hasStateMap: boolean;
+  }[] = [];
   const seenHandlers = new Set<StyleHandler>();
 
   for (const styleName of styleKeys) {
@@ -1006,15 +1010,19 @@ function buildHandlerQueue(
 
       const lookupStyles = handler.__lookupStyles;
       const styleMap: StyleMap = {};
+      let hasStateMap = false;
 
       for (const name of lookupStyles) {
         const val = styles[name];
         if (val !== undefined) {
           styleMap[name] = val as StyleValue | StyleValueStateMap;
+          hasStateMap ||= isValueMapping(
+            val as StyleValue | Record<string, StyleValue>,
+          );
         }
       }
 
-      queue.push({ handler, styleMap });
+      queue.push({ handler, styleMap, hasStateMap });
     }
   }
 

@@ -1975,6 +1975,25 @@ describe('rule finalization', () => {
 });
 
 describe('renderStyles integration', () => {
+  it('renders direct values like equivalent default state maps', () => {
+    const direct = {
+      display: 'flex',
+      flow: 'row wrap',
+      gap: '8px',
+      whiteSpace: 'nowrap',
+    };
+    const mapped = {
+      display: { '': 'flex' },
+      flow: { '': 'row wrap' },
+      gap: { '': '8px' },
+      whiteSpace: { '': 'nowrap' },
+    };
+
+    expect(renderStyles(direct, '.test')).toEqual(
+      renderStyles(mapped, '.test'),
+    );
+  });
+
   it('skips absent dimensions in a multi-property handler', () => {
     expect(renderStyles({ whiteSpace: 'nowrap' }, '.test')).toEqual([
       {

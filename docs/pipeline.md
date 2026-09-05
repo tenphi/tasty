@@ -395,6 +395,8 @@ See the comment block in `exclusive.ts:500-523`: a default value whose higher-pr
 
 Computes the Cartesian product of all style entries for a handler, creating snapshots of which value each style has for each possible state combination.
 
+When every input is a direct value rather than a state map, the pipeline skips stages 0–4 and passes one unconditional snapshot directly to the handler. This avoids building exclusive entries and a Cartesian product for ordinary state-free styles.
+
 ### How It Works
 
 1. Collect exclusive entries for each style the handler uses

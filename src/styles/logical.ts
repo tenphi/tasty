@@ -1,5 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { filterMods, parseStyle } from '../utils/styles';
+import { parseStyle } from '../utils/styles';
 import type { StyleHandler, StyleValue } from '../utils/styles';
 import { warnOnceDev } from '../utils/warnings';
 import { parseBorderValue } from './border';
@@ -17,6 +17,22 @@ type LogicalValue = string | number | boolean | undefined;
 
 const LOGICAL_DIRECTIONS = ['start', 'end'] as const;
 type LogicalDirection = (typeof LOGICAL_DIRECTIONS)[number];
+
+const LOGICAL_START = 1;
+const LOGICAL_END = 2;
+const LOGICAL_LONGHAND = 4;
+
+function logicalModFlags(mods: string[]): number {
+  let flags = 0;
+
+  for (const mod of mods) {
+    if (mod === 'start') flags |= LOGICAL_START;
+    else if (mod === 'end') flags |= LOGICAL_END;
+    else if (mod === 'longhand') flags |= LOGICAL_LONGHAND;
+  }
+
+  return flags;
+}
 
 interface LogicalAxisConfig<Name extends string> {
   styleName: Name;
@@ -67,19 +83,17 @@ function logicalAxisStyle<const Name extends string>({
     let useLonghand = false;
 
     for (const group of groups) {
-      const directions = filterMods(
-        group.mods,
-        LOGICAL_DIRECTIONS,
-      ) as LogicalDirection[];
+      const modFlags = logicalModFlags(group.mods);
+      const hasDirection = modFlags & (LOGICAL_START | LOGICAL_END);
       const keyword = extractCSSWideKeyword(group);
       const values = keyword
         ? [keyword]
         : group.values.length
           ? group.values
           : [defaultValue];
-      if (directions.length && values.length > 1) {
+      if (hasDirection && values.length > 1) {
         warnExtraGroupValues(styleName, group.input, 1, LOGICAL_DIRECTIONS);
-      } else if (!directions.length && values.length > 2) {
+      } else if (!hasDirection && values.length > 2) {
         warnOnceDev(
           `extra-logical-axis-values:${styleName}:${group.input}`,
           `${styleName}="${group.input}": a logical axis takes at most two ` +
@@ -87,15 +101,14 @@ function logicalAxisStyle<const Name extends string>({
         );
       }
 
-      if (group.mods.includes('longhand')) useLonghand = true;
+      if (modFlags & LOGICAL_LONGHAND) useLonghand = true;
 
-      if (!directions.length) {
+      if (!hasDirection) {
         edges.start = values[0];
         edges.end = values[1] ?? values[0];
       } else {
-        for (const direction of directions) {
-          edges[direction] = values[0];
-        }
+        if (modFlags & LOGICAL_START) edges.start = values[0];
+        if (modFlags & LOGICAL_END) edges.end = values[0];
       }
     }
 
@@ -150,21 +163,18 @@ function logicalBorderStyle<const Name extends string>(
       const borderValue = parseBorderValue(group.input);
       if (borderValue == null) continue;
 
-      const directions = filterMods(
-        group.mods,
-        LOGICAL_DIRECTIONS,
-      ) as LogicalDirection[];
+      const modFlags = logicalModFlags(group.mods);
+      const hasDirection = modFlags & (LOGICAL_START | LOGICAL_END);
 
-      if (group.mods.includes('longhand')) useLonghand = true;
+      if (modFlags & LOGICAL_LONGHAND) useLonghand = true;
 
-      if (!directions.length) {
+      if (!hasDirection) {
         edges.start = borderValue;
         edges.end = borderValue;
       } else {
         fallback = zeroBorderValue(borderValue);
-        for (const direction of directions) {
-          edges[direction] = borderValue;
-        }
+        if (modFlags & LOGICAL_START) edges.start = borderValue;
+        if (modFlags & LOGICAL_END) edges.end = borderValue;
       }
     }
 

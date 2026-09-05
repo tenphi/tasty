@@ -166,6 +166,12 @@ describe('insetStyle', () => {
       });
     });
 
+    it('keeps every named edge explicit when spanning multiple sides', () => {
+      expect(insetStyle({ inset: '2x 4x top right dock' })).toEqual({
+        inset: '16px 16px 32px 32px',
+      });
+    });
+
     it('docks every side when no direction is named', () => {
       expect(insetStyle({ inset: 'dock' })).toEqual({ inset: '0' });
     });

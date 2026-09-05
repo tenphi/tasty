@@ -1,5 +1,103 @@
 # @tenphi/tasty
 
+## 3.8.1
+
+### Patch Changes
+
+- [#309](https://github.com/tenphi/tasty/pull/309) [`e27591e`](https://github.com/tenphi/tasty/commit/e27591e3ba1339369ce46a3843e4277e98a5cab3) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime bundle size by consolidating stylesheet and debug bookkeeping.
+
+- [#302](https://github.com/tenphi/tasty/pull/302) [`28b92f1`](https://github.com/tenphi/tasty/commit/28b92f19ae554b78443eae67185c0631f670c456) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the Babel plugin dependency graph by separating build-time configuration
+  from browser runtime setup, while consistently applying plugin-provided static
+  configuration.
+
+- [#322](https://github.com/tenphi/tasty/pull/322) [`8d6452f`](https://github.com/tenphi/tasty/commit/8d6452f6c1664f02042d4d1971164f630af19732) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the runtime footprint and unnecessary CSS formatting work of `tastyDebug`.
+
+- [#316](https://github.com/tenphi/tasty/pull/316) [`7ee392b`](https://github.com/tenphi/tasty/commit/7ee392befe60a5330bf90262ba5f21209d577b73) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime bundle size and condition-processing overhead.
+
+- [#298](https://github.com/tenphi/tasty/pull/298) [`70aae4d`](https://github.com/tenphi/tasty/commit/70aae4df5eb91daacc5312dc81c0e80a5c2abcb1) Thanks [@tenphi](https://github.com/tenphi)! - Reduce tree-shaken runtime bundle sizes with semantic shared chunks. `tastyDebug`
+  now requires an explicit `tastyDebug.install()` call before browser-console use.
+
+- [#329](https://github.com/tenphi/tasty/pull/329) [`d2ed93f`](https://github.com/tenphi/tasty/commit/d2ed93ffd7ca8a13226b7ece4be8bb50faa85eab) Thanks [@tenphi](https://github.com/tenphi)! - Reduce bundle size and improve base prop filtering performance.
+
+- [#330](https://github.com/tenphi/tasty/pull/330) [`850eea2`](https://github.com/tenphi/tasty/commit/850eea26f5f49edded1b52525c9fd08abcbf522e) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime setup overhead for built-in style handlers.
+
+- [#311](https://github.com/tenphi/tasty/pull/311) [`8e84f40`](https://github.com/tenphi/tasty/commit/8e84f400c90def48daaaf194c2310be6ab441883) Thanks [@tenphi](https://github.com/tenphi)! - Reduce bundle size and temporary allocations while normalizing configuration.
+
+- [#321](https://github.com/tenphi/tasty/pull/321) [`23ecbd2`](https://github.com/tenphi/tasty/commit/23ecbd2fa28a90b87c51046599a64c9446af5f15) Thanks [@tenphi](https://github.com/tenphi)! - Reduce advanced-state normalization work and predefined-state allocations.
+
+- [#310](https://github.com/tenphi/tasty/pull/310) [`dd633fc`](https://github.com/tenphi/tasty/commit/dd633fcc67d7f9c9425e6d37d25f5debea5538d0) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime bundle size and repeated work while computing SSR and RSC styles.
+
+- [#324](https://github.com/tenphi/tasty/pull/324) [`8a3de8c`](https://github.com/tenphi/tasty/commit/8a3de8c92dfc9f7ed79c208ddef22da90d724eef) Thanks [@tenphi](https://github.com/tenphi)! - Speed up state-map style merging while reducing runtime bundle size.
+
+- [#333](https://github.com/tenphi/tasty/pull/333) [`5a49aa9`](https://github.com/tenphi/tasty/commit/5a49aa992c2947c7bc89c748366678bf186d2bfc) Thanks [@tenphi](https://github.com/tenphi)! - Speed up directional fade style processing.
+
+- [#334](https://github.com/tenphi/tasty/pull/334) [`5166a6d`](https://github.com/tenphi/tasty/commit/5166a6d7d17c8317db603bb9381fe780b16fb7db) Thanks [@tenphi](https://github.com/tenphi)! - Speed up outline style processing.
+
+- [#335](https://github.com/tenphi/tasty/pull/335) [`11c6ade`](https://github.com/tenphi/tasty/commit/11c6ade8b152c62f2e33253468d9526f1a398aa2) Thanks [@tenphi](https://github.com/tenphi)! - Improve text overflow style rendering performance.
+
+- [#326](https://github.com/tenphi/tasty/pull/326) [`af52dc7`](https://github.com/tenphi/tasty/commit/af52dc7db324a5f8dfa52f7586eeb745b147bab7) Thanks [@tenphi](https://github.com/tenphi)! - Speed up style chunk categorization, reduce its runtime footprint, and remove the unused undocumented `dotize` export.
+
+- [#313](https://github.com/tenphi/tasty/pull/313) [`9d78795`](https://github.com/tenphi/tasty/commit/9d7879502b2a7cebfb021431c248062882f7abf4) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime work and bundle size when creating and rendering Tasty components.
+
+- [#337](https://github.com/tenphi/tasty/pull/337) [`972d667`](https://github.com/tenphi/tasty/commit/972d66751cf3e5e295fd3ecb8ce4ebecaefdae33) Thanks [@tenphi](https://github.com/tenphi)! - Reduce allocations while rendering style state combinations.
+
+- [#315](https://github.com/tenphi/tasty/pull/315) [`aaf399b`](https://github.com/tenphi/tasty/commit/aaf399b0e0d5045b9d83f36c7f0c55993dc08d1a) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the runtime bundle and preset processing overhead.
+
+- [#304](https://github.com/tenphi/tasty/pull/304) [`e92046c`](https://github.com/tenphi/tasty/commit/e92046c6534217d522f43044c80f3ed24f36fd2b) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the Next.js configuration helper dependency graph by generating shared
+  configuration CSS through the build-time style engine instead of the browser
+  runtime and request-scoped SSR collector.
+
+- [#308](https://github.com/tenphi/tasty/pull/308) [`a8f0068`](https://github.com/tenphi/tasty/commit/a8f006810e3c1584b462accfaf0406c968dec3fa) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime bundle sizes without changing generated styles.
+
+- [#305](https://github.com/tenphi/tasty/pull/305) [`b7416f5`](https://github.com/tenphi/tasty/commit/b7416f55b12ffd1dc5998b9012d055e69b71cf99) Thanks [@tenphi](https://github.com/tenphi)! - Reduce generic SSR and Astro server dependency graphs by separating shared
+  configuration state from the browser style injector.
+
+- [#314](https://github.com/tenphi/tasty/pull/314) [`a61e523`](https://github.com/tenphi/tasty/commit/a61e523d68a382dbf68fbf64d217e72c03fbe14b) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime size and allocation overhead when rendering border and transition styles.
+
+- [#301](https://github.com/tenphi/tasty/pull/301) [`78741dc`](https://github.com/tenphi/tasty/commit/78741dc23a9ad3d8cb55cc1aaeb22f8039a2eb07) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the programmatic zero-runtime dependency graph by separating pure CSS
+  definition utilities from the DOM injector and runtime configuration engine.
+
+- [#332](https://github.com/tenphi/tasty/pull/332) [`2f59640`](https://github.com/tenphi/tasty/commit/2f59640989292129ca325314dd0420b0b49b8f2d) Thanks [@tenphi](https://github.com/tenphi)! - Speed up physical and logical border style processing.
+
+- [#340](https://github.com/tenphi/tasty/pull/340) [`d0ee534`](https://github.com/tenphi/tasty/commit/d0ee5340fa338b6492a834c399eb806d4597b839) Thanks [@tenphi](https://github.com/tenphi)! - Improve rendering performance when a style handler produces at most one CSS rule.
+
+- [#320](https://github.com/tenphi/tasty/pull/320) [`7ecb861`](https://github.com/tenphi/tasty/commit/7ecb8613d3a8121ac5d567246499e0a48d7611ff) Thanks [@tenphi](https://github.com/tenphi)! - Reduce state-key parser allocations and avoid pathological tokenizer backtracking.
+
+- [#318](https://github.com/tenphi/tasty/pull/318) [`5dc0cc0`](https://github.com/tenphi/tasty/commit/5dc0cc0bf99adf11bcf12b90604e75bbf8010f4c) Thanks [@tenphi](https://github.com/tenphi)! - Reduce local keyframe discovery and animation rewriting overhead.
+
+- [#331](https://github.com/tenphi/tasty/pull/331) [`94b77ad`](https://github.com/tenphi/tasty/commit/94b77ad0b522c487c8b44c1e6b5d63f4b2c0dacd) Thanks [@tenphi](https://github.com/tenphi)! - Speed up physical and logical directional style processing.
+
+- [#328](https://github.com/tenphi/tasty/pull/328) [`fe36238`](https://github.com/tenphi/tasty/commit/fe3623814cc8ed27a0f496ac527b0670923e1181) Thanks [@tenphi](https://github.com/tenphi)! - Speed up Tasty component renders and preserve native boolean attributes on sub-elements.
+
+- [#312](https://github.com/tenphi/tasty/pull/312) [`1709063`](https://github.com/tenphi/tasty/commit/17090638821ccf79dac08c838102bfe06a4ee6e3) Thanks [@tenphi](https://github.com/tenphi)! - Reduce bundle size by sharing logical style family metadata during handler setup.
+
+- [#306](https://github.com/tenphi/tasty/pull/306) [`b2ef139`](https://github.com/tenphi/tasty/commit/b2ef139164e8e30b619a678f1aeae32084fb4d50) Thanks [@tenphi](https://github.com/tenphi)! - Keep the core entry from loading the component and hooks chunk by grouping its
+  hook-free style computation and prop helpers with the existing runtime engine.
+
+- [#323](https://github.com/tenphi/tasty/pull/323) [`e9c660b`](https://github.com/tenphi/tasty/commit/e9c660b2a7a7e85319e42fce77377ccfa9ac4acf) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the runtime bundle cost of CSS formatting in the debug tools.
+
+- [#338](https://github.com/tenphi/tasty/pull/338) [`7385573`](https://github.com/tenphi/tasty/commit/7385573a4091e4378ac78196a552f3866b0ea105) Thanks [@tenphi](https://github.com/tenphi)! - Reduce published runtime bundle sizes while preserving API documentation and tree-shaking annotations.
+
+- [#307](https://github.com/tenphi/tasty/pull/307) [`3ff144b`](https://github.com/tenphi/tasty/commit/3ff144bd6f778ee66e1ce2cd3172de706c0f8dc6) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the main and core runtime bundle sizes without changing styling behavior.
+
+- [#325](https://github.com/tenphi/tasty/pull/325) [`a972c7a`](https://github.com/tenphi/tasty/commit/a972c7a16b15d60099befa3ef98d21c9337f3725) Thanks [@tenphi](https://github.com/tenphi)! - Speed up style chunk cache-key generation while reducing runtime bundle size.
+
+- [#317](https://github.com/tenphi/tasty/pull/317) [`8527dbc`](https://github.com/tenphi/tasty/commit/8527dbccac8ad74ebb9c7d6b98e929e876b3dcd2) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the bundle size and conversion overhead of built-in color handling.
+
+- [#339](https://github.com/tenphi/tasty/pull/339) [`d9fcc07`](https://github.com/tenphi/tasty/commit/d9fcc079327c23cc54c371b680c509cb7c29014d) Thanks [@tenphi](https://github.com/tenphi)! - Improve rendering performance for styles without state maps.
+
+- [#336](https://github.com/tenphi/tasty/pull/336) [`186d829`](https://github.com/tenphi/tasty/commit/186d82991c52a57caa80e39c0d75a9c1652d755e) Thanks [@tenphi](https://github.com/tenphi)! - Improve transition style rendering performance.
+
+- [#327](https://github.com/tenphi/tasty/pull/327) [`7aeb634`](https://github.com/tenphi/tasty/commit/7aeb63472273507908d19c7c49af00ded393dc2a) Thanks [@tenphi](https://github.com/tenphi)! - Reduce runtime size and speed up modifier attribute generation.
+
+- [#319](https://github.com/tenphi/tasty/pull/319) [`6b49393`](https://github.com/tenphi/tasty/commit/6b493938ebe21f6c3704ab813ac320af29d0e93e) Thanks [@tenphi](https://github.com/tenphi)! - Reduce style parser allocation and token scanning overhead.
+
+- [#300](https://github.com/tenphi/tasty/pull/300) [`c98f5ac`](https://github.com/tenphi/tasty/commit/c98f5ac616e916f7020617bb49a982272a8ca85d) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the static and Babel entrypoint dependency graphs by isolating shared
+  style-object utilities from the React and runtime engines.
+
+- [#303](https://github.com/tenphi/tasty/pull/303) [`6a6369e`](https://github.com/tenphi/tasty/commit/6a6369e22f62bd83d5fcfe5caeaa126bf04d24b1) Thanks [@tenphi](https://github.com/tenphi)! - Reduce the Astro client hydration bundle by deferring class registration until
+  the runtime injector is available.
+
 ## 3.8.0
 
 ### Minor Changes

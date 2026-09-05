@@ -5,6 +5,7 @@ import { getGlobalParser } from '../utils/styles';
 import { borderStyle } from './border';
 import { fadeStyle } from './fade';
 import { insetStyle } from './inset';
+import { outlineStyle } from './outline';
 import { paddingStyle } from './padding';
 import { logicalStyleHandlers } from './logical';
 
@@ -17,6 +18,7 @@ const PHYSICAL_BORDER = '2bw dashed #purple';
 const PHYSICAL_BORDER_DIRECTIONS = '2bw dashed #purple top bottom';
 const PHYSICAL_BORDER_GROUPS = '1bw solid #red, 2bw dashed #blue top bottom';
 const FADE = '3x top, 1x bottom';
+const OUTLINE = '2ow dashed #purple / 1x';
 const DOCKED_INSET = '2x 4x bottom dock';
 
 function warmParserCache(): void {
@@ -36,6 +38,7 @@ function warmParserCache(): void {
   borderStyle({ border: PHYSICAL_BORDER_DIRECTIONS });
   borderStyle({ border: PHYSICAL_BORDER_GROUPS });
   fadeStyle({ fade: FADE });
+  outlineStyle({ outline: OUTLINE });
   insetStyle({ inset: DOCKED_INSET });
 }
 
@@ -124,6 +127,16 @@ describe('style handlers with cached parsing', () => {
     'fade direction groups',
     () => {
       fadeStyle({ fade: FADE });
+    },
+    {
+      setup: warmParserCache,
+    },
+  );
+
+  bench(
+    'outline with offset',
+    () => {
+      outlineStyle({ outline: OUTLINE });
     },
     {
       setup: warmParserCache,

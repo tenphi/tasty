@@ -1,9 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import {
-  filterMods,
-  parseStyle,
-  resolveCustomProperties,
-} from '../utils/styles';
+import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import { BORDER_STYLES } from './const';
 import { assignLineSlots } from './shared';
 
@@ -32,7 +28,7 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
   // Handle outline (0 is valid - means no outline)
   if (outline != null && outline !== false) {
     if (typeof outline === 'string' && CSS_WIDE_KEYWORDS.has(outline)) {
-      result['outline'] = outline;
+      result.outline = outline;
     } else {
       let outlineValue: string | boolean | number = outline;
       if (outline === true) outlineValue = '1ow';
@@ -45,15 +41,18 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
         const { parts } = group;
         const outlinePart = parts[0] ?? { values: [], mods: [], colors: [] };
         const offsetPart = parts[1];
+        let lineStyle: string | undefined;
 
-        const typeMods = filterMods(
-          outlinePart.mods,
-          BORDER_STYLES as unknown as string[],
-        );
+        for (const mod of outlinePart.mods) {
+          if ((BORDER_STYLES as readonly string[]).includes(mod)) {
+            lineStyle = mod;
+            break;
+          }
+        }
 
         const slots = assignLineSlots(
           outlinePart.values,
-          typeMods[0],
+          lineStyle,
           outlinePart.colors[0],
         );
 
@@ -61,7 +60,7 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
         const type = slots.style || 'solid';
         const outlineColor = slots.color || 'var(--outline-color)';
 
-        result['outline'] = [value, type, outlineColor].join(' ');
+        result.outline = `${value} ${type} ${outlineColor}`;
 
         if (offsetPart?.values[0]) {
           result['outline-offset'] = offsetPart.values[0];
@@ -71,7 +70,7 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
   }
 
   // Handle outlineOffset prop (only if not already set by slash syntax)
-  if (outlineOffset != null && !result['outline-offset']) {
+  if (outlineOffset != null && result['outline-offset'] === undefined) {
     const offsetValue =
       typeof outlineOffset === 'number' ? `${outlineOffset}px` : outlineOffset;
     const processed = parseStyle(offsetValue);
@@ -79,11 +78,9 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
       processed.groups[0]?.values[0] || resolveCustomProperties(offsetValue);
   }
 
-  if (Object.keys(result).length === 0) {
-    return null;
-  }
-
-  return result;
+  return result.outline === undefined && result['outline-offset'] === undefined
+    ? null
+    : result;
 }
 
 outlineStyle.__lookupStyles = ['outline', 'outlineOffset'];

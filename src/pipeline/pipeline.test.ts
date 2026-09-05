@@ -1975,6 +1975,15 @@ describe('rule finalization', () => {
 });
 
 describe('renderStyles integration', () => {
+  it('skips absent dimensions in a multi-property handler', () => {
+    expect(renderStyles({ whiteSpace: 'nowrap' }, '.test')).toEqual([
+      {
+        selector: '.test',
+        declarations: 'white-space: nowrap;',
+      },
+    ]);
+  });
+
   it('should handle radius with value mapping', () => {
     const styles = {
       radius: {

@@ -1079,13 +1079,10 @@ function computeStateCombinations(
  * Cartesian product of arrays
  */
 function cartesianProduct<T>(arrays: T[][]): T[][] {
-  if (arrays.length === 0) return [[]];
-
-  const nonEmpty = arrays.filter((a) => a.length > 0);
-  if (nonEmpty.length === 0) return [[]];
-
   let result: T[][] = [[]];
-  for (const arr of nonEmpty) {
+  for (const arr of arrays) {
+    if (arr.length === 0) continue;
+
     const next: T[][] = [];
     for (const combo of result) {
       for (const item of arr) {

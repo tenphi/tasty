@@ -9,6 +9,7 @@ import { insetStyle } from './inset';
 import { outlineStyle } from './outline';
 import { paddingStyle } from './padding';
 import { logicalStyleHandlers } from './logical';
+import { transitionStyle } from './transition';
 
 const PHYSICAL_SHORTHAND = '1x 2x 3x 4x';
 const PHYSICAL_DIRECTIONS = '1x, 2x top bottom, 3x left';
@@ -22,6 +23,7 @@ const FADE = '3x top, 1x bottom';
 const OUTLINE = '2ow dashed #purple / 1x';
 const DOCKED_INSET = '2x 4x bottom dock';
 const MULTILINE_TEXT_OVERFLOW = 'ellipsis / 3';
+const TRANSITION = 'fill 200ms ease';
 
 function warmParserCache(): void {
   const parser = getGlobalParser();
@@ -43,6 +45,7 @@ function warmParserCache(): void {
   outlineStyle({ outline: OUTLINE });
   insetStyle({ inset: DOCKED_INSET });
   displayStyle({ textOverflow: MULTILINE_TEXT_OVERFLOW });
+  transitionStyle({ transition: TRANSITION });
 }
 
 describe('style handlers with cached parsing', () => {
@@ -164,5 +167,13 @@ describe('style handlers with cached parsing', () => {
     {
       setup: warmParserCache,
     },
+  );
+
+  bench(
+    'mapped transition',
+    () => {
+      transitionStyle({ transition: TRANSITION });
+    },
+    { setup: warmParserCache },
   );
 });

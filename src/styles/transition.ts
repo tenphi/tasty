@@ -140,8 +140,8 @@ export function transitionStyle({ transition }: { transition?: string }) {
   }
 
   // Every entry may have been rejected as a reference-named transition.
-  const result = Object.entries(map)
-    .map(([style, value]) => `${style} ${value}`)
+  const result = Object.keys(map)
+    .map((style) => `${style} ${map[style]}`)
     .join(', ');
   if (!result) return null;
 

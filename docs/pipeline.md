@@ -456,6 +456,7 @@ Style handlers encapsulate the logic for translating design tokens (like `'2x'`)
 ### What It Does
 
 Combines rules that have identical CSS output into a single rule with an OR condition.
+Zero- and one-rule inputs return unchanged because no merge is possible.
 
 ### How It Works
 

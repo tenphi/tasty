@@ -1120,6 +1120,8 @@ function stringifyDeclarations(decl: Record<string, string>): string {
  * Merge rules with identical CSS output
  */
 function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
+  if (rules.length <= 1) return rules;
+
   const groups = new Map<string, ComputedRule[]>();
 
   for (const rule of rules) {

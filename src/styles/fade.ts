@@ -1,73 +1,63 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { DIRECTIONS, filterMods, parseStyle } from '../utils/styles';
+import type { StyleDetails } from '../parser/types';
+import { DIRECTIONS, parseStyle } from '../utils/styles';
 
 import { warnExtraGroupValues } from './shared';
 
-const DIRECTION_MAP: Record<(typeof DIRECTIONS)[number], string> = {
-  right: 'to left',
-  left: 'to right',
-  top: 'to bottom',
-  bottom: 'to top',
-};
+// Positional counterparts to DIRECTIONS: top, right, bottom, left.
+const GRADIENT_DIRECTIONS = ['to bottom', 'to left', 'to top', 'to right'];
 
 // Default mask colors (standard black with alpha for gradient masks)
 const DEFAULT_TRANSPARENT_COLOR = 'rgb(0 0 0 / 0)';
 const DEFAULT_OPAQUE_COLOR = 'rgb(0 0 0 / 1)';
 
-interface GroupData {
-  input: string;
-  values: string[];
-  mods: string[];
-  colors: string[];
-}
-
 /**
- * Process a single group and return gradient strings for its directions.
+ * Process a single group and append gradient strings for its directions.
  */
-function processGroup(group: GroupData, isOnlyGroup: boolean): string[] {
-  let { values } = group;
-  const { input, mods, colors } = group;
-
-  const named = filterMods(mods, DIRECTIONS) as (typeof DIRECTIONS)[number][];
-  let directions = named;
-
-  if (!values.length) {
-    values = ['calc(2 * var(--gap))'];
-  }
-
-  // If this is the only group and no directions specified, apply to all edges
-  if (!directions.length) {
-    if (isOnlyGroup) {
-      directions = ['top', 'right', 'bottom', 'left'];
-    } else {
-      // For multi-group without explicit direction, skip this group
-      return [];
-    }
-  }
+function processGroup(
+  group: StyleDetails,
+  isOnlyGroup: boolean,
+  gradients: string[],
+): void {
+  const { input, values, mods, colors } = group;
 
   // Extract colors: first = transparent mask color, second = opaque mask color
-  const transparentColor = colors?.[0] || DEFAULT_TRANSPARENT_COLOR;
-  const opaqueColor = colors?.[1] || DEFAULT_OPAQUE_COLOR;
+  const transparentColor = colors[0] || DEFAULT_TRANSPARENT_COLOR;
+  const opaqueColor = colors[1] || DEFAULT_OPAQUE_COLOR;
+  const firstSize = values.length ? values[0] : 'calc(2 * var(--gap))';
+  let namedCount = 0;
 
   // A group that names edges takes a single width, applied to every edge it
   // names — different widths per edge come from comma groups
   // (`fade: '3x top, 1x bottom'`). A group that names none covers all four
   // edges and keeps plain CSS shorthand order, so `fade: '3x 1x'` fades block
   // edges at 3x and inline edges at 1x, matching `padding`.
-  if (named.length > 0 && values.length > 1) {
-    warnExtraGroupValues('fade', input, 1);
+  for (const mod of mods) {
+    const directionIndex = DIRECTIONS.indexOf(mod);
+    if (directionIndex === -1) continue;
+
+    if (namedCount++ === 0 && values.length > 1) {
+      warnExtraGroupValues('fade', input, 1);
+    }
+
+    gradients.push(
+      `linear-gradient(${GRADIENT_DIRECTIONS[directionIndex]}, ${transparentColor} 0%, ${opaqueColor} ${firstSize})`,
+    );
   }
 
-  return directions.map(
-    (direction: (typeof DIRECTIONS)[number], index: number) => {
-      const size =
-        named.length > 0
-          ? values[0]
-          : values[index] || values[index % 2] || values[0];
+  if (namedCount || !isOnlyGroup) return;
 
-      return `linear-gradient(${DIRECTION_MAP[direction]}, ${transparentColor} 0%, ${opaqueColor} ${size})`;
-    },
-  );
+  // If this is the only group and no directions are specified, apply it to
+  // every edge in CSS shorthand order.
+  for (let i = 0; i < DIRECTIONS.length; i++) {
+    const size = values.length
+      ? values[i] || values[i % 2] || values[0]
+      : firstSize;
+
+    gradients.push(
+      `linear-gradient(${GRADIENT_DIRECTIONS[i]}, ${transparentColor} 0%, ${opaqueColor} ${size})`,
+    );
+  }
 }
 
 export function fadeStyle({ fade }: { fade?: string }) {
@@ -77,8 +67,7 @@ export function fadeStyle({ fade }: { fade?: string }) {
     return { mask: fade, 'mask-composite': fade };
   }
 
-  const processed = parseStyle(fade);
-  const groups: GroupData[] = processed.groups ?? [];
+  const groups = parseStyle(fade).groups;
 
   if (!groups.length) return null;
 
@@ -88,16 +77,7 @@ export function fadeStyle({ fade }: { fade?: string }) {
   const gradients: string[] = [];
 
   for (const group of groups) {
-    const groupGradients = processGroup(
-      {
-        input: group.input ?? '',
-        values: group.values ?? [],
-        mods: group.mods ?? [],
-        colors: group.colors ?? [],
-      },
-      isOnlyGroup,
-    );
-    gradients.push(...groupGradients);
+    processGroup(group, isOnlyGroup, gradients);
   }
 
   if (!gradients.length) return null;

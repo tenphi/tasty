@@ -55,6 +55,16 @@ describe('fadeStyle', () => {
     expect(result.mask).not.toContain('to bottom');
   });
 
+  it('preserves authored direction order and repetitions', () => {
+    const result = fadeStyle({ fade: 'bottom top bottom' });
+
+    expect(result.mask).toBe(
+      'linear-gradient(to top, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) calc(2 * var(--gap))), ' +
+        'linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) calc(2 * var(--gap))), ' +
+        'linear-gradient(to top, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) calc(2 * var(--gap)))',
+    );
+  });
+
   it('handles custom transparent color only', () => {
     const result = fadeStyle({ fade: 'top #transparent-mask' });
     expect(result.mask).toBe(
@@ -141,6 +151,12 @@ describe('fadeStyle', () => {
       expect(result.mask).toContain('16px');
       expect(result.mask).toContain('to top');
       expect(result.mask).toContain('8px');
+    });
+
+    it('skips directionless groups when multiple groups are present', () => {
+      expect(fadeStyle({ fade: '4x, 1x bottom' })!.mask).toBe(
+        'linear-gradient(to top, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 1) 8px)',
+      );
     });
 
     it('handles multiple groups with different widths and colors', () => {

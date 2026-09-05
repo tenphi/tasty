@@ -59,6 +59,11 @@ export default defineConfig([
     },
     outputOptions: {
       chunkFileNames: 'chunks/[name]-[hash].js',
+      comments: {
+        legal: true,
+        annotation: true,
+        jsdoc: false,
+      },
       codeSplitting: {
         // Keep the published build compact while preserving meaningful
         // tree-shaking boundaries for consumers that import a narrow API.

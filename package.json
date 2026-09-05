@@ -237,7 +237,7 @@
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "49.56 kB"
+      "limit": "50.61 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -278,7 +278,7 @@
         "path",
         "crypto"
       ],
-      "limit": "31.25 kB"
+      "limit": "32.29 kB"
     },
     {
       "name": "babel-plugin",

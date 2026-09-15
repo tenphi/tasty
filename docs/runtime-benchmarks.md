@@ -302,8 +302,11 @@ On an Apple M3 Pro with React 19.2.8 and Chromium 151, first contentful paint:
 
 That is one full run of the matrix; a second moved every cell by a few percent.
 The `baseline` column is Tasty-free and identical across runs by construction,
-so its own drift between runs — up to ~8 ms here — is a fair estimate of the
-noise on every cell, and small FCP differences should not be over-read.
+so its own drift between runs is a fair estimate of the noise on every cell:
+across two runs here it moved by up to 16 ms. Read the throttled rows, where
+Tasty's cost is an order of magnitude above that. The unthrottled 1x row
+(+4 ms) sits inside the noise band and should be read as "too small to
+measure this way", not as a 4 ms cost.
 
 **The cost is the bundle, not the work.** On Slow 4G the extra transfer alone
 accounts for 260 ms of the 264 ms FCP delta — nearly all of it. Everything

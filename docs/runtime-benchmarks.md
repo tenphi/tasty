@@ -40,27 +40,44 @@ of elements, rules or interactions. Machine load, browser versions, and CPU
 power will move the results — on a loaded machine the absolute columns drift
 several percent while the raw/Tasty delta holds, so read the delta.
 
+**On a laptop, check the power state first.** Low Power Mode caps CPU frequency,
+and it is the single largest source of error here — larger than background load.
+Measured on the machine below, running on battery with Low Power Mode enabled
+made every one of the 53 Node cases slower, by a median of 26%, and halving the
+background load recovered only 3 points of that. A frequency cap scales every
+case by roughly the same factor, so it does not look like noise; it looks like a
+uniformly slower library. Verify before trusting a run:
+
+```bash
+pmset -g ps | head -2      # want 'AC Power'
+pmset -g | grep -i lowpowermode   # want 0
+```
+
 ## Core Style Pipeline
 
-The following numbers are single-call throughput measured on an Apple M1 Max
-with Node 22:
+Single-call throughput, three consecutive runs on an Apple M3 Pro with Node
+24.18.0 on AC power:
 
-| Operation                                                   |              ops/sec | Latency (mean) |
-| ----------------------------------------------------------- | -------------------: | -------------: |
-| `renderStyles` — 5 flat properties (cold)                   |              ~60,000 |         ~17 us |
-| `renderStyles` — state map with media/hover/modifier (cold) |              ~18,500 |         ~54 us |
-| `renderStyles` — same styles (cached)                       |           ~5,800,000 |       ~0.17 us |
-| `parseStateKey` — simple key like `:hover` (cold)           |             ~790,000 |        ~1.3 us |
-| `parseStateKey` — complex OR/AND/NOT key (cold)             |             ~140,000 |          ~7 us |
-| `parseStateKey` — any key (cached)                          | ~3,400,000–8,300,000 |    ~0.1–0.3 us |
-| `parseStyle` — value tokens like `2x 4x` (cold)             |             ~344,000 |        ~2.9 us |
-| `parseStyle` — color tokens (cold)                          |             ~567,000 |        ~1.8 us |
-| `parseStyle` — any value (cached)                           |          ~15,250,000 |       ~0.07 us |
+| Operation                                                   |               ops/sec | Latency (mean) |
+| ----------------------------------------------------------- | --------------------: | -------------: |
+| `renderStyles` — 5 flat properties (cold)                   |       143,000–158,000 |     6.3–7.0 us |
+| `renderStyles` — state map with media/hover/modifier (cold) |         31,000–36,000 |       28–32 us |
+| `renderStyles` — OR state map across contexts (cold)        |         13,000–14,000 |       71–76 us |
+| `renderStyles` — same styles (cached)                       |  9,830,000–10,420,000 |       ~0.10 us |
+| `parseStateKey` — simple key like `:hover` (cold)           |   1,910,000–1,980,000 |       ~0.50 us |
+| `parseStateKey` — value modifier key (cold)                 |   1,120,000–1,160,000 |       ~0.90 us |
+| `parseStateKey` — complex OR/AND/NOT key (cold)             |       341,000–357,000 |     2.8–2.9 us |
+| `parseStateKey` — any key (cached)                          |  4,900,000–16,530,000 |    0.10–0.20 us |
+| `parseStyle` — value tokens like `2x 4x` (cold)             |       575,000–605,000 |       ~1.7 us |
+| `parseStyle` — color tokens (cold)                          |   1,160,000–1,240,000 |    0.80–0.90 us |
+| `parseStyle` — layered functions (cold)                     |       175,000–184,000 |     5.4–5.7 us |
+| `parseStyle` — any value (cached)                           | 29,500,000–30,750,000 |      <0.05 us |
 
 “Cold” cases use unique inputs to bypass the relevant caches. Cached cases
-reuse one input and measure the LRU hot path. Expect roughly ±10% between runs.
-These benchmarks do not include React, DOM work, stylesheet injection, style
-resolution, layout, or paint.
+reuse one input and measure the LRU hot path. Run-to-run spread on an idle
+machine was 1–7% for most cases, rising to 10–16% for the two `renderStyles`
+cold cases. These benchmarks do not include React, DOM work, stylesheet
+injection, style resolution, layout, or paint.
 
 The benchmark sources are colocated with the code they exercise:
 [`pipeline.bench.ts`](../src/pipeline/pipeline.bench.ts),
@@ -86,19 +103,19 @@ excludes layout, paint, and stylesheet matching. Every commit is wrapped in
 `flushSync`, keeping its synchronous reconciliation and commit inside the
 sample. This does not estimate React's concurrent scheduling latency.
 
-On an Apple M3 Pro with React 19.2.4 and Chromium 151, three consecutive runs
+On an Apple M3 Pro with React 19.2.8 and Chromium 151, three consecutive runs
 produced these ranges:
 
-| Work on 10,000 siblings             | Raw elements |  `tasty({})` | Extra per wrapped element |
-| ----------------------------------- | -----------: | -----------: | ------------------------: |
-| Mount + remove                      |   4.5–4.9 ms | 14.0–14.9 ms |              0.95–1.00 us |
-| Rerender, same host props           |   1.3–1.4 ms | 10.9–11.4 ms |              0.96–1.00 us |
-| Rerender, change one host attribute |   2.8–3.4 ms | 15.0–15.7 ms |              1.21–1.27 us |
+| Work on 10,000 siblings             | Raw elements | `tasty({})` | Extra per wrapped element |
+| ----------------------------------- | -----------: | ----------: | ------------------------: |
+| Mount + remove                      |   4.2–4.3 ms |  9.2–9.7 ms |              0.50–0.54 us |
+| Rerender, same host props           |   1.2–1.3 ms |  6.3–6.5 ms |              0.51–0.52 us |
+| Rerender, change one host attribute |   2.5–2.7 ms | 11.2–11.6 ms |             0.86–0.91 us |
 
 The useful result is the raw/Tasty time difference divided by 10,000, not the
 ratio between the two times. The ratio becomes large because the raw baseline
-is tiny. In this synthetic workload, an empty wrapper adds roughly 1 us per
-participating element, or 1.2–1.3 us when React also changes a DOM attribute.
+is tiny. In this synthetic workload, an empty wrapper adds roughly 0.5 us per
+participating element, or ~0.9 us when React also changes a DOM attribute.
 
 This is the floor Tasty consumes when it has no styling job. It is not a
 page-level score. Real trees include application components, effects, layout,
@@ -143,16 +160,22 @@ ranges:
 
 | Workload                                             | CSS already present |  Tasty runtime | Incremental Tasty cost |
 | ---------------------------------------------------- | ------------------: | -------------: | ---------------------: |
-| One new rule + immediate resolution, per transaction |          2.8–3.3 us | 110.3–113.8 us |         107.3–111.0 us |
-| 1,000 new rules + one resolution                     |        1.86–2.06 ms |   9.01–9.98 ms |           7.13–7.92 ms |
-| 1,000-rule workload, incremental cost per rule       |                   — |              — |             7.1–7.9 us |
+| One new rule + immediate resolution, per transaction |          2.6–3.0 us | 102.8–107.0 us |         100.3–104.3 us |
+| 1,000 new rules + one resolution                     |        1.69–1.79 ms |   7.42–7.67 ms |           5.73–5.94 ms |
+| 1,000-rule workload, incremental cost per rule       |                   — |              — |             5.7–5.9 us |
 
 Directly compared, injecting 1,000 rules before one resolution boundary cost
-about 66–71 times as much in total as injecting one rule and resolving it—not
-1,000 times as much. Its average incremental cost per rule was about 14–16
+about 55–59 times as much in total as injecting one rule and resolving it—not
+1,000 times as much. Its average incremental cost per rule was about 17–18
 times lower. This is the same Tasty generation and injection path in both cases;
 the group amortizes fixed transaction work and lets the browser resolve all the
 stylesheet writes together.
+
+The per-transaction single-rule figure is the one number here that engine work
+does not move: it is dominated by the browser's injection-to-resolution
+boundary, which is crossed once per rule regardless of how fast generation is.
+The 1,000-rule column, where Tasty's own generation dominates, is where engine
+changes show up.
 
 The subtraction is the meaningful result. It includes Tasty's cold style
 generation, cache and injector bookkeeping, rule insertion, and any additional
@@ -207,25 +230,25 @@ if the hovered rule is not already there. That a style map's states all ship in
 one chunk on first render is the premise of this case; if the hovered rule
 arrived lazily, the first sample would be timing injection.
 
-On an Apple M1 Max with React 19.2.8 and Chromium 151, across several runs:
+On an Apple M3 Pro with React 19.2.8 and Chromium 151, three consecutive runs:
 
-| Workload                                             | Raw elements |   Tasty mods |           Extra per unit |
-| ---------------------------------------------------- | -----------: | -----------: | -----------------------: |
-| 300 single-element mod toggles in a 100-element tree |   2.1–2.5 ms |   2.7–3.1 ms | 1.6–2.1 us / interaction |
-| 20 mount + unmount cycles of a 200-element subtree    |   7.6–8.0 ms | 12.6–12.7 ms |   1.22–1.27 us / element |
+| Workload                                             | Raw elements | Tasty mods |           Extra per unit |
+| ---------------------------------------------------- | -----------: | ---------: | -----------------------: |
+| 300 single-element mod toggles in a 100-element tree |   1.7–1.8 ms | 2.0–2.1 ms | 1.2–1.3 us / interaction |
+| 20 mount + unmount cycles of a 200-element subtree    |   5.2–5.4 ms | 8.3–8.6 ms |   0.77–0.81 us / element |
 
 The absolute columns move several percent with machine load; the delta between
 the arms is the stable quantity, so read that rather than either column.
 
 Two things are worth reading out of this.
 
-A mod flip on an already-mounted element costs about 2 us. The CSS for both
+A mod flip on an already-mounted element costs about 1.2 us. The CSS for both
 states already exists — Tasty emits every state of a style map in one chunk on
 first render — so both arms perform the same commit, and what is left is
-Tasty's props and mod handling. That is the same order as the ~1 us empty
+Tasty's props and mod handling. That is the same order as the ~0.5 us empty
 wrapper measured above, which is most of where it comes from.
 
-Subtree churn is not about styling at all. Its ~1.25 us per element sits right
+Subtree churn is not about styling at all. Its ~0.8 us per element sits right
 on the empty-wrapper mount cost, because the styles are already cached:
 reopening a menu re-pays the React wrapper, not the style pipeline.
 
@@ -257,7 +280,7 @@ Two things about the payload decide whether this measures a deployment or a
 straw man, so both are enforced rather than assumed:
 
 - **Assets are served brotli-compressed**, the way a static host serves them.
-  The bundle is 52.0 KB on the wire and 186 KB decoded; putting the decoded
+  The bundle is 51.5 KB on the wire and 180 KB decoded; putting the decoded
   bytes on a 1.6 Mbps link would add ~700 ms and charge it to Tasty. The run
   reads `encodedBodySize` back out of resource timing and fails if what
   crossed the wire is not the compressed size the table reports.
@@ -266,35 +289,38 @@ straw man, so both are enforced rather than assumed:
   would be. Re-exporting the whole library adds ~4 KB brotli of code no page
   here calls.
 
-On an Apple M1 Max with React 19.2.8 and Chromium 151, first contentful paint:
+On an Apple M3 Pro with React 19.2.8 and Chromium 151, first contentful paint:
 
 | Link / CPU            | baseline | runtime | prewarm | Tasty's cost |
 | --------------------- | -------: | ------: | ------: | -----------: |
-| No throttling, 1x     |    40 ms |   52 ms |   52 ms |       +12 ms |
-| Fast 4G, 1x           |   624 ms |  680 ms |  676 ms |       +56 ms |
-| Slow 4G, 1x           |  2028 ms | 2304 ms | 2304 ms |      +276 ms |
-| No throttling, 4x CPU |   148 ms |  196 ms |  196 ms |       +48 ms |
-| Fast 4G, 4x CPU       |   684 ms |  784 ms |  788 ms |      +100 ms |
-| Slow 4G, 4x CPU       |  2096 ms | 2416 ms | 2408 ms |      +320 ms |
+| No throttling, 1x     |    36 ms |   40 ms |   40 ms |        +4 ms |
+| Fast 4G, 1x           |   628 ms |  700 ms |  692 ms |       +72 ms |
+| Slow 4G, 1x           |  2056 ms | 2320 ms | 2320 ms |      +264 ms |
+| No throttling, 4x CPU |   100 ms |  128 ms |  132 ms |       +28 ms |
+| Fast 4G, 4x CPU       |   656 ms |  724 ms |  740 ms |       +68 ms |
+| Slow 4G, 4x CPU       |  2068 ms | 2360 ms | 2360 ms |      +292 ms |
 
 That is one full run of the matrix; a second moved every cell by a few percent.
+The `baseline` column is Tasty-free and identical across runs by construction,
+so its own drift between runs — up to ~8 ms here — is a fair estimate of the
+noise on every cell, and small FCP differences should not be over-read.
 
 **The cost is the bundle, not the work.** On Slow 4G the extra transfer alone
-accounts for 262 ms of the 276 ms FCP delta — nearly all of it. Everything
+accounts for 260 ms of the 264 ms FCP delta — nearly all of it. Everything
 Tasty then *does* is small by comparison:
 
 | Phase (Slow 4G, 1x)     | baseline | runtime | prewarm |
 | ----------------------- | -------: | ------: | ------: |
-| js+css transfer         |  1420 ms | 1682 ms | 1681 ms |
-| module compile (shared) |   1.2 ms |  1.5 ms |  2.0 ms |
-| tasty top-level execute |        — |  1.2 ms |  0.9 ms |
-| `configure()`           |        — |  0.6 ms |  0.5 ms |
-| prewarm                 |        — |       — |  5.3 ms |
-| render 1st component    |   2.0 ms |  8.2 ms |  2.7 ms |
-| render 49 more          |   1.0 ms |  7.1 ms |  6.0 ms |
+| js+css transfer         |  1433 ms | 1693 ms | 1690 ms |
+| module compile (shared) |   4.1 ms |  3.3 ms |  3.0 ms |
+| tasty top-level execute |        — |  1.2 ms |  1.1 ms |
+| `configure()`           |        — |  0.6 ms |  0.6 ms |
+| prewarm                 |        — |       — |  5.2 ms |
+| render 1st component    |   3.0 ms |  7.3 ms |  2.8 ms |
+| render 49 more          |   1.3 ms |  5.2 ms |  5.0 ms |
 
 Importing Tasty costs about 1 ms of top-level execution; `configure()` costs
-half of one. The rest of the CPU delta — about 13 ms for 50 components — is
+half of one. The rest of the CPU delta — about 10 ms for 50 components — is
 generation and injection, which is the cost the injection benchmark isolates.
 
 One asymmetry is worth naming: the control links a render-blocking stylesheet
@@ -304,20 +330,20 @@ delivery models, not a thumb on the scale, but it means the FCP delta is not
 purely "what Tasty costs to execute".
 
 **Prewarming moves the wake-up, it does not remove it.** The first styled render
-is ~5 ms more expensive than the ones after it, because that is when the
+is ~4.5 ms more expensive than the ones after it, because that is when the
 engine's deferred payload is actually compiled. A throwaway `computeStyles()`
-against a detached root pays it early: `render 1st` drops from 8.2 ms to
-2.7 ms. The prewarm itself costs 5.3 ms, so FCP does not move. It is worth
+against a detached root pays it early: `render 1st` drops from 7.3 ms to
+2.8 ms. The prewarm itself costs 5.2 ms, so FCP does not move. It is worth
 doing only when something else can overlap it, or when the first render is on a
 latency-critical path and the page has idle time before it.
 
 **Retained heap.** After a forced collection, the runtime page holds about
-1,013 KB more than the control (2,632 KB vs 1,619 KB) for 50 components — the
+985 KB more than the control (2,605 KB vs 1,619 KB) for 50 components — the
 parser caches, the chunk cache, the injector's registry and the generated CSS.
 The control is not zero either; most of its 1.6 MB is React and the DOM.
 
 CPU throttling changes which line moves. At 4x, module compilation of the
-larger graph becomes visible (5.9 ms → 25 ms) where at 1x it is free: V8
+larger graph becomes visible (2.6 ms → 18 ms) where at 1x it is free: V8
 pre-parses at import and compiles lazily, so a slower CPU pays for code the
 faster one never fully compiled. Transfer numbers from the unthrottled cells
 are not worth reading — with no emulated link, resource timings are scheduling
@@ -341,8 +367,8 @@ blindly. They describe different paths:
 
 The cold-start measurement is the one that puts the rest in proportion. On a
 slow connection, nearly all of Tasty's page-load cost is transferring the
-library — 262 ms of a 276 ms delta — while the generation and injection the
-microbenchmarks obsess over is ~13 ms for 50 components. Bundle size is
+library — 260 ms of a 264 ms delta — while the generation and injection the
+microbenchmarks obsess over is ~10 ms for 50 components. Bundle size is
 therefore the lever with the largest effect on first paint, and the runtime
 levers matter for what happens after it.
 

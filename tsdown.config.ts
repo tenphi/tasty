@@ -164,7 +164,7 @@ export default defineConfig([
             test: (id) =>
               isSourceModule(
                 id,
-                /(?:[\\/]src[\\/](?:config|compute-styles|rsc-cache)\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|ssr[\\/]collect-auto-properties\.ts|utils[\\/](?:cache-wrapper|client-state|deps-equal|filter-base-props|has-keys|mod-attrs|process-tokens|resolve-recipes|typography)\.ts)$)/,
+                /(?:[\\/]src[\\/](?:config|compute-styles|rsc-cache)\.ts(?:$|\?)|[\\/](?:prop-handlers\.ts|injector[\\/].+|ssr[\\/]collect-auto-properties\.ts|utils[\\/](?:client-state|deps-equal|filter-base-props|has-keys|mod-attrs|process-tokens|resolve-recipes|typography)\.ts)$)/,
               ),
             priority: 60,
           },

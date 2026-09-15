@@ -71,7 +71,7 @@ Single-call throughput, three consecutive runs on an Apple M3 Pro with Node
 | `parseStyle` — value tokens like `2x 4x` (cold)             |       575,000–605,000 |       ~1.7 us |
 | `parseStyle` — color tokens (cold)                          |   1,160,000–1,240,000 |    0.80–0.90 us |
 | `parseStyle` — layered functions (cold)                     |       175,000–184,000 |     5.4–5.7 us |
-| `parseStyle` — any value (cached)                           | 29,500,000–30,750,000 |      <0.05 us |
+| `parseStyle` — any value (cached)                           | 29,500,000–30,750,000 |      ~0.03 us |
 
 “Cold” cases use unique inputs to bypass the relevant caches. Cached cases
 reuse one input and measure the LRU hot path. Run-to-run spread on an idle

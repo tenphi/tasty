@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="assets/tasty.svg" width="128" height="128" alt="Tasty logo">
+  <img src="assets/tasty.svg" width="128" height="128" alt="Tasty logo" />
 </p>
 
 <h1 align="center">Tasty</h1>
 
 <p align="center">
-  <strong>CSS-in-JS for React design systems.</strong><br>
+  <strong>CSS-in-JS for React design systems.</strong><br />
   Build components whose styles don’t fight.
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@tenphi/tasty"><img src="https://img.shields.io/npm/v/@tenphi/tasty.svg" alt="npm version"></a>
-  <a href="https://github.com/tenphi/tasty/actions/workflows/ci.yml"><img src="https://github.com/tenphi/tasty/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="https://github.com/tenphi/tasty/blob/main/LICENSE"><img src="https://img.shields.io/github/license/tenphi/tasty" alt="license"></a>
+  <a href="https://www.npmjs.com/package/@tenphi/tasty"><img src="https://img.shields.io/npm/v/@tenphi/tasty.svg" alt="npm version" /></a>
+  <a href="https://github.com/tenphi/tasty/actions/workflows/ci.yml"><img src="https://github.com/tenphi/tasty/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="https://github.com/tenphi/tasty/blob/main/LICENSE"><img src="https://img.shields.io/github/license/tenphi/tasty" alt="license" /></a>
 </p>
 
 ---
@@ -615,7 +615,7 @@ const tokens = theme.tasty(); // Ready-to-use Tasty tokens
 Syntax highlighting for Tasty styles in TypeScript, TSX, JavaScript, and JSX. Highlights color tokens, custom units, state keys, presets, and style properties inside `tasty()`, `tastyStatic()`, and related APIs.
 
 <p align="center">
-  <img src="assets/tasty-vscode-highlight.png" width="512" alt="Tasty VS Code syntax highlighting example">
+  <img src="assets/tasty-vscode-highlight.png" width="512" alt="Tasty VS Code syntax highlighting example" />
 </p>
 
 ## Built with Tasty

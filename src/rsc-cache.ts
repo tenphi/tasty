@@ -8,7 +8,8 @@
  * flushed into inline <style> tags by the next tasty() component.
  */
 
-import { cache } from 'react';
+// A default import also loads on React 18, which has no named `cache` export.
+import React from 'react';
 
 import { getNamePrefix } from './config';
 import type { ServerStyleCollector } from './ssr/collector';
@@ -32,14 +33,22 @@ export interface RSCStyleCache {
  * React.cache provides per-request memoization in Server Components,
  * so each request gets its own isolated cache.
  */
-export const getRSCCache = cache((): RSCStyleCache => ({
+const createRSCCache = (): RSCStyleCache => ({
   cacheKeyToClassName: new Map(),
   emittedKeys: new Set(),
   internalsEmitted: false,
   pendingCSS: [],
   keyToIndex: new Map(),
   generatedNames: new Map(),
-}));
+});
+
+// React 18 has no RSC cache API. Its client and collector-backed SSR paths do
+// not use this cache; a fallback call must still allocate isolated state rather
+// than retain one global cache across requests. React 19 keeps request caching.
+export const getRSCCache =
+  typeof React.cache === 'function'
+    ? React.cache(createRSCCache)
+    : createRSCCache;
 
 export function rscAllocateClassName(
   rscCache: RSCStyleCache,

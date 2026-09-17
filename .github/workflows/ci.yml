@@ -68,6 +68,9 @@ jobs:
       - name: Built entrypoint check
         run: pnpm check:build
 
+      - name: Packed React compatibility check
+        run: pnpm check:react-compat
+
       - name: Test
         run: pnpm test
 

@@ -133,6 +133,7 @@
     "release": "changeset publish",
     "knip": "knip",
     "check:build": "node scripts/check-built-entries.mjs",
+    "check:react-compat": "node scripts/check-react-compat.mjs",
     "check:test-only": "node scripts/check-test-only-code.mjs",
     "hygiene": "pnpm lint && pnpm format:check && pnpm typecheck",
     "hygiene:fix": "pnpm lint:fix && pnpm format && pnpm typecheck"

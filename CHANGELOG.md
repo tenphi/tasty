@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.9.2
+
+### Patch Changes
+
+- [#345](https://github.com/tenphi/tasty/pull/345) [`6d4ce8f`](https://github.com/tenphi/tasty/commit/6d4ce8f83c4034a9d3cca3f2bf68d1f45166cbd6) Thanks [@tenphi](https://github.com/tenphi)! - Fix package imports under React 18 by using the React 19 server cache API only when available. React 18 client rendering and collector-backed SSR can load the runtime without a missing-export error; React 19 retains request-scoped caching.
+
 ## 3.9.1
 
 ### Patch Changes

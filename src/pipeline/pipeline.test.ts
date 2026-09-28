@@ -75,6 +75,23 @@ import { clearConditionCache } from './materialize';
 import { configure, resetConfig } from '../config';
 import type { StyleResult } from './index';
 
+describe('native animation shorthand', () => {
+  it('resolves a duration token without a custom animation handler', () => {
+    const rules = renderStyles(
+      { animation: 'pulse $animation-duration ease-in infinite' },
+      '.pulse',
+    );
+
+    expect(
+      rules.some((rule) =>
+        rule.declarations.includes(
+          'animation: pulse var(--animation-duration) ease-in infinite;',
+        ),
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('ConditionNode operations', () => {
   describe('and()', () => {
     it('should return TRUE for empty args', () => {

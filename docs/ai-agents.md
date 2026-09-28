@@ -134,6 +134,14 @@ Omit the duration to use `$fill-transition` with `$transition` as fallback, or
 use a duration token explicitly (`transition: 'fill $transition'`). Avoid raw
 time values in duration slots. An explicit zero can be useful to disable motion.
 
+Use `transition` when defining a complete transition, and the native CSS
+`animation` shorthand when defining a complete animation. Tasty accepts
+`animation` directly and tracks local keyframes referenced by it; no special
+animation handler is needed. Use duration tokens in either form. Keep
+`transitionDuration`, `animationDuration`, and other motion longhands when a
+state or extension changes only one part of an existing effect. A shorthand
+resets omitted parts, including an animation's timeline and range.
+
 ## 4. State maps
 
 A property value can be an object of `state: value`. Key order is priority — later keys win.

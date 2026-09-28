@@ -583,6 +583,24 @@ If the name is not a semantic name, it is used as a literal CSS property name.
 
 ---
 
+### `animation`
+
+`animation` is the native CSS shorthand. Tasty parses tokens in its value and
+tracks local `@keyframes` names referenced by it, so it needs no custom style
+handler. Define a complete animation with the shorthand, using a configured
+duration token where appropriate (for example,
+`animation: 'pulse $animation-duration ease-in infinite'`).
+
+Use `animationDuration`, `animationTimeline`, `animationRange`, and other CSS
+longhands when changing just one part of an existing animation in a state or
+component extension. Setting `animation` resets omitted parts, including its
+timeline and range. The same principle applies to `transitionDuration` and
+other transition longhands when a base `transition` is already defined.
+`transitionBehavior` remains a separate CSS longhand; Tasty's semantic
+`transition` syntax covers name, timing, easing, and delay.
+
+---
+
 ## Scrollbar & Overflow
 
 ### `scrollbar`

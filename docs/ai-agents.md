@@ -22,6 +22,12 @@ tastyStatic('.card', { … });                                              // b
 - Wrap, don't pass styles per instance: ❌ `<Box styles={{ padding: '2x' }} />` → ✅ `const Box = tasty({ styles: { padding: '2x' } })`.
 - Style values are **static**. Route anything conditional through a state map plus `mods` (or `tokens` / `styleProps`):
   ❌ `fill: isOpen ? '#primary' : '#surface'` → ✅ `fill: { '': '#surface', open: '#primary' }` with `mods={{ open: isOpen }}`.
+- Keep JavaScript identifiers, calls, computed keys, and interpolated templates
+  out of style values. Use token references inside strings for values supplied
+  at runtime. Spell out style properties rather than spreading objects; if a
+  runtime spread is unavoidable, add a
+  `// eslint-disable-next-line tasty/no-style-spread -- reason` comment directly
+  above it. `tastyStatic()` cannot use spreads.
 
 ## 2. Property names
 

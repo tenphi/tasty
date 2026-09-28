@@ -566,20 +566,38 @@ When easing is provided without a duration, the default timing variable is used 
 | `zIndex` | `z-index` |
 | `inset` | `inset`, `top`, `right`, `bottom`, `left` |
 
-Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name).
+Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name). Prefer omitting the duration or using a duration token instead of repeating raw time values across components. Explicit zero can disable motion.
 
 ```jsx
-transition="theme 0.3s"
-transition="fill 0.2s, radius 0.3s"
-transition="fade 0.15s ease-in"
+transition="theme"
+transition="fill, radius"
+transition="fade $transition ease-in"
 transition="fill ease-in"           // easing without duration (uses default timing)
 transition="radius ease-in-out"     // easing keyword only
-transition="$$custom-prop 0.3s"     // custom property transition
+transition="$$custom-prop"          // custom property transition
 ```
 
 **Recognized easing keywords:** `ease`, `ease-in`, `ease-out`, `ease-in-out`, `linear`, `step-start`, `step-end`. CSS easing functions (`cubic-bezier(...)`, `steps(...)`, `linear(...)`) are also recognized.
 
 If the name is not a semantic name, it is used as a literal CSS property name.
+
+---
+
+### `animation`
+
+`animation` is the native CSS shorthand. Tasty parses tokens in its value and
+tracks local `@keyframes` names referenced by it, so it needs no custom style
+handler. Define a complete animation with the shorthand, using a configured
+duration token where appropriate (for example,
+`animation: 'pulse $animation-duration ease-in infinite'`).
+
+Use `animationDuration`, `animationTimeline`, `animationRange`, and other CSS
+longhands when changing just one part of an existing animation in a state or
+component extension. Setting `animation` resets omitted parts, including its
+timeline and range. The same principle applies to `transitionDuration` and
+other transition longhands when a base `transition` is already defined.
+`transitionBehavior` remains a separate CSS longhand; Tasty's semantic
+`transition` syntax covers name, timing, easing, and delay.
 
 ---
 

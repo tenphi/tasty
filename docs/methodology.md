@@ -236,7 +236,7 @@ const ProgressBar = tasty({
       width: '$progress',
       height: '100%',
       fill: '#primary',
-      transition: 'width 0.3s',
+      transition: 'width',
     },
   },
   elements: { Bar: 'div' },
@@ -534,7 +534,7 @@ See [Configuration](configuration.md) for the full `configure()` API.
 
 - **Create styled wrappers** instead of passing `styles` directly — faster, composable, inspectable
 - **Use design tokens and custom units** (`#text`, `2x`, `1r`) instead of raw CSS values
-- **Use semantic transition names** (`transition: 'theme 0.3s'`) instead of listing CSS properties
+- **Use semantic transition names** (`transition: 'theme'`) instead of listing CSS properties; omit the duration to use the motion tokens
 - **Use `elements` prop** to declare typed sub-components for compound components
 - **Use `styleProps`** to define what product engineers can customize
 - **Use `modProps`** to expose known modifier states as clean component props

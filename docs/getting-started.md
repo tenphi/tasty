@@ -180,6 +180,7 @@ The `recommended` config covers common correctness and style issues:
 | Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`                    |
 | Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax          |
 | Motion guidance     | `no-raw-transition-duration`                                                                           | Suggests timing tokens or the default timing for transition durations |
+| Dynamic styles      | `no-runtime-styles-mutation`, `no-style-spread`                                                         | Warns on JavaScript values and spreads inside runtime style objects   |
 
 ### Strict config
 

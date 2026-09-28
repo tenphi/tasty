@@ -701,7 +701,7 @@ const FadeIn = tasty({
   styles: {
     opacity: { '': '1', '@starting': '0' },
     transform: { '': 'scale(1)', '@starting': 'scale(0.95)' },
-    transition: 'opacity 0.3s, translate 0.3s',
+    transition: 'opacity, translate',
   },
 });
 ```
@@ -833,7 +833,7 @@ const AnimatedGradient = tasty({
     '$gradient-angle': '0deg',
     '#theme': 'okhst(280 80% 50%)',
     image: 'linear-gradient($gradient-angle, #theme, #clear)',
-    transition: '$$gradient-angle 0.3s, ##theme 0.3s',
+    transition: '$$gradient-angle, ##theme',
   },
 });
 ```

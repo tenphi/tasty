@@ -566,15 +566,15 @@ When easing is provided without a duration, the default timing variable is used 
 | `zIndex` | `z-index` |
 | `inset` | `inset`, `top`, `right`, `bottom`, `left` |
 
-Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name).
+Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name). Prefer omitting the duration or using a duration token instead of repeating raw time values across components. Explicit zero can disable motion.
 
 ```jsx
-transition="theme 0.3s"
-transition="fill 0.2s, radius 0.3s"
-transition="fade 0.15s ease-in"
+transition="theme"
+transition="fill, radius"
+transition="fade $transition ease-in"
 transition="fill ease-in"           // easing without duration (uses default timing)
 transition="radius ease-in-out"     // easing keyword only
-transition="$$custom-prop 0.3s"     // custom property transition
+transition="$$custom-prop"          // custom property transition
 ```
 
 **Recognized easing keywords:** `ease`, `ease-in`, `ease-out`, `ease-in-out`, `linear`, `step-start`, `step-end`. CSS easing functions (`cubic-bezier(...)`, `steps(...)`, `linear(...)`) are also recognized.

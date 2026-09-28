@@ -246,7 +246,7 @@ function glazeStyles(value: GlazeValue): Styles {
     styles = Object.freeze({
       '#glaze-bg': `#${tone}.${intensity}`,
       fill: '#glaze-bg',
-      transition: 'fill 0.2s',
+      transition: 'fill',
     }) as Styles;
     cache.set(key, styles);
   }

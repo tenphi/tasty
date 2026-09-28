@@ -289,7 +289,7 @@ export interface TastyConfig {
    * const Spinner = tasty({
    *   styles: {
    *     transform: 'rotate($rotation)',
-   *     transition: '$$rotation 0.3s', // outputs: --rotation 0.3s
+   *     transition: '$$rotation $transition', // outputs: --rotation var(--transition)
    *   },
    * });
    * ```

@@ -489,7 +489,7 @@ const button = tastyStatic({
   radius: '1r',
   fill: '#gray.20',
   color: '#text',
-  transition: 'fill 0.15s',
+  transition: 'fill',
 });
 
 // Variants

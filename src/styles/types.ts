@@ -335,10 +335,10 @@ export interface StylesInterface extends Omit<
    * Multiple transitions: separated by commas
    *
    * Examples:
-   * - `transition="fill 0.2s, radius 0.3s"` // transitions background-color and border-radius
-   * - `transition="fade 0.15s ease-in"` // transitions mask with easing
-   * - `transition="theme 0.3s"` // transitions all theme-related properties
-   * - `transition="preset 0.2s"` // transitions typography properties
+   * - `transition="fill, radius"` // transitions background-color and border-radius
+   * - `transition="fade $transition ease-in"` // transitions mask with explicit timing token
+   * - `transition="theme"` // transitions all theme-related properties
+   * - `transition="preset"` // transitions typography properties
    */
   transition?: CSSProperties['transition'] | string;
   /**

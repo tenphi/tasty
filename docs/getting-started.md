@@ -169,20 +169,21 @@ export default [
 
 ### What `recommended` catches
 
-The `recommended` config enables 18 of the plugin's 27 total rules. It covers the most common issues without turning on the stricter governance rules:
+The `recommended` config covers common correctness and style issues:
 
-| Category            | Rules                                                                                                  | Examples                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element`                                        | Flags typos like `pading` or invalid boolean usage           |
-| Value validation    | `valid-value`, `valid-color-token`, `valid-custom-unit`                                                | Catches `#nonexistent` tokens, bad unit syntax               |
-| State validation    | `valid-state-key`, `no-nested-state-map`, `require-default-state`                                      | Validates state key syntax, ensures `''` default exists      |
-| Structure           | `valid-styles-structure`, `no-important`, `no-nested-selector`                                         | Prevents `!important`, invalid nesting                       |
-| Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`           |
-| Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax |
+| Category            | Rules                                                                                                  | Examples                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element`                                        | Flags typos like `pading` or invalid boolean usage                    |
+| Value validation    | `valid-value`, `valid-color-token`, `valid-custom-unit`                                                | Catches `#nonexistent` tokens, bad unit syntax                        |
+| State validation    | `valid-state-key`, `no-nested-state-map`, `require-default-state`                                      | Validates state key syntax, ensures `''` default exists               |
+| Structure           | `valid-styles-structure`, `no-important`, `no-nested-selector`                                         | Prevents `!important`, invalid nesting                                |
+| Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`                    |
+| Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax          |
+| Motion guidance     | `no-raw-transition-duration`                                                                           | Suggests timing tokens or the default timing for transition durations |
 
 ### Strict config
 
-For stricter governance, use `tasty.configs.strict`. It adds rules that enforce best practices like preferring shorthand properties, consistent token usage, and flagging direct `styles` prop usage:
+For stricter governance, use `tasty.configs.strict`. It adds rules that flag direct `styles` prop usage and other patterns:
 
 ```js
 export default [tasty.configs.strict];

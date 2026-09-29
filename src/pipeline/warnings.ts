@@ -13,7 +13,8 @@ type TastyWarningCode =
   | 'INVALID_FALLBACK_KEY'
   | 'MISPLACED_DEFAULT_STATE'
   | 'REDUNDANT_DEFAULT_STATE'
-  | 'HANDLER_CAMEL_CASE_KEY';
+  | 'HANDLER_CAMEL_CASE_KEY'
+  | 'INVALID_STATE_KEY';
 
 interface TastyWarning {
   code: TastyWarningCode;

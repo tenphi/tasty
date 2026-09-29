@@ -39,6 +39,25 @@ describe('extractStylesWithChunks', () => {
 
     expect(chunks1[0].className).not.toBe(chunks2[0].className);
   });
+
+  it('should generate different classNames for state maps in a different key order', () => {
+    // Later keys win, so these style a checked, disabled element differently
+    // and must not share a class (or one of them ships the other's CSS).
+    const checkedWins = {
+      padding: { '': '1x', disabled: '3x', checked: '2x' },
+    };
+    const disabledWins = {
+      padding: { '': '1x', checked: '2x', disabled: '3x' },
+    };
+
+    const [first] = extractStylesWithChunks(checkedWins);
+    const [second] = extractStylesWithChunks(disabledWins);
+
+    expect(first.className).not.toBe(second.className);
+    expect(first.css).not.toBe(
+      second.css.replaceAll(second.className, first.className),
+    );
+  });
 });
 
 describe('extractFunctionsFromStyles', () => {

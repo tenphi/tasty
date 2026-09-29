@@ -39,13 +39,13 @@ exports[`Advanced State Mapping - CSS Output > @container query states > should 
 
 exports[`Advanced State Mapping - CSS Output > @media query states > should expand dimension shorthands in media queries 1`] = `
 "@media (not (height > 800px)) and (not (width < 600px)) {
-  .tngbv2n.tngbv2n { padding: 32px; }
+  .tcifab3.tcifab3 { padding: 32px; }
 }
 @media (not (height > 800px)) and (width < 600px) {
-  .tngbv2n.tngbv2n { padding: 16px; }
+  .tcifab3.tcifab3 { padding: 16px; }
 }
 @media (height > 800px) {
-  .tngbv2n.tngbv2n { padding: 48px; }
+  .tcifab3.tcifab3 { padding: 48px; }
 }"
 `;
 
@@ -69,13 +69,13 @@ exports[`Advanced State Mapping - CSS Output > @media query states > should gene
 
 exports[`Advanced State Mapping - CSS Output > @media query states > should generate exclusive CSS for multiple overlapping breakpoints 1`] = `
 "@media (not (width < 480px)) and (not (width < 768px)) {
-  .t1s0nwne.t1s0nwne { padding: 32px; }
+  .t1e0pt8q.t1e0pt8q { padding: 32px; }
 }
 @media (not (width < 480px)) and (width < 768px) {
-  .t1s0nwne.t1s0nwne { padding: 16px; }
+  .t1e0pt8q.t1e0pt8q { padding: 16px; }
 }
 @media (width < 480px) {
-  .t1s0nwne.t1s0nwne { padding: 8px; }
+  .t1e0pt8q.t1e0pt8q { padding: 8px; }
 }"
 `;
 
@@ -148,16 +148,16 @@ exports[`Advanced State Mapping - CSS Output > @parent states > should handle mu
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with modifier 1`] = `
-".t1dofem5.t1dofem5:where(:not([data-disabled])):where(:not([data-hovered] *)) { background-color: var(--white-color); }
-.t1dofem5.t1dofem5:where([data-disabled]):where(:not([data-hovered] *)) { background-color: var(--gray-03-color); }
-.t1dofem5.t1dofem5:where(:not([data-disabled])):where([data-hovered] *) { background-color: var(--blue-color); }
-.t1dofem5.t1dofem5:where([data-disabled]):where([data-hovered] *) { background-color: var(--gray-05-color); }"
+".te2oe5.te2oe5:where(:not([data-disabled])):where(:not([data-hovered] *)) { background-color: var(--white-color); }
+.te2oe5.te2oe5:where([data-disabled]):where(:not([data-hovered] *)) { background-color: var(--gray-03-color); }
+.te2oe5.te2oe5:where(:not([data-disabled])):where([data-hovered] *) { background-color: var(--blue-color); }
+.te2oe5.te2oe5:where([data-disabled]):where([data-hovered] *) { background-color: var(--gray-05-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent combined with root 1`] = `
-":where(:root:not([data-theme="dark"])) .t168yhp7.t168yhp7:where(:not([data-hovered] *)) { background-color: var(--white-color); }
-:where(:root[data-theme="dark"]) .t168yhp7.t168yhp7:where(:not([data-hovered] *)) { background-color: var(--dark-02-color); }
-.t168yhp7.t168yhp7:where([data-hovered] *) { background-color: var(--gray-05-color); }"
+":where(:root:not([data-theme="dark"])) .t1ke0srf.t1ke0srf:where(:not([data-hovered] *)) { background-color: var(--white-color); }
+:where(:root[data-theme="dark"]) .t1ke0srf.t1ke0srf:where(:not([data-hovered] *)) { background-color: var(--dark-02-color); }
+.t1ke0srf.t1ke0srf:where([data-hovered] *) { background-color: var(--gray-05-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > @parent states > should handle parent on sub-element 1`] = `
@@ -217,24 +217,24 @@ exports[`Advanced State Mapping - CSS Output > @starting style states > should h
 
 exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should combine media queries with regular modifiers 1`] = `
 "@media (not (width < 600px)) {
-  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 32px; }
+  .t86mlte.t86mlte:where(:not([data-hovered])) { padding: 32px; }
 }
 @media (not (width < 600px)) {
-  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 40px; }
+  .t86mlte.t86mlte:where([data-hovered]) { padding: 40px; }
 }
 @media (width < 600px) {
-  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 16px; }
+  .t86mlte.t86mlte:where(:not([data-hovered])) { padding: 16px; }
 }
 @media (width < 600px) {
-  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 24px; }
+  .t86mlte.t86mlte:where([data-hovered]) { padding: 24px; }
 }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > combined advanced states with regular modifiers > should handle root states with regular modifiers 1`] = `
-":where(:root:not([data-theme="dark"])) .t1m7ai2a.t1m7ai2a:where(:not([data-disabled])) { background-color: var(--white-color); }
-:where(:root:not([data-theme="dark"])) .t1m7ai2a.t1m7ai2a:where([data-disabled]) { background-color: var(--gray-03-color); }
-:where(:root[data-theme="dark"]) .t1m7ai2a.t1m7ai2a:where(:not([data-disabled])) { background-color: var(--dark-02-color); }
-:where(:root[data-theme="dark"]) .t1m7ai2a.t1m7ai2a:where([data-disabled]) { background-color: var(--dark-04-color); }"
+":where(:root:not([data-theme="dark"])) .t1dw7y7m.t1dw7y7m:where(:not([data-disabled])) { background-color: var(--white-color); }
+:where(:root:not([data-theme="dark"])) .t1dw7y7m.t1dw7y7m:where([data-disabled]) { background-color: var(--gray-03-color); }
+:where(:root[data-theme="dark"]) .t1dw7y7m.t1dw7y7m:where(:not([data-disabled])) { background-color: var(--dark-02-color); }
+:where(:root[data-theme="dark"]) .t1dw7y7m.t1dw7y7m:where([data-disabled]) { background-color: var(--dark-04-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should generate CSS with linked styles with a different set of states 1`] = `
@@ -315,38 +315,38 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should gen
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle advanced states with multiple modifiers 1`] = `
 "@media (not (width < 600px)) {
-  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 32px; }
+  .t86mlte.t86mlte:where(:not([data-hovered])) { padding: 32px; }
 }
 @media (not (width < 600px)) {
-  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 40px; }
+  .t86mlte.t86mlte:where([data-hovered]) { padding: 40px; }
 }
 @media (width < 600px) {
-  .t13c2sj6.t13c2sj6:where(:not([data-hovered])) { padding: 16px; }
+  .t86mlte.t86mlte:where(:not([data-hovered])) { padding: 16px; }
 }
 @media (width < 600px) {
-  .t13c2sj6.t13c2sj6:where([data-hovered]) { padding: 24px; }
+  .t86mlte.t86mlte:where([data-hovered]) { padding: 24px; }
 }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle cascading root states with specificity 1`] = `
-":where(:root:not([data-mode="compact"]):not([data-theme="dark"]):not([data-theme="light"])) .t1ve3s2q.t1ve3s2q { background-color: var(--white-color); }
-:where(:root:not([data-mode="compact"])[data-theme="dark"]) .t1ve3s2q.t1ve3s2q { background-color: var(--dark-02-color); }
-:where(:root:not([data-mode="compact"])[data-theme="light"]) .t1ve3s2q.t1ve3s2q { background-color: var(--light-01-color); }
-:where(:root[data-mode="compact"]) .t1ve3s2q.t1ve3s2q { background-color: var(--gray-02-color); }"
+":where(:root:not([data-mode="compact"]):not([data-theme="dark"]):not([data-theme="light"])) .t1320n0i.t1320n0i { background-color: var(--white-color); }
+:where(:root:not([data-mode="compact"])[data-theme="dark"]) .t1320n0i.t1320n0i { background-color: var(--dark-02-color); }
+:where(:root:not([data-mode="compact"])[data-theme="light"]) .t1320n0i.t1320n0i { background-color: var(--light-01-color); }
+:where(:root[data-mode="compact"]) .t1320n0i.t1320n0i { background-color: var(--gray-02-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle combined media and root states on same property 1`] = `
 "@media (not (width < 600px)) and (not (width >= 1200px)) {
-  :where(:root:not([data-theme="dark"])) .tueks5i.tueks5i { padding: 32px; }
+  :where(:root:not([data-theme="dark"])) .twax2rq.twax2rq { padding: 32px; }
 }
 @media (width < 600px) {
-  :where(:root:not([data-theme="dark"])) .tueks5i.tueks5i { padding: 16px; }
+  :where(:root:not([data-theme="dark"])) .twax2rq.twax2rq { padding: 16px; }
 }
 @media (not (width >= 1200px)) {
-  :where(:root[data-theme="dark"]) .tueks5i.tueks5i { padding: 24px; }
+  :where(:root[data-theme="dark"]) .twax2rq.twax2rq { padding: 24px; }
 }
 @media (width >= 1200px) {
-  .tueks5i.tueks5i { padding: 48px; }
+  .twax2rq.twax2rq { padding: 48px; }
 }"
 `;
 
@@ -362,20 +362,20 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should han
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle media queries on different dimensions 1`] = `
 "@media (not (height < 400px)) and (not (width < 600px)) {
-  .t18l7iv8.t18l7iv8 { padding: 32px; }
+  .t1awhmkk.t1awhmkk { padding: 32px; }
 }
 @media (not (height < 400px)) and (width < 600px) {
-  .t18l7iv8.t18l7iv8 { padding: 16px; }
+  .t1awhmkk.t1awhmkk { padding: 16px; }
 }
 @media (height < 400px) {
-  .t18l7iv8.t18l7iv8 { padding: 8px; }
+  .t1awhmkk.t1awhmkk { padding: 8px; }
 }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle multiple root states 1`] = `
-":where(:root:not([data-high-contrast]):not([data-theme="dark"])) .ti2u7ou.ti2u7ou { background-color: var(--white-color); }
-:where(:root:not([data-high-contrast])[data-theme="dark"]) .ti2u7ou.ti2u7ou { background-color: var(--dark-02-color); }
-:where(:root[data-high-contrast]) .ti2u7ou.ti2u7ou { background-color: var(--black-color); }"
+":where(:root:not([data-high-contrast]):not([data-theme="dark"])) .tpannn2.tpannn2 { background-color: var(--white-color); }
+:where(:root:not([data-high-contrast])[data-theme="dark"]) .tpannn2.tpannn2 { background-color: var(--dark-02-color); }
+:where(:root[data-high-contrast]) .tpannn2.tpannn2 { background-color: var(--black-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle nested container queries 1`] = `
@@ -413,16 +413,16 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should han
 
 exports[`Advanced State Mapping - CSS Output > complex combinations > should handle three-way media query cascade 1`] = `
 "@media (not (width <= 1200px)) and (not (width <= 400px)) and (not (width <= 800px)) {
-  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
+  .tbt97jw.tbt97jw { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
 }
 @media (not (width <= 400px)) and (not (width <= 800px)) and (width <= 1200px) {
-  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
+  .tbt97jw.tbt97jw { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr) minmax(1px, 1fr); }
 }
 @media (not (width <= 400px)) and (width <= 800px) {
-  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr); }
+  .tbt97jw.tbt97jw { grid-template-columns: minmax(1px, 1fr) minmax(1px, 1fr); }
 }
 @media (width <= 400px) {
-  .t1c5uvh8.t1c5uvh8 { grid-template-columns: minmax(1px, 1fr); }
+  .tbt97jw.tbt97jw { grid-template-columns: minmax(1px, 1fr); }
 }"
 `;
 
@@ -452,13 +452,13 @@ exports[`Advanced State Mapping - CSS Output > complex combinations > should sup
 
 exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanced states with complex style values 1`] = `
 "@media (not (width < 600px)) {
-  :where(:root:not([data-theme="dark"])) .t1ik0iam.t1ik0iam { border: 1px solid var(--border-color); }
+  :where(:root:not([data-theme="dark"])) .t134qtxa.t134qtxa { border: 1px solid var(--border-color); }
 }
 @media (not (width < 600px)) {
-  :where(:root[data-theme="dark"]) .t1ik0iam.t1ik0iam { border: 1px solid var(--dark-05-color); }
+  :where(:root[data-theme="dark"]) .t134qtxa.t134qtxa { border: 1px solid var(--dark-05-color); }
 }
 @media (width < 600px) {
-  .t1ik0iam.t1ik0iam { border: var(--border-width) none var(--border-color, currentColor); }
+  .t134qtxa.t134qtxa { border: var(--border-width) none var(--border-color, currentColor); }
 }"
 `;
 
@@ -475,13 +475,13 @@ exports[`Advanced State Mapping - CSS Output > edge cases > should handle empty 
 
 exports[`Advanced State Mapping - CSS Output > predefined states (global) > should handle multiple global predefined states 1`] = `
 "@media (width < 768px) {
-  .t3k5liw.t3k5liw { padding: 8px; }
+  .tbny88o.tbny88o { padding: 8px; }
 }
 @media (768px <= width < 1024px) {
-  .t3k5liw.t3k5liw { padding: 24px; }
+  .tbny88o.tbny88o { padding: 24px; }
 }
 @media (width >= 1024px) {
-  .t3k5liw.t3k5liw { padding: 32px; }
+  .tbny88o.tbny88o { padding: 32px; }
 }"
 `;
 
@@ -505,13 +505,13 @@ exports[`Advanced State Mapping - CSS Output > predefined states (global) > shou
 
 exports[`Advanced State Mapping - CSS Output > predefined states (local) > should handle multiple local predefined states 1`] = `
 "@media (width < 400px) {
-  .t3hf1l1.t3hf1l1 { padding: 8px; }
+  .tt0vf6t.tt0vf6t { padding: 8px; }
 }
 @media (400px <= width < 800px) {
-  .t3hf1l1.t3hf1l1 { padding: 24px; }
+  .tt0vf6t.tt0vf6t { padding: 24px; }
 }
 @media (width >= 800px) {
-  .t3hf1l1.t3hf1l1 { padding: 32px; }
+  .tt0vf6t.tt0vf6t { padding: 32px; }
 }"
 `;
 
@@ -548,23 +548,23 @@ exports[`Advanced State Mapping - CSS Output > sub-element advanced states > sho
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with media query 1`] = `
 "@media (not (width < 600px)) {
-  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where(:not([data-hovered])) { font-size: 16px; }
+  .t17rikw5.t17rikw5 [data-element="Label"]:where(:not([data-hovered])) { font-size: 16px; }
 }
 @media (width < 600px) {
-  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where([data-hovered]) { font-size: 16px; }
+  .t17rikw5.t17rikw5 [data-element="Label"]:where([data-hovered]) { font-size: 16px; }
 }
 @media (not (width < 600px)) {
-  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where([data-hovered]) { font-size: 18px; }
+  .t17rikw5.t17rikw5 [data-element="Label"]:where([data-hovered]) { font-size: 18px; }
 }
 @media (width < 600px) {
-  .t1lzdqf9.t1lzdqf9 [data-element="Label"]:where(:not([data-hovered])) { font-size: 14px; }
+  .t17rikw5.t17rikw5 [data-element="Label"]:where(:not([data-hovered])) { font-size: 14px; }
 }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should combine @own state with parent modifiers 1`] = `
-".t157koo.t157koo:where(:not([data-disabled])) [data-element="Icon"]:where(:not([data-hovered])) { color: var(--gray-color); --current-color: var(--gray-color); }
-.t157koo.t157koo:where([data-disabled]) [data-element="Icon"] { color: var(--light-gray-color); --current-color: var(--light-gray-color); }
-.t157koo.t157koo:where(:not([data-disabled])) [data-element="Icon"]:where([data-hovered]) { color: var(--purple-color); --current-color: var(--purple-color); }"
+".t77mebc.t77mebc:where(:not([data-disabled])) [data-element="Icon"]:where(:not([data-hovered])) { color: var(--gray-color); --current-color: var(--gray-color); }
+.t77mebc.t77mebc:where([data-disabled]) [data-element="Icon"] { color: var(--light-gray-color); --current-color: var(--light-gray-color); }
+.t77mebc.t77mebc:where(:not([data-disabled])) [data-element="Icon"]:where([data-hovered]) { color: var(--purple-color); --current-color: var(--purple-color); }"
 `;
 
 exports[`Advanced State Mapping - CSS Output > sub-element advanced states > should handle negated @own state 1`] = `

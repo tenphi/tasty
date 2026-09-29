@@ -35,6 +35,7 @@ const BROWSER_TESTS = [
   'src/keyframes/keyframes.test.ts',
   // Engine-observed style output.
   'src/chunks/chunk-predefined-states.test.ts',
+  'src/pipeline/state-priority.test.ts',
   'src/compute-styles.test.ts',
   'src/config.test.ts',
   'src/rsc-cache.test.ts',

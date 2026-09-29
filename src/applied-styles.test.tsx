@@ -296,6 +296,75 @@ describe('generated CSS applies in the browser', () => {
     });
   });
 
+  // Later keys win. `src/pipeline/state-priority.test.ts` checks this
+  // exhaustively; these pin the two reported regressions at component level.
+  describe('state maps resolve by key order', () => {
+    it('lets a later key equal to the default outrank an earlier key', () => {
+      // `disabled` has the default's value; it used to be folded into `''`
+      // once the `&` key was present, losing its priority over `checked`.
+      const Box = tasty({
+        qa: 'Box',
+        styles: {
+          display: 'block',
+          padding: {
+            '': '1x',
+            checked: '2x',
+            'invalid & checked': '3x',
+            disabled: '1x',
+          },
+        },
+      });
+
+      const el = render(
+        <Box mods={{ checked: true, disabled: true }} />,
+      ).getByTestId('Box');
+
+      expect(computed(el, 'padding')).toBe('8px');
+    });
+
+    it('keeps components whose maps differ only in key order apart', () => {
+      const Base = tasty({ styles: { display: 'block', padding: '1x' } });
+      const CheckedWins = tasty(Base, {
+        qa: 'CheckedWins',
+        styles: { padding: { '': '1x', disabled: '3x', checked: '2x' } },
+      });
+      const DisabledWins = tasty(Base, {
+        qa: 'DisabledWins',
+        styles: { padding: { '': '1x', checked: '2x', disabled: '3x' } },
+      });
+
+      const mods = { checked: true, disabled: true };
+      const { getByTestId } = render(
+        <>
+          <CheckedWins mods={mods} />
+          <DisabledWins mods={mods} />
+        </>,
+      );
+
+      expect(computed(getByTestId('CheckedWins'), 'padding')).toBe('16px');
+      expect(computed(getByTestId('DisabledWins'), 'padding')).toBe('24px');
+    });
+
+    it('matches a single-letter modifier only when it is set', () => {
+      // A one-letter key used to parse as a state that always applies.
+      const Box = tasty({
+        qa: 'Box',
+        styles: { display: 'block', padding: { '': '1x', x: '2x' } },
+      });
+
+      const { getAllByTestId } = render(
+        <>
+          <Box />
+          <Box mods={{ x: true }} />
+        </>,
+      );
+      const [plain, withX] = getAllByTestId('Box');
+
+      expect(computed(plain, 'padding')).toBe('8px');
+      expect(computed(withX, 'padding')).toBe('16px');
+    });
+  });
+
   describe('sub-elements', () => {
     it('styles a descendant marked with data-element', () => {
       const Card = tasty({

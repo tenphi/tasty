@@ -84,25 +84,31 @@ const INTERNAL_PSEUDO_PATTERN = /:-internal-[a-z0-9-]+/g;
 // Tokenizer Patterns
 // ============================================================================
 
-const SIMPLE_MODIFIER_PATTERN = /^[a-z][a-z0-9-]+$/i;
+// Modifier and class names may be a single letter (`x`, `.x`), the same as a
+// value modifier's name (`x=1`) and the `data-x` attribute `mods={{ x: true }}`
+// renders.
+const SIMPLE_MODIFIER_PATTERN = /^[a-z][a-z0-9-]*$/i;
 const FUNCTION_START_PATTERN =
   /@(?:media|supports|root|parent|own)?\(|:(?:is|has|not|where)\(/iy;
 const SIMPLE_TOKEN_PATTERN =
-  /@media:[a-z]+|@[a-z][a-z0-9-]*|[a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+)|[a-z][a-z0-9-]+|:[-a-z][a-z0-9-]*(?:\([^)]+\))?|\.[a-z][a-z0-9-]+/iy;
+  /@media:[a-z]+|@[a-z][a-z0-9-]*|[a-z][a-z0-9-]*(?:\^=|\$=|\*=|=)(?:"[^"]*"|'[^']*'|[^\s&|!^()]+)|[a-z][a-z0-9-]*|:[-a-z][a-z0-9-]*(?:\([^)]+\))?|\.[a-z][a-z0-9-]*/iy;
+const OPERATOR_TOKENS = new Set(['&', '|', '!', '^', '(', ')']);
 
 // ============================================================================
 // Tokenizer
 // ============================================================================
 
 /**
- * Tokenize a state notation string
+ * Tokenize a state notation string. Text that is not state notation is
+ * skipped, and reported in `problems`.
  */
-function tokenize(stateKey: string): string[] {
+function tokenize(stateKey: string, problems: string[]): string[] {
   const tokens: string[] = [];
   const source = stateKey.includes(',')
     ? replaceCommasOutsideParens(stateKey)
     : stateKey;
 
+  let unread = '';
   let i = 0;
   while (i < source.length) {
     const ch = source[i];
@@ -155,10 +161,18 @@ function tokenize(stateKey: string): string[] {
       continue;
     }
 
+    if (!/\s/.test(ch)) unread += ch;
     i++;
   }
 
+  if (unread) problems.push(`cannot read "${excerpt(unread)}"`);
+
   return tokens;
+}
+
+/** Quote at most `max` characters of `text` in a warning. */
+function excerpt(text: string, max = 60): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
 /** Return the index after a balanced function, preserving the two-level limit. */
@@ -204,17 +218,29 @@ class Parser {
   private tokens: string[];
   private pos = 0;
   private options: ParseStateKeyOptions;
+  private problems: string[];
 
-  constructor(tokens: string[], options: ParseStateKeyOptions) {
+  constructor(
+    tokens: string[],
+    options: ParseStateKeyOptions,
+    problems: string[],
+  ) {
     this.tokens = tokens;
     this.options = options;
+    this.problems = problems;
   }
 
   parse(): ConditionNode {
     if (this.tokens.length === 0) {
       return trueCondition();
     }
-    return this.parseExpression();
+    const expr = this.parseExpression();
+    if (this.pos < this.tokens.length) {
+      this.problems.push(
+        `unexpected "${excerpt(this.tokens.slice(this.pos).join(' '))}"`,
+      );
+    }
+    return expr;
   }
 
   private match(token: string): boolean {
@@ -299,14 +325,17 @@ class Parser {
 
     // Handle state tokens
     const token = this.tokens[this.pos];
-    // Every operator/group token is one character; every state token emitted by
-    // tokenize() is at least two characters long.
-    if (token && token.length > 1) {
+    if (token !== undefined && !OPERATOR_TOKENS.has(token)) {
       this.pos++;
       return this.parseStateToken(token);
     }
 
-    // Fallback for empty/invalid - return TRUE
+    // A missing operand (`a &`, `()`) reads as TRUE, leaving the rest intact.
+    this.problems.push(
+      token === undefined
+        ? 'missing a state at the end'
+        : `missing a state before "${token}"`,
+    );
     return trueCondition();
   }
 
@@ -912,9 +941,19 @@ export function parseStateKey(
     }
   }
 
+  const problems: string[] = [];
   const result = SIMPLE_MODIFIER_PATTERN.test(trimmed)
     ? createBooleanModifier(trimmed)
-    : new Parser(tokenize(trimmed), options).parse();
+    : new Parser(tokenize(trimmed, problems), options, problems).parse();
+
+  // Reported once per key: later lookups hit the cache above.
+  if (problems.length > 0) {
+    emitWarning(
+      'INVALID_STATE_KEY',
+      `State key "${excerpt(trimmed)}" is not valid state notation: ${problems.join(', ')}. ` +
+        `Tasty skips the parts it cannot read, so the key may apply in states you did not intend.`,
+    );
+  }
 
   // Cache result
   parseCache.set(cacheKey, result);

@@ -180,6 +180,94 @@ describe('generateChunkCacheKey', () => {
     );
   });
 
+  // A state map resolves by key order — later keys win — so two maps with the
+  // same entries in a different order style some states differently. Sharing
+  // a key would hand the second one the first one's class and rules.
+  it('distinguishes state maps whose keys differ only in order', () => {
+    const checkedWins = {
+      shadow: { '': '#a', disabled: '#c', checked: '#b' },
+    } as unknown as Styles;
+    const disabledWins = {
+      shadow: { '': '#a', checked: '#b', disabled: '#c' },
+    } as unknown as Styles;
+
+    expect(
+      generateChunkCacheKey(checkedWins, 'appearance', ['shadow']),
+    ).not.toBe(generateChunkCacheKey(disabledWins, 'appearance', ['shadow']));
+  });
+
+  it('distinguishes reordered state maps nested in a sub-element', () => {
+    const checkedWins = {
+      Icon: { fill: { '': '#a', disabled: '#c', checked: '#b' } },
+    } as unknown as Styles;
+    const disabledWins = {
+      Icon: { fill: { '': '#a', checked: '#b', disabled: '#c' } },
+    } as unknown as Styles;
+
+    expect(
+      generateChunkCacheKey(checkedWins, 'subcomponents', ['Icon']),
+    ).not.toBe(generateChunkCacheKey(disabledWins, 'subcomponents', ['Icon']));
+  });
+
+  it("ignores the order of a sub-element's style keys", () => {
+    const a = {
+      Icon: { color: '#text', fill: { '': '#a', checked: '#b' } },
+    } as unknown as Styles;
+    const b = {
+      Icon: { fill: { '': '#a', checked: '#b' }, color: '#text' },
+    } as unknown as Styles;
+
+    expect(generateChunkCacheKey(b, 'subcomponents', ['Icon'])).toBe(
+      generateChunkCacheKey(a, 'subcomponents', ['Icon']),
+    );
+  });
+
+  it('keeps one object apart as a state map and as sub-element styles', () => {
+    // The same object serializes differently in the two positions (order
+    // kept vs. keys sorted), so a cached serialization must not leak across.
+    const shared = { disabled: '#c', checked: '#b' };
+    const reordered = { checked: '#b', disabled: '#c' };
+
+    const asMap = generateChunkCacheKey(
+      { fill: shared } as unknown as Styles,
+      'appearance',
+      ['fill'],
+    );
+    generateChunkCacheKey(
+      { Icon: shared } as unknown as Styles,
+      'subcomponents',
+      ['Icon'],
+    );
+
+    expect(
+      generateChunkCacheKey(
+        { fill: shared } as unknown as Styles,
+        'appearance',
+        ['fill'],
+      ),
+    ).toBe(asMap);
+    expect(
+      generateChunkCacheKey(
+        { Icon: shared } as unknown as Styles,
+        'subcomponents',
+        ['Icon'],
+      ),
+    ).toBe(
+      generateChunkCacheKey(
+        { Icon: reordered } as unknown as Styles,
+        'subcomponents',
+        ['Icon'],
+      ),
+    );
+    expect(asMap).not.toBe(
+      generateChunkCacheKey(
+        { fill: reordered } as unknown as Styles,
+        'appearance',
+        ['fill'],
+      ),
+    );
+  });
+
   it('folds referenced local predefined states into the key', () => {
     const base = {
       color: { '': '#text', '@active': '#primary' },

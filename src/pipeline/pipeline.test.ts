@@ -569,6 +569,147 @@ describe('parseStateKey()', () => {
   });
 });
 
+describe('single-letter state names', () => {
+  beforeEach(() => {
+    clearParseCache();
+    clearPipelineCache();
+  });
+
+  it('parses a single-letter modifier', () => {
+    expect(parseStateKey('x')).toMatchObject({
+      type: 'modifier',
+      attribute: 'data-x',
+      value: undefined,
+      negated: false,
+    });
+    expect(parseStateKey('!x')).toMatchObject({
+      type: 'modifier',
+      attribute: 'data-x',
+      negated: true,
+    });
+  });
+
+  it('parses single-letter names next to operators', () => {
+    const result = parseStateKey('x & (y | !z)');
+
+    expect(result).toMatchObject({ kind: 'compound', operator: 'AND' });
+    expect(result.kind === 'compound' && result.children).toMatchObject([
+      { attribute: 'data-x', negated: false },
+      {
+        kind: 'compound',
+        operator: 'OR',
+        children: [
+          { attribute: 'data-y', negated: false },
+          { attribute: 'data-z', negated: true },
+        ],
+      },
+    ]);
+  });
+
+  it('parses a single-letter class and a nested single-letter modifier', () => {
+    expect(parseStateKey('.x & beta')).toMatchObject({
+      kind: 'compound',
+      children: [{ type: 'pseudo', pseudo: '.x' }, { attribute: 'data-beta' }],
+    });
+    expect(parseStateKey('@parent(x)')).toMatchObject({
+      type: 'parent',
+      innerCondition: { attribute: 'data-x' },
+    });
+  });
+
+  it('keeps a single-letter key conditional', () => {
+    const rules = renderStyles({ order: { '': '1', x: '2' } }, '.t');
+
+    expect(rules).toEqual([
+      { selector: '.t:where(:not([data-x]))', declarations: 'order: 1;' },
+      { selector: '.t:where([data-x])', declarations: 'order: 2;' },
+    ]);
+  });
+});
+
+describe('INVALID_STATE_KEY warning', () => {
+  let warnings: { code: string; message: string }[];
+  let restore: () => void;
+
+  beforeEach(async () => {
+    const { setWarningHandler } = await import('./warnings');
+    clearParseCache();
+    warnings = [];
+    restore = setWarningHandler((w) => {
+      warnings.push(w);
+    });
+  });
+
+  afterEach(() => {
+    restore();
+  });
+
+  const invalid = () => warnings.filter((w) => w.code === 'INVALID_STATE_KEY');
+
+  it.each([
+    ['1st', 'cannot read "1"'],
+    ['$x', 'cannot read "$"'],
+    ['alpha + beta', 'cannot read "+", unexpected "beta"'],
+    ['alpha beta', 'unexpected "beta"'],
+    ['alpha)', 'unexpected ")"'],
+    ['alpha &', 'missing a state at the end'],
+    ['& alpha', 'missing a state before "&"'],
+    ['!', 'missing a state at the end'],
+    ['()', 'missing a state before ")"'],
+    ['@media (w < 600px)', 'cannot read "<600", unexpected "( w px )"'],
+  ])('warns about %j', (key, problem) => {
+    parseStateKey(key);
+
+    expect(invalid()).toEqual([
+      {
+        code: 'INVALID_STATE_KEY',
+        message: expect.stringContaining(
+          `State key "${key}" is not valid state notation: ${problem}.`,
+        ),
+      },
+    ]);
+  });
+
+  it.each([
+    'x',
+    '!x',
+    'hovered & !disabled',
+    'theme=dark | .x',
+    'a, b',
+    'alpha ^ beta',
+    'alpha & (beta',
+    '[data-x="a b"]',
+    '@media(w < 600px)',
+    '@media:print',
+    '@(w < 600px)',
+    '@supports(display: grid)',
+    '@parent(x, >)',
+    '@root(theme=dark)',
+    ':has(> Icon)',
+    ':nth-child(2n+1)',
+    '@starting',
+  ])('does not warn about %j', (key) => {
+    parseStateKey(key);
+
+    expect(invalid()).toEqual([]);
+  });
+
+  it('warns once per key', () => {
+    parseStateKey('alpha beta');
+    parseStateKey('alpha beta');
+
+    expect(invalid()).toHaveLength(1);
+  });
+
+  it('quotes at most a short excerpt of a long key', () => {
+    parseStateKey(`alpha & ${'$'.repeat(10_000)}`);
+
+    const [warning] = invalid();
+    expect(warning.message.length).toBeLessThan(400);
+    expect(warning.message).toContain(`cannot read "${'$'.repeat(60)}…"`);
+  });
+});
+
 describe('simplifyCondition()', () => {
   it('should detect A & !A contradiction', () => {
     const a = createModifierCondition('data-hovered');
@@ -1020,7 +1161,7 @@ describe('misplaced default state reordering', () => {
           '': 'red',
           hovered: 'blue',
           pressed: 'green',
-          '@media (min-width: 768px)': 'darkblue',
+          '@media(w >= 768px)': 'darkblue',
         },
       },
       '.btn',
@@ -1032,7 +1173,7 @@ describe('misplaced default state reordering', () => {
         color: {
           hovered: 'blue',
           pressed: 'green',
-          '@media (min-width: 768px)': 'darkblue',
+          '@media(w >= 768px)': 'darkblue',
           '': 'red',
         },
       },
@@ -1046,7 +1187,7 @@ describe('misplaced default state reordering', () => {
           hovered: 'blue',
           '': 'red',
           pressed: 'green',
-          '@media (min-width: 768px)': 'darkblue',
+          '@media(w >= 768px)': 'darkblue',
         },
       },
       '.btn',

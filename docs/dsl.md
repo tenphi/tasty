@@ -54,6 +54,8 @@ fill: {
 }
 ```
 
+Modifier and class names start with a letter and may be a single letter (`x` → `[data-x]`, `.x`). Tasty emits an `INVALID_STATE_KEY` warning for a key it cannot fully read and skips the unreadable parts. That covers characters outside the notation (`1st`, or `@media (w < 600px)` with a space before the parenthesis), an operator missing a state (`hovered &`), and two states with no operator between them (`hovered focused`). A partly read key can apply in states you did not mean, so fix the key rather than rely on what it produces.
+
 #### Default State Ordering
 
 Key order sets priority — later keys win and turn off earlier ones via negation. The bare default (`''`) is the lowest-priority state, so it **must be the first key**. If it appears after other states, Tasty moves it to the front and emits a dev warning (`MISPLACED_DEFAULT_STATE`); otherwise it would override every state above it.

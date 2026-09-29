@@ -280,7 +280,7 @@ describe('state map priority (checked against the browser cascade)', () => {
       ],
       [
         'a later key equal to the default outranks an earlier compound key',
-        { '': '1', 'alpha & beta': '2', gamma: '1', 'delta & alpha': '3' },
+        { '': '1', 'alpha & beta': '2', gamma: '1', 'd & alpha': '3' },
       ],
       [
         'a genuine don’t-care atom (full truth table)',
@@ -304,7 +304,7 @@ describe('state map priority (checked against the browser cascade)', () => {
       ],
       [
         'same-value keys interleaved with other values',
-        { '': '1', alpha: '2', beta: '3', gamma: '2', 'alpha & delta': '1' },
+        { '': '1', alpha: '2', beta: '3', gamma: '2', 'alpha & d': '1' },
       ],
       [
         'a long cascade where later keys repeat earlier values',
@@ -314,8 +314,8 @@ describe('state map priority (checked against the browser cascade)', () => {
           'alpha & beta': '3',
           beta: '1',
           gamma: '2',
-          'gamma & delta': '1',
-          delta: '3',
+          'gamma & d': '1',
+          d: '3',
         },
       ],
       [
@@ -535,7 +535,7 @@ describe('state map priority (checked against the browser cascade)', () => {
       ['alpha', '2'],
       ['beta', '1'],
       ['alpha & gamma', '3'],
-      ['!delta', '2'],
+      ['!d', '2'],
       ['theme=dark & beta', '4'],
     ];
 
@@ -559,8 +559,10 @@ describe('state map priority (checked against the browser cascade)', () => {
     );
   });
 
-  describe('random maps', () => {
-    const MOD_ATOMS = ['alpha', 'beta', 'gamma', 'delta'];
+  // Hundreds of maps per test: the time scales with the machine, and CI
+  // runners are several times slower than a laptop.
+  describe('random maps', { timeout: 30_000 }, () => {
+    const MOD_ATOMS = ['alpha', 'beta', 'gamma', 'd'];
     const ALL_ATOMS = [
       ...MOD_ATOMS,
       ...MOD_ATOMS,

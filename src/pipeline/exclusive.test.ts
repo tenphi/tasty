@@ -36,10 +36,17 @@ import {
 
 const STATES = allOracleStates();
 
+/**
+ * The generated-map tests run the pipeline on hundreds of maps each, so their
+ * time scales with the machine: CI runners are several times slower than a
+ * laptop. Each batch takes about a second locally.
+ */
+const PROPERTY_TIMEOUT = 30_000;
+
 /** A width inside every `STATIC_ATOMS` media range that is meant to hold. */
 const VIEWPORT_WIDTH = 1000;
 
-const MOD_ATOMS = ['alpha', 'beta', 'gamma', 'delta'];
+const MOD_ATOMS = ['alpha', 'beta', 'gamma', 'd'];
 const ALL_ATOMS = [
   ...MOD_ATOMS,
   ...MOD_ATOMS,
@@ -94,79 +101,79 @@ function inRange(node: {
   return true;
 }
 
-/** Does `node` hold in `state`? Covers the oracle's vocabulary only. */
-function holds(
-  node: ConditionNode,
-  state: OracleState,
-  scope: Scope = 'element',
-): boolean {
+type Predicate = (state: OracleState) => boolean;
+
+const always: Predicate = () => true;
+const never: Predicate = () => false;
+
+/**
+ * Compile `node` into a test of whether it holds in an oracle state. Covers
+ * the oracle's vocabulary only. Compiling once per entry keeps the checks
+ * below cheap enough to run on every state of thousands of maps.
+ */
+function compile(node: ConditionNode, scope: Scope = 'element'): Predicate {
   switch (node.kind) {
     case 'true':
-      return true;
+      return always;
     case 'false':
-      return false;
-    case 'compound':
+      return never;
+    case 'compound': {
+      const children = node.children.map((child) => compile(child, scope));
       return node.operator === 'AND'
-        ? node.children.every((child) => holds(child, state, scope))
-        : node.children.some((child) => holds(child, state, scope));
+        ? (state) => children.every((child) => child(state))
+        : (state) => children.some((child) => child(state));
+    }
   }
 
-  let result: boolean;
+  let test: Predicate;
 
   switch (node.type) {
     case 'modifier': {
       const name = node.attribute.replace(/^data-/, '');
-      if (scope === 'root') result = name === 'night' && state.night;
-      else if (scope === 'parent') result = name === 'open' && state.open;
-      else if (name === 'theme') {
-        result =
-          node.value === undefined
-            ? state.theme !== null
-            : state.theme === node.value;
-      } else result = node.value === undefined && state.mods.has(name);
+      if (scope === 'root') {
+        test = name === 'night' ? (state) => state.night : never;
+      } else if (scope === 'parent') {
+        test = name === 'open' ? (state) => state.open : never;
+      } else if (name === 'theme') {
+        const { value } = node;
+        test =
+          value === undefined
+            ? (state) => state.theme !== null
+            : (state) => state.theme === value;
+      } else {
+        test =
+          node.value === undefined ? (state) => state.mods.has(name) : never;
+      }
       break;
     }
     case 'pseudo':
       if (node.pseudo !== ':has(> [data-inner])') {
         throw new Error(`Unexpected pseudo ${node.pseudo}`);
       }
-      result = state.inner;
+      test = (state) => state.inner;
       break;
     case 'media':
-      result = inRange(node);
+      test = inRange(node) ? always : never;
       break;
     case 'supports':
-      result = node.condition.trim() === 'display: grid';
+      test = node.condition.trim() === 'display: grid' ? always : never;
       break;
     case 'root':
-      result = holds(node.innerCondition, state, 'root');
+      test = compile(node.innerCondition, 'root');
       break;
     case 'parent':
-      result = holds(node.innerCondition, state, 'parent');
+      test = compile(node.innerCondition, 'parent');
       break;
     default:
       throw new Error(`Unexpected condition type ${node.type}`);
   }
 
-  return node.negated ? !result : result;
+  return node.negated ? (state) => !test(state) : test;
 }
 
 // ============================================================================
 // Checks
 // ============================================================================
-
-interface Entry {
-  stateKey: string;
-  value: unknown;
-  priority: number;
-  condition: ConditionNode;
-  floor?: boolean;
-}
-
-/** The oracle's answer, in the pipeline's terms (`null` = nothing set). */
-function expectedValue(map: OracleMap, state: OracleState) {
-  return resolveStateMap(map, state);
-}
 
 function withFloor(
   value: unknown,
@@ -176,16 +183,6 @@ function withFloor(
   return (value ?? null) === null && floor ? floor.value : (value ?? null);
 }
 
-/** Resolve parsed entries by priority: the highest one that holds wins. */
-function resolveEntries(entries: Entry[], state: OracleState) {
-  let winner: Entry | undefined;
-  for (const entry of entries) {
-    if (entry.floor || !holds(entry.condition, state)) continue;
-    if (!winner || entry.priority > winner.priority) winner = entry;
-  }
-  return withFloor(winner?.value, entries);
-}
-
 /**
  * Stages 0–3 on `map`, returning the first disagreement with the oracle, or
  * `null`. Exclusive entries must also partition the states: at most one
@@ -193,11 +190,16 @@ function resolveEntries(entries: Entry[], state: OracleState) {
  * order.
  */
 function checkStages(map: OracleMap): string | null {
+  // The oracle's answer in each state, in the pipeline's terms (`null` =
+  // nothing set).
+  const expected = STATES.map((state) => resolveStateMap(map, state));
+
   const reduced = extractCompoundStates(map) as OracleMap;
-  for (const state of STATES) {
-    if (resolveStateMap(reduced, state) !== expectedValue(map, state)) {
-      return `stage 0 (${JSON.stringify(reduced)}) in ${describeState(state)}`;
-    }
+  const stage0 = STATES.findIndex(
+    (state, i) => resolveStateMap(reduced, state) !== expected[i],
+  );
+  if (stage0 !== -1) {
+    return `stage 0 (${JSON.stringify(reduced)}) in ${describeState(STATES[stage0])}`;
   }
 
   const parsed = parseStyleEntries('order', reduced, (key) =>
@@ -206,16 +208,26 @@ function checkStages(map: OracleMap): string | null {
   const merged = mergeEntriesByValue(parsed);
   const expanded = expandOrConditions(merged);
 
+  // Before stage 2b, entries may overlap: the highest priority that holds
+  // wins.
   for (const [stage, entries] of [
     ['parse', parsed],
     ['merge by value', merged],
     ['OR expansion', expanded],
   ] as const) {
-    for (const state of STATES) {
-      const actual = resolveEntries(entries, state);
-      const expected = expectedValue(map, state);
-      if (actual !== expected) {
-        return `${stage} in ${describeState(state)}: expected ${expected}, got ${actual}`;
+    const byPriority = entries
+      .filter((entry) => !entry.floor)
+      .sort((a, b) => b.priority - a.priority)
+      .map((entry) => ({
+        value: entry.value,
+        holds: compile(entry.condition),
+      }));
+
+    for (const [i, state] of STATES.entries()) {
+      const winner = byPriority.find((entry) => entry.holds(state));
+      const actual = withFloor(winner?.value, entries);
+      if (actual !== expected[i]) {
+        return `${stage} in ${describeState(state)}: expected ${expected[i]}, got ${actual}`;
       }
     }
   }
@@ -227,10 +239,15 @@ function checkStages(map: OracleMap): string | null {
     ['exclusive', exclusive],
     ['De Morgan expansion', deMorgan],
   ] as const) {
-    for (const state of STATES) {
-      const applying = entries.filter(
-        (entry) => !entry.floor && holds(entry.exclusiveCondition, state),
-      );
+    const compiled = entries
+      .filter((entry) => !entry.floor)
+      .map((entry) => ({
+        ...entry,
+        holds: compile(entry.exclusiveCondition),
+      }));
+
+    for (const [i, state] of STATES.entries()) {
+      const applying = compiled.filter((entry) => entry.holds(state));
       const values = new Set(applying.map((entry) => entry.value ?? null));
       if (values.size > 1) {
         return `${stage} in ${describeState(state)}: overlapping ${applying
@@ -238,9 +255,8 @@ function checkStages(map: OracleMap): string | null {
           .join(', ')}`;
       }
       const actual = withFloor(applying[0]?.value, entries);
-      const expected = expectedValue(map, state);
-      if (actual !== expected) {
-        return `${stage} in ${describeState(state)}: expected ${expected}, got ${actual}`;
+      if (actual !== expected[i]) {
+        return `${stage} in ${describeState(state)}: expected ${expected[i]}, got ${actual}`;
       }
     }
   }
@@ -304,7 +320,7 @@ describe('extractCompoundStates', () => {
     expect(extractCompoundStates(map)).toBe(map);
   });
 
-  it('never changes how a map resolves', () => {
+  it('never changes how a map resolves', { timeout: PROPERTY_TIMEOUT }, () => {
     const maps = [
       ...randomMaps(1, 1500),
       ...randomMaps(2, 1500, { atoms: ALL_ATOMS, operators: true }),
@@ -361,19 +377,27 @@ describe('stages 0–3 keep state map priority', () => {
     ).toBeNull();
   });
 
-  it.each([1, 2, 3])('`&` of modifiers, seed %i', (seed) => {
-    expect(failuresOf(randomMaps(100 + seed, 400))).toEqual([]);
-  });
+  it.each([1, 2, 3])(
+    '`&` of modifiers, seed %i',
+    (seed) => {
+      expect(failuresOf(randomMaps(100 + seed, 400))).toEqual([]);
+    },
+    PROPERTY_TIMEOUT,
+  );
 
-  it.each([1, 2, 3])('any operator and atom, seed %i', (seed) => {
-    expect(
-      failuresOf(
-        randomMaps(200 + seed, 200, {
-          atoms: ALL_ATOMS,
-          operators: true,
-          maxKeys: 5,
-        }),
-      ),
-    ).toEqual([]);
-  });
+  it.each([1, 2, 3, 4, 5, 6])(
+    'any operator and atom, seed %i',
+    (seed) => {
+      expect(
+        failuresOf(
+          randomMaps(200 + seed, 100, {
+            atoms: ALL_ATOMS,
+            operators: true,
+            maxKeys: 5,
+          }),
+        ),
+      ).toEqual([]);
+    },
+    PROPERTY_TIMEOUT,
+  );
 });

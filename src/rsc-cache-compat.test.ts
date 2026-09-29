@@ -9,6 +9,11 @@ const { react } = vi.hoisted(() => ({
 
 vi.mock('react', () => ({ default: react }));
 
+// `rsc-cache` needs only the name prefix from `config`, whose import graph is
+// the whole engine. Each test re-imports `rsc-cache` from scratch, and under a
+// full parallel run transforming that graph took most of the 5s timeout.
+vi.mock('./config', () => ({ getNamePrefix: () => 't' }));
+
 afterEach(() => {
   react.cache = undefined;
   vi.resetModules();

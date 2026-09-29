@@ -344,6 +344,25 @@ describe('generated CSS applies in the browser', () => {
       expect(computed(getByTestId('CheckedWins'), 'padding')).toBe('16px');
       expect(computed(getByTestId('DisabledWins'), 'padding')).toBe('24px');
     });
+
+    it('matches a single-letter modifier only when it is set', () => {
+      // A one-letter key used to parse as a state that always applies.
+      const Box = tasty({
+        qa: 'Box',
+        styles: { display: 'block', padding: { '': '1x', x: '2x' } },
+      });
+
+      const { getAllByTestId } = render(
+        <>
+          <Box />
+          <Box mods={{ x: true }} />
+        </>,
+      );
+      const [plain, withX] = getAllByTestId('Box');
+
+      expect(computed(plain, 'padding')).toBe('8px');
+      expect(computed(withX, 'padding')).toBe('16px');
+    });
   });
 
   describe('sub-elements', () => {

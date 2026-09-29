@@ -17,8 +17,12 @@
  * in `parseStateKey`) and parentheses.
  */
 
-/** Boolean modifiers on the styled element (`data-alpha`, …). */
-export const ORACLE_MODS = ['alpha', 'beta', 'gamma', 'delta'] as const;
+/**
+ * Boolean modifiers on the styled element (`data-alpha`, …). `d` is one
+ * letter on purpose: a single-letter name once parsed as a key that always
+ * applies.
+ */
+export const ORACLE_MODS = ['alpha', 'beta', 'gamma', 'd'] as const;
 
 /** Atoms whose truth is fixed in the test browser. */
 export const STATIC_ATOMS: Readonly<Record<string, boolean>> = {
@@ -307,16 +311,27 @@ function randomTerm(
   const roll = random();
 
   if (!options.operators || depth > 1 || roll < 0.55) {
-    const atom = pick(random, options.atoms);
-    return options.operators && random() < 0.2 ? `!${atom}` : atom;
+    return randomAtom(random, options);
   }
 
   if (roll < 0.65) return `!(${randomExpr(random, options, depth + 1)})`;
 
-  const op = roll < 0.85 ? '|' : roll < 0.95 ? '&' : '^';
+  // `a ^ b` expands to `(a & !b) | (!a & b)`, so XOR over compound operands
+  // grows the pipeline's work exponentially with nesting. Real keys XOR plain
+  // states; so does the generator.
+  if (roll >= 0.95) {
+    return `(${randomAtom(random, options)} ^ ${randomAtom(random, options)})`;
+  }
+
+  const op = roll < 0.85 ? '|' : '&';
   const left = randomTerm(random, options, depth + 1);
   const right = randomTerm(random, options, depth + 1);
   return `(${left} ${op} ${right})`;
+}
+
+function randomAtom(random: () => number, options: RandomMapOptions): string {
+  const atom = pick(random, options.atoms);
+  return options.operators && random() < 0.2 ? `!${atom}` : atom;
 }
 
 function randomExpr(

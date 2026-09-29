@@ -95,11 +95,6 @@ export function buildExclusiveConditions(
     let exclusive: ConditionNode = entry.condition;
 
     for (const prior of priorConditions) {
-      // Skip negating "always true" (default state) - it would become "always false"
-      if (prior.kind === 'true') {
-        continue;
-      }
-
       // Cheap mutual-exclusivity pre-check: if this entry's own condition
       // already contradicts `prior` (e.g. `[theme=purple]` vs a prior
       // `[theme=green] & ...`), then `prior` can never match when this entry
@@ -134,10 +129,13 @@ export function buildExclusiveConditions(
       exclusiveCondition: simplified,
     });
 
-    // Add non-default conditions to prior list for subsequent entries
-    if (entry.condition.kind !== 'true') {
-      priorConditions.push(entry.condition);
-    }
+    // Every entry blocks the ones below it. That includes an entry whose
+    // condition always holds — a tautological key, or same-value keys that
+    // merged into one (`@media(w > 1px) | !@media(w > 1px)`): nothing below
+    // it can apply, and negating it makes every lower entry FALSE. The bare
+    // `''` default is TRUE too, but it is always the lowest priority, so
+    // nothing comes after it.
+    priorConditions.push(entry.condition);
   }
 
   // Re-append the fallback floor(s). Their exclusive condition is just their
@@ -376,10 +374,13 @@ export function mergeEntriesByValue(
       if (prev.condition.kind === 'true') continue;
       if (serializeValue(prev.value) !== valueKey) continue;
 
+      // An intermediate that always holds (a tautological key, or keys that
+      // already merged into one) is checked like any other: it blocks every
+      // entry below it. The `''` default and the `_` floor are always the
+      // lowest priorities, so they are never intermediates.
       let safe = true;
       for (let k = j + 1; k < merged.length; k++) {
         const inter = merged[k];
-        if (inter.condition.kind === 'true') continue;
         if (serializeValue(inter.value) === valueKey) continue;
 
         // Safety: simplify(C_m & C_l & !C_h) must be FALSE.
@@ -438,23 +439,51 @@ function serializeValue(value: StyleValue): string {
 // ============================================================================
 
 /**
- * Eliminate redundant state dimensions from a value map.
+ * Atoms are tracked as bits of a 32-bit mask. A map with more distinct
+ * atoms than that is left for the later stages to handle unreduced.
+ */
+const MAX_EXTRACTION_ATOMS = 32;
+
+/**
+ * A key of the value map as the don't-care analysis sees it: the set of
+ * top-level AND atoms it requires (as a bitmask) and the value it selects.
+ */
+interface CascadeKey {
+  mask: number;
+  value: string;
+}
+
+/**
+ * Eliminate don't-care state atoms from a value map.
  *
- * When a value map contains compound AND state keys (e.g. `@dark & @hc`),
- * checks whether any state atom is a "don't-care" variable — i.e. the
- * value is the same whether that atom is present or absent. Redundant
- * atoms are removed from all keys and duplicate entries are collapsed.
+ * A value map is a priority cascade: the last authored key whose
+ * condition holds wins, and the bare `''` default is always the lowest
+ * priority. An atom is a **don't-care** when flipping it never changes
+ * which value wins, for any combination of the other atoms. Every key
+ * that mentions a don't-care atom is dropped: with the atom forced absent
+ * those keys never match, and by definition the winning value is the
+ * same with the atom absent as with it present.
+ *
+ * The analysis is over the cascade, not over individual keys. A key is
+ * *not* made redundant by a same-value key with the atom removed — in
+ * `{ '': A, checked: B, 'invalid & checked': C, disabled: A }` the
+ * `disabled` key matches `''` but still outranks `checked`, so an element
+ * that is both disabled and checked gets `A`, and `disabled` must stay.
  *
  * This runs **before** condition parsing so that downstream stages
  * (`mergeEntriesByValue`, `buildExclusiveConditions`, materialization)
  * never see the irrelevant dimension, producing simpler, smaller CSS.
  *
- * Only pure top-level AND combinations are eligible. Keys that contain
- * `|`, `^`, or `,` at the top level are treated as opaque single atoms.
+ * Atoms are the top-level `&` operands of a key, compared as strings and
+ * treated as independent booleans. A key with `|`, `^`, or `,` at the top
+ * level is a single opaque atom. Real atoms can be related (`theme=dark`
+ * vs `theme=light`, nested media ranges); that only rules combinations
+ * out, so an atom that is a don't-care over independent booleans is also
+ * one for every state that can really occur.
  *
  * @example
  *   { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
- *   // @hc is redundant → { '': A, '@dark': B }
+ *   // @hc is a don't-care → { '': A, '@dark': B }
  */
 export function extractCompoundStates(
   valueMap: Record<string, StyleValue>,
@@ -465,44 +494,115 @@ export function extractCompoundStates(
     return valueMap;
   }
 
-  const entries = keys.map((key) => {
-    const atoms = splitTopLevelAnd(key);
-    // Keys containing the `_` fallback floor must stay opaque so `_` is never
-    // dropped as a "redundant atom" or collapsed into the `""` default.
-    // (`_` is handled later in parseStyleEntries.)
-    const isOpaque = atoms === null || atoms.includes('_');
-    return {
-      // null means the key has non-AND operators; treat the whole key
-      // as a single opaque atom so it never matches partial pairs.
-      atoms: isOpaque ? [key] : (atoms as string[]),
-      value: valueMap[key],
-    };
-  });
+  const atomBits = new Map<string, number>();
+  const masks = new Map<string, number>();
+  // Lowest priority first.
+  const cascade: CascadeKey[] = [];
+  let hasFloor = false;
 
-  const allAtoms = new Set<string>();
-  for (const e of entries) {
-    for (const a of e.atoms) allAtoms.add(a);
-  }
-
-  const redundant = new Set<string>();
-  for (const atom of allAtoms) {
-    if (isAtomRedundant(entries, atom)) {
-      redundant.add(atom);
+  for (const key of keys) {
+    // The `_` fallback floor is not part of the cascade (it always applies
+    // underneath it), and a misused `_` key is ignored by parseStyleEntries.
+    // Both are kept verbatim and never looked into.
+    if (key === '_' || isMisusedFallbackKey(key)) {
+      hasFloor ||= key === '_';
+      continue;
     }
+
+    let mask = 0;
+    for (const atom of splitTopLevelAnd(key) ?? [key]) {
+      let bit = atomBits.get(atom);
+      if (bit === undefined) {
+        if (atomBits.size === MAX_EXTRACTION_ATOMS) return valueMap;
+        bit = 1 << atomBits.size;
+        atomBits.set(atom, bit);
+      }
+      mask |= bit;
+    }
+
+    masks.set(key, mask);
+    const entry = { mask, value: serializeValue(valueMap[key]) };
+    // A misplaced `''` is moved to the lowest priority by
+    // normalizeDefaultStates, so that is where it resolves.
+    if (key === '') cascade.unshift(entry);
+    else cascade.push(entry);
   }
 
-  if (redundant.size === 0) return valueMap;
+  let dropMask = 0;
+  for (const bit of atomBits.values()) {
+    if (isDontCare(cascade, bit)) dropMask |= bit;
+  }
+
+  if (dropMask === 0) return valueMap;
 
   const newMap: Record<string, StyleValue> = {};
-  for (const e of entries) {
-    const filtered = e.atoms.filter((a) => !redundant.has(a));
-    const newKey = filtered.join(' & ');
-    if (!(newKey in newMap)) {
-      newMap[newKey] = e.value;
+  let keptStates = false;
+  for (const key of keys) {
+    const mask = masks.get(key);
+    if (mask !== undefined && mask & dropMask) continue;
+    newMap[key] = valueMap[key];
+    keptStates ||= mask !== undefined && key !== '';
+  }
+
+  // `{ _: F, '': A }` means "use the floor" (see parseStyleEntries), so a
+  // reduction must not leave a floor alone with the default: that would
+  // replace `A` with `F`. Keep the original states instead.
+  if (hasFloor && !keptStates && '' in newMap) return valueMap;
+
+  return newMap;
+}
+
+/**
+ * The value the cascade resolves to when exactly the atoms in `state` hold:
+ * that of the highest-priority key whose atoms are all in `state`, or
+ * `undefined` when no key matches.
+ */
+function resolveCascade(
+  cascade: CascadeKey[],
+  state: number,
+): string | undefined {
+  for (let i = cascade.length - 1; i >= 0; i--) {
+    if ((cascade[i].mask & ~state) === 0) return cascade[i].value;
+  }
+  return undefined;
+}
+
+/**
+ * Is the atom at `bit` a don't-care — does flipping it leave the resolved
+ * value unchanged in every state?
+ *
+ * Checking every state would be exponential, but only a few can tell the
+ * two cases apart. If flipping the atom changes the result in some state,
+ * the winner with the atom set is some key `K1` that contains it, and the
+ * winner without it is some key `K0` that does not (or nothing). Every key
+ * that matches the smaller state `(K1 minus the atom) ∪ K0` also matches the
+ * original one, so the same two keys still win there. Trying that state for
+ * every such pair of keys is enough.
+ */
+function isDontCare(cascade: CascadeKey[], bit: number): boolean {
+  for (const withAtom of cascade) {
+    if ((withAtom.mask & bit) === 0) continue;
+
+    const base = withAtom.mask & ~bit;
+
+    // No key without the atom matches: `K0` is "nothing".
+    if (resolveCascade(cascade, base) !== resolveCascade(cascade, base | bit)) {
+      return false;
+    }
+
+    for (const withoutAtom of cascade) {
+      if (withoutAtom.mask & bit) continue;
+
+      const state = base | withoutAtom.mask;
+      if (
+        resolveCascade(cascade, state) !== resolveCascade(cascade, state | bit)
+      ) {
+        return false;
+      }
     }
   }
 
-  return newMap;
+  return true;
 }
 
 /**
@@ -542,34 +642,6 @@ function splitTopLevelAnd(key: string): string[] | null {
   if (trimmed) parts.push(trimmed);
 
   return parts;
-}
-
-/**
- * An atom is redundant when every entry that contains it has a matching
- * partner (same remaining atoms, atom absent) with the same value.
- */
-function isAtomRedundant(
-  entries: { atoms: string[]; value: StyleValue }[],
-  atom: string,
-): boolean {
-  const withAtom = entries.filter((e) => e.atoms.includes(atom));
-  if (withAtom.length === 0) return false;
-
-  for (const wa of withAtom) {
-    const remaining = wa.atoms.filter((a) => a !== atom);
-
-    const pair = entries.find(
-      (e) =>
-        !e.atoms.includes(atom) &&
-        e.atoms.length === remaining.length &&
-        remaining.every((r) => e.atoms.includes(r)),
-    );
-
-    if (!pair) return false;
-    if (serializeValue(wa.value) !== serializeValue(pair.value)) return false;
-  }
-
-  return true;
 }
 
 /**

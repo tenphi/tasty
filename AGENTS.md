@@ -169,6 +169,8 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 **Where a new test goes.** Add it to the `BROWSER_TESTS` list in `vitest.config.ts` if it touches `document`, renders React, or asserts on injected CSS; otherwise it lands in `node` automatically. All `*.test.tsx` files are already matched by the list. A DOM test left in the `node` project fails loudly with `document is not defined`, so the mistake is cheap.
 
+**State-map priority.** A state map resolves by authored order: the last key whose condition holds wins. `src/test/state-oracle.ts` states that rule directly, and two suites hold the pipeline to it: `src/pipeline/exclusive.test.ts` (Node, per stage) and `src/pipeline/state-priority.test.ts` (browser, computed values plus rule overlap, through the pipeline, runtime, and SSR paths). Any change to `src/pipeline/` or to cache keys must keep both green. A snapshot pins CSS text, not what it resolves to, so it cannot catch a priority bug. See [Testing Priority](docs/pipeline.md#testing-priority).
+
 **Why a real browser.** Tasty compiles to CSS, and only a CSS engine can tell you whether that CSS is valid. jsdom and happy-dom reject `@container`, `@starting-style`, `@property`, `@function`, and CSS nesting outright — under jsdom, 53 of the 54 snapshots in `advanced-states.test.tsx` were empty strings asserting nothing, and `@container`/`@starting-style` coverage did not exist at all. Chromium accepts these rules, so the snapshots now pin real CSS and an invalid declaration shows up as a dropped property.
 
 **Consequences to keep in mind:**

@@ -86,18 +86,22 @@ Output: CSSRule[]
 
 ### What It Does
 
-Runs on each style's value map **before** any parsing. If a compound AND state key shares a value with the "atom absent" variant, the atom is a don't-care and every key is simplified by dropping it. Duplicate keys collapse.
+Runs on each style's value map **before** any parsing, when the map has at least three keys and one of them uses `&`. An atom is a **don't-care** when flipping it never changes which value the map resolves to; every key that mentions a don't-care atom is dropped.
 
 ### How It Works
 
-1. Gather the unique set of top-level AND atoms across all keys.
-2. An atom is **redundant** when every entry that contains it has a same-value partner with the atom absent and the rest of the atoms identical.
-3. Keys containing `|`, `^`, or `,` at top level are treated as opaque single atoms (they don't participate in atom-level extraction).
-4. Drop redundant atoms from every key; collapse duplicates.
+1. Split each key into its top-level `&` atoms. Keys containing `|`, `^`, or `,` at top level are a single opaque atom. The `_` floor (and a misused `_` key) is kept verbatim and left out of the analysis.
+2. Treat the map as the cascade it is: the last authored key whose atoms all hold wins, and `''` is always the lowest priority.
+3. An atom is a don't-care when, in every state, the cascade resolves to the same value with the atom present as with it absent. Only the states `(K₁ minus the atom) ∪ K₀`, for every key `K₁` that contains the atom and every key `K₀` that does not (or none), can tell the two apart, so the check is quadratic in the number of keys rather than exponential in atoms.
+4. Drop every key that contains a don't-care atom. With the atom forced absent those keys never match, and by definition the result is unchanged.
+
+The check is over the cascade, not over pairs of keys. In `{ '': A, checked: B, 'invalid & checked': C, disabled: A }`, `disabled` has the default's value, but it outranks `checked`: a checked, disabled element gets `A`, so `disabled` is not a don't-care. (An earlier pairwise rule — "every key with the atom has a same-value partner without it" — folded `disabled` into `''` here and lost that priority.)
+
+Atoms are compared as strings and treated as independent. Real atoms can be related (`theme=dark` vs `theme=light`, nested media ranges); that only rules states out, so a don't-care over independent atoms is one for every real state too. Two guards keep the rewrite safe: a map with more than 32 distinct atoms is left unreduced, and a reduction that would leave the `_` floor alone with `''` (which means "use the floor", see Stage 1) is skipped.
 
 ### Why
 
-Removing don't-care dimensions before parsing prevents combinatorial blowup in later stages. `mergeEntriesByValue`, `buildExclusiveConditions`, and materialization all see fewer entries and fewer spurious conditions. Implemented as part of the Apr 2026 fix for overlapping CSS rules (commit 7cd9dbe).
+Removing don't-care dimensions before parsing prevents combinatorial blowup in later stages. `mergeEntriesByValue`, `buildExclusiveConditions`, and materialization all see fewer entries and fewer spurious conditions.
 
 ### Example
 
@@ -197,6 +201,8 @@ The merge is safe iff for every entry `e_m` strictly between them in priority wi
 
 i.e. there is no scenario where the intermediate state could have matched, the lower same-value entry would also have matched, and the higher one would not. This is the only way the merge could leak through and shadow the intermediate state.
 
+An intermediate whose condition always holds (a tautological key, or same-value keys that already merged into one, like `beta | !beta`) is checked like any other. Only the `''` default and the `_` floor are exempt from the check, and they are always the lowest priorities, so they are never intermediates.
+
 ### Why
 
 Without this pass a value map like `{ '@dark': 'red', '@dark & @hc': 'red' }` would create two separate entries that later produce two CSS rules with identical output. Merging before exclusive building keeps the exclusive condition algebra small and avoids duplicate CSS. The safety check ensures we never break the cascade in service of this optimization.
@@ -293,7 +299,9 @@ B: B & !A               (applies only when A doesn't)
 C: C & !A & !B          (applies only when neither A nor B)
 ```
 
-Each exclusive condition is passed through `simplifyCondition`. Entries that simplify to `FALSE` (impossible) are filtered out. The default state (`''` → `TrueCondition`) is not added to the “prior” list for negation (see `buildExclusiveConditions`).
+Each exclusive condition is passed through `simplifyCondition`. Entries that simplify to `FALSE` (impossible) are filtered out.
+
+Every entry is added to the "prior" list, including one whose condition is `TRUE`. That can be a tautological key, or same-value keys that merged into one in Stage 1b (`alpha: X, '!alpha': X` → `TRUE`). Such an entry always applies at its priority, so negating it correctly makes every lower entry `FALSE`. The bare `''` default is `TRUE` too, but it is always the lowest priority, so no entry comes after it.
 
 ### `_` fallback floor
 
@@ -383,7 +391,7 @@ The pre-build Stage 2a pass doesn't need this because user-authored ORs aren't p
 
 ### Example (conceptual)
 
-See the comment block in `exclusive.ts:500-523`: a default value whose higher-priority sibling is `@supports(...) & :has(...)` gets an exclusive of `!@supports | !:has`. Expansion yields one branch under `@supports (not ...)` and another under `@supports (...) { :not(:has()) }` instead of a bare `:not(:has())` rule.
+See the comment block on `expandExclusiveOrs` in `exclusive.ts`: a default value whose higher-priority sibling is `@supports(...) & :has(...)` gets an exclusive of `!@supports | !:has`. Expansion yields one branch under `@supports (not ...)` and another under `@supports (...) { :not(:has()) }` instead of a bare `:not(:has())` rule.
 
 ---
 
@@ -742,3 +750,16 @@ Impossible combinations are detected at multiple levels (simplification, variant
 ### 4. Aggressive Caching
 
 Parse, simplify, condition-to-CSS, and full-pipeline results are cached independently, enabling fast re-rendering when only parts of the style object change.
+
+Cache keys must respect key order where it carries meaning. A state map resolves by key order, so `{ '': A, checked: B, disabled: C }` and `{ '': A, disabled: C, checked: B }` are different styles and must get different keys (and classes). Only the style keys of a styles object, including a sub-element's, are order-insensitive, so they may be sorted. `stringifyStyles` (pipeline cache) and `generateChunkCacheKey` (class allocation) both follow this rule.
+
+---
+
+## Testing Priority
+
+Every stage above is an optimization that must leave one thing unchanged: in any state, the value that applies is the value of the last authored key whose condition holds. `src/test/state-oracle.ts` states that rule directly, with none of the pipeline's machinery, and two suites compare the pipeline against it:
+
+- `src/pipeline/exclusive.test.ts` (Node) evaluates the conditions after each of Stages 0–3 on thousands of generated maps, and names the stage that disagrees.
+- `src/pipeline/state-priority.test.ts` (browser) renders hand-written, permuted, and generated maps to CSS, applies every combination of states (modifiers, value modifiers, `:has()`, `@root`, `@parent`, `@own`, media, supports), and compares what the browser computes against the oracle. It also checks that rules stay mutually exclusive, which a correct computed value alone can hide. It runs through the pipeline, the runtime injector, and the SSR collector, with all maps mounted at once so a cache-key collision shows up.
+
+A change to any stage should keep both green. When a generated map fails, the message includes the map, the failing states, and the CSS; the map is usually worth adding to the hand-written cases once it is reduced.

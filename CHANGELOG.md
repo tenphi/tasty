@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 3.9.3
+
+### Patch Changes
+
+- [#349](https://github.com/tenphi/tasty/pull/349) [`9855fb7`](https://github.com/tenphi/tasty/commit/9855fb7c48cb216e8b55973eb95f0d8914df6ea9) Thanks [@tenphi](https://github.com/tenphi)! - Fix state maps losing key priority. A later key whose value equals the `''` default (e.g. `disabled` in `{ '': A, checked: B, 'invalid & checked': C, disabled: A }`) no longer gets folded into the default and outranked by earlier keys, and keys that together always apply (such as `hovered: X, '!hovered': X`) now block the keys below them instead of overlapping them. Components whose state maps differ only in key order no longer share one class and its styles.
+
+- [#349](https://github.com/tenphi/tasty/pull/349) [`9855fb7`](https://github.com/tenphi/tasty/commit/9855fb7c48cb216e8b55973eb95f0d8914df6ea9) Thanks [@tenphi](https://github.com/tenphi)! - Parse single-letter modifier and class names in state keys (`x` → `[data-x]`, `.x`), matching the `data-x` attribute `mods={{ x: true }}` renders. They used to be skipped, turning a key like `{ '': A, x: B }` into one that always applies. State keys Tasty cannot fully read — unknown characters, an operator missing a state, or two states with no operator between them — now emit an `INVALID_STATE_KEY` warning.
+
 ## 3.9.2
 
 ### Patch Changes

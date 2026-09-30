@@ -37,6 +37,24 @@ Use these instead of their raw CSS counterparts:
 
 ## Layout
 
+### `overscrollBehavior`
+
+The native `overscrollBehavior` shorthand and its `overscrollBehaviorBlock`,
+`overscrollBehaviorInline`, `overscrollBehaviorX`, and `overscrollBehaviorY`
+longhands support `auto`, `contain`, `none`, and `chain`. The shorthand can set
+separate X and Y values, for example `overscrollBehavior: 'chain contain'`.
+
+`chain` allows scroll chaining to another scrollable area while suppressing
+boundary effects such as bounce. It requires browser support; use a feature
+query and a fallback floor when targeting browsers without it:
+
+```jsx
+overscrollBehaviorBlock: {
+  _: 'auto',
+  '@supports(overscroll-behavior-block: chain)': 'chain',
+}
+```
+
 ### `display`
 
 Standard CSS display values. Handled together with `hide`, `textOverflow`, `overflow`, and `whiteSpace` for priority resolution.

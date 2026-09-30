@@ -4,12 +4,61 @@ import {
   extractFunctionsFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
+  extractStylesForSelector,
   extractStylesWithChunks,
   getExtractorNamePrefix,
   setExtractorNamePrefix,
 } from './extractor';
 
 describe('extractStylesWithChunks', () => {
+  it('preserves nested at-rule support functions in selector and chunk output', () => {
+    const styles = {
+      order: {
+        _: 1,
+        '@supports(at-rule(@scope)) & @supports(display: grid)': 2,
+        '!@supports(at-rule(@scope))': 3,
+      },
+    };
+    const outputs = [
+      extractStylesForSelector('.probe', styles).css,
+      extractStylesWithChunks(styles)
+        .map((chunk) => chunk.css)
+        .join('\n'),
+    ];
+
+    for (const css of outputs) {
+      expect(css).toContain('order: 1;');
+      expect(css).toContain('@supports (at-rule(@scope)) and (display: grid)');
+      expect(css).toContain('order: 2;');
+      expect(css).toContain('@supports (not (at-rule(@scope)))');
+      expect(css).toContain('order: 3;');
+    }
+  });
+
+  it.each([
+    ['overscrollBehavior', 'overscroll-behavior'],
+    ['overscrollBehaviorBlock', 'overscroll-behavior-block'],
+    ['overscrollBehaviorInline', 'overscroll-behavior-inline'],
+    ['overscrollBehaviorX', 'overscroll-behavior-x'],
+    ['overscrollBehaviorY', 'overscroll-behavior-y'],
+  ])('extracts chain feature queries for %s', (property, cssProperty) => {
+    const styles = {
+      [property]: { _: 'auto', [`@supports(${cssProperty}: chain)`]: 'chain' },
+    };
+    const outputs = [
+      extractStylesForSelector('.probe', styles).css,
+      extractStylesWithChunks(styles)
+        .map((chunk) => chunk.css)
+        .join('\n'),
+    ];
+
+    for (const css of outputs) {
+      expect(css).toContain(`${cssProperty}: auto;`);
+      expect(css).toContain(`@supports (${cssProperty}: chain)`);
+      expect(css).toContain(`${cssProperty}: chain;`);
+    }
+  });
+
   it('should generate deterministic className from content', () => {
     const styles = { display: 'block', color: 'red' };
     const chunks1 = extractStylesWithChunks(styles);

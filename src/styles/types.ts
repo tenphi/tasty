@@ -88,7 +88,18 @@ export interface StylesInterface extends Omit<
   | 'scrollPaddingRight'
   | 'scrollPaddingBottom'
   | 'scrollPaddingLeft'
+  | 'overscrollBehaviorBlock'
+  | 'overscrollBehaviorInline'
+  | 'overscrollBehaviorX'
+  | 'overscrollBehaviorY'
 > {
+  // csstype's longhand unions do not yet include the CSS `chain` keyword.
+  overscrollBehaviorBlock?: CSSProperties['overscrollBehaviorBlock'] | 'chain';
+  overscrollBehaviorInline?:
+    CSSProperties['overscrollBehaviorInline'] | 'chain';
+  overscrollBehaviorX?: CSSProperties['overscrollBehaviorX'] | 'chain';
+  overscrollBehaviorY?: CSSProperties['overscrollBehaviorY'] | 'chain';
+
   /**
    * @deprecated Use `flow` style instead.
    */

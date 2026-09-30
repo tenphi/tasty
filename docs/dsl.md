@@ -538,13 +538,16 @@ Container style queries use `$prop` (boolean) or `$prop=value` syntax, which map
 
 ### `@supports(...)` — Feature Queries
 
-Feature queries test CSS property support. Use `$` as the first argument to test selector support:
+Feature queries test CSS property support and accept CSS support functions such
+as `at-rule()`. Use `$` as the first argument to test selector support:
 
-| Tasty syntax                | CSS output                        |
-| --------------------------- | --------------------------------- |
-| `@supports(display: grid)`  | `@supports (display: grid)`       |
-| `@supports($, :has(*))`     | `@supports selector(:has(*))`     |
-| `!@supports(display: grid)` | `@supports (not (display: grid))` |
+| Tasty syntax                 | CSS output                         |
+| ---------------------------- | ---------------------------------- |
+| `@supports(display: grid)`   | `@supports (display: grid)`        |
+| `@supports($, :has(*))`       | `@supports selector(:has(*))`      |
+| `@supports(at-rule(@scope))`  | `@supports (at-rule(@scope))`      |
+| `!@supports(display: grid)`  | `@supports (not (display: grid))`  |
+| `!@supports(at-rule(@scope))` | `@supports (not (at-rule(@scope)))` |
 
 ```jsx
 display: {
@@ -552,6 +555,25 @@ display: {
   '@supports(display: grid)': 'grid',
 }
 ```
+
+`at-rule()` tests whether the browser supports the named at-rule. Its surrounding
+parentheses in Tasty's CSS output are valid CSS. Negation and combinations with
+other states use the same syntax as property queries:
+
+```jsx
+color: {
+  _: 'red',
+  '@supports(at-rule(@scope)) & @supports(display: grid)': 'blue',
+}
+```
+
+Use `_` to keep a base value when a browser cannot evaluate a query. A support
+query only detects a browser feature; it does not add an API for authoring the
+queried at-rule in a Tasty style object. For conditional stylesheet imports such
+as `@import url("scoped.css") supports(at-rule(@scope));`, use an ordinary CSS
+stylesheet or document-level `useRawCSS()`. Put imports before other rules in
+that stylesheet. Imports cannot be used in constructable stylesheets, including
+Tasty's adopted-sheet mode for Shadow DOM.
 
 ### `_` — Fallback Floor
 

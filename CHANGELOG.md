@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.9.4
+
+### Patch Changes
+
+- [#351](https://github.com/tenphi/tasty/pull/351) [`16bc0cb`](https://github.com/tenphi/tasty/commit/16bc0cb4edff3ac6e8f6d8c308b72911fa9b5392) Thanks [@tenphi](https://github.com/tenphi)! - Accept the CSS `chain` value in overscroll behavior longhand style types, including state maps.
+
 ## 3.9.3
 
 ### Patch Changes

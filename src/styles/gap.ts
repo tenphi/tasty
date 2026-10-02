@@ -1,15 +1,16 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
+import type { NoType } from './types';
 
 export function gapStyle({
   display = 'block',
   flow,
   gap,
 }: {
-  display?: string;
-  flow?: string;
-  gap?: string | number | boolean;
+  display?: string | NoType;
+  flow?: string | NoType;
+  gap?: string | number | boolean | NoType;
 }) {
   if (typeof gap === 'number') {
     gap = `${gap}px`;
@@ -27,8 +28,8 @@ export function gapStyle({
     return { gap: String(gap) };
   }
 
-  const isGrid = display.includes('grid');
-  const isFlex = display.includes('flex');
+  const isGrid = typeof display === 'string' && display.includes('grid');
+  const isFlex = typeof display === 'string' && display.includes('flex');
   const isWrap = flow
     ? flow.includes('wrap') && !flow.includes('nowrap')
     : false;
@@ -46,7 +47,7 @@ export function gapStyle({
     return { gap };
   }
 
-  const gapDir = flow?.includes('row') ? 'right' : 'bottom';
+  const gapDir = flow && flow.includes('row') ? 'right' : 'bottom';
 
   return isWrap
     ? [

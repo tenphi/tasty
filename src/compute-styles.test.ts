@@ -4,6 +4,64 @@ import { destroy, getCSSText } from './injector';
 import { ServerStyleCollector } from './ssr/collector';
 import type { Styles } from './styles/types';
 
+describe('computeStyles with a null display default', () => {
+  afterEach(() => {
+    destroy();
+  });
+
+  it.each(['runtime', 'ssr'] as const)(
+    'preserves flow and gap across layout state changes through %s',
+    (path) => {
+      const collector = path === 'ssr' ? new ServerStyleCollector() : null;
+      const result = computeStyles(
+        {
+          display: { '': null, flex: 'flex', grid: 'grid' },
+          flow: 'column',
+          gap: '8px',
+        },
+        collector ? { ssrCollector: collector } : undefined,
+      );
+      const sheet = document.createElement('style');
+      if (collector) sheet.textContent = collector.getCSS();
+      document.head.append(sheet);
+
+      const root = document.createElement('div');
+      root.className = result.className;
+      const child = document.createElement('div');
+      root.append(child, document.createElement('div'));
+      document.body.append(root);
+
+      try {
+        expect(getComputedStyle(root).display).toBe('block');
+        expect(getComputedStyle(root).gap).toBe('normal');
+        expect(getComputedStyle(child).marginBottom).toBe('8px');
+
+        root.setAttribute('data-flex', '');
+        expect(getComputedStyle(root).display).toBe('flex');
+        expect(getComputedStyle(root).flexDirection).toBe('column');
+        expect(getComputedStyle(root).gap).toBe('8px');
+        expect(getComputedStyle(child).marginBottom).toBe('0px');
+
+        // The later grid branch wins when both layout states hold.
+        root.setAttribute('data-grid', '');
+        expect(getComputedStyle(root).display).toBe('grid');
+        expect(getComputedStyle(root).gridAutoFlow).toBe('column');
+        expect(getComputedStyle(root).gap).toBe('8px');
+        expect(getComputedStyle(child).marginBottom).toBe('0px');
+
+        root.removeAttribute('data-flex');
+        root.removeAttribute('data-grid');
+        expect(getComputedStyle(root).display).toBe('block');
+        expect(getComputedStyle(root).gap).toBe('normal');
+        expect(getComputedStyle(child).marginBottom).toBe('8px');
+      } finally {
+        root.remove();
+        sheet.remove();
+      }
+    },
+  );
+});
+
 function createAncillaryStyles(): Styles {
   return {
     '@property': {

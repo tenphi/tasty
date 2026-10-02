@@ -260,6 +260,47 @@ describe('transitionStyle', () => {
       });
     });
 
+    it('keeps an explicitly named property when a later group covers it', () => {
+      expect(
+        transitionStyle({ transition: 'opacity 120ms ease-in-out, theme' }),
+      ).toEqual({
+        transition: [
+          'opacity 120ms ease-in-out',
+          'color var(--theme-transition, var(--transition))',
+          'background-color var(--theme-transition, var(--transition))',
+          'background-image var(--theme-transition, var(--transition))',
+          'box-shadow var(--theme-transition, var(--transition))',
+          'border var(--theme-transition, var(--transition))',
+          'border-radius var(--theme-transition, var(--transition))',
+          'outline var(--theme-transition, var(--transition))',
+          '--tasty-second-fill-color var(--theme-transition, var(--transition))',
+        ].join(', '),
+      });
+    });
+
+    it('lets a named property override an earlier group that covers it', () => {
+      const result = transitionStyle({
+        transition: 'theme 0.5s, opacity 120ms ease-in-out',
+      });
+
+      expect(result?.transition).toContain('opacity 120ms ease-in-out');
+      expect(result?.transition).toContain('color 0.5s');
+      expect(result?.transition).not.toContain('opacity 0.5s');
+    });
+
+    it('treats a semantic name that maps to one property as named', () => {
+      const result = transitionStyle({ transition: 'shadow 1s, theme 0.5s' });
+
+      expect(result?.transition).toContain('box-shadow 1s');
+      expect(result?.transition).not.toContain('box-shadow 0.5s');
+    });
+
+    it('still resolves two named entries for one property last-wins', () => {
+      expect(
+        transitionStyle({ transition: 'opacity 1s, opacity 2s linear' }),
+      ).toEqual({ transition: 'opacity 2s linear' });
+    });
+
     it('preserves first insertion order when a later semantic overlaps', () => {
       expect(transitionStyle({ transition: 'fill 0.2s, theme 0.5s' })).toEqual({
         transition: [

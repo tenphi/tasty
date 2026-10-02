@@ -584,6 +584,8 @@ When easing is provided without a duration, the default timing variable is used 
 | `zIndex` | `z-index` |
 | `inset` | `inset`, `top`, `right`, `bottom`, `left` |
 
+When two entries cover the same property, an entry that names that one property wins over a group such as `theme`, in either order: `opacity 120ms ease-in-out, theme` keeps the opacity timing. Otherwise the later entry wins, as in CSS.
+
 Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name). Prefer omitting the duration or using a duration token instead of repeating raw time values across components. Explicit zero can disable motion.
 
 ```jsx

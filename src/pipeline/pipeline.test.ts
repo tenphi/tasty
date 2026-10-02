@@ -2133,6 +2133,61 @@ describe('rule finalization', () => {
 });
 
 describe('renderStyles integration', () => {
+  it('leaves a null display default unset while rendering flex flow', () => {
+    expect(
+      renderStyles(
+        { display: { '': null, active: 'flex' }, flow: 'row wrap' },
+        '.test',
+      ),
+    ).toEqual([
+      {
+        selector: '.test:where([data-active])',
+        declarations: 'display: flex; flex-flow: row wrap;',
+      },
+    ]);
+  });
+
+  it('renders a null flow default without losing the display', () => {
+    expect(
+      renderStyles(
+        { display: 'flex', flow: { '': null, active: 'column' } },
+        '.test',
+      ),
+    ).toEqual([
+      { selector: '.test', declarations: 'display: flex;' },
+      {
+        selector: '.test:where([data-active])',
+        declarations: 'flex-flow: column;',
+      },
+    ]);
+  });
+
+  it('renders a null display without flow', () => {
+    expect(renderStyles({ display: { '': null } }, '.test')).toEqual([]);
+  });
+
+  it('falls back to block gaps for a null display default', () => {
+    expect(
+      renderStyles(
+        {
+          display: { '': null, active: 'flex' },
+          flow: 'row',
+          gap: '8px',
+        },
+        '.test',
+      ),
+    ).toEqual([
+      {
+        selector: '.test:where(:not([data-active])) > *:not(:last-child)',
+        declarations: 'margin-right: 8px;',
+      },
+      {
+        selector: '.test:where([data-active])',
+        declarations: 'display: flex; gap: 8px; flex-flow: row;',
+      },
+    ]);
+  });
+
   it('renders direct values like equivalent default state maps', () => {
     const direct = {
       display: 'flex',

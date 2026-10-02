@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.9.5
+
+### Patch Changes
+
+- [#353](https://github.com/tenphi/tasty/pull/353) [`d068547`](https://github.com/tenphi/tasty/commit/d06854708a5eee0a7996e776eabae012b1c17d71) Thanks [@tenphi](https://github.com/tenphi)! - Fix crashes when `flow` and `gap` styles encounter an unset `display` branch, including a `null` default in a state map.
+
 ## 3.9.4
 
 ### Patch Changes

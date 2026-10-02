@@ -101,6 +101,12 @@ export function transitionStyle({ transition }: { transition?: string }) {
 
   const processed = parseStyle(transition);
   const map: Record<string, string> = {};
+  // Properties set by an entry that names exactly one property. A group such
+  // as `theme` that also covers one of them leaves it alone, whatever the
+  // order: in `opacity 120ms ease-in-out, theme`, the opacity entry is the
+  // author's intent, not something `theme` should silently overwrite. Entries
+  // of the same kind still resolve last-wins, as CSS does.
+  const named = new Set<string>();
 
   for (const group of processed.groups) {
     const tokens = group.all;
@@ -131,11 +137,13 @@ export function transitionStyle({ transition }: { transition?: string }) {
       value += ` ${delay}`;
     }
 
-    const styles = MAP[name];
-    if (styles) {
-      for (const style of styles) map[style] = value;
-    } else {
-      map[name] = value;
+    const styles = MAP[name] ?? [name];
+    const isGroup = styles.length > 1;
+
+    for (const style of styles) {
+      if (isGroup && named.has(style)) continue;
+      map[style] = value;
+      if (!isGroup) named.add(style);
     }
   }
 

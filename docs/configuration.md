@@ -549,7 +549,23 @@ configure({
 });
 ```
 
-Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@property`. Recipes cannot reference other recipes.
+Recipe values are flat tasty styles (no sub-element keys). They may contain base styles, tokens, local states, `@keyframes`, and `@property`.
+
+**Recipes cannot reference other recipes.** A `recipe` key inside a configured recipe's value is not recursively resolved:
+
+```jsx
+// Unsupported: applying 'elevatedCard' does not expand 'card elevated'.
+configure({
+  recipes: {
+    elevatedCard: {
+      recipe: 'card elevated',
+      padding: '6x',
+    },
+  },
+});
+```
+
+Instead, compose the names where you apply the styles: `styles: { recipe: 'card elevated', padding: '6x' }`. Recipe references are resolved on the component root and independently inside each sub-element's styles (for example, `styles: { Panel: { recipe: 'card elevated' } }`). This sub-element support does not allow one recipe definition to inherit another. Tasty warns in development when a recipe definition contains a `recipe` key.
 
 For how to apply, compose, and override recipes in components, see [Recipes](dsl.md#recipes) in the Style DSL reference.
 

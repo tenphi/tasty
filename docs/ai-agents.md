@@ -220,6 +220,8 @@ styles: { Title: { preset: 'h3' }, Icon: { $: '>@:last-child', color: '#accent' 
 | `@function`      | `{ '$$name': { args, returns?, result, '$local'? } }`                                                       |
 | `recipe`         | a **string** of configured recipe names: `'card elevated'`, `'reset input / autofill'`, `'none / disabled'` |
 
+`recipe` resolves on the component root and independently in each sub-element's styles: `styles: { Panel: { recipe: 'card elevated' } }` is supported. Configured recipe definitions must be flat and cannot contain their own `recipe` key; references inside recipe values are not recursively expanded. Compose names where the recipe is applied, not inside `configure({ recipes })`. See [Recipes](dsl.md#recipes).
+
 At-rule keys match the real CSS at-rule names, so they are kebab-case, not camelCase. Inside `@function`, the callable is `$$name` but its parameters and local variables are `$name`:
 
 ```jsx

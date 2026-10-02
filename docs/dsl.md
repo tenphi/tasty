@@ -343,6 +343,26 @@ const ElevatedCard = tasty({
 });
 ```
 
+**Where recipes resolve:**
+
+The `recipe` property is resolved on the component root and independently inside each sub-element's styles:
+
+```jsx
+const CardWithPanel = tasty({
+  styles: {
+    recipe: 'card',
+    Panel: {
+      recipe: 'card elevated',
+      padding: '2x', // Overrides the panel's base recipe padding
+    },
+  },
+});
+```
+
+At each level, base recipes are collected in name order (later recipes replace earlier values for the same property), then local styles are merged, then post recipes are merged. The merges with local styles and post recipes follow the [state-map extension and replacement rules](#extending-vs-replacing-state-maps).
+
+Recipe definitions themselves cannot contain a `recipe` reference to another recipe: there is no recursive expansion or recipe inheritance. Compose names in the root or sub-element `recipe` property instead. See [Configuration — Recipes](configuration.md#recipes) for an unsupported nesting example.
+
 **Post-merge recipes (`/` separator):**
 
 Recipes listed after `/` are applied _after_ component styles using `mergeStyles`:

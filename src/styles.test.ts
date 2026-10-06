@@ -413,6 +413,37 @@ describe('Tasty style tests', () => {
     );
   });
 
+  it.each([
+    ['normal', 'normal'],
+    ['italic', 'italic'],
+    ['oblique', 'oblique'],
+    ['oblique 10deg', 'oblique 10deg'],
+    ['inherit', 'inherit'],
+    ['initial', 'initial'],
+    ['unset', 'unset'],
+    ['revert', 'revert'],
+    ['revert-layer', 'revert-layer'],
+    ['$text-font-style', 'var(--text-font-style)'],
+    ['var(--text-font-style, normal)', 'var(--text-font-style, normal)'],
+    [true, 'italic'],
+    [false, 'normal'],
+  ] as const)('should resolve fontStyle=%s to %s', (fontStyle, expected) => {
+    expect(presetStyle({ fontStyle })).toEqual({
+      'font-style': expected,
+    });
+  });
+
+  it.each(['normal', 'oblique', false] as const)(
+    'fontStyle=%s should override an italic preset modifier',
+    (fontStyle) => {
+      expect(presetStyle({ preset: 't3 / italic', fontStyle })).toEqual(
+        expect.objectContaining({
+          'font-style': fontStyle === false ? 'normal' : fontStyle,
+        }),
+      );
+    },
+  );
+
   it('should support multiple modifiers: t3 / strong italic', () => {
     expect(
       presetStyle({

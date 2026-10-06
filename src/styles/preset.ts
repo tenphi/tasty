@@ -246,13 +246,8 @@ export function presetStyle({
   }
 
   if (fontStyle != null) {
-    if (fontStyle === true) {
-      styles['font-style'] = 'italic';
-    } else if (
-      typeof fontStyle === 'string' &&
-      CSS_WIDE_KEYWORDS.has(fontStyle)
-    ) {
-      styles['font-style'] = fontStyle;
+    if (typeof fontStyle === 'string') {
+      styles['font-style'] = resolveCustomProperties(fontStyle);
     } else {
       styles['font-style'] = fontStyle ? 'italic' : 'normal';
     }

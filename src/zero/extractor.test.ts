@@ -11,6 +11,25 @@ import {
 } from './extractor';
 
 describe('extractStylesWithChunks', () => {
+  it.each([
+    ['normal', 'normal'],
+    ['oblique 10deg', 'oblique 10deg'],
+    ['$text-font-style', 'var(--text-font-style)'],
+  ])('preserves fontStyle=%s over an italic preset', (fontStyle, expected) => {
+    const styles = { preset: 't3 / italic', fontStyle };
+    const outputs = [
+      extractStylesForSelector('.probe', styles).css,
+      extractStylesWithChunks(styles)
+        .map((chunk) => chunk.css)
+        .join('\n'),
+    ];
+
+    for (const css of outputs) {
+      expect(css).toContain(`font-style: ${expected};`);
+      expect(css).not.toContain('font-style: italic;');
+    }
+  });
+
   it('preserves nested at-rule support functions in selector and chunk output', () => {
     const styles = {
       order: {

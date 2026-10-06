@@ -30,3 +30,57 @@ export function transformSelectorContent(content: string): string {
     (_, prefix, name) => `${prefix}[data-element="${name}"]`,
   );
 }
+
+/** Split a CSS selector list at commas outside strings, brackets, and functions. */
+export function splitSelectorsSafely(selectorList: string): string[] {
+  if (!selectorList.includes(',')) {
+    const selector = selectorList.trim();
+    return selector ? [selector] : [];
+  }
+
+  const parts: string[] = [];
+  let start = 0;
+  let squareDepth = 0;
+  let parenDepth = 0;
+  let quote = '';
+
+  for (let i = 0; i < selectorList.length; i++) {
+    const char = selectorList[i];
+
+    // Escapes protect commas and quotes; skipping pairs also handles an even
+    // number of backslashes before a closing quote correctly.
+    if (char === '\\') {
+      i++;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === '/' && selectorList[i + 1] === '*') {
+      const end = selectorList.indexOf('*/', i + 2);
+      if (end === -1) break;
+      i = end + 1;
+      continue;
+    }
+
+    if (char === '[') squareDepth++;
+    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (char === '(') parenDepth++;
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+
+    if (char === ',' && squareDepth === 0 && parenDepth === 0) {
+      const part = selectorList.slice(start, i).trim();
+      if (part) parts.push(part);
+      start = i + 1;
+    }
+  }
+
+  const tail = selectorList.slice(start).trim();
+  if (tail) parts.push(tail);
+  return parts;
+}

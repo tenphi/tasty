@@ -1,5 +1,6 @@
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import { createStyle, STYLE_HANDLER_MAP } from '../styles';
+import { splitSelectorsSafely } from '../utils/selector-transform';
 
 import type {
   CacheMetrics,
@@ -32,46 +33,6 @@ function wrapAtRules(css: string, atRules?: string[]): string {
   return (
     atRules?.reduce((wrapped, atRule) => `${atRule} { ${wrapped} }`, css) ?? css
   );
-}
-
-/** Split a selector list without treating commas inside [] / () / strings as separators. */
-function splitSelectorsSafely(selectorList: string): string[] {
-  const parts: string[] = [];
-  let buffer = '';
-  let squareDepth = 0;
-  let parenDepth = 0;
-  let quote: '"' | "'" | '' = '';
-
-  for (let i = 0; i < selectorList.length; i++) {
-    const char = selectorList[i];
-
-    if (quote) {
-      if (char === quote && selectorList[i - 1] !== '\\') quote = '';
-      buffer += char;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char as '"' | "'";
-      buffer += char;
-      continue;
-    }
-    if (char === '[') squareDepth++;
-    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
-    else if (char === '(') parenDepth++;
-    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
-
-    if (char === ',' && squareDepth === 0 && parenDepth === 0) {
-      const part = buffer.trim();
-      if (part) parts.push(part);
-      buffer = '';
-    } else {
-      buffer += char;
-    }
-  }
-
-  const tail = buffer.trim();
-  if (tail) parts.push(tail);
-  return parts;
 }
 
 function rulesToCSS(sheet: CSSStyleSheet): string {

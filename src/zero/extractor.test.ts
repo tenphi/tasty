@@ -11,6 +11,23 @@ import {
 } from './extractor';
 
 describe('extractStylesWithChunks', () => {
+  it('scopes every branch of nested selector lists in both extraction modes', () => {
+    // eslint-disable-next-line tasty/no-nested-selector -- raw selectors are the regression under test
+    const styles = { '& > .first, & > .second': { order: 7 } };
+    const selectorCSS = extractStylesForSelector('.probe', styles).css;
+    expect(selectorCSS).toContain('.probe > .first');
+    expect(selectorCSS).toContain('.probe > .second');
+
+    const [chunk] = extractStylesWithChunks(styles);
+    expect(chunk.css).toContain(
+      `.${chunk.className}.${chunk.className} > .first`,
+    );
+    expect(chunk.css).toContain(
+      `.${chunk.className}.${chunk.className} > .second`,
+    );
+    expect(selectorCSS + chunk.css).not.toContain('&');
+  });
+
   it.each([
     ['normal', 'normal'],
     ['oblique 10deg', 'oblique 10deg'],

@@ -32,6 +32,7 @@ import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 import { isSelector } from '../utils/is-selector';
+import { splitSelectorsSafely } from '../utils/selector-transform';
 import { toSnakeCase } from '../utils/string';
 import type {
   StyleHandler,
@@ -507,12 +508,12 @@ type AffixResult =
  * // → ['> [data-element="Cell"]', ' [data-element="Body"] > [data-element="Cell"]']
  */
 function getAllSelectors(key: string, styles?: Styles): string[] | null {
-  if (key.startsWith('&')) {
-    return [key.slice(1)];
-  }
-
-  if (key.startsWith('.')) {
-    return [` ${key}`];
+  if (key.startsWith('&') || key.startsWith('.')) {
+    return splitSelectorsSafely(key).map((selector) => {
+      // Comments can precede a later branch's nesting reference.
+      const part = selector.replace(/^(?:\/\*[\s\S]*?\*\/\s*)+/, '');
+      return part.startsWith('&') ? part.slice(1) : ` ${part}`;
+    });
   }
 
   if (/^[A-Z]/.test(key)) {

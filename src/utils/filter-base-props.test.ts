@@ -82,12 +82,32 @@ describe('filterBaseProps', () => {
     });
   });
 
+  it('drops style props unless explicitly allowed', () => {
+    const props = {
+      id: 'styled',
+      color: { '': '#purple', active: '#red' },
+      width: { '': '2x', active: '4x' },
+      display: 'flex',
+      padding: '2x',
+      styles: { fill: '#purple' },
+    };
+
+    expect(filterBaseProps(props)).toEqual({ id: 'styled' });
+    expect(filterBaseProps(props, { propNames: new Set(['color']) })).toEqual({
+      id: 'styled',
+      color: props.color,
+    });
+  });
+
   it('preserves DOM event props only when requested', () => {
     const props = {
       onClick: () => undefined,
       onPointerDown: () => undefined,
+      onCustom: () => undefined,
+      onA1: () => undefined,
       onA: () => undefined,
       onclick: () => undefined,
+      onÄvent: () => undefined,
       onPress: () => undefined,
       onHoverStart: () => undefined,
       onHoverEnd: () => undefined,
@@ -99,6 +119,8 @@ describe('filterBaseProps', () => {
     expect(filterBaseProps(props, { eventProps: true })).toEqual({
       onClick: props.onClick,
       onPointerDown: props.onPointerDown,
+      onCustom: props.onCustom,
+      onA1: props.onA1,
     });
     expect(filterBaseProps(props, { propNames: new Set(['onPress']) })).toEqual(
       {
@@ -120,6 +142,17 @@ describe('filterBaseProps', () => {
     expect(filterBaseProps(props)).toEqual({
       role: 'button',
       'data-child': 'own',
+    });
+  });
+
+  it('preserves explicitly allowed numeric keys via their string names', () => {
+    const props = { 0: 'own', 1: false };
+
+    expect(filterBaseProps(props)).toEqual({});
+    expect(
+      filterBaseProps(props, { propNames: new Set(['0'] as const) }),
+    ).toEqual({
+      0: 'own',
     });
   });
 });

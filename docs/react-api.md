@@ -70,6 +70,8 @@ const Span = tasty({
 
 The wrapped component only needs to forward `className` (and ideally `style`/`ref`). Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `styleProps`, `modProps`, `tokenProps`) are consumed by Tasty and never leak to the DOM.
 
+Props forwarded to the `as` component keep their declared types and requiredness. For example, a component with `position: 'top-right' | 'bottom-left'` accepts those values through `tasty({ as: Component })`; CSS positioning can still be set through `styles.position`. A prop explicitly listed in `styleProps` is consumed as a style value instead. The always-available base style props below are also consumed by Tasty, so keep component-specific prop names separate from those reserved names.
+
 ---
 
 ## Style Props

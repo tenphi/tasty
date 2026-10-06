@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 3.9.8
+
+### Patch Changes
+
+- [#361](https://github.com/tenphi/tasty/pull/361) [`6850bec`](https://github.com/tenphi/tasty/commit/6850bec761047461593e559c9f1b0f8b1cb79673) Thanks [@tenphi](https://github.com/tenphi)! - Scope every part of comma-separated nested selector keys, including each `&` reference, while preserving commas inside selector functions, attributes, and escaped names.
+
+- [#362](https://github.com/tenphi/tasty/pull/362) [`c321706`](https://github.com/tenphi/tasty/commit/c3217065b1588a15e2a5450a2a530ce48848d71c) Thanks [@tenphi](https://github.com/tenphi)! - Preserve `title` and `inert` in `filterBaseProps` so components using the helper forward these attributes to the DOM.
+
+- [#364](https://github.com/tenphi/tasty/pull/364) [`2bc4b3b`](https://github.com/tenphi/tasty/commit/2bc4b3bda3bfeaba15eb64685596548363734f45) Thanks [@tenphi](https://github.com/tenphi)! - Fix `tasty({ as: Component })` claiming unconfigured style prop names such as `position`, `color`, and `width` instead of preserving the component's declared prop types and requiredness. Explicitly exposed style props and always-available base style props retain their styling behavior.
+
 ## 3.9.7
 
 ### Patch Changes

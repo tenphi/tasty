@@ -5,6 +5,8 @@ describe('filterBaseProps', () => {
     const props = {
       id: 'trigger',
       role: 'button',
+      title: 'Open details',
+      inert: true,
       as: 'a',
       element: 'root',
       css: 'color: red',
@@ -27,6 +29,8 @@ describe('filterBaseProps', () => {
     expect(filterBaseProps(props)).toEqual({
       id: 'trigger',
       role: 'button',
+      title: 'Open details',
+      inert: true,
       as: 'a',
       element: 'root',
       css: 'color: red',
@@ -56,7 +60,7 @@ describe('filterBaseProps', () => {
           'data-testid': 'close',
           'data-': 'bare data prefix',
           download: true,
-          title: 'discarded',
+          unknown: 'discarded',
         },
         { propNames: new Set(['download']) },
       ),
@@ -66,6 +70,15 @@ describe('filterBaseProps', () => {
       'data-testid': 'close',
       'data-': 'bare data prefix',
       download: true,
+    });
+  });
+
+  it.each([true, false])('preserves inert=%s without coercion', (inert) => {
+    expect(
+      filterBaseProps({ inert, title: 'Details', unknown: 'discarded' }),
+    ).toEqual({
+      inert,
+      title: 'Details',
     });
   });
 

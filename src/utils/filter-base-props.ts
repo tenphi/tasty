@@ -1,5 +1,7 @@
 const BasePropNames = new Set([
   'role',
+  'title',
+  'inert',
   'as',
   'element',
   'css',

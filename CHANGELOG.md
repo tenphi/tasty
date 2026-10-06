@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.9.7
+
+### Patch Changes
+
+- [#359](https://github.com/tenphi/tasty/pull/359) [`81ded8e`](https://github.com/tenphi/tasty/commit/81ded8e68589a9ca13d7351350d275d7c137d46d) Thanks [@tenphi](https://github.com/tenphi)! - Fix `fontStyle` string values such as `normal`, `oblique`, and token references being converted to `italic`, including when overriding a typography preset.
+
 ## 3.9.6
 
 ### Patch Changes

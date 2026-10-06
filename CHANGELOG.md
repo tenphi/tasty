@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.9.9
+
+### Patch Changes
+
+- [#365](https://github.com/tenphi/tasty/pull/365) [`8f27081`](https://github.com/tenphi/tasty/commit/8f27081754ac0535c2ed59096bc6e70cd4678f67) Thanks [@tenphi](https://github.com/tenphi)! - Fix `filterBaseProps` return types to exclude filtered-out props, allowing Tasty style props such as state-map `color` values to be safely filtered before spreading into native HTML elements or other components. Preserve explicitly allowed props and opt-in event handlers with their original value types.
+
 ## 3.9.8
 
 ### Patch Changes

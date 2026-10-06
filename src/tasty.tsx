@@ -418,10 +418,11 @@ export type AllBasePropsWithMods<
   ResolveTokenProps<TP>;
 
 /**
- * Keys from BasePropsWithoutChildren that should be omitted from HTML attributes.
- * This excludes event handlers so they can be properly typed from JSX.IntrinsicElements.
+ * Props consumed by Tasty rather than forwarded to the `as` component.
+ * Event handlers are resolved from JSX.IntrinsicElements or the component's own props.
  */
 type TastySpecificKeys =
+  | keyof BaseStyleProps
   | 'as'
   | 'qa'
   | 'qaVal'
@@ -434,8 +435,7 @@ type TastySpecificKeys =
   | 'style'
   | 'theme'
   | 'tokens'
-  | 'ref'
-  | 'color';
+  | 'ref';
 
 /** Extract prop key names from a ModPropsInput (array elements or object keys). */
 type ModPropsKeys<M extends ModPropsInput> = M extends readonly (infer K)[]
@@ -527,9 +527,11 @@ export type TastyPolymorphicComponent<
     RefAttributes<unknown>
 >;
 
+// An omitted styleProps list must not infer the entire StyleList constraint:
+// that would claim every CSS name, including the `as` component's own props.
 export function tasty<
-  K extends StyleList,
-  V extends VariantMap,
+  K extends StyleList = readonly never[],
+  V extends VariantMap = VariantMap,
   E extends ElementsDefinition = Record<string, never>,
   AsType extends ElementType = 'div',
   M extends ModPropsInput = readonly never[],

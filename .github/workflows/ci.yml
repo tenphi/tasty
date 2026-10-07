@@ -13,13 +13,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -32,7 +32,7 @@ jobs:
       # version bump invalidates the cache and pulls a matching browser.
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}

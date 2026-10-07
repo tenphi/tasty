@@ -4,6 +4,22 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      babel:
+        patterns: ['@babel/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      vitest:
+        patterns: ['vitest', '@vitest/*']
+      size-limit:
+        patterns: ['size-limit', '@size-limit/*']
+      astro:
+        patterns: ['astro', '@astrojs/*']
+      dependencies:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
     open-pull-requests-limit: 10
     labels:
       - dependencies
@@ -12,6 +28,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     open-pull-requests-limit: 5
     labels:
       - dependencies

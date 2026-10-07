@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.1.0
 
       # Publish jobs stay on Node 24 (not CI's Node 22) because OIDC trusted
       # publishing requires npm ≥ 11.5.1+, which Node 24 ships natively.
@@ -35,7 +35,7 @@ jobs:
       # Do not run `npm install -g npm@latest` — it corrupts npm's module
       # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
           cache: pnpm
@@ -68,7 +68,7 @@ jobs:
         run: npm publish --tag pr_${{ github.event.number }} --access public --provenance
 
       - name: Comment on PR
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const setMessage = (await import('${{ github.workspace }}/scripts/ci/set-message.mjs')).default;
@@ -89,10 +89,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.1.0
 
       # Publish jobs stay on Node 24 (not CI's Node 22) because OIDC trusted
       # publishing requires npm ≥ 11.5.1+, which Node 24 ships natively.
@@ -100,7 +100,7 @@ jobs:
       # Do not run `npm install -g npm@latest` — it corrupts npm's module
       # tree (e.g. missing sigstore) on hosted runners.
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
           cache: pnpm
@@ -123,21 +123,21 @@ jobs:
 
       - name: Create Release Pull Request or Publish
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2.1.2
         with:
-          publish: pnpm release
-          title: 'chore: version packages'
-          commit: 'chore: version packages'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish-script: pnpm release
+          pr-title: 'chore: version packages'
+          commit-message: 'chore: version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
       - name: Create GitHub Release
         if: steps.changesets.outputs.published == 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
-            const publishedPackages = JSON.parse('${{ steps.changesets.outputs.publishedPackages }}');
+            const publishedPackages = JSON.parse('${{ steps.changesets.outputs.published-packages }}');
             for (const pkg of publishedPackages) {
               const tag = `v${pkg.version}`;
               try {
@@ -172,16 +172,16 @@ jobs:
 
       - name: Trigger website redeploy (release)
         if: steps.changesets.outputs.published == 'true'
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4.0.1
         with:
           token: ${{ secrets.DISPATCH_TOKEN }}
           repository: tenphi/tasty.style
           event-type: tasty-release
-          client-payload: '{"version": "${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}"}'
+          client-payload: '{"version": "${{ fromJSON(steps.changesets.outputs.published-packages)[0].version }}"}'
 
       - name: Trigger website redeploy (update)
         if: steps.changesets.outputs.published != 'true'
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4.0.1
         with:
           token: ${{ secrets.DISPATCH_TOKEN }}
           repository: tenphi/tasty.style

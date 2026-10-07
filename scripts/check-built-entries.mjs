@@ -7,9 +7,13 @@
  * points catches that class of packaging failure.
  */
 
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
 
 const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 
@@ -121,6 +125,100 @@ function assertGraphOnlyLoads(entry, allowedPrefixes) {
 
 for (const entry of entries) {
   await import(new URL(`../dist/${entry}`, import.meta.url));
+}
+
+// Source tests cannot catch NODE_ENV being folded to "development" while the
+// package is built. Load the emitted runtime in fresh consumer processes.
+for (const [mode, debug, expectedDevMode] of [
+  ['production', false, false],
+  ['test', false, false],
+  ['development', false, true],
+  ['production', true, true],
+]) {
+  const result = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+          const warnings = [];
+          console.warn = (...args) => warnings.push(args.join(' '));
+          if (${debug}) {
+            globalThis.window = {
+              localStorage: { getItem: () => 'true' },
+            };
+          }
+          const { configure, getConfig, computeStyles } =
+            await import(${JSON.stringify(new URL('../dist/core/index.js', import.meta.url).href)});
+          configure({ recipes: { existing: { display: 'block' } } });
+          computeStyles({ recipe: 'missing-recipe' });
+          const recipeWarnings = [...warnings];
+          warnings.length = 0;
+          const { tastyStatic } =
+            await import(${JSON.stringify(new URL('../dist/static/index.js', import.meta.url).href)});
+          tastyStatic({ display: 'block' });
+          console.log(JSON.stringify({
+            devMode: getConfig().devMode,
+            recipeWarnings,
+            staticWarnings: warnings,
+          }));
+        `,
+      ],
+      { encoding: 'utf8', env: { ...process.env, NODE_ENV: mode } },
+    ),
+  );
+
+  const context = `NODE_ENV=${mode}, TASTY_DEBUG=${debug}`;
+  assert.equal(result.devMode, expectedDevMode, context);
+  assert.equal(result.recipeWarnings.length, expectedDevMode ? 1 : 0, context);
+  assert.equal(
+    result.staticWarnings.length,
+    mode === 'production' ? 0 : 1,
+    context,
+  );
+  if (expectedDevMode) {
+    assert.match(
+      result.recipeWarnings[0],
+      /Recipe "missing-recipe" not found/,
+      context,
+    );
+  }
+}
+
+// The original runtime debug switch must also survive a consuming app's
+// production bundling and minification, with or without a process shim.
+const consumerBundle = await build({
+  stdin: {
+    contents: `
+      import { configure, getConfig, computeStyles } from './dist/core/index.js';
+      configure({ recipes: { existing: { display: 'block' } } });
+      computeStyles({ recipe: 'missing-recipe' });
+      globalThis.tastyConfig = getConfig();
+    `,
+    resolveDir: dirname(distDir),
+  },
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  write: false,
+  minify: true,
+  define: { 'process.env.NODE_ENV': '"production"' },
+});
+
+for (const processShim of [false, true]) {
+  for (const debug of [false, true]) {
+    const warnings = [];
+    const sandbox = {
+      ...(processShim ? { process: { env: { NODE_ENV: 'production' } } } : {}),
+      window: { localStorage: { getItem: () => (debug ? 'true' : null) } },
+      console: { warn: (...args) => warnings.push(args.join(' ')) },
+    };
+    runInNewContext(consumerBundle.outputFiles[0].text, sandbox);
+    const context = `Production browser, process shim=${processShim}, TASTY_DEBUG=${debug}`;
+    assert.equal(sandbox.tastyConfig.devMode, debug, context);
+    assert.equal(warnings.length, debug ? 1 : 0, context);
+  }
 }
 
 assertGraphExcludes('static/index.js', [

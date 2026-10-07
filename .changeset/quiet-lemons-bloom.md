@@ -2,6 +2,6 @@
 '@tenphi/tasty': patch
 ---
 
-Keep development diagnostics and debug instrumentation disabled in production
-unless TASTY_DEBUG is enabled. Reusing server-rendered global styles no longer
-emits a warning.
+Preserve environment checks in the published package so production consumers
+do not enable development diagnostics or debug instrumentation by default.
+Keep the TASTY_DEBUG override available in production.

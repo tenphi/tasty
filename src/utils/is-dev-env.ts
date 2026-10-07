@@ -1,6 +1,6 @@
 /**
  * Check if we're in a development environment at runtime
- * The package build preserves NODE_ENV for the consuming app's bundler.
+ * Uses bracket notation to avoid bundler compilation
  * Also checks for TASTY_DEBUG localStorage setting
  */
 export function isDevEnv(): boolean {
@@ -23,6 +23,7 @@ export function isDevEnv(): boolean {
   // Check NODE_ENV for Node.js environments
   if (typeof process === 'undefined') return false;
 
-  const nodeEnv = process.env.NODE_ENV;
+  // Use bracket notation to avoid bundler replacement
+  const nodeEnv = process.env?.['NODE_ENV'];
   return nodeEnv !== 'test' && nodeEnv !== 'production';
 }

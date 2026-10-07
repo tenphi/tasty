@@ -12,6 +12,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
 
 const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 
@@ -181,6 +183,41 @@ for (const [mode, debug, expectedDevMode] of [
       /Recipe "missing-recipe" not found/,
       context,
     );
+  }
+}
+
+// The original runtime debug switch must also survive a consuming app's
+// production bundling and minification, with or without a process shim.
+const consumerBundle = await build({
+  stdin: {
+    contents: `
+      import { configure, getConfig, computeStyles } from './dist/core/index.js';
+      configure({ recipes: { existing: { display: 'block' } } });
+      computeStyles({ recipe: 'missing-recipe' });
+      globalThis.tastyConfig = getConfig();
+    `,
+    resolveDir: dirname(distDir),
+  },
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  write: false,
+  minify: true,
+  define: { 'process.env.NODE_ENV': '"production"' },
+});
+
+for (const processShim of [false, true]) {
+  for (const debug of [false, true]) {
+    const warnings = [];
+    const sandbox = {
+      ...(processShim ? { process: { env: { NODE_ENV: 'production' } } } : {}),
+      window: { localStorage: { getItem: () => (debug ? 'true' : null) } },
+      console: { warn: (...args) => warnings.push(args.join(' ')) },
+    };
+    runInNewContext(consumerBundle.outputFiles[0].text, sandbox);
+    const context = `Production browser, process shim=${processShim}, TASTY_DEBUG=${debug}`;
+    assert.equal(sandbox.tastyConfig.devMode, debug, context);
+    assert.equal(warnings.length, debug ? 1 : 0, context);
   }
 }
 

@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 3.9.10
+
+### Patch Changes
+
+- [#374](https://github.com/tenphi/tasty/pull/374) [`19b3932`](https://github.com/tenphi/tasty/commit/19b3932e30f663aa064540276b3c489336e9821a) Thanks [@tenphi](https://github.com/tenphi)! - Preserve environment checks in the published package so production consumers
+  do not enable development diagnostics or debug instrumentation by default.
+  Keep the TASTY_DEBUG override available in production.
+
 ## 3.9.9
 
 ### Patch Changes

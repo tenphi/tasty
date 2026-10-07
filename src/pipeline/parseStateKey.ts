@@ -924,8 +924,8 @@ export function parseStateKey(
   // inside `:is(...)` / `:has(...)` / `:not(...)` / `:where(...)`.
   //
   // Gated behind `isDevEnv()` because this is a developer-only aid.
-  // `isDevEnv()` uses bracket notation on `process.env` to survive
-  // tasty's own bundling and also returns `false` under `NODE_ENV=test`
+  // Tasty's package build preserves the environment check in `isDevEnv()`,
+  // which also returns `false` under `NODE_ENV=test`
   // / `NODE_ENV=production`, so the warning only fires in real dev.
   if (isDevEnv()) {
     INTERNAL_PSEUDO_PATTERN.lastIndex = 0;

@@ -44,6 +44,9 @@ const sharedConfig = {
     'next/navigation',
   ],
   platform: 'browser',
+  // Preserve the consumer's environment; the browser preset otherwise folds
+  // NODE_ENV to "development" while publishing the library.
+  define: { 'process.env.NODE_ENV': 'process.env.NODE_ENV' },
   target: 'es2022',
   sourcemap: true,
 } satisfies UserConfig;

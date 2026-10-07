@@ -7,6 +7,8 @@
  * points catches that class of packaging failure.
  */
 
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,6 +123,65 @@ function assertGraphOnlyLoads(entry, allowedPrefixes) {
 
 for (const entry of entries) {
   await import(new URL(`../dist/${entry}`, import.meta.url));
+}
+
+// Source tests cannot catch NODE_ENV being folded to "development" while the
+// package is built. Load the emitted runtime in fresh consumer processes.
+for (const [mode, debug, expectedDevMode] of [
+  ['production', false, false],
+  ['test', false, false],
+  ['development', false, true],
+  ['production', true, true],
+]) {
+  const result = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+          const warnings = [];
+          console.warn = (...args) => warnings.push(args.join(' '));
+          if (${debug}) {
+            globalThis.window = {
+              localStorage: { getItem: () => 'true' },
+            };
+          }
+          const { configure, getConfig, computeStyles } =
+            await import(${JSON.stringify(new URL('../dist/core/index.js', import.meta.url).href)});
+          configure({ recipes: { existing: { display: 'block' } } });
+          computeStyles({ recipe: 'missing-recipe' });
+          const recipeWarnings = [...warnings];
+          warnings.length = 0;
+          const { tastyStatic } =
+            await import(${JSON.stringify(new URL('../dist/static/index.js', import.meta.url).href)});
+          tastyStatic({ display: 'block' });
+          console.log(JSON.stringify({
+            devMode: getConfig().devMode,
+            recipeWarnings,
+            staticWarnings: warnings,
+          }));
+        `,
+      ],
+      { encoding: 'utf8', env: { ...process.env, NODE_ENV: mode } },
+    ),
+  );
+
+  const context = `NODE_ENV=${mode}, TASTY_DEBUG=${debug}`;
+  assert.equal(result.devMode, expectedDevMode, context);
+  assert.equal(result.recipeWarnings.length, expectedDevMode ? 1 : 0, context);
+  assert.equal(
+    result.staticWarnings.length,
+    mode === 'production' ? 0 : 1,
+    context,
+  );
+  if (expectedDevMode) {
+    assert.match(
+      result.recipeWarnings[0],
+      /Recipe "missing-recipe" not found/,
+      context,
+    );
+  }
 }
 
 assertGraphExcludes('static/index.js', [

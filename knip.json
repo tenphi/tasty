@@ -1,16 +1,16 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/**/*.test.{ts,tsx}",
     "src/**/*.bench.{ts,tsx}",
     "src/ssr/fixtures/**/astro.config.mjs",
     "src/ssr/fixtures/**/*.astro",
-    "scripts/**/*.mjs"
+    "scripts/**/*.{mjs,tsx}"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
     "src/ssr/fixtures/**/*.{astro,mjs}",
-    "scripts/**/*.mjs"
+    "scripts/**/*.{mjs,tsx}"
   ],
   "ignoreExportsUsedInFile": true
 }

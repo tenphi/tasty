@@ -41,6 +41,18 @@ Follow the ordered steps in [`.cursor/commands/submit-changes.md`](.cursor/comma
 6. **Commit** — Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`; optional scope). Keep the subject line short. Include the changeset file in the same commit.
 7. **Push** — Do not push to `main`. Confirm the current branch, then push with `git push -u origin HEAD`.
 
+## Dependency upgrades
+
+Follow [Dependency upgrades in CONTRIBUTING.md](CONTRIBUTING.md#dependency-upgrades).
+Select the newest compatible stable, non-deprecated release published at least
+**14 full days** ago. Verify npm publication timestamps and GitHub Actions release
+dates; record the cutoff, selected versions, and compatibility holds in the PR.
+Keep coupled packages in sync and review migrations before major upgrades. Keep
+the pnpm release-age checks and Dependabot cooldown enabled.
+Preserve consumer support: a tooling upgrade does not justify raising public
+peer minima, narrowing peer ranges, or raising the published Node requirement.
+Any necessary consumer support change must be called out and reviewed explicitly.
+
 ## Stack
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)

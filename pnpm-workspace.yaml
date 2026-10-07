@@ -1,3 +1,7 @@
+minimumReleaseAge: 20160 # 14 days, in minutes
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+
 allowBuilds:
   esbuild: false
   sharp: true

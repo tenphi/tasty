@@ -1,4 +1,3 @@
-/* eslint-disable tasty/known-property -- published plugin predates these logical category styles */
 import { render } from '@testing-library/react';
 
 import { resetConfig } from './config';

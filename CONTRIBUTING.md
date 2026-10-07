@@ -15,7 +15,8 @@ For security vulnerabilities, do **not** open a public issue — see [SECURITY.m
 
 ## Prerequisites
 
-- Node.js **20+**
+- Node.js **22.19+** on the 22.x line or **24.11+** on the 24.x line for repository tooling
+  (the published package supports Node.js **20+**)
 - pnpm **11+** (the project uses `packageManager: pnpm@11.x` in `package.json`)
 - Git
 
@@ -115,6 +116,42 @@ configure `forceTextInjection: true` and read it back with `getCSSText()`.
    ```
 7. **Commit and push.** Use clear, present-tense commit messages (`fix: …`, `feat: …`, `docs: …`). Conventional Commits aren't enforced, but they help.
 8. **Open a pull request** against `main`. Describe the motivation, the change, and any trade-offs. Link the related issue if there is one.
+
+## Dependency upgrades
+
+Choose the newest **compatible, stable, non-deprecated** release that has been
+published for at least **14 full days**. This applies to npm packages, the pinned
+pnpm version, and GitHub Actions. Verify npm's `time` metadata (for example,
+`pnpm view <package> time --json`) or the action's GitHub release publication date;
+do not infer age from a dependency PR's creation date or use an unreviewed
+`@latest` update.
+
+Record the UTC cutoff and the selected versions and publication dates in the PR.
+Review major-version migration guides, Node requirements, and peer dependencies.
+Upgrade coupled packages together (React and React DOM, Babel, Vitest and its
+browser provider, Astro and its React integration, and Size Limit plugins). If the
+newest mature version conflicts with the supported API or tooling, use the newest
+compatible release and explain the hold in the PR. Keep Node types aligned with
+the supported LTS tooling. A tooling upgrade does not justify raising public
+peer minima, narrowing peer ranges, or raising the published Node requirement.
+Preserve existing consumer ranges unless the package actually needs a newer
+version; any necessary support change must be explicit in the PR and changeset,
+with tests against the remaining supported versions. Check packed declarations
+against older supported React types as well as checking runtime compatibility.
+
+`pnpm-workspace.yaml` enforces 14 days (`minimumReleaseAge: 20160`) for direct and
+transitive npm dependencies, fails when no eligible version exists, and requires
+publication timestamps. Keep these checks enabled when refreshing the lockfile.
+Dependabot uses the same 14-day cooldown for version updates and groups coupled
+packages and other minor/patch updates to reduce PR noise. Dependabot security
+updates bypass its cooldown; an urgent fix requiring a younger npm release needs
+a documented, version-specific `minimumReleaseAgeExclude` exception reviewed in
+the PR. Remove that exception after the release matures.
+
+Run the full submit workflow, both test projects, and the CI checks (including
+the built-entrypoint, packed React compatibility, and test-only-code checks).
+Runtime/type dependency or generated-build changes need a changeset; tooling-only
+updates do not.
 
 ## Changesets
 

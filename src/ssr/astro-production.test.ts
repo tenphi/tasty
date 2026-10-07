@@ -12,7 +12,7 @@ const REPO_ROOT = resolve(__dirname, '../..');
 const FIXTURE = resolve(__dirname, 'fixtures/astro-extraction');
 const FIXTURE_CACHE = resolve(FIXTURE, '.astro');
 const FIXTURE_MODULE_CACHE = resolve(FIXTURE, 'node_modules');
-const ASTRO_BIN = resolve(REPO_ROOT, 'node_modules/astro/astro.js');
+const ASTRO_BIN = resolve(REPO_ROOT, 'node_modules/astro/bin/astro.mjs');
 
 afterEach(async () => {
   await Promise.all([

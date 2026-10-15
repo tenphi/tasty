@@ -1,5 +1,14 @@
 # @tenphi/tasty
 
+## 3.9.11
+
+### Patch Changes
+
+- [#377](https://github.com/tenphi/tasty/pull/377) [`bf90645`](https://github.com/tenphi/tasty/commit/bf90645dd7924944a52ce35fe5609058395034a5) Thanks [@tenphi](https://github.com/tenphi)! - Link source files and directories referenced by the shipped documentation to
+  GitHub. `src/` and `scripts/` are not published with the package, so the
+  relative links in `docs/pipeline.md` and `docs/runtime-benchmarks.md` were
+  broken for npm consumers and documentation sites built from the docs.
+
 ## 3.9.10
 
 ### Patch Changes

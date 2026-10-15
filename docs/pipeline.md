@@ -2,7 +2,7 @@
 
 This document describes the style rendering pipeline that transforms style objects into CSS rules. The pipeline ensures that each style value is applied to exactly one condition through exclusive condition building, boolean simplification, and intelligent CSS generation.
 
-**Implementation:** [`src/pipeline/`](../src/pipeline/) — TypeScript file names below are relative to that directory.
+**Implementation:** [`src/pipeline/`](https://github.com/tenphi/tasty/tree/main/src/pipeline) — TypeScript file names below are relative to that directory.
 
 ## Overview
 

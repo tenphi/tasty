@@ -80,9 +80,9 @@ cold cases. These benchmarks do not include React, DOM work, stylesheet
 injection, style resolution, layout, or paint.
 
 The benchmark sources are colocated with the code they exercise:
-[`pipeline.bench.ts`](../src/pipeline/pipeline.bench.ts),
-[`parseStateKey.bench.ts`](../src/pipeline/parseStateKey.bench.ts), and the
-parser benchmark files under [`src/parser`](../src/parser).
+[`pipeline.bench.ts`](https://github.com/tenphi/tasty/blob/main/src/pipeline/pipeline.bench.ts),
+[`parseStateKey.bench.ts`](https://github.com/tenphi/tasty/blob/main/src/pipeline/parseStateKey.bench.ts), and the
+parser benchmark files under [`src/parser`](https://github.com/tenphi/tasty/tree/main/src/parser).
 
 ## Empty Wrapper Overhead
 
@@ -91,7 +91,7 @@ Skipping the style pipeline does not make a `tasty()` component free. Even
 tracks another fiber, and Tasty still processes and forwards the element's
 props.
 
-[`tasty-overhead.bench.tsx`](../src/tasty-overhead.bench.tsx) compares 10,000
+[`tasty-overhead.bench.tsx`](https://github.com/tenphi/tasty/blob/main/src/tasty-overhead.bench.tsx) compares 10,000
 raw `<div className>` siblings with 10,000 instances of one module-scoped
 `tasty({})` component. Both receive the same props, and the benchmark fails if
 they do not produce equivalent DOM.
@@ -125,7 +125,7 @@ snapshot experiment with controlled garbage collection.
 
 ## Cold Generation and Injection
 
-[`tasty-injection.bench.ts`](../src/tasty-injection.bench.ts) measures the extra
+[`tasty-injection.bench.ts`](https://github.com/tenphi/tasty/blob/main/src/tasty-injection.bench.ts) measures the extra
 work when Tasty must generate and inject CSS that an otherwise equivalent page
 already has. It does not compare different stylesheet insertion techniques.
 
@@ -201,7 +201,7 @@ and dialogs open. Both paths go through the state-map and ref-counting
 machinery rather than the parser, so a regression in them is invisible to every
 other benchmark here.
 
-[`tasty-interaction.bench.tsx`](../src/tasty-interaction.bench.tsx) pairs each
+[`tasty-interaction.bench.tsx`](https://github.com/tenphi/tasty/blob/main/src/tasty-interaction.bench.tsx) pairs each
 case with a raw-DOM equivalent driven by a hand-written stylesheet that
 produces the same computed color and background in both states. The benchmark
 fails if either arm resolves to anything else, so an arm that quietly rendered
@@ -255,7 +255,7 @@ reopening a menu re-pays the React wrapper, not the style pipeline.
 ## Page-Load Cold Start
 
 Every benchmark above deliberately excludes the network, module compilation and
-the first render. [`scripts/cold-start`](../scripts/cold-start) measures exactly
+the first render. [`scripts/cold-start`](https://github.com/tenphi/tasty/tree/main/scripts/cold-start) measures exactly
 those: what a visitor waits for between requesting a page and seeing styled
 content, in a real Chromium under CDP network and CPU throttling.
 

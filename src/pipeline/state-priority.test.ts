@@ -484,6 +484,16 @@ describe('state map priority (checked against the browser cascade)', () => {
           '@media(w < 1px)': '4',
         },
       ],
+      // 150em is wider than 200px, though 150 < 200.
+      [
+        'media ranges in different units',
+        {
+          '': '1',
+          '@media(w < 150em)': '2',
+          '@media(w > 200px) & @media(w > 150em)': '3',
+          '@media(w > 200px) & alpha': '4',
+        },
+      ],
     ];
 
     // Keys in a sub-element's map read the root's states; `@own()` reads the
@@ -577,6 +587,9 @@ describe('state map priority (checked against the browser cascade)', () => {
       '@media(w < 99999px)',
       '@media(w < 1px)',
       '@media(1px < w < 99999px)',
+      '@media(w > 200px)',
+      '@media(w < 150em)',
+      '@media(w > 150em)',
       '@supports(display: grid)',
       '@supports(display: frobnicate)',
     ];

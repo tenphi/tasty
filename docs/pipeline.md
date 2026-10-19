@@ -618,7 +618,7 @@ Applies boolean algebra rules to reduce condition complexity and detect impossib
    - `A & (A | B) = A`
    - `A | (A & B) = A`
 
-7. **Range intersection**: For **media and container** dimension queries, impossible ranges simplify to `FALSE` (e.g. `@media(w > 400px) & @media(w < 300px)`). Ranges with compatible bounds are also merged in place (`w >= 400 & w <= 800` → a single bounded range).
+7. **Range intersection**: For **media and container** dimension queries, impossible ranges simplify to `FALSE` (e.g. `@media(w > 400px) & @media(w < 300px)`). Ranges with compatible bounds are also merged in place (`w >= 400 & w <= 800` → a single bounded range). Only bounds in the same unit are compared: `600px` and `40em` are never merged or found contradictory, because a query `em` follows the user's default font size. A bound with no numeric value (`calc(…)`) and a range whose two bounds use different units are left as they are.
 
 8. **Container style queries**: Conflicting or redundant `@container` style conditions on the same property can be reduced (see `simplify.ts` around the container-style conflict pass).
 

@@ -468,6 +468,32 @@ describe('generated CSS applies in the browser', () => {
       await page.viewport(900, 600);
       expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
     });
+
+    it('leaves em and px bounds for the browser to compare', async () => {
+      const Box = tasty({
+        qa: 'Box',
+        styles: {
+          display: 'block',
+          padding: {
+            '': '4x',
+            '@media(w < 40em)': '2x',
+            '@media(w < 600px)': '1x',
+          },
+        },
+      });
+
+      const { getByTestId } = render(<Box />);
+
+      // 40em is 640px at the default font size, so 620px is only `w < 40em`.
+      await page.viewport(620, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('16px');
+
+      await page.viewport(500, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('8px');
+
+      await page.viewport(900, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
+    });
   });
 
   /* eslint-disable tasty/prefer-custom-property-syntax --

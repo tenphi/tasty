@@ -2102,6 +2102,67 @@ describe('Integration: Exclusive conditions for media queries', () => {
   });
 });
 
+describe('query bounds in different units', () => {
+  // `em` in a query follows the user's default font size, so `40em` has no
+  // fixed place relative to `600px`: such bounds are never compared, merged,
+  // or found contradictory.
+  function rulesFor(color: Record<string, string>): [string, string[]][] {
+    return renderStyles({ color }, '.t').map((rule) => [
+      rule.declarations.split(';')[0],
+      rule.atRules ?? [],
+    ]);
+  }
+
+  it('keeps a branch that only an em bound separates from a px one', () => {
+    expect(
+      rulesFor({
+        '': 'red',
+        '@media(w < 40em)': 'green',
+        '@media(w < 600px)': 'blue',
+      }),
+    ).toEqual([
+      ['color: red', ['@media (not (width < 40em)) and (not (width < 600px))']],
+      ['color: green', ['@media (not (width < 600px)) and (width < 40em)']],
+      ['color: blue', ['@media (width < 600px)']],
+    ]);
+  });
+
+  it.each([
+    ['@media(w >= 600px) & @media(w < 40em)', '@media'],
+    ['@(w >= 600px) & @(w < 40em)', '@container'],
+  ])('does not treat %s as an empty range', (stateKey, atRule) => {
+    expect(rulesFor({ '': 'red', [stateKey]: 'blue' })).toContainEqual([
+      'color: blue',
+      [`${atRule} (width < 40em) and (width >= 600px)`],
+    ]);
+  });
+
+  it.each([
+    [
+      '@media(w > 600px) & @media(w > 40em)',
+      '(width > 40em) and (width > 600px)',
+    ],
+    [
+      '@media(w > 40x) & @media(w > 600px)',
+      '(width > 600px) and (width > calc(var(--gap) * 40))',
+    ],
+  ])('keeps both bounds of %s', (stateKey, query) => {
+    expect(rulesFor({ '': 'red', [stateKey]: 'blue' })).toContainEqual([
+      'color: blue',
+      [`@media ${query}`],
+    ]);
+  });
+
+  it('still merges and prunes bounds in one unit', () => {
+    expect(
+      rulesFor({ '': 'red', '@media(w > 400px) & @media(w > 600px)': 'blue' }),
+    ).toContainEqual(['color: blue', ['@media (width > 600px)']]);
+    expect(
+      rulesFor({ '': 'red', '@media(w >= 800px) & @media(w < 600px)': 'blue' }),
+    ).toEqual([['color: red', []]]);
+  });
+});
+
 describe('rule finalization', () => {
   it('deduplicates expanded selectors while keeping @starting rules last', () => {
     const result = renderStyles(

@@ -29,6 +29,7 @@ import {
   createRootCondition,
   falseCondition,
   getConditionUniqueId,
+  getRangeUnit,
   not,
   or,
   trueCondition,
@@ -417,9 +418,15 @@ function hasRangeContradiction(terms: ConditionNode[]): boolean {
 
   for (const term of terms) {
     if (term.kind !== 'state') continue;
+    if (term.type !== 'media' && term.type !== 'container') continue;
+    if (term.subtype !== 'dimension') continue;
 
-    if (term.type === 'media' && term.subtype === 'dimension') {
-      const key = term.dimension || 'width';
+    // Only bounds in the same unit can contradict each other.
+    const unit = getRangeUnit(term);
+    if (unit === null) continue;
+
+    if (term.type === 'media') {
+      const key = `${term.dimension || 'width'}|${unit}`;
       let group = mediaByDim.get(key);
       if (!group) {
         group = { positive: [], negated: [] };
@@ -432,8 +439,8 @@ function hasRangeContradiction(terms: ConditionNode[]): boolean {
       }
     }
 
-    if (term.type === 'container' && term.subtype === 'dimension') {
-      const key = `${term.containerName || '_'}:${term.dimension || 'width'}`;
+    if (term.type === 'container') {
+      const key = `${term.containerName || '_'}:${term.dimension || 'width'}|${unit}`;
       let group = containerByDim.get(key);
       if (!group) {
         group = { positive: [], negated: [] };
@@ -916,13 +923,16 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
 
   terms.forEach((term, index) => {
     if (term.kind !== 'state') return;
+    if (term.type !== 'media' && term.type !== 'container') return;
+    if (term.subtype !== 'dimension' || term.negated) return;
 
-    if (
-      term.type === 'media' &&
-      term.subtype === 'dimension' &&
-      !term.negated
-    ) {
-      const key = term.dimension || 'width';
+    // Only bounds in the same unit can be tightened into one range; the
+    // others stay as separate terms.
+    const unit = getRangeUnit(term);
+    if (unit === null) return;
+
+    if (term.type === 'media') {
+      const key = `${term.dimension || 'width'}|${unit}`;
       let group = mediaByDim.get(key);
       if (!group) {
         group = { conditions: [], indices: [] };
@@ -932,12 +942,8 @@ function mergeRanges(terms: ConditionNode[]): ConditionNode[] {
       group.indices.push(index);
     }
 
-    if (
-      term.type === 'container' &&
-      term.subtype === 'dimension' &&
-      !term.negated
-    ) {
-      const key = `${term.containerName || '_'}:${term.dimension || 'width'}`;
+    if (term.type === 'container') {
+      const key = `${term.containerName || '_'}:${term.dimension || 'width'}|${unit}`;
       let group = containerByDim.get(key);
       if (!group) {
         group = { conditions: [], indices: [] };

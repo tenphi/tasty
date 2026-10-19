@@ -442,6 +442,27 @@ describe('extractPropertiesFromStyles', () => {
   });
 });
 
+describe('extractPropertiesFromStyles with keyframe tokens', () => {
+  it('infers types for the custom properties keyframe steps set', () => {
+    const properties = extractPropertiesFromStyles({
+      animation: 'spin 1s',
+      '@keyframes': {
+        spin: {
+          from: { $angle: '0deg', '#glow': '#red' },
+          to: { $angle: '360deg' },
+        },
+      },
+    });
+
+    expect(properties.map((p) => p.css)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^@property --angle \{ syntax: "<angle>";/),
+        expect.stringMatching(/^@property --glow-color \{ syntax: "<color>";/),
+      ]),
+    );
+  });
+});
+
 describe('extractor namePrefix', () => {
   afterEach(() => {
     // Reset to default zero-runtime prefix between tests so other suites
@@ -472,5 +493,124 @@ describe('extractor namePrefix', () => {
 
   it('rejects an invalid prefix', () => {
     expect(() => setExtractorNamePrefix('1bad')).toThrow(/namePrefix/);
+  });
+});
+
+describe('extractStylesForSelector', () => {
+  it('wraps @starting values in @starting-style', () => {
+    const { css } = extractStylesForSelector('.toast', {
+      opacity: { '': 1, '@starting': 0 },
+      transition: 'opacity 0.2s',
+    });
+
+    expect(css).toBe(
+      '.toast { opacity: 1; transition: opacity 0.2s; }\n\n' +
+        '.toast { @starting-style { opacity: 0; } }',
+    );
+  });
+
+  it('emits local @keyframes under the name the animation is rewritten to', () => {
+    const { css } = extractStylesForSelector('.spinner', {
+      animation: 'spin 1s linear infinite',
+      '@keyframes': {
+        spin: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
+        },
+      },
+    });
+
+    const name = /@keyframes (\S+)/.exec(css)?.[1];
+    expect(name).toMatch(/^tsk[a-f0-9]{6}$/);
+    expect(css).toBe(
+      `@keyframes ${name} { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }\n\n` +
+        `.spinner { animation: ${name} 1s linear infinite; }`,
+    );
+  });
+
+  it('leaves animations without a local definition alone', () => {
+    const { css } = extractStylesForSelector('.spinner', {
+      animation: 'spin 1s linear infinite',
+    });
+
+    expect(css).toBe('.spinner { animation: spin 1s linear infinite; }');
+  });
+
+  it('leaves custom properties named like animation alone', () => {
+    const { css } = extractStylesForSelector('.spinner', {
+      '$my-animation': 'spin',
+      animation: 'spin 1s',
+      '@keyframes': { spin: { to: { opacity: 0 } } },
+    });
+
+    expect(css).toContain('--my-animation: spin;');
+    expect(css).toMatch(/[^-]animation: tsk[a-f0-9]{6} 1s;/);
+  });
+
+  it('leaves selectors that contain animation: alone', () => {
+    const { css } = extractStylesForSelector('.animation', {
+      animation: { '': 'spin 1s', ':hover': 'spin 2s' },
+      '@keyframes': { spin: { to: { opacity: 0 } } },
+    });
+
+    expect(css).toMatch(
+      /\.animation:where\(:not\(:hover\)\) \{ animation: tsk[a-f0-9]{6} 1s; \}/,
+    );
+    expect(css).toMatch(
+      /\.animation:where\(:hover\) \{ animation: tsk[a-f0-9]{6} 2s; \}/,
+    );
+  });
+
+  it('renames camelCase names and names after a stepped timing function', () => {
+    const { css } = extractStylesForSelector('.loader', {
+      animation: 'fadeIn 1s, 2s steps(4, end) spin',
+      '@keyframes': {
+        fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+        spin: { to: { opacity: 0 } },
+      },
+    });
+
+    const names = [...css.matchAll(/@keyframes (tsk[a-f0-9]{6})/g)].map(
+      (m) => m[1],
+    );
+    expect(names).toHaveLength(2);
+    expect(css).toContain(
+      `.loader { animation: ${names[0]} 1s, 2s steps(4, end) ${names[1]}; }`,
+    );
+  });
+
+  it('only renames whole animation names', () => {
+    const { css } = extractStylesForSelector('.spinner', {
+      animation: 'spin 1s, spin-fast 2s',
+      '@keyframes': { spin: { to: { opacity: 0 } } },
+    });
+
+    expect(css).toMatch(/animation: tsk[a-f0-9]{6} 1s, spin-fast 2s;/);
+  });
+
+  it('gives every item of a selector list the states and sub-elements', () => {
+    const { css } = extractStylesForSelector('.card, .panel', {
+      fill: { '': '#white', selected: '#blue' },
+      Icon: { color: '#red' },
+    });
+
+    expect(css).toContain(
+      '.card [data-element="Icon"], .panel [data-element="Icon"] {',
+    );
+    expect(css).toContain(
+      '.card:where([data-selected]), .panel:where([data-selected]) {',
+    );
+    expect(css).not.toMatch(/(?:^|\n)\.card, /);
+  });
+
+  it('joins root states to a :root selector', () => {
+    const { css } = extractStylesForSelector(':root', {
+      '#accent': { '': '#06f', '@root(scheme=dark)': '#49f' },
+    });
+
+    expect(css).toBe(
+      ':root:where(:not([data-scheme="dark"])) { --accent-color: #06f; }\n\n' +
+        ':root:where([data-scheme="dark"]) { --accent-color: #49f; }',
+    );
   });
 });

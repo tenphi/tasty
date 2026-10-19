@@ -1,3 +1,4 @@
+import { computeStyles } from '../compute-styles';
 import { configure, resetConfig } from '../config';
 import { getCSSText } from '../injector';
 
@@ -172,5 +173,132 @@ describe.each([
 
     host1.remove();
     host2.remove();
+  });
+});
+
+describe('useGlobalStyles in the CSS engine', () => {
+  const spinner = {
+    animation: 'gs-spin 1s linear infinite',
+    '@keyframes': {
+      'gs-spin': {
+        from: { transform: 'rotate(0deg)' },
+        to: { transform: 'rotate(360deg)' },
+      },
+    },
+  };
+
+  const elements: Element[] = [];
+  const element = (html: string) => {
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    document.body.append(host);
+    elements.push(host);
+    return host.firstElementChild as HTMLElement;
+  };
+  const keyframesNames = () =>
+    [...getCSSText().matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]);
+
+  beforeEach(() => {
+    resetConfig();
+    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+  });
+
+  afterEach(() => {
+    elements.splice(0).forEach((el) => el.remove());
+    document.documentElement.removeAttribute('data-gs-scheme');
+    document.head.querySelectorAll('[data-tasty]').forEach((el) => el.remove());
+    resetConfig();
+  });
+
+  it('applies states and sub-elements to every item of a selector list', () => {
+    useGlobalStyles('.gs-card, .gs-panel', {
+      fill: { '': 'rgb(1, 1, 1)', selected: 'rgb(2, 2, 2)' },
+      Icon: { color: 'rgb(3, 3, 3)' },
+    });
+
+    const card = element(
+      '<div class="gs-card"><i data-element="Icon"></i></div>',
+    );
+    const panel = element('<div class="gs-panel" data-selected></div>');
+
+    expect(getComputedStyle(card).backgroundColor).toBe('rgb(1, 1, 1)');
+    expect(getComputedStyle(panel).backgroundColor).toBe('rgb(2, 2, 2)');
+    expect(getComputedStyle(card.firstElementChild!).color).toBe(
+      'rgb(3, 3, 3)',
+    );
+    expect(getComputedStyle(card).color).not.toBe('rgb(3, 3, 3)');
+  });
+
+  it('defines root-state custom properties on the root itself', () => {
+    useGlobalStyles(':root', {
+      '$gs-gap': { '': '1px', '@root(gs-scheme=dark)': '2px' },
+    });
+    const gap = () =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--gs-gap')
+        .trim();
+
+    expect(gap()).toBe('1px');
+    document.documentElement.setAttribute('data-gs-scheme', 'dark');
+    expect(gap()).toBe('2px');
+  });
+
+  it('keeps @starting-style when a rejected list is split', () => {
+    // Blink rejects the `-moz-` item, which sends the rule down the split path.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* noop */
+    });
+    useGlobalStyles('.gs-fade::-moz-placeholder, .gs-fade', {
+      opacity: { '': 1, '@starting': 0 },
+    });
+    warn.mockRestore();
+
+    const css = getCSSText();
+    expect(css).toMatch(/\.gs-fade \{\s*@starting-style \{\s*opacity: 0;/);
+    expect(css).not.toMatch(/\.gs-fade \{\s*opacity: 0;/);
+  });
+
+  it('injects local @keyframes the rules animate', () => {
+    useGlobalStyles('.gs-spinner', spinner);
+
+    const [name] = keyframesNames();
+    expect(name).toMatch(/^gs-spin-\w+$/);
+    expect(
+      getComputedStyle(element('<i class="gs-spinner"></i>')).animationName,
+    ).toBe(name);
+  });
+
+  it('releases the keyframes with the slot, unless a class still animates them', () => {
+    useGlobalStyles('.gs-spinner', spinner, { id: 'gs-spinner' });
+    expect(keyframesNames()).toHaveLength(1);
+
+    useGlobalStyles('.gs-spinner', { opacity: 1 }, { id: 'gs-spinner' });
+    expect(keyframesNames()).toEqual([]);
+
+    computeStyles(spinner);
+    useGlobalStyles('.gs-spinner', spinner, { id: 'gs-spinner' });
+    useGlobalStyles('.gs-spinner', { opacity: 1 }, { id: 'gs-spinner' });
+    expect(keyframesNames()).toHaveLength(1);
+  });
+
+  it('defines configured root-state tokens and animates configured global styles', () => {
+    configure({
+      states: { '@gs-dark': '@root(gs-scheme=dark)' },
+      tokens: { '$gs-gap': { '': '1px', '@gs-dark': '2px' } },
+      globalStyles: { '.gs-configured': spinner },
+    });
+    computeStyles({ display: 'block' });
+
+    expect(
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--gs-gap')
+        .trim(),
+    ).toBe('1px');
+
+    const [name] = keyframesNames();
+    expect(name).toMatch(/^gs-spin-\w+$/);
+    expect(
+      getComputedStyle(element('<i class="gs-configured"></i>')).animationName,
+    ).toBe(name);
   });
 });

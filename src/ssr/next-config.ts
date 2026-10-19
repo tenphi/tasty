@@ -15,6 +15,7 @@ import type { TastyConfig } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { formatFunctionRule, parseFunctionName } from '../functions';
+import { resolveSelectorKeyframes } from '../keyframes';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { DEFAULT_PROPERTIES } from '../properties/defaults';
@@ -27,6 +28,7 @@ import { createServerStyleArtifact } from './artifacts';
 import type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 import { findUnsafeCSSResource } from './css-resources';
 import { formatGlobalRules } from './format-global-rules';
+import { formatKeyframesCSS } from './format-keyframes';
 import { formatPropertyCSS } from './format-property';
 
 const ENV_KEY = 'TASTY_NEXT_SHARED_CSS_HREF';
@@ -191,9 +193,19 @@ function collectSharedCSS(config: TastyConfig): string {
       append('global', '__global:tokens', formatGlobalRules(rules));
     }
 
+    const keyframeNames = new Set<string>();
     for (const [selector, styles] of Object.entries(normalized.globalStyles)) {
       if (Object.keys(styles).length === 0) continue;
-      const rules = renderStyles(styles, selector) as StyleResult[];
+      const { rules, keyframes } = resolveSelectorKeyframes(
+        styles,
+        renderStyles(styles, selector) as StyleResult[],
+        normalized.keyframes,
+      );
+      for (const [name, steps] of keyframes ?? []) {
+        if (keyframeNames.has(name)) continue;
+        keyframeNames.add(name);
+        append('keyframes', name, formatKeyframesCSS(name, steps));
+      }
       append('global', `__global:styles:${selector}`, formatGlobalRules(rules));
     }
 

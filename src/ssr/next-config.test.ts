@@ -158,6 +158,28 @@ describe('withTastyNext', () => {
     );
   });
 
+  it('emits the keyframes configured global styles animate, once', async () => {
+    const outputDir = await makeTempDir();
+    const result = withTastyNext({
+      outputDir,
+      publicPath: '/_tasty',
+      config: {
+        keyframes: { fade: { from: { opacity: 0 } } },
+        globalStyles: {
+          '.toast': { animation: 'fade 1s' },
+          '.banner': { animation: 'fade 2s' },
+        },
+      },
+    })({});
+    const filename = result.env?.TASTY_NEXT_SHARED_CSS_HREF?.split('/').at(-1);
+    const css = await readFile(join(outputDir, filename!), 'utf8');
+    const names = [...css.matchAll(/@keyframes (\S+)/g)].map((m) => m[1]);
+
+    expect(names).toEqual([expect.stringMatching(/^fade-\w+$/)]);
+    expect(css).toContain(`.toast { animation: ${names[0]} 1s; }`);
+    expect(css).toContain(`.banner { animation: ${names[0]} 2s; }`);
+  });
+
   it('loads a TypeScript config file', async () => {
     const root = await makeTempDir();
     const outputDir = 'public/generated/tasty';

@@ -1,11 +1,13 @@
 /**
- * Zero-runtime module for programmatic use.
+ * Zero-runtime module for programmatic use. Loads no React.
  *
  * For the Babel plugin, import from '@tenphi/tasty/babel-plugin'
  *
  * @example
  * ```typescript
- * import { extractStylesWithChunks, CSSWriter } from '@tenphi/tasty/zero';
+ * import { configure, extractStylesWithChunks, CSSWriter } from '@tenphi/tasty/zero';
+ *
+ * configure({ units: { x: 'var(--gap)' } });
  *
  * const chunks = extractStylesWithChunks({ fill: '#blue', padding: '2x' });
  * const writer = new CSSWriter('output.css');
@@ -13,6 +15,10 @@
  * writer.write();
  * ```
  */
+
+// Configuration (React-free)
+export { configure, resetConfig } from './configure';
+export type { TastyZeroConfig } from './babel-types';
 
 // Core extraction utilities
 export { extractStylesWithChunks, extractStylesForSelector } from './extractor';

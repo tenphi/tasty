@@ -50,6 +50,34 @@ describe('SSR/client parity for local keyframes', () => {
     expect(server.css).toContain(serverName);
   });
 
+  it('animates a camelCase name under its resolved name', () => {
+    const { css } = serverRender([
+      {
+        animation: 'fadeIn 1s',
+        '@keyframes': { fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } } },
+      } as never,
+    ]);
+
+    const name = /@keyframes\s+(fadeIn-[a-z0-9]+)/.exec(css)?.[1];
+    expect(name).toBeDefined();
+    expect(css).toContain(`animation: ${name} 1s;`);
+  });
+
+  it('finds the name after a timing function with commas', () => {
+    const { css } = serverRender([
+      {
+        animation: '1s steps(4, end) spin',
+        '@keyframes': {
+          spin: { from: { rotate: '0deg' }, to: { rotate: '360deg' } },
+        },
+      } as never,
+    ]);
+
+    const name = /@keyframes\s+(spin-[a-z0-9]+)/.exec(css)?.[1];
+    expect(name).toBeDefined();
+    expect(css).toContain(`animation: 1s steps(4, end) ${name};`);
+  });
+
   it('keeps two different definitions apart on both sides', () => {
     const server = serverRender([FADE, OTHER_FADE]);
 

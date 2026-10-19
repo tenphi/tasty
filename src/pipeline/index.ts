@@ -32,7 +32,10 @@ import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 import { isSelector } from '../utils/is-selector';
-import { splitSelectorsSafely } from '../utils/selector-transform';
+import {
+  rootStateIndex,
+  splitSelectorsSafely,
+} from '../utils/selector-transform';
 import { toSnakeCase } from '../utils/string';
 import type {
   StyleHandler,
@@ -62,7 +65,8 @@ import {
   mergeVariantsIntoSelectorGroups,
   optimizeGroups,
   parentGroupsToCSS,
-  rootGroupsToCSS,
+  rootGroupsToStateCSS,
+  rootStateToPrefix,
   selectorGroupToCSS,
   wrapWhere,
 } from './materialize';
@@ -1227,6 +1231,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
       variants: SelectorVariant[];
       atRules: string[];
       rootPrefix?: string;
+      rootState?: string;
       startingStyle?: boolean;
     }
   >();
@@ -1234,7 +1239,9 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   for (const variant of components.variants) {
     const atRules = buildAtRulesFromVariant(variant);
     const startingStyle = variant.startingStyle;
-    const rootPrefix = rootGroupsToCSS(variant.rootGroups);
+    const rootState = rootGroupsToStateCSS(variant.rootGroups);
+    const rootPrefix =
+      rootState === undefined ? undefined : rootStateToPrefix(rootState);
     const key =
       atRules.sort().join('|||') +
       '###' +
@@ -1250,6 +1257,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
         variants: [variant],
         atRules,
         rootPrefix,
+        rootState,
         startingStyle: startingStyle || undefined,
       });
     }
@@ -1283,6 +1291,7 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
 
     if (group.rootPrefix) {
       cssRule.rootPrefix = group.rootPrefix;
+      cssRule.rootState = group.rootState;
     }
 
     if (group.startingStyle) {
@@ -1404,6 +1413,13 @@ export function renderStyles(
   if (directSelector) {
     const shouldDouble = options?.doubleSelector ?? false;
 
+    // Every item of a selector list gets the states and sub-elements, not
+    // just the last one a plain suffix would land on.
+    const items = splitSelectorsSafely(classNameOrSelector);
+    const bases = (items.length > 0 ? items : [classNameOrSelector]).map(
+      (base) => ({ base, rootAt: rootStateIndex(base) }),
+    );
+
     const results = rules.map((rule): StyleResult => {
       // Handle selector as array (OR conditions) or string
       const selectorParts = Array.isArray(rule.selector)
@@ -1413,28 +1429,33 @@ export function renderStyles(
           : [''];
 
       const finalSelector = selectorParts
-        .map((part) => {
-          let sel = part
-            ? `${classNameOrSelector}${part}`
-            : classNameOrSelector;
+        .flatMap((part) =>
+          bases.map(({ base, rootAt }) => {
+            // A selector that is itself the root takes root states directly:
+            // as an ancestor prefix they would ask for a root inside the root.
+            const joinsRoot = rule.rootState !== undefined && rootAt !== -1;
+            let sel = joinsRoot
+              ? `${base.slice(0, rootAt)}${wrapWhere(rule.rootState!)}${base.slice(rootAt)}${part}`
+              : `${base}${part}`;
 
-          // Double class selector for increased specificity if requested
-          // This is used when the caller explicitly wants higher specificity
-          if (shouldDouble && sel.startsWith('.')) {
-            const classMatch = sel.match(/^\.[a-zA-Z_-][a-zA-Z0-9_-]*/);
-            if (classMatch) {
-              const baseClass = classMatch[0];
-              sel = baseClass + sel;
+            // Double class selector for increased specificity if requested
+            // This is used when the caller explicitly wants higher specificity
+            if (shouldDouble && sel.startsWith('.')) {
+              const classMatch = sel.match(/^\.[a-zA-Z_-][a-zA-Z0-9_-]*/);
+              if (classMatch) {
+                const baseClass = classMatch[0];
+                sel = baseClass + sel;
+              }
             }
-          }
 
-          // Handle root prefix for this selector
-          if (rule.rootPrefix) {
-            sel = `${rule.rootPrefix} ${sel}`;
-          }
+            // Handle root prefix for this selector
+            if (rule.rootPrefix && !joinsRoot) {
+              sel = `${rule.rootPrefix} ${sel}`;
+            }
 
-          return sel;
-        })
+            return sel;
+          }),
+        )
         .join(', ');
 
       const result: StyleResult = {

@@ -105,6 +105,8 @@ tastyStatic('body', {
 });
 ```
 
+The selector can be a list (`'.uni-checkbox, uni-checkbox'`): every item gets the states and sub-elements. Local `@keyframes` and `@starting` states work as in `tastyStatic(styles)`.
+
 ---
 
 ## StaticStyle Object
@@ -296,6 +298,37 @@ The generated CSS file (e.g. `public/tasty.css`) is created as an empty stub bef
 ```gitignore
 public/tasty.css
 ```
+
+---
+
+## Programmatic API
+
+`@tenphi/tasty/zero` turns styles into CSS in Node without Babel or React — for build scripts, or CSS shipped to other frameworks:
+
+```ts
+import {
+  configure,
+  extractStylesForSelector,
+  extractStylesWithChunks,
+} from '@tenphi/tasty/zero';
+
+configure({
+  units: { u: 'var(--unit)' },
+  states: { '@dark': '@root(schema=dark)' },
+});
+
+extractStylesForSelector('.card', { padding: '2u', fill: '#surface' }).css;
+// → '.card { padding: calc(2 * var(--unit)); background-color: … }'
+
+extractStylesWithChunks({ display: 'flex', gap: '1u' });
+// → [{ className: 'ts…', css: '.ts….ts… { … }' }]
+```
+
+`configure()` takes the same options as the Babel plugin's `config` (see [Plugin Options](#plugin-options)) and replaces the previous configuration on each call; `resetConfig()` returns to the defaults. Options that shape the extracted rules apply — `states`, `units`, parse `functions`, `handlers`, `replaceTokens`, `recipes`, `plugins`, `namePrefix`. Definitions that become at-rules or global CSS of their own are not emitted: `tokens`, `globalStyles`, `fontFaces`, `counterStyles`, `properties` and `$$` `@function` definitions. Render tokens and global styles with `extractStylesForSelector(':root', tokens)` and `extractStylesForSelector(selector, styles)`.
+
+The configuration is process-wide and shared with the Babel plugin and the runtime `configure()` from `@tenphi/tasty`. The extractors re-apply their own configuration when the Babel plugin replaced it, but not after a runtime `configure()` — don't mix the runtime and build-time configuration in one process.
+
+`extractStylesForSelector()` output starts with the `@keyframes` its rules animate — local `@keyframes` and configured `keyframes` — under hashed names the `animation` declarations are rewritten to. `extractStylesWithChunks()` returns class rules only.
 
 ---
 

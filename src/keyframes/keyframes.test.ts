@@ -180,6 +180,30 @@ describe('Keyframes Utilities', () => {
       );
     });
 
+    it('should read a timing function with commas as one token', () => {
+      // The `end` in `steps(4, end)` is part of the timing function, and its
+      // comma does not start a new animation.
+      expect(
+        extractAnimationNamesFromStyles({
+          animation: 'spin 1s steps(4, end) infinite',
+        }),
+      ).toEqual(new Set(['spin']));
+      expect(
+        extractAnimationNamesFromStyles({
+          animation:
+            '1s steps(4, jump-start) spin, 2s cubic-bezier(0.1, 0.7, 1, 0.1) fadeIn',
+        }),
+      ).toEqual(new Set(['spin', 'fadeIn']));
+    });
+
+    it('should not read a name out of a function or a custom property', () => {
+      expect(
+        extractAnimationNamesFromStyles({
+          animation: 'var(--motion) 1s, $duration ease-in',
+        }),
+      ).toEqual(new Set());
+    });
+
     it('should collect nested animation names without duplicates', () => {
       const styles: Styles = {
         animation: 'fadeIn 300ms',

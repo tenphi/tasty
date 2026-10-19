@@ -7,7 +7,17 @@ import { transformSync } from '@babel/core';
 import { resetConfig } from '../config';
 
 import babelPlugin from './babel';
+import {
+  configure as configureZeroApi,
+  resetConfig as resetZeroApi,
+} from './index';
 import { clearWriterCache } from './writer-cache';
+
+/** Configure the shared engine the way the programmatic `/zero` API does. */
+function configureZeroElsewhere(): void {
+  configureZeroApi({ units: { u: '100px' } });
+  resetZeroApi();
+}
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'tasty-babel-test-'));
@@ -256,6 +266,34 @@ const button = tastyStatic({
       expect(css).toContain('block');
     });
 
+    it('should animate camelCase and stepped local keyframes under their hashed names', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const card = tastyStatic({
+  animation: 'fadeIn 1s, 2s steps(4, end) spin',
+  '@keyframes': {
+    fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+    spin: { from: { opacity: 0.5 }, to: { opacity: 1 } },
+  },
+});
+`;
+
+      transformCode(code, { output: outputPath });
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      const names = [...css.matchAll(/@keyframes (tsk[a-f0-9]+)/g)].map(
+        (m) => m[1],
+      );
+
+      expect(names).toHaveLength(2);
+      expect(css).toContain(
+        `animation: ${names[0]} 1s, 2s steps(4, end) ${names[1]};`,
+      );
+    });
+
     it('should prefer config over configFile when both are set', () => {
       const configPath = path.join(tempDir, 'tasty-zero.config.ts');
       const outputPath = path.join(tempDir, 'output.css');
@@ -501,6 +539,160 @@ tastyStatic('html', { margin: 0 });
       expect(css2).toContain('margin');
       // New token from updated config is present
       expect(css2).toContain('--gap');
+    });
+  });
+  describe('selector mode', () => {
+    let tempDir: string;
+    let outputPath: string;
+
+    beforeEach(() => {
+      tempDir = createTempDir();
+      outputPath = path.join(tempDir, 'output.css');
+    });
+
+    afterEach(() => {
+      clearWriterCache();
+      resetConfig();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    const keyframesIn = (css: string) =>
+      [...css.matchAll(/@keyframes (\S+)/g)].map((m) => m[1]);
+
+    it('emits the animated keyframes once and keeps @starting-style', () => {
+      transformCode(
+        `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('.spinner', {
+  animation: 'spin 1s linear infinite',
+  opacity: { '': 1, '@starting': 0 },
+  '@keyframes': { spin: { to: { transform: 'rotate(360deg)' } } },
+});
+`,
+        { output: outputPath },
+      );
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      const names = keyframesIn(css);
+
+      expect(names).toEqual([expect.stringMatching(/^tsk[a-f0-9]{6}$/)]);
+      expect(css).toContain(`animation: ${names[0]} 1s linear infinite;`);
+      expect(css).toContain('.spinner { @starting-style { opacity: 0; } }');
+    });
+
+    it('emits keyframes animated by configured global styles', () => {
+      // The CSS file is written once a file contributes styles of its own.
+      transformCode(
+        `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('body', { margin: 0 });
+`,
+        {
+          output: outputPath,
+          config: {
+            keyframes: { fade: { from: { opacity: 0 } } },
+            globalStyles: {
+              '.toast': { animation: 'fade 1s' },
+              '.spinner': {
+                animation: 'spin 1s',
+                '@keyframes': { spin: { to: { transform: 'rotate(1turn)' } } },
+              },
+            },
+          },
+        },
+      );
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      const names = keyframesIn(css);
+
+      expect(names).toHaveLength(2);
+      expect(css).toContain(`.toast { animation: ${names[0]} 1s; }`);
+      expect(css).toContain(`.spinner { animation: ${names[1]} 1s; }`);
+    });
+
+    it('emits keyframes shared by several sources once', () => {
+      transformCode(
+        `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const toast = tastyStatic({ animation: 'fade 1s' });
+`,
+        {
+          output: outputPath,
+          config: {
+            keyframes: { fade: { from: { opacity: 0 } } },
+            globalStyles: {
+              '.toast': { animation: 'fade 1s' },
+              '.banner': { animation: 'fade 3s' },
+            },
+          },
+        },
+      );
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+
+      const names = keyframesIn(css);
+
+      expect(names).toEqual([expect.stringMatching(/^tsk[a-f0-9]{6}$/)]);
+      expect(css).toContain(`.toast { animation: ${names[0]} 1s; }`);
+      expect(css).toContain(`.banner { animation: ${names[0]} 3s; }`);
+    });
+
+    it('re-applies its config when other configuration replaced it', () => {
+      const options = {
+        output: outputPath,
+        config: { units: { u: '4px' } },
+      };
+      transformCode(
+        `
+import { tastyStatic } from '@tenphi/tasty/static';
+tastyStatic('.a', { padding: '2u' });
+`,
+        options,
+      );
+
+      configureZeroElsewhere();
+
+      transformCode(
+        `
+import { tastyStatic } from '@tenphi/tasty/static';
+tastyStatic('.b', { padding: '2u' });
+`,
+        options,
+      );
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      expect(css).toContain('.a { padding: 8px; }');
+      expect(css).toContain('.b { padding: 8px; }');
+    });
+
+    it('drops units and states removed by a config change', () => {
+      const configPath = path.join(tempDir, 'tasty-zero.config.ts');
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+tastyStatic('.card', { padding: { '': '2u', '@narrow': '1u' } });
+`;
+
+      fs.writeFileSync(
+        configPath,
+        `export default { units: { u: '4px' }, states: { '@narrow': '@media(w < 600px)' } };`,
+      );
+      transformCode(code, { output: outputPath, configFile: configPath });
+      const before = fs.readFileSync(outputPath, 'utf-8');
+      expect(before).toContain('padding: 8px;');
+      expect(before).toContain('@media (width < 600px)');
+
+      fs.writeFileSync(configPath, `export default {};`);
+      const later = new Date(Date.now() + 1000);
+      fs.utimesSync(configPath, later, later);
+      transformCode(code, { output: outputPath, configFile: configPath });
+      const after = fs.readFileSync(outputPath, 'utf-8');
+
+      expect(after).not.toContain('8px');
+      expect(after).not.toContain('@media (width < 600px)');
     });
   });
 });

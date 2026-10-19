@@ -102,6 +102,56 @@ function createAncillaryStyles(): Styles {
   };
 }
 
+describe('computeStyles animation names', () => {
+  afterEach(() => {
+    destroy();
+  });
+
+  it.each(['runtime', 'ssr'] as const)(
+    'animates camelCase keyframes after a stepped timing function through %s',
+    (path) => {
+      const collector = path === 'ssr' ? new ServerStyleCollector() : null;
+      const result = computeStyles(
+        {
+          animation: 'fadeIn 1s steps(4, end), 2s steps(2, start) slideUp',
+          '@keyframes': {
+            fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+            slideUp: { from: { opacity: 0.5 }, to: { opacity: 1 } },
+          },
+        } as Styles,
+        collector ? { ssrCollector: collector } : undefined,
+      );
+      const sheet = document.createElement('style');
+      if (collector) sheet.textContent = collector.getCSS();
+      document.head.append(sheet);
+
+      const el = document.createElement('div');
+      el.className = result.className;
+      document.body.append(el);
+
+      try {
+        const names = getComputedStyle(el).animationName.split(', ');
+        expect(names).toEqual([
+          expect.stringMatching(/^fadeIn-/),
+          expect.stringMatching(/^slideUp-/),
+        ]);
+
+        const defined = [
+          ...document.styleSheets,
+          ...document.adoptedStyleSheets,
+        ]
+          .flatMap((s) => [...s.cssRules])
+          .filter((rule) => rule instanceof CSSKeyframesRule)
+          .map((rule) => (rule as CSSKeyframesRule).name);
+        expect(defined).toEqual(expect.arrayContaining(names));
+      } finally {
+        el.remove();
+        sheet.remove();
+      }
+    },
+  );
+});
+
 describe('computeStyles with root option', () => {
   let host: HTMLDivElement;
   let shadowRoot: ShadowRoot;

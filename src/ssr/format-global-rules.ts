@@ -12,7 +12,7 @@ import type { StyleResult } from '../pipeline';
  * Format an array of global StyleResult rules into a CSS text string.
  *
  * Rules already have their full selectors applied by renderStyles().
- * Handles rootPrefix prepending and at-rule wrapping.
+ * Handles rootPrefix prepending, `@starting-style` and at-rule wrapping.
  */
 export function formatGlobalRules(rules: StyleResult[]): string {
   if (rules.length === 0) return '';
@@ -24,7 +24,10 @@ export function formatGlobalRules(rules: StyleResult[]): string {
       ? `${rule.rootPrefix} ${rule.selector}`
       : rule.selector;
 
-    const baseRule = `${selector} { ${rule.declarations} }`;
+    const innerContent = rule.startingStyle
+      ? `@starting-style { ${rule.declarations} }`
+      : rule.declarations;
+    const baseRule = `${selector} { ${innerContent} }`;
 
     let fullRule = baseRule;
     if (rule.atRules && rule.atRules.length > 0) {

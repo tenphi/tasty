@@ -19,11 +19,13 @@ import {
   getGlobalCounterStyles,
   getGlobalFontFaces,
   getGlobalFunctions,
+  getGlobalKeyframes,
   getGlobalStyles,
   mergeGlobalConfigTokens,
   mergeGlobalCounterStyles,
   mergeGlobalFontFaces,
   mergeGlobalFunctions,
+  mergeGlobalKeyframes,
   mergeGlobalProperties,
   mergeGlobalStyles,
   resetConfigResources,
@@ -40,6 +42,7 @@ import { resetStyleChunks } from './chunks/style-chunk-map';
 import type { PropHandlerDefinition } from './prop-handlers';
 import { registerPropHandler, resetPropHandlers } from './prop-handlers';
 import { StyleInjector } from './injector/injector';
+import { resolveSelectorKeyframes } from './keyframes';
 import { clearPipelineCache, renderStyles } from './pipeline';
 import { resetHandlers } from './styles/predefined';
 import {
@@ -569,9 +572,6 @@ function warnOnce(key: string, message: string): void {
 // Current configuration (null until first configure() or auto-configured on first use)
 let currentConfig: TastyConfig | null = null;
 
-// Global keyframes storage (null = no keyframes configured, empty object checked via hasGlobalKeyframes)
-let globalKeyframes: Record<string, KeyframesSteps> | null = null;
-
 // Global recipes storage (null = no recipes configured)
 let globalRecipes: Record<string, RecipeStyles> | null = null;
 
@@ -715,8 +715,17 @@ export function markStylesGenerated(): void {
   if (configuredGlobalStyles) {
     for (const [selector, styles] of Object.entries(configuredGlobalStyles)) {
       if (Object.keys(styles).length > 0) {
-        const rules = renderStyles(styles, selector) as StyleResult[];
-        if (rules.length > 0) {
+        const rendered = renderStyles(styles, selector) as StyleResult[];
+        if (rendered.length > 0) {
+          const { rules, keyframes } = resolveSelectorKeyframes(
+            styles,
+            rendered,
+            getGlobalKeyframes(),
+          );
+          // Held for good, like the global rules that animate them.
+          for (const [name, steps] of keyframes ?? []) {
+            injector.keyframes(steps, { name, distinctByName: true });
+          }
           injector.injectGlobal(rules);
         }
       }
@@ -741,23 +750,15 @@ export function resetStylesGenerated(): void {
 // Global Keyframes Management
 // ============================================================================
 
-let _hasGlobalKeyframes = false;
-
 /**
  * Check if any global keyframes are configured.
- * Uses a pre-computed flag to avoid Object.keys() allocation on every call.
+ * Storage only ever holds a non-empty record, so no Object.keys() is needed.
  */
 export function hasGlobalKeyframes(): boolean {
-  return _hasGlobalKeyframes;
+  return getGlobalKeyframes() !== null;
 }
 
-/**
- * Get global keyframes configuration.
- * Returns null if no keyframes configured (fast path for zero-overhead).
- */
-export function getGlobalKeyframes(): Record<string, KeyframesSteps> | null {
-  return globalKeyframes;
-}
+export { getGlobalKeyframes } from './config-resources';
 
 /**
  * Set global keyframes (called from configure).
@@ -772,8 +773,7 @@ function setGlobalKeyframes(keyframes: Record<string, KeyframesSteps>): void {
     );
     return;
   }
-  globalKeyframes = { ...(globalKeyframes ?? {}), ...keyframes };
-  _hasGlobalKeyframes = Object.keys(globalKeyframes).length > 0;
+  mergeGlobalKeyframes(keyframes);
 }
 
 // ============================================================================
@@ -1186,8 +1186,6 @@ export function getGlobalInjector(): StyleInjector {
 export function resetConfig(): void {
   resetStylesGeneratedState();
   currentConfig = null;
-  globalKeyframes = null;
-  _hasGlobalKeyframes = false;
   resetGlobalPolyfillsState();
   globalRecipes = null;
   resetConfigResources();

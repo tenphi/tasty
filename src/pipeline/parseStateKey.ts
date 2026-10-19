@@ -962,7 +962,8 @@ export function parseStateKey(
 }
 
 /**
- * Clear the parse cache (for testing)
+ * Clear the parse cache. Needed whenever global state aliases change, since
+ * cached results do not key on them (tests, build-time configuration reset).
  */
 export function clearParseCache(): void {
   parseCache.clear();

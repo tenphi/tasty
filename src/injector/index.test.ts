@@ -247,27 +247,21 @@ describe('Global Style Injector API', () => {
         .map((el) => el.textContent || '')
         .join('');
 
-      // All base-state tokens should appear in a single :root rule
-      const rootMatches = allCssText.match(/:root\s*\{[^}]*\}/g) || [];
-      const baseRootRules = rootMatches.filter(
-        (r) => !r.includes('data-theme'),
-      );
+      // Each state's tokens share one rule on the root itself (not three
+      // separate blocks, and not a `:root` nested under a root ancestor)
+      const rootRules = (selector: string) =>
+        allCssText
+          .split('\n')
+          .filter((rule) => rule.startsWith(`${selector} {`));
 
-      // There should be exactly one :root { ... } block containing all three tokens
-      // (not three separate :root blocks)
-      const combinedBase = baseRootRules.find(
-        (r) =>
-          r.includes('--gap-sm') &&
-          r.includes('--gap-md') &&
-          r.includes('--gap-lg'),
-      );
-      expect(combinedBase).toBeDefined();
-
-      // All dark-state tokens should also be grouped
-      expect(allCssText).toContain('[data-theme="dark"]');
-      expect(allCssText).toContain('2px');
-      expect(allCssText).toContain('4px');
-      expect(allCssText).toContain('8px');
+      expect(rootRules(':root:where(:not([data-theme="dark"]))')).toEqual([
+        expect.stringMatching(
+          /--gap-sm: 4px;.*--gap-md: 8px;.*--gap-lg: 16px;/,
+        ),
+      ]);
+      expect(rootRules(':root:where([data-theme="dark"])')).toEqual([
+        expect.stringMatching(/--gap-sm: 2px;.*--gap-md: 4px;.*--gap-lg: 8px;/),
+      ]);
     });
 
     it('should handle same key in both tokens and replaceTokens without error', () => {

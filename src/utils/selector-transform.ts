@@ -31,6 +31,107 @@ export function transformSelectorContent(content: string): string {
   );
 }
 
+/** The `html` type selector at the start of a compound. */
+const HTML_TYPE_RE = /^html(?![\w\-|\\\u0080-\uffff])/i;
+
+/** Legacy single-colon pseudo-elements, which end a compound like `::x`. */
+const LEGACY_PSEUDO_ELEMENT_RE = /^:(?:before|after|first-line|first-letter)$/i;
+
+/**
+ * Where a state segment for the root element goes in `selector`, when
+ * `selector` is a single compound that can only match the root: one carrying
+ * a top-level `:root`, the `html` type selector, or an `:is()` / `:where()`
+ * whose every argument is such a compound. The index is before any
+ * pseudo-element, so `html::before` takes states as `html:where(…)::before`.
+ *
+ * Returns -1 for anything else — a compound that may match other elements, or
+ * a complex selector, whose root is an ancestor rather than the subject.
+ *
+ * @example
+ * rootStateIndex(':root')          // → 5
+ * rootStateIndex('html.dark')      // → 9
+ * rootStateIndex(':where(:root)')  // → 13
+ * rootStateIndex('html::before')   // → 4
+ * rootStateIndex('body')           // → -1
+ * rootStateIndex(':root .card')    // → -1
+ */
+export function rootStateIndex(selector: string): number {
+  // `html|x` is a namespaced type and `html\.x` an escaped name, not `html`.
+  let isRoot = HTML_TYPE_RE.test(selector);
+  let pseudoElementAt = -1;
+  let squareDepth = 0;
+  let parenDepth = 0;
+  let quote = '';
+  // Where a top-level `:is(` / `:where(` opens, and where its arguments start.
+  let rootFunctionParen = -1;
+  let rootFunctionArgs = -1;
+
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i];
+
+    if (char === '\\') {
+      i++;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (char === '[') squareDepth++;
+    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (char === '(') {
+      if (i === rootFunctionParen && parenDepth === 0) rootFunctionArgs = i + 1;
+      parenDepth++;
+    } else if (char === ')') {
+      parenDepth = Math.max(0, parenDepth - 1);
+      if (parenDepth === 0 && rootFunctionArgs !== -1) {
+        // `:where(:root)` matches only the root when every argument does.
+        const args = splitSelectorsSafely(selector.slice(rootFunctionArgs, i));
+        if (
+          args.length > 0 &&
+          args.every((arg) => rootStateIndex(arg) === arg.length)
+        ) {
+          isRoot = true;
+        }
+        rootFunctionArgs = -1;
+      }
+    }
+
+    if (squareDepth > 0 || parenDepth > 0) continue;
+
+    // A combinator (or a comment, which may hide one) makes the root an
+    // ancestor of the subject, not the subject.
+    if (/[\s>+~,]/.test(char) || (char === '/' && selector[i + 1] === '*')) {
+      return -1;
+    }
+
+    if (char !== ':' || pseudoElementAt !== -1) continue;
+
+    if (selector[i + 1] === ':') {
+      pseudoElementAt = i;
+      continue;
+    }
+
+    const name = (/^:[\w-]+/.exec(selector.slice(i))?.[0] ?? '').toLowerCase();
+    if (name === ':root') isRoot = true;
+    else if (LEGACY_PSEUDO_ELEMENT_RE.test(name)) pseudoElementAt = i;
+    else if (
+      (name === ':is' || name === ':where') &&
+      selector[i + name.length] === '('
+    ) {
+      rootFunctionParen = i + name.length;
+    }
+  }
+
+  if (!isRoot) return -1;
+  return pseudoElementAt === -1 ? selector.length : pseudoElementAt;
+}
+
 /** Split a CSS selector list at commas outside strings, brackets, and functions. */
 export function splitSelectorsSafely(selectorList: string): string[] {
   if (!selectorList.includes(',')) {

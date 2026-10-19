@@ -1,5 +1,7 @@
-import { getConfig } from '../config';
+import { getConfig, getGlobalInjector, getGlobalKeyframes } from '../config';
 import { injectGlobal } from '../injector';
+import type { KeyframesSteps } from '../injector/types';
+import { resolveSelectorKeyframes } from '../keyframes';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
 import { getStyleTarget, pushRSCCSS } from '../rsc-cache';
@@ -8,6 +10,7 @@ import {
   collectAutoInferredPropertiesRSC,
 } from '../ssr/collect-auto-properties';
 import { formatGlobalRules } from '../ssr/format-global-rules';
+import { formatKeyframesCSS } from '../ssr/format-keyframes';
 import type { Styles } from '../styles/types';
 import { createClientState } from '../utils/client-state';
 import { hashString } from '../utils/hash';
@@ -106,9 +109,9 @@ export function useGlobalStyles(
 
   const resolvedStyles = resolveRecipes(styles);
 
-  const styleResults = renderStyles(resolvedStyles, selector) as StyleResult[];
+  const rendered = renderStyles(resolvedStyles, selector) as StyleResult[];
 
-  if (styleResults.length === 0) {
+  if (rendered.length === 0) {
     // An update that renders no CSS must still clear the slot's previous
     // injection, otherwise the stale rules keep applying to the selector.
     if (slots) {
@@ -118,8 +121,25 @@ export function useGlobalStyles(
     return;
   }
 
+  // Animated rules name keyframes that have to exist: emit them under the
+  // resolved names the class path uses, and point the rules at those names.
+  const { rules: styleResults, keyframes } = resolveSelectorKeyframes(
+    resolvedStyles,
+    rendered,
+    getGlobalKeyframes(),
+  );
+
   if (target.mode === 'ssr') {
     target.collector.collectInternals();
+
+    if (keyframes) {
+      for (const [name, steps] of keyframes) {
+        target.collector.collectKeyframes(
+          name,
+          formatKeyframesCSS(name, steps),
+        );
+      }
+    }
 
     const css = formatGlobalRules(styleResults);
     if (css) {
@@ -142,6 +162,16 @@ export function useGlobalStyles(
   }
 
   if (target.mode === 'rsc') {
+    if (keyframes) {
+      for (const [name, steps] of keyframes) {
+        pushRSCCSS(
+          target.cache,
+          `__kf:${name}`,
+          formatKeyframesCSS(name, steps),
+        );
+      }
+    }
+
     const css = formatGlobalRules(styleResults);
     if (css) {
       const key = options?.id
@@ -162,9 +192,41 @@ export function useGlobalStyles(
 
   // Client path
   if (slots) {
+    // Keyframes are referenced before the previous injection is released, so
+    // ones that survive the update are not deleted and re-inserted.
+    const releaseKeyframes = holdKeyframes(keyframes, options?.root);
+
     existing?.dispose();
 
     const { dispose } = injectGlobal(styleResults, { root: options?.root });
-    slots.set(slotKey, { stylesKey, dispose });
+    slots.set(slotKey, {
+      stylesKey,
+      dispose: () => {
+        dispose();
+        releaseKeyframes();
+      },
+    });
   }
+}
+
+/**
+ * Take a reference on each keyframes rule under its resolved name, which the
+ * rules were rewritten to. Shares the entries the class path holds, so neither
+ * side deletes a rule the other still animates.
+ */
+function holdKeyframes(
+  keyframes: Map<string, KeyframesSteps> | null,
+  root?: Document | ShadowRoot,
+): () => void {
+  if (!keyframes) return noop;
+
+  const injector = getGlobalInjector();
+  const disposers = [...keyframes].map(
+    ([name, steps]) =>
+      injector.keyframes(steps, { name, root, distinctByName: true }).dispose,
+  );
+
+  return () => {
+    for (const dispose of disposers) dispose();
+  };
 }

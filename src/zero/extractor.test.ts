@@ -561,6 +561,24 @@ describe('extractStylesForSelector', () => {
     );
   });
 
+  it('renames camelCase names and names after a stepped timing function', () => {
+    const { css } = extractStylesForSelector('.loader', {
+      animation: 'fadeIn 1s, 2s steps(4, end) spin',
+      '@keyframes': {
+        fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+        spin: { to: { opacity: 0 } },
+      },
+    });
+
+    const names = [...css.matchAll(/@keyframes (tsk[a-f0-9]{6})/g)].map(
+      (m) => m[1],
+    );
+    expect(names).toHaveLength(2);
+    expect(css).toContain(
+      `.loader { animation: ${names[0]} 1s, 2s steps(4, end) ${names[1]}; }`,
+    );
+  });
+
   it('only renames whole animation names', () => {
     const { css } = extractStylesForSelector('.spinner', {
       animation: 'spin 1s, spin-fast 2s',

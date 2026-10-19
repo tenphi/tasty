@@ -22,7 +22,6 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
-import { getEffectivePropertiesByName } from '../config-resources';
 import { isFunctionsPolyfillEnabled } from '../config-state';
 import {
   extractLocalFunctions,
@@ -46,7 +45,13 @@ import {
   formatKeyframesSteps,
 } from '../ssr/format-keyframes';
 import { formatPropertyCSS } from '../ssr/format-property';
-import { extractLocalProperties, hasLocalProperties } from '../properties';
+import type { DeclaredPropertyEntry } from '../properties';
+import {
+  extractLocalProperties,
+  hasLocalProperties,
+  indexPropertiesByName,
+} from '../properties';
+import { DEFAULT_PROPERTIES } from '../properties/defaults';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
 import {
@@ -446,6 +451,16 @@ export function extractKeyframesFromStyles(
 // Property Extraction (auto-infer @property types for zero-runtime)
 // ============================================================================
 
+// Built on first use. Only Tasty's defaults: zero-runtime output emits no
+// configured `properties`, and its module graph stays clear of the runtime
+// configuration state.
+let defaultPropertyIndex: ReadonlyMap<string, DeclaredPropertyEntry> | null =
+  null;
+
+function getDefaultPropertyIndex(): ReadonlyMap<string, DeclaredPropertyEntry> {
+  return (defaultPropertyIndex ??= indexPropertiesByName(DEFAULT_PROPERTIES));
+}
+
 export interface ExtractedProperty {
   name: string;
   css: string;
@@ -491,7 +506,7 @@ export function extractPropertiesFromStyles(
   }
 
   const resolver = new PropertyTypeResolver();
-  const declared = getEffectivePropertiesByName();
+  const declared = getDefaultPropertyIndex();
 
   const registerProperty = (
     name: string,

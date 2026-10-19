@@ -75,7 +75,7 @@ describe('fadeStyle', () => {
   it('handles both custom colors', () => {
     const result = fadeStyle({ fade: 'top #clear #solid' });
     expect(result.mask).toBe(
-      'linear-gradient(to bottom, var(--clear-color) 0%, var(--solid-color) calc(2 * var(--gap)))',
+      'linear-gradient(to bottom, transparent 0%, var(--solid-color) calc(2 * var(--gap)))',
     );
   });
 

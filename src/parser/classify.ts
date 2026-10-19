@@ -271,6 +271,12 @@ export function classify(
           if (baseKey in predefinedTokens) {
             const resolvedValue = predefinedTokens[baseKey];
 
+            // A transparent alias stays invisible even with an opacity suffix.
+            // This applies to the built-in #clear and to user-defined aliases.
+            if (resolvedValue.trim().toLowerCase() === 'transparent') {
+              return { bucket: Bucket.Color, processed: 'transparent' };
+            }
+
             // If resolved value starts with # (color token), use standard alpha syntax
             if (resolvedValue.startsWith('#')) {
               // Fold to match parser behavior

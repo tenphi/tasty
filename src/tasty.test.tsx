@@ -78,6 +78,24 @@ describe('tasty() API', () => {
     expect(container).toMatchTastySnapshot();
   });
 
+  it.each(['#clear', '#clear.5', '#clear.$opacity'])(
+    'renders %s as transparent regardless of local color tokens',
+    (color) => {
+      const Element = tasty({
+        styles: {
+          '#clear': 'rgb(255 0 0)',
+          color,
+          fill: color,
+        },
+      });
+      const { container } = render(<Element />);
+      const styles = getComputedStyle(container.firstElementChild!);
+
+      expect(styles.color).toBe('rgba(0, 0, 0, 0)');
+      expect(styles.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    },
+  );
+
   it('should support modifiers', () => {
     const StyledBlock = tasty(Block, {
       styles: { color: { '': '#dark', modified: '#purple' } },

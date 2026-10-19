@@ -5,6 +5,38 @@ import { configure, extractStylesForSelector, resetConfig } from './index';
 describe('zero configure()', () => {
   afterEach(() => resetConfig());
 
+  it.each(['#clear', '#clear.5', '#clear.$opacity'])(
+    'extracts %s as transparent without configuration',
+    (color) => {
+      const { css } = extractStylesForSelector('.card', { fill: color });
+      expect(css).toBe('.card { background-color: transparent; }');
+    },
+  );
+
+  it('restores the clear alias after resetting an explicit override', () => {
+    configure({ replaceTokens: { '#clear': 'rgb(255 0 0)' } });
+    expect(extractStylesForSelector('.card', { fill: '#clear.5' }).css).toBe(
+      '.card { background-color: rgb(255 0 0 / .5); }',
+    );
+
+    resetConfig();
+    expect(extractStylesForSelector('.card', { fill: '#clear.5' }).css).toBe(
+      '.card { background-color: transparent; }',
+    );
+  });
+
+  it.each([true, 'transparent', '#clear'])(
+    'keeps a configured alias for %s transparent with opacity',
+    (value) => {
+      configure({ replaceTokens: { '#invisible': value } });
+
+      const { css } = extractStylesForSelector('.card', {
+        fill: '#invisible.$opacity',
+      });
+      expect(css).toBe('.card { background-color: transparent; }');
+    },
+  );
+
   it('applies units, states and replace tokens to extraction', () => {
     configure({
       units: { u: 'var(--unit)' },

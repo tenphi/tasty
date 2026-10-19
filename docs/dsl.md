@@ -171,7 +171,7 @@ fill: '#current',           // → currentcolor
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
-`#white`, `#black`, `#clear` (transparent), and `#border` are registered by default, so they work before you define any tokens.
+`#white`, `#black`, `#border`, and `#outline` are registered by default, and `#clear` is a built-in alias for `transparent` (see [below](#clear-is-transparent)), so they work before you define any tokens.
 
 The suffix sets the alpha on the token's color with CSS relative color syntax:
 
@@ -197,6 +197,17 @@ Two properties follow from writing the alpha slot rather than compositing:
 - **The alpha may be a number or a percentage.** `#purple.$fade` emits
   `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
   which is what `--*-opacity` properties are registered to accept.
+
+### `#clear` is transparent
+
+`#clear` is a built-in [replace token](#replace-tokens) for `transparent`.
+Opacity suffixes are ignored: `#clear.5` and `#clear.$fade` both emit
+`transparent`. The same rule applies to user-defined replace tokens resolving
+to `transparent`, including aliases of `#clear`.
+
+It does not read `--clear-color` or require an `@property` registration.
+An explicit `configure({ replaceTokens: { '#clear': ... } })` overrides the
+default alias and uses the replacement's usual opacity behavior.
 
 ### `#current` is the keyword
 
@@ -235,7 +246,7 @@ through `color-mix()`, which works from Safari 16.2 and composes like every othe
 
 ### `#current` composes instead
 
-`#current` is the one exception, and the difference is deliberate. A token _names_
+`#current` composes alpha, and the difference is deliberate. A token _names_
 a color, so fading it sets its alpha. `currentcolor` is the color an element
 **inherits**, which an ancestor may already have faded — `#current.4` means "40%
 of what reaches me":

@@ -114,6 +114,7 @@ describe('Global Style Injector API', () => {
 
       const tokens = getGlobalPredefinedTokens();
       expect(tokens).toEqual({
+        '#clear': 'transparent',
         $spacing: '2x',
         '#accent': '#purple',
       });
@@ -143,6 +144,7 @@ describe('Global Style Injector API', () => {
 
       const tokens = getGlobalPredefinedTokens();
       expect(tokens).toEqual({
+        '#clear': 'transparent',
         $plugin: '1x',
         '#plugin': '#blue',
         $config: '2x',

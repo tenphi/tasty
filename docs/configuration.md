@@ -60,7 +60,7 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 | `propHandlers`       | `Record<string, PropHandlerDefinition>`          | -                                                                                    | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware)                                                                                                                                                                                                                                   |
 | `baseStyleProps`     | `readonly string[]`                              | -                                                                                    | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props)                                                                                                                                                                                                                                          |
 | `tokens`             | `Record<string, value \| stateMap>`              | -                                                                                    | Design tokens injected as `:root` CSS custom properties                                                                                                                                                                                                                                                                                 |
-| `replaceTokens`      | `Record<string, string \| number \| boolean>`    | -                                                                                    | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens                                                                                                                                                                                                                                           |
+| `replaceTokens`      | `Record<string, string \| number \| boolean>`    | `{ '#clear': 'transparent' }`                                                        | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens                                                                                                                                                                                                                                           |
 | `keyframes`          | `Record<string, KeyframesSteps>`                 | -                                                                                    | Global keyframes for animations                                                                                                                                                                                                                                                                                                         |
 | `properties`         | `Record<string, PropertyDefinition>`             | -                                                                                    | Global CSS @property definitions                                                                                                                                                                                                                                                                                                        |
 | `fontFaces`          | `Record<string, FontFaceInput>`                  | -                                                                                    | Global @font-face definitions                                                                                                                                                                                                                                                                                                           |
@@ -373,6 +373,17 @@ configure({
 ```
 
 When a component uses `padding: '$card-padding'`, the parser replaces it with `'4x'` before generating CSS. When a component uses `fill: '#accent'`, it is replaced with `'#purple'`, which in turn resolves to `var(--purple-color)`.
+
+Tasty includes `'#clear': 'transparent'` as a default replace token, available
+without calling `configure()`. It survives `resetConfig()`, and explicit
+`replaceTokens` entries can override it. A replace token resolving to the literal
+`transparent` ignores numeric and custom-property opacity suffixes:
+`#clear`, `#clear.5`, and `#clear.$opacity` all emit `transparent`.
+
+`#clear` no longer reads `--clear-color`, and Tasty no longer registers that
+property by default. If you previously customized `#clear` through `tokens`,
+local token definitions, or CSS, use a different color token or explicitly
+override `replaceTokens['#clear']` instead.
 
 See [Replace Tokens](dsl.md#replace-tokens) in the Style DSL reference.
 

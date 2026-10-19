@@ -7,9 +7,7 @@
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import type { createJiti as createJitiType } from 'jiti';
 
 import type { TastyConfig } from '../config';
 import { formatCounterStyleRule } from '../counter-style';
@@ -24,6 +22,7 @@ import {
   functionsForExtraction,
   resetZeroConfig,
 } from '../zero/config';
+import { loadConfigFile } from '../zero/config-file';
 import { createServerStyleArtifact } from './artifacts';
 import type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 import { findUnsafeCSSResource } from './css-resources';
@@ -32,7 +31,6 @@ import { formatKeyframesCSS } from './format-keyframes';
 import { formatPropertyCSS } from './format-property';
 
 const ENV_KEY = 'TASTY_NEXT_SHARED_CSS_HREF';
-const packageRequire = createRequire(import.meta.url);
 
 interface NextConfig {
   basePath?: string;
@@ -104,32 +102,10 @@ function loadConfig(
     );
   }
 
-  const configPath = resolve(projectDir, options.configFile);
-  let jitiPath: string;
-  try {
-    jitiPath = packageRequire.resolve('jiti');
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      error.code === 'MODULE_NOT_FOUND'
-    ) {
-      throw new Error(
-        '[Tasty] `configFile` requires the optional `jiti` package. Install `jiti` or pass the imported config through `config` instead.',
-        { cause: error },
-      );
-    }
-    throw error;
-  }
-  const { createJiti } = packageRequire(jitiPath) as {
-    createJiti: typeof createJitiType;
-  };
-  const jiti = createJiti(projectDir, { moduleCache: false });
-  const loaded = jiti(configPath) as TastyConfig | { default: TastyConfig };
-
-  return loaded && typeof loaded === 'object' && 'default' in loaded
-    ? loaded.default
-    : loaded;
+  return loadConfigFile<TastyConfig>(
+    resolve(projectDir, options.configFile),
+    projectDir,
+  );
 }
 
 function collectSharedCSS(config: TastyConfig): string {

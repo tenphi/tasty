@@ -111,8 +111,12 @@ export interface TastyConfig {
   parserCacheSize?: number;
   /**
    * Custom units for the style parser (merged with built-in units).
-   * Units transform numeric values like `2x` → `calc(2 * var(--gap))`.
-   * @example { em: 'em', vw: 'vw', custom: (n) => `${n * 10}px` }
+   * A unit scales its value by the number in front of it: the built-in
+   * `x: '8px'` makes `2x` → `16px`, and `u: 'var(--u)'` would make `2u` →
+   * `calc(2 * var(--u))`. A function receives the number and returns the CSS.
+   * Native CSS units (`px`, `em`, `vw`, …) need no entry: one with the same
+   * name replaces them.
+   * @example { u: 'var(--u)', col: (n) => `${n * 80}px` }
    */
   units?: Record<string, string | UnitHandler>;
   /**
@@ -472,7 +476,7 @@ export interface TastyConfig {
    * // Now use in styles - tokens are replaced at parse time:
    * const Card = tasty({
    *   styles: {
-   *     padding: '$spacing',  // → calc(2 * var(--gap))
+   *     padding: '$spacing',  // → 16px
    *     fill: '#accent',      // → var(--purple-color)
    *   },
    * });

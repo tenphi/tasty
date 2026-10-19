@@ -1,5 +1,28 @@
 # @tenphi/tasty
 
+## 3.10.0
+
+### Minor Changes
+
+- [#385](https://github.com/tenphi/tasty/pull/385) [`7dc285e`](https://github.com/tenphi/tasty/commit/7dc285e9acb412377e9f73efbfc6a7d366520cd1) Thanks [@tenphi](https://github.com/tenphi)! - Add a React-free `configure()` and `resetConfig()` to `@tenphi/tasty/zero`, so Node build scripts can set units, states, recipes, keyframes and the other options that shape generated CSS without installing `react` (see the Programmatic API section of the zero-runtime docs for what it emits). Each `configure()` call replaces the previous configuration, and reconfiguring the Babel plugin no longer keeps units and state aliases removed from its config. The Babel plugin also re-applies its configuration before each file when another build-time configuration in the same process (another output, `withTastyNext()`, `/zero` `configure()`) replaced it.
+
+### Patch Changes
+
+- [#385](https://github.com/tenphi/tasty/pull/385) [`7dc285e`](https://github.com/tenphi/tasty/commit/7dc285e9acb412377e9f73efbfc6a7d366520cd1) Thanks [@tenphi](https://github.com/tenphi)! - Fix two ways an `animation` could silently fail to run:
+
+  - **camelCase names were lowercased.** The style parser folds values to lowercase, so `animation: 'fadeIn 1s'` emitted `fadein`, which matched neither `@keyframes fadeIn` nor the hashed name of a local `@keyframes`. `animation` and `animationName` now keep each name's authored case; durations, timing functions and keywords are still parsed as before.
+  - **A name after `steps(n, end)` was missed.** Name detection split the value at every comma and picked `end` (or `start`) out of the timing function, so in `'1s steps(4, end) spin'` the local `@keyframes spin` was never emitted or renamed. Lists now split at top-level commas only, and function arguments are never read as names.
+
+- [#385](https://github.com/tenphi/tasty/pull/385) [`7dc285e`](https://github.com/tenphi/tasty/commit/7dc285e9acb412377e9f73efbfc6a7d366520cd1) Thanks [@tenphi](https://github.com/tenphi)! - Fix selector-mode styles (`useGlobalStyles`, `globalStyles` in `configure()`, `tastyStatic(selector, …)`, `extractStylesForSelector`):
+
+  - `@starting` values are wrapped in `@starting-style` instead of being emitted as a plain rule that applied permanently.
+  - Tokens and other styles whose states use `@root()` on a selector that is the root itself (`:root`, `html`, `:where(:root)`) now attach the states to it (`:root:where([data-schema="dark"])`) instead of requiring a root inside the root, which never matched. This includes theme tokens defined in `configure({ tokens })`.
+  - Local `@keyframes` (and configured `keyframes`) used by an `animation` are emitted alongside the rules, under the name the declaration is rewritten to.
+  - A selector list such as `'.card, .panel'` gives every item its states and sub-elements, not only the last one. Surrounding whitespace and empty list items are ignored, so `'.card '` no longer turns states into a descendant selector.
+  - Build-time `@keyframes` steps follow Tasty style semantics, as they do at runtime: units, color tokens and `$` properties produce valid CSS, the custom properties set by local `@keyframes` get their `@property` types inferred, and style names map like everywhere else in Tasty (`fill` becomes `background-color`).
+  - Build-time animation renaming no longer rewrites names inside longer ones (`spin` in `spin-fast`) or custom properties such as `--my-animation`.
+  - In React Server Components, CSS queued by standalone style functions is no longer dropped when the next component renders no class.
+
 ## 3.9.11
 
 ### Patch Changes

@@ -40,6 +40,10 @@ import {
 } from '../keyframes';
 import type { StyleResult } from '../pipeline';
 import { renderStyles } from '../pipeline';
+import {
+  formatKeyframesCSS,
+  formatKeyframesSteps,
+} from '../ssr/format-keyframes';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
@@ -49,6 +53,14 @@ import {
   makeKeyframeName,
   validateNamePrefix,
 } from '../utils/name-prefix';
+import { resolveRecipesWith } from '../utils/resolve-recipes-core';
+
+import type { ResolvedZeroConfig } from './config';
+import {
+  getActiveZeroConfig,
+  reapplyZeroConfig,
+  setActiveZeroConfig,
+} from './config';
 
 export interface ExtractedChunk {
   className: string;
@@ -110,10 +122,40 @@ function generateClassName(cacheKey: string): string {
 }
 
 /**
+ * The configuration set through `/zero` `configure()`, applied to the engine
+ * again if something else replaced it since (the state is process-wide).
+ * The Babel plugin applies and passes its own, and uses the internal
+ * extractors that skip this.
+ */
+function applyActiveConfig(): ResolvedZeroConfig | null {
+  const active = getActiveZeroConfig();
+  if (!active) return null;
+
+  const applied = reapplyZeroConfig(active);
+  if (applied !== active) {
+    setActiveZeroConfig(applied);
+    setExtractorNamePrefix(
+      applied.source.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX,
+    );
+  }
+  return applied;
+}
+
+/**
  * Extract styles using chunking (for className mode).
  * Returns multiple classes, one per chunk.
  */
 export function extractStylesWithChunks(styles: Styles): ExtractedChunk[] {
+  const config = applyActiveConfig();
+  return extractChunks(
+    config ? resolveRecipesWith(styles, config.normalized.recipes) : styles,
+  );
+}
+
+/**
+ * Chunked class extraction against whatever configuration is applied.
+ */
+export function extractChunks(styles: Styles): ExtractedChunk[] {
   const chunks: ExtractedChunk[] = [];
 
   // Categorize style keys into chunks
@@ -149,18 +191,90 @@ export function extractStylesWithChunks(styles: Styles): ExtractedChunk[] {
 
 /**
  * Extract styles for a specific selector (for global/selector mode).
- * Returns a single CSS block.
+ * Returns a single CSS block, led by the `@keyframes` its rules animate.
  */
 export function extractStylesForSelector(
   selector: string,
   styles: Styles,
 ): ExtractedSelector {
+  const config = applyActiveConfig();
+  const css = extractSelectorCSS(
+    selector,
+    config ? resolveRecipesWith(styles, config.normalized.recipes) : styles,
+    config?.normalized.keyframes,
+  );
+
+  return { selector, css };
+}
+
+/**
+ * Selector-mode CSS with the `@keyframes` its rules animate — local ones and
+ * the given global ones — under hashed names the rules are rewritten to.
+ */
+export function extractSelectorCSS(
+  selector: string,
+  styles: Styles,
+  globalKeyframes?: Record<string, KeyframesSteps> | null,
+): string {
+  const css = renderSelectorCSS(selector, styles);
+  const { keyframes, nameMap } = extractKeyframesFromStyles(
+    styles,
+    globalKeyframes,
+  );
+  if (keyframes.length === 0) return css;
+
+  return [
+    ...keyframes.map((kf) => kf.css),
+    replaceAnimationNamesInCSS(css, nameMap),
+  ].join('\n\n');
+}
+
+/**
+ * Selector-mode rules alone, for callers that emit the keyframes themselves.
+ */
+export function renderSelectorCSS(selector: string, styles: Styles): string {
   // renderStyles with selector returns StyleResult[] with selectors already applied
   const rules = renderStyles(styles, selector);
   // Format without re-prefixing - rules already have the full selector
-  const css = formatRulesDirectly(rules);
+  return formatRulesDirectly(rules);
+}
 
-  return { selector, css };
+/**
+ * Replace animation names in formatted CSS (whole rules, not declarations).
+ */
+export function replaceAnimationNamesInCSS(
+  css: string,
+  nameMap: Map<string, string>,
+): string {
+  if (nameMap.size === 0) return css;
+
+  // The CSS contains full rules like ".class { animation: name 1s; }".
+  // Only a declaration start (after `{` or `;`) counts, so neither a selector
+  // such as `.animation:hover` nor a custom property such as
+  // `--my-animation` is rewritten.
+  return css.replace(
+    /(?<=[{;]\s*)(animation(?:-name)?)\s*:\s*([^;}]+)/gi,
+    (match, prop, value) => {
+      let newValue = value;
+      for (const [original, replacement] of nameMap) {
+        // Identifier boundary: `-` continues a name, so `spin` stays out of
+        // `spin-fast`.
+        const pattern = new RegExp(
+          `(?<![\\w-])${escapeRegex(original)}(?![\\w-])`,
+          'g',
+        );
+        newValue = newValue.replace(pattern, replacement);
+      }
+      return `${prop}: ${newValue}`;
+    },
+  );
+}
+
+/**
+ * Escape special regex characters.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -238,7 +352,10 @@ function formatRulesDirectly(rules: StyleResult[]): string {
         ? `${rule.rootPrefix} ${rule.selector}`
         : rule.selector;
 
-      let css = `${selector} { ${rule.declarations} }`;
+      const declarations = rule.startingStyle
+        ? `@starting-style { ${rule.declarations} }`
+        : rule.declarations;
+      let css = `${selector} { ${declarations} }`;
 
       // Wrap in at-rules (in reverse order for proper nesting)
       if (rule.atRules && rule.atRules.length > 0) {
@@ -315,44 +432,12 @@ export function extractKeyframesFromStyles(
     // Only emit each unique keyframe once
     if (!seenHashes.has(hashedName)) {
       seenHashes.add(hashedName);
-      const css = keyframesToCSS(hashedName, steps);
+      const css = formatKeyframesCSS(hashedName, steps);
       keyframesToEmit.push({ name: hashedName, css });
     }
   }
 
   return { keyframes: keyframesToEmit, nameMap };
-}
-
-/**
- * Convert keyframes steps to CSS string.
- */
-function keyframesToCSS(name: string, steps: KeyframesSteps): string {
-  const stepRules: string[] = [];
-
-  for (const [key, value] of Object.entries(steps)) {
-    if (typeof value === 'string') {
-      // Raw CSS string
-      stepRules.push(`${key} { ${value.trim()} }`);
-    } else if (value && typeof value === 'object') {
-      // Style map - convert to CSS declarations
-      const declarations = Object.entries(value)
-        .map(([prop, val]) => {
-          const cssProperty = camelToKebab(prop);
-          return `${cssProperty}: ${val}`;
-        })
-        .join('; ');
-      stepRules.push(`${key} { ${declarations} }`);
-    }
-  }
-
-  return `@keyframes ${name} { ${stepRules.join(' ')} }`;
-}
-
-/**
- * Convert camelCase to kebab-case.
- */
-function camelToKebab(str: string): string {
-  return str.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
 // ============================================================================
@@ -466,23 +551,13 @@ function scanKeyframeSteps(
     initialValue: string,
   ) => void,
 ): void {
-  for (const value of Object.values(steps)) {
-    if (typeof value === 'string') {
-      resolver.scanDeclarations(value, isPropertyDefined, registerProperty);
-    } else if (value && typeof value === 'object') {
-      const declarations = Object.entries(value)
-        .map(([prop, val]) => {
-          const cssProperty = camelToKebab(prop);
-          return `${cssProperty}: ${val}`;
-        })
-        .join('; ');
-      resolver.scanDeclarations(
-        declarations,
-        isPropertyDefined,
-        registerProperty,
-      );
-    }
-  }
+  // The declarations the steps are emitted with, so `$name` and `#name` keys
+  // register the custom properties they actually set.
+  resolver.scanDeclarations(
+    formatKeyframesSteps(steps).declarations,
+    isPropertyDefined,
+    registerProperty,
+  );
 }
 
 // ============================================================================

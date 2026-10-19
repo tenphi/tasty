@@ -252,9 +252,13 @@ function computeStylesRSC(
   );
   if (ancillaryCSS) cssParts.push(ancillaryCSS);
 
-  if (classNames.length === 0) return EMPTY_RESULT;
-
   const css = cssParts.join('\n');
+
+  // CSS taken from the pending queue (or marked emitted above) has to go out
+  // with this result even when no class did — nothing else will emit it now.
+  if (classNames.length === 0) {
+    return css ? { className: '', css } : EMPTY_RESULT;
+  }
 
   return {
     className: classNames.join(' '),

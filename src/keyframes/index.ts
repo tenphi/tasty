@@ -6,6 +6,7 @@
  */
 
 import type { KeyframesSteps } from '../injector/types';
+import type { StyleResult } from '../pipeline';
 import type { Styles } from '../styles/types';
 import { hashString } from '../utils/hash';
 
@@ -317,4 +318,67 @@ export function filterUsedKeyframes(
   }
 
   return hasAny ? used : null;
+}
+
+// ============================================================================
+// Selector Mode
+// ============================================================================
+
+/**
+ * Keyframes used by selector-mode rules, under the names the rules now
+ * reference. `null` when the rules animate nothing defined here.
+ */
+export interface SelectorKeyframes {
+  rules: StyleResult[];
+  keyframes: Map<string, KeyframesSteps> | null;
+}
+
+/**
+ * Point selector-mode rules (global styles, `useGlobalStyles`) at the
+ * keyframes they animate, as the class path does: local `@keyframes` and the
+ * given global ones are emitted under resolved names, and the `animation`
+ * declarations are rewritten to match.
+ *
+ * Only keyframes the rendered rules actually reference are returned.
+ */
+export function resolveSelectorKeyframes(
+  styles: Styles,
+  rules: StyleResult[],
+  globalKeyframes: Record<string, KeyframesSteps> | null,
+): SelectorKeyframes {
+  const usedNames = extractAnimationNamesFromStyles(styles);
+  if (usedNames.size === 0) return { rules, keyframes: null };
+
+  const local = hasLocalKeyframes(styles)
+    ? extractLocalKeyframes(styles)
+    : null;
+  const used = filterUsedKeyframes(
+    mergeKeyframes(local, globalKeyframes),
+    usedNames,
+  );
+  if (!used) return { rules, keyframes: null };
+
+  const names = resolveKeyframesNames(used);
+  const referenced = new Set<string>();
+  const renamed = rules.map((rule) => {
+    const declarations = replaceAnimationNames(
+      rule.declarations,
+      names,
+      referenced,
+    );
+    return declarations === rule.declarations
+      ? rule
+      : { ...rule, declarations };
+  });
+
+  if (referenced.size === 0) return { rules, keyframes: null };
+
+  const keyframes = new Map<string, KeyframesSteps>();
+  for (const [authored, steps] of Object.entries(used)) {
+    if (referenced.has(authored)) {
+      keyframes.set(names.get(authored)!, steps);
+    }
+  }
+
+  return { rules: renamed, keyframes };
 }

@@ -277,6 +277,7 @@ type       TastyZeroConfig
 
 ## @tenphi/tasty/zero
 
+value      configure
 value      createCSSWriter
 value+type CSSWriter
 type       CSSWriterOptions
@@ -284,6 +285,8 @@ type       ExtractedChunk
 type       ExtractedSelector
 value      extractStylesForSelector
 value      extractStylesWithChunks
+value      resetConfig
+type       TastyZeroConfig
 
 ## @tenphi/tasty/zero/next
 

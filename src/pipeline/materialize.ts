@@ -683,22 +683,35 @@ export function optimizeGroups(groups: SelectorGroup[]): SelectorGroup[] {
 }
 
 /**
- * Convert root groups to CSS selector prefix (for final output)
+ * Convert root groups to the state segment they put on the root element
+ * (e.g. `[data-schema="dark"]`), without the `:root` anchor. Used where the
+ * styled selector is the root itself, so the states join it instead of
+ * becoming its ancestor.
  */
-export function rootGroupsToCSS(groups: SelectorGroup[]): string | undefined {
+export function rootGroupsToStateCSS(
+  groups: SelectorGroup[],
+): string | undefined {
   if (groups.length === 0) return undefined;
 
   const optimized = optimizeGroups(groups);
   if (optimized.length === 0) return undefined;
 
-  let prefix = ':root';
+  let state = '';
   for (const group of optimized) {
-    prefix += selectorGroupToCSS(group);
+    state += selectorGroupToCSS(group);
   }
+  return state;
+}
+
+/**
+ * Convert a root-state segment to the ancestor prefix placed before the
+ * styled selector (for final output).
+ */
+export function rootStateToPrefix(state: string): string {
   // The root context prefix carries zero specificity: wrap the whole
   // `:root...` selector in :where() so neither the :root pseudo nor its
   // state groups contribute to specificity.
-  return wrapWhere(prefix);
+  return wrapWhere(`:root${state}`);
 }
 
 /**

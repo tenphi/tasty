@@ -173,7 +173,8 @@ export function getGlobalPredefinedStates(): Record<string, string> {
 }
 
 /**
- * Clear global predefined states (for testing only)
+ * Clear global predefined states. Used by tests and by the build-time
+ * configuration reset, which replaces aliases instead of merging into them.
  */
 export function clearGlobalPredefinedStates(): void {
   globalPredefinedStates = {};

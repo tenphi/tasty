@@ -10,15 +10,21 @@ import { createStyle, STYLE_HANDLER_MAP } from '../styles';
 import type { CSSMap, StyleHandler, StyleValueStateMap } from '../utils/styles';
 
 /**
- * Convert keyframes steps to a CSS string.
- * Replicates SheetManager.stepsToCSS() without the class instance.
+ * Convert keyframes steps to a CSS string, plus every step's declarations for
+ * `@property` inference. Replicates SheetManager.stepsToCSS() without the
+ * class instance.
  */
-function stepsToCSS(steps: KeyframesSteps): string {
+export function formatKeyframesSteps(steps: KeyframesSteps): {
+  css: string;
+  declarations: string;
+} {
   const rules: string[] = [];
+  const allDeclarations: string[] = [];
 
   for (const [key, value] of Object.entries(steps)) {
     if (typeof value === 'string') {
       rules.push(`${key} { ${value.trim()} }`);
+      allDeclarations.push(value.trim());
       continue;
     }
 
@@ -80,9 +86,10 @@ function stepsToCSS(steps: KeyframesSteps): string {
       .join('; ');
 
     rules.push(`${key} { ${declarations.trim()} }`);
+    if (declarations) allDeclarations.push(declarations);
   }
 
-  return rules.join(' ');
+  return { css: rules.join(' '), declarations: allDeclarations.join('; ') };
 }
 
 /**
@@ -92,6 +99,5 @@ export function formatKeyframesCSS(
   name: string,
   steps: KeyframesSteps,
 ): string {
-  const cssSteps = stepsToCSS(steps);
-  return `@keyframes ${name} { ${cssSteps} }`;
+  return `@keyframes ${name} { ${formatKeyframesSteps(steps).css} }`;
 }

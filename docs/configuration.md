@@ -631,7 +631,7 @@ configure({
 });
 ```
 
-Each key is a CSS selector, and each value is a Tasty `Styles` object supporting the full style syntax including style properties, tokens, state maps, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). Global styles are injected alongside `:root` tokens when the first style is rendered.
+Each key is a CSS selector (a list such as `'.uni-checkbox, uni-checkbox'` styles every item), and each value is a Tasty `Styles` object supporting the full style syntax including style properties, tokens, state maps, `@keyframes`, and selector-based sub-styling (e.g. `$: '> .app'` for elements outside React scope). Global styles are injected alongside `:root` tokens when the first style is rendered.
 
 Global styles are automatically emitted in all delivery modes: client rendering, server rendering, and build-time extraction with the Babel plugin. Plugins can also provide `globalStyles`; they are merged per selector with config global styles (config wins on conflict).
 

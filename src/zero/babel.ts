@@ -35,6 +35,7 @@ export type { TastyZeroConfig } from './babel-types';
 import {
   configureZero,
   functionsForExtraction,
+  reapplyZeroConfig,
   resetZeroConfig,
 } from './config';
 import { writerCache, type StaticStyleRegistry } from './writer-cache';
@@ -44,8 +45,10 @@ import {
   extractFunctionsFromStyles,
   extractKeyframesFromStyles,
   extractPropertiesFromStyles,
-  extractStylesForSelector,
-  extractStylesWithChunks,
+  extractChunks,
+  extractSelectorCSS,
+  renderSelectorCSS,
+  replaceAnimationNamesInCSS,
   setExtractorNamePrefix,
 } from './extractor';
 import type {
@@ -284,8 +287,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       for (const [selector, styles] of Object.entries(
         config.normalized.globalStyles,
       )) {
-        const css = extractCSSFromStyles(selector, styles);
-        if (css) newWriter.add(`global:${selector}`, css);
+        writeGlobalStyles(
+          newWriter,
+          selector,
+          styles,
+          config.normalized.keyframes,
+        );
       }
     }
 
@@ -298,6 +305,9 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   }
 
   const entry = writerCache.get(resolvedOutputPath)!;
+  // The engine state is process-wide: another output's build, `withTastyNext()`
+  // or `/zero` `configure()` may have replaced this one's since it was cached.
+  entry.config = reapplyZeroConfig(entry.config);
   const cssWriter = entry.writer;
   const globalRegistry = entry.registry;
   const config = entry.config;
@@ -318,7 +328,11 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     if (Object.keys(gs).length > 0) {
       globalStylesCSS = new Map();
       for (const [selector, styles] of Object.entries(gs)) {
-        const css = extractCSSFromStyles(selector, styles);
+        const css = extractCSSFromStyles(
+          selector,
+          styles,
+          config.normalized.keyframes,
+        );
         if (css) globalStylesCSS.set(selector, css);
       }
       if (globalStylesCSS.size === 0) globalStylesCSS = undefined;
@@ -329,6 +343,14 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     name: 'tasty-zero',
 
     pre(this: PluginState) {
+      // Babel reuses this plugin instance across files, and another build,
+      // `withTastyNext()` or `/zero` `configure()` may have replaced the
+      // process-wide engine state in between.
+      entry.config = reapplyZeroConfig(entry.config);
+      setExtractorNamePrefix(
+        sourceConfig.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX,
+      );
+
       // Initialize per-file registry
       this.staticStyleRegistry = {};
       this._fileAddedCSS = false;
@@ -640,7 +662,7 @@ function handleStylesMode(
   const functions = extractFunctionsFromStyles(styles, globalFunction);
 
   // Extract styles with chunking
-  const chunks = extractStylesWithChunks(styles);
+  const chunks = extractChunks(styles);
 
   const className =
     chunks.length > 0 ? chunks.map((c) => c.className).join(' ') : '';
@@ -761,7 +783,7 @@ function handleExtensionMode(
   const functions = extractFunctionsFromStyles(mergedStyles, globalFunction);
 
   // Extract styles with chunking
-  const chunks = extractStylesWithChunks(mergedStyles);
+  const chunks = extractChunks(mergedStyles);
 
   const className =
     chunks.length > 0 ? chunks.map((c) => c.className).join(' ') : '';
@@ -868,13 +890,11 @@ function handleSelectorMode(
   // Extract @function rules
   const functions = extractFunctionsFromStyles(styles, globalFunction);
 
-  // Extract styles for selector
-  const result = extractStylesForSelector(selector, styles);
+  // Extract styles for selector; the keyframes above are emitted separately
+  const css = renderSelectorCSS(selector, styles);
 
   const selectorCSS =
-    nameMap.size > 0
-      ? replaceAnimationNamesInCSS(result.css, nameMap)
-      : result.css;
+    nameMap.size > 0 ? replaceAnimationNamesInCSS(css, nameMap) : css;
 
   if (mode === 'inject') {
     const cssParts: string[] = [];
@@ -988,16 +1008,43 @@ function writeCSSToWriter(
 }
 
 /**
- * Extract CSS for a selector from a styles/tokens object.
- * Returns undefined when there are no styles or no CSS output.
+ * Extract CSS for a selector from a styles/tokens object, with the keyframes
+ * it animates. Returns undefined when there are no styles or no CSS output.
  */
 function extractCSSFromStyles(
   selector: string,
   styles: Styles | ConfigTokens | null,
+  globalKeyframes?: Record<string, KeyframesSteps>,
 ): string | undefined {
   if (!styles || Object.keys(styles).length === 0) return undefined;
-  const result = extractStylesForSelector(selector, styles as Styles);
-  return result.css || undefined;
+  return (
+    extractSelectorCSS(selector, styles as Styles, globalKeyframes) || undefined
+  );
+}
+
+/**
+ * Write a configured global selector's CSS, with the keyframes it animates
+ * keyed by their CSS so selectors sharing one emit it once.
+ */
+function writeGlobalStyles(
+  cssWriter: CSSWriter,
+  selector: string,
+  styles: Styles,
+  globalKeyframes: Record<string, KeyframesSteps>,
+): void {
+  const { keyframes, nameMap } = extractKeyframesFromStyles(
+    styles,
+    globalKeyframes,
+  );
+  for (const kf of keyframes) {
+    cssWriter.add(kf.css, kf.css);
+  }
+
+  const css = replaceAnimationNamesInCSS(
+    renderSelectorCSS(selector, styles),
+    nameMap,
+  );
+  if (css) cssWriter.add(`global:${selector}`, css);
 }
 
 /**
@@ -1195,37 +1242,4 @@ function evaluateExpression(node: t.Node, path: NodePath): unknown {
     `Dynamic expressions are not supported in tastyStatic() - got ${node.type}. ` +
       'All values must be static literals.',
   );
-}
-
-/**
- * Replace animation names in CSS string.
- * Wraps the keyframes replaceAnimationNames to work on full CSS blocks.
- */
-function replaceAnimationNamesInCSS(
-  css: string,
-  nameMap: Map<string, string>,
-): string {
-  if (nameMap.size === 0) return css;
-
-  // The CSS contains full rules like ".class { animation: name 1s; }"
-  // We need to replace animation names within declaration blocks
-  return css.replace(
-    /(animation(?:-name)?)\s*:\s*([^;}]+)/gi,
-    (match, prop, value) => {
-      let newValue = value;
-      for (const [original, replacement] of nameMap) {
-        // Word boundary replacement
-        const pattern = new RegExp(`\\b${escapeRegex(original)}\\b`, 'g');
-        newValue = newValue.replace(pattern, replacement);
-      }
-      return `${prop}: ${newValue}`;
-    },
-  );
-}
-
-/**
- * Escape special regex characters.
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

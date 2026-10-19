@@ -192,6 +192,12 @@ export interface CSSRule {
   declarations: string;
   atRules?: string[];
   rootPrefix?: string;
+  /**
+   * The root-state segment `rootPrefix` wraps, without its `:root` anchor.
+   * Set together with `rootPrefix`; lets a selector that is itself the root
+   * take the states directly (`:root:where([data-schema="dark"])`).
+   */
+  rootState?: string;
   /** When true, declarations are wrapped in @starting-style { ... } inside the selector rule */
   startingStyle?: boolean;
   /**

@@ -17,12 +17,14 @@ import {
   getGlobalCounterStyles,
   getGlobalFontFaces,
   getGlobalFunctions,
+  getGlobalKeyframes,
   getGlobalStyles,
   getRuntimeConfigState,
 } from '../config-resources';
 import { formatCounterStyleRule } from '../counter-style';
 import { fontFaceContentHash, formatFontFaceRule } from '../font-face';
 import { formatFunctionRule, parseFunctionName } from '../functions';
+import { resolveSelectorKeyframes } from '../keyframes';
 import { renderStyles } from '../pipeline';
 import type { StyleResult } from '../pipeline';
 import { hashString } from '../utils/hash';
@@ -37,6 +39,7 @@ import { createServerStyleArtifact } from './artifacts';
 import type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
 import { formatPropertyCSS } from './format-property';
 import { formatGlobalRules } from './format-global-rules';
+import { formatKeyframesCSS } from './format-keyframes';
 import { formatRules } from './format-rules';
 
 export type { ServerStyleArtifact, ServerStyleArtifactKind } from './artifacts';
@@ -148,8 +151,16 @@ export class ServerStyleCollector {
     if (globalStyles) {
       for (const [selector, styles] of Object.entries(globalStyles)) {
         if (Object.keys(styles).length > 0) {
-          const rules = renderStyles(styles, selector) as StyleResult[];
-          if (rules.length > 0) {
+          const rendered = renderStyles(styles, selector) as StyleResult[];
+          if (rendered.length > 0) {
+            const { rules, keyframes } = resolveSelectorKeyframes(
+              styles,
+              rendered,
+              getGlobalKeyframes(),
+            );
+            for (const [name, steps] of keyframes ?? []) {
+              this.collectKeyframes(name, formatKeyframesCSS(name, steps));
+            }
             const css = formatGlobalRules(rules);
             if (css) {
               this.collectGlobalStyles(`__global:styles:${selector}`, css);

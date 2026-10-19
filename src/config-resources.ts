@@ -12,6 +12,7 @@ import type {
   CounterStyleDescriptors,
   FontFaceInput,
   FunctionDefinition,
+  KeyframesSteps,
   PropertyDefinition,
 } from './injector/types';
 import { DEFAULT_PROPERTIES } from './properties/defaults';
@@ -29,6 +30,7 @@ let globalFunction: Record<string, FunctionDefinition> | null = null;
 let globalProperties: Record<string, PropertyDefinition> | null = null;
 let globalConfigTokens: ConfigTokens | null = null;
 let globalStyles: Record<string, Styles> | null = null;
+let globalKeyframes: Record<string, KeyframesSteps> | null = null;
 
 const GTKEY_TOKENS = '__tasty_cfg_tokens__';
 const GTKEY_FONT_FACE = '__tasty_cfg_font_face__';
@@ -36,6 +38,7 @@ const GTKEY_COUNTER_STYLE = '__tasty_cfg_counter_style__';
 const GTKEY_FUNCTION = '__tasty_cfg_function__';
 const GTKEY_PROPERTIES = '__tasty_cfg_properties__';
 const GTKEY_GLOBAL_STYLES = '__tasty_cfg_global_styles__';
+const GTKEY_KEYFRAMES = '__tasty_cfg_keyframes__';
 
 function setOnGlobalThis(key: string, value: unknown): void {
   (globalThis as Record<string, unknown>)[key] = value;
@@ -108,6 +111,18 @@ export function getGlobalStyles(): Record<string, Styles> | null {
   );
 }
 
+/**
+ * Get global keyframes configuration.
+ * Returns null if no keyframes configured (fast path for zero-overhead).
+ */
+export function getGlobalKeyframes(): Record<string, KeyframesSteps> | null {
+  return (
+    globalKeyframes ??
+    getFromGlobalThis<Record<string, KeyframesSteps>>(GTKEY_KEYFRAMES) ??
+    null
+  );
+}
+
 export function mergeGlobalProperties(
   properties: Record<string, PropertyDefinition>,
 ): void {
@@ -162,6 +177,13 @@ export function mergeGlobalStyles(styles: Record<string, Styles>): void {
   setOnGlobalThis(GTKEY_GLOBAL_STYLES, globalStyles);
 }
 
+export function mergeGlobalKeyframes(
+  keyframes: Record<string, KeyframesSteps>,
+): void {
+  globalKeyframes = { ...(getGlobalKeyframes() ?? {}), ...keyframes };
+  setOnGlobalThis(GTKEY_KEYFRAMES, globalKeyframes);
+}
+
 export function resetConfigResources(): void {
   runtimeConfig = null;
   globalProperties = null;
@@ -170,6 +192,7 @@ export function resetConfigResources(): void {
   globalFunction = null;
   globalConfigTokens = null;
   globalStyles = null;
+  globalKeyframes = null;
 
   const globalState = globalThis as Record<string, unknown>;
   delete globalState[GTKEY_TOKENS];
@@ -178,4 +201,5 @@ export function resetConfigResources(): void {
   delete globalState[GTKEY_FUNCTION];
   delete globalState[GTKEY_PROPERTIES];
   delete globalState[GTKEY_GLOBAL_STYLES];
+  delete globalState[GTKEY_KEYFRAMES];
 }

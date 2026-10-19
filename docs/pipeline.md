@@ -522,7 +522,7 @@ Converts condition trees into actual CSS selectors and at-rules.
    - the flat root modifiers + pseudos and the root element's `:is()`/`:not()` groups are combined into one `:where(...)` (`buildSelectorFromVariant`);
    - the sub-element (`@own`) groups are wrapped in a **separate** `:where(...)` so the sub-element's structural `[data-element="X"]` specificity is preserved while its states are zeroed;
    - `@parent` ancestors (`parentGroupsToCSS`) become `:where(... *)` / `:where(:not(... *))`;
-   - the `@root` context prefix (`rootGroupsToCSS`) becomes `:where(:root...)` (zeroing the `:root` pseudo too).
+   - the `@root` context prefix (`rootStateToPrefix`) becomes `:where(:root...)` (zeroing the `:root` pseudo too). When a direct selector can only match the root itself (`:root`, `html`, `:where(:root)`), the state segment joins it instead — `:root:where([data-schema="dark"])` — since an ancestor prefix would ask for a `:root` inside the root.
 
    The only specificity anchors that remain are the doubled component class (`.tXX.tXX`, added by the injector) and sub-element `[data-element]` attributes. Because Stage 2b already makes ordinary rules mutually exclusive, zeroing specificity never changes *which* rule matches — it only makes additive layering (`_` fallback floor, `@starting-style`) resolve deterministically by source order (see the post-pass). Canonical sorting/dedup/subsumption still run first; `:where()` is only the final wrapper, and both output paths (injector and direct-selector / SSR) consume the same wrapped fragments.
 

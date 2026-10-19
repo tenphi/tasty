@@ -385,7 +385,7 @@ export class SheetManager {
             const selectors = splitSelectorsSafely(rule.selector);
             if (selectors.length > 1) {
               for (const sel of selectors) {
-                const singleBase = `${sel} { ${declarations} }`;
+                const singleBase = `${sel} { ${innerContent} }`;
                 const singleRule = wrapAtRules(singleBase, rule.atRules);
 
                 try {

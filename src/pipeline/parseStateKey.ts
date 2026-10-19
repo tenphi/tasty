@@ -9,7 +9,7 @@ import { Lru } from '../parser/lru';
 import type { StateParserContext } from '../states';
 import {
   expandDimensionShorthands,
-  expandTastyUnits,
+  expandQueryUnits,
   findTopLevelComma,
   resolvePredefinedState,
 } from '../states';
@@ -472,7 +472,7 @@ class Parser {
 
     // Expand shorthands and units
     let condition = expandDimensionShorthands(content);
-    condition = expandTastyUnits(condition);
+    condition = expandQueryUnits(condition);
 
     // Check for feature queries (contains ':' but not dimension comparison)
     if (
@@ -507,8 +507,14 @@ class Parser {
       this.parseDimensionCondition(condition);
 
     if (!dimension) {
-      // Fallback for unparseable - treat as pseudo
-      return createPseudoCondition(raw, false, raw);
+      // Range over another feature: @media(resolution >= 2x),
+      // @media(aspect-ratio > 16/9). Passed through as written.
+      return createMediaFeatureCondition(
+        condition.trim(),
+        undefined,
+        false,
+        raw,
+      );
     }
 
     return createMediaDimensionCondition(
@@ -776,7 +782,7 @@ class Parser {
 
     // Dimension query
     let expandedCondition = expandDimensionShorthands(condition);
-    expandedCondition = expandTastyUnits(expandedCondition);
+    expandedCondition = expandQueryUnits(expandedCondition);
 
     const { dimension, lowerBound, upperBound } =
       this.parseDimensionCondition(expandedCondition);

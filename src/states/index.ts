@@ -387,6 +387,43 @@ export function expandTastyUnits(value: string): string {
   );
 }
 
+/** Query features whose value is a length: `width`, `min-width`, `inline-size`, … */
+const RE_LENGTH_FEATURE =
+  /^(?:min-|max-)?(?:width|height|inline-size|block-size)$/;
+const RE_QUERY_OPERATOR = /<=|>=|<|>|=/;
+const RE_FEATURE_NAME = /^[a-z][a-z-]*$/;
+
+/**
+ * Convert tasty units in a query condition, but only when the feature it tests
+ * takes a length: `min-width: 40x` and `40x <= width` expand, while
+ * `min-resolution: 2x` and `resolution >= 2x` stay as written, because there
+ * `x` is CSS's own resolution unit (an alias of `dppx`).
+ *
+ * Expects one feature per condition, after `expandDimensionShorthands()`.
+ */
+export function expandQueryUnits(condition: string): string {
+  let feature: string | undefined;
+
+  if (RE_QUERY_OPERATOR.test(condition)) {
+    // Range syntax: the feature is the operand that is a bare name
+    // (`width` in `40x <= width < 80x`); the others are values.
+    feature = condition
+      .split(RE_QUERY_OPERATOR)
+      .map((operand) => operand.trim())
+      .find((operand) => RE_FEATURE_NAME.test(operand));
+  } else {
+    // `feature: value`, or a bare boolean feature.
+    const colonIdx = condition.indexOf(':');
+    feature = (
+      colonIdx === -1 ? condition : condition.slice(0, colonIdx)
+    ).trim();
+  }
+
+  return feature && RE_LENGTH_FEATURE.test(feature)
+    ? expandTastyUnits(condition)
+    : condition;
+}
+
 /**
  * Parse an advanced state key and return its type and components
  */
@@ -446,7 +483,7 @@ export function parseAdvancedState(
 
     // Expand shorthands and units
     condition = expandDimensionShorthands(condition);
-    condition = expandTastyUnits(condition);
+    condition = expandQueryUnits(condition);
 
     return {
       type: 'media',
@@ -609,7 +646,7 @@ export function parseAdvancedState(
     } else {
       // Dimension query - expand shorthands and units
       condition = expandDimensionShorthands(condition);
-      condition = expandTastyUnits(condition);
+      condition = expandQueryUnits(condition);
     }
 
     return {

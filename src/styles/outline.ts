@@ -58,7 +58,11 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
 
         const value = outlinePart.values[0] || 'var(--outline-width)';
         const type = slots.style || 'solid';
-        const outlineColor = slots.color || 'var(--outline-color)';
+        // `#outline` when the app defines it, else the text color (the CSS
+        // default). A fallback, not a default @property: zero-runtime CSS
+        // ships without Tasty's default @property rules.
+        const outlineColor =
+          slots.color || 'var(--outline-color, currentColor)';
 
         result.outline = `${value} ${type} ${outlineColor}`;
 

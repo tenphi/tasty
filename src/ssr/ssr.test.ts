@@ -388,6 +388,11 @@ describe('ServerStyleCollector', () => {
     expect(css).toContain(
       '@property --current-color { syntax: "<color>"; inherits: true; initial-value: currentcolor; }',
     );
+    // Same for `--outline-color`: an outline with no color is drawn in the
+    // text color, matching the handler's fallback in zero-runtime CSS.
+    expect(css).toContain(
+      '@property --outline-color { syntax: "<color>"; inherits: true; initial-value: currentcolor; }',
+    );
   });
 
   it('collectInternals is idempotent', () => {

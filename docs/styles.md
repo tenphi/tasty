@@ -433,7 +433,7 @@ Outline with inline offset support.
 
 **Syntax:** `[width] [style] [color] / [offset]`
 
-**Defaults:** width = `1ow`, style = `solid`, color = `#outline`
+**Defaults:** width = `1ow`, style = `solid`, color = `#outline`, which is the text color (`currentColor`) until your tokens define `#outline`
 
 **Styles:** Same as `border` (`none`, `dotted`, `dashed`, `solid`, etc.)
 

@@ -64,9 +64,9 @@ describe('radiusStyle', () => {
 
     it('expands leaf modifier with longhand', () => {
       expect(radiusStyle({ radius: 'leaf longhand' })).toEqual({
-        'border-top-left-radius': 'var(--sharp-radius)',
+        'border-top-left-radius': 'var(--sharp-radius, 0)',
         'border-top-right-radius': 'var(--radius)',
-        'border-bottom-right-radius': 'var(--sharp-radius)',
+        'border-bottom-right-radius': 'var(--sharp-radius, 0)',
         'border-bottom-left-radius': 'var(--radius)',
       });
     });
@@ -74,9 +74,9 @@ describe('radiusStyle', () => {
     it('expands backleaf modifier with longhand', () => {
       expect(radiusStyle({ radius: 'backleaf longhand' })).toEqual({
         'border-top-left-radius': 'var(--radius)',
-        'border-top-right-radius': 'var(--sharp-radius)',
+        'border-top-right-radius': 'var(--sharp-radius, 0)',
         'border-bottom-right-radius': 'var(--radius)',
-        'border-bottom-left-radius': 'var(--sharp-radius)',
+        'border-bottom-left-radius': 'var(--sharp-radius, 0)',
       });
     });
 

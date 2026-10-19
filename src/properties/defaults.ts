@@ -41,6 +41,14 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'rgb(0 0 0)',
   },
+  // Default outline color: the text color, the same as the `outline` handler's
+  // `var(--outline-color, currentColor)` fallback, which zero-runtime CSS
+  // relies on. Registering it keeps auto-inference from claiming
+  // `--outline-color` as a `transparent` <color> once any style sets `#outline`.
+  '#outline': {
+    inherits: true,
+    initialValue: 'currentcolor',
+  },
 
   // ---- Core design tokens used by style handlers ----
   // These provide sensible defaults so Tasty works standalone without a design system.

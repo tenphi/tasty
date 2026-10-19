@@ -1,7 +1,7 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import { BORDER_STYLES } from './const';
-import { assignLineSlots } from './shared';
+import { assignLineSlots, resolveDefaultValue } from './shared';
 
 interface OutlineStyleProps {
   outline?: string | boolean | number;
@@ -56,7 +56,8 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
           outlinePart.colors[0],
         );
 
-        const value = outlinePart.values[0] || 'var(--outline-width)';
+        // The same `1ow` as `outline: true`, so `'dotted'` follows the unit.
+        const value = outlinePart.values[0] || resolveDefaultValue('1ow');
         const type = slots.style || 'solid';
         const outlineColor = slots.color || 'var(--outline-color)';
 

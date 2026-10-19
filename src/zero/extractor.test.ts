@@ -442,6 +442,20 @@ describe('extractPropertiesFromStyles', () => {
   });
 });
 
+describe('extractPropertiesFromStyles with a property Tasty declares', () => {
+  it('emits the declared definition instead of an inferred one', () => {
+    // `color` publishes `--current-color`. Inferred, it would register as a
+    // `<color>` starting `transparent`, which renders a reader invisible where
+    // nothing published the color.
+    const rules = extractPropertiesFromStyles({ color: '#purple' }).filter(
+      (p) => p.name === '--current-color',
+    );
+
+    expect(rules).toHaveLength(1);
+    expect(rules[0].css).toContain('initial-value: currentcolor');
+  });
+});
+
 describe('extractPropertiesFromStyles with keyframe tokens', () => {
   it('infers types for the custom properties keyframe steps set', () => {
     const properties = extractPropertiesFromStyles({

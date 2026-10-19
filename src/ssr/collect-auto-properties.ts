@@ -6,6 +6,7 @@
  * Mirrors the client-side auto-inference in StyleInjector.inject().
  */
 
+import { getEffectivePropertiesByName } from '../config-resources';
 import type { StyleResult } from '../pipeline';
 import { parsePropertyToken } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
@@ -39,13 +40,17 @@ function scanAndEmitAutoProperties(
     }
   }
 
+  // Tasty's default properties and `configure({ properties })` are emitted by
+  // the collector's internals with their own definitions; inferring one again
+  // would register it twice, the second time with a guessed initial value.
+  const declared = getEffectivePropertiesByName();
   const resolver = new PropertyTypeResolver();
 
   for (const rule of rules) {
     if (!rule.declarations) continue;
     resolver.scanDeclarations(
       rule.declarations,
-      (name) => registered.has(name),
+      (name) => registered.has(name) || declared.has(name),
       (name, syntax, initialValue) => {
         registered.add(name);
         const css = formatPropertyCSS(name, {

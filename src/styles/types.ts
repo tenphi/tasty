@@ -126,7 +126,8 @@ export interface StylesInterface extends Omit<
    * - `fill="okhsl(200 100% 50%)"` // perceptually uniform OKHSL color
    * - `fill="oklch(0.7 0.15 200)"` // OKLCH color
    * - `fill="#primary #secondary"` // double color (second as foreground overlay)
-   * - `fill={true}` // default fill color
+   *
+   * `fill={false}` sets no fill. `fill={true}` names no color and is ignored.
    */
   fill?: ColorValue | boolean;
   /**

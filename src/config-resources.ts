@@ -15,6 +15,7 @@ import type {
   KeyframesSteps,
   PropertyDefinition,
 } from './injector/types';
+import { parsePropertyToken } from './properties';
 import { DEFAULT_PROPERTIES } from './properties/defaults';
 import type { ConfigTokens, Styles } from './styles/types';
 
@@ -63,6 +64,48 @@ export function getEffectiveProperties(): Record<string, PropertyDefinition> {
   return properties
     ? { ...DEFAULT_PROPERTIES, ...properties }
     : DEFAULT_PROPERTIES;
+}
+
+export interface EffectivePropertyEntry {
+  /** The token the property was declared under (`#current`, `$gap`). */
+  token: string;
+  definition: PropertyDefinition;
+}
+
+let effectivePropertyIndex: {
+  source: Record<string, PropertyDefinition> | null | undefined;
+  index: ReadonlyMap<string, EffectivePropertyEntry>;
+} | null = null;
+
+/**
+ * The effective properties keyed by the custom property each one registers
+ * (`#current` → `--current-color`).
+ *
+ * Auto-inference consults it so a property Tasty already declares keeps its
+ * own definition: otherwise a scan that meets `--current-color: …` registers it
+ * a second time as a `<color>` with a guessed `transparent` initial value.
+ * Rebuilt only when `configure({ properties })` replaces the set.
+ */
+export function getEffectivePropertiesByName(): ReadonlyMap<
+  string,
+  EffectivePropertyEntry
+> {
+  const source =
+    globalProperties ??
+    getFromGlobalThis<Record<string, PropertyDefinition>>(GTKEY_PROPERTIES);
+
+  if (effectivePropertyIndex && effectivePropertyIndex.source === source) {
+    return effectivePropertyIndex.index;
+  }
+
+  const index = new Map<string, EffectivePropertyEntry>();
+  for (const [token, definition] of Object.entries(getEffectiveProperties())) {
+    const parsed = parsePropertyToken(token);
+    if (parsed.isValid) index.set(parsed.cssName, { token, definition });
+  }
+
+  effectivePropertyIndex = { source, index };
+  return index;
 }
 
 export function getGlobalFontFaces(): Record<string, FontFaceInput> | null {

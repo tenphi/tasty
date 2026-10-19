@@ -1,8 +1,9 @@
 import { makeEmptyDetails } from '../parser/types';
 import { DIRECTIONS, parseStyle } from '../utils/styles';
-import { extractCSSWideKeyword } from './shared';
+import { extractCSSWideKeyword, resolveDefaultValue } from './shared';
 
-const PROP = 'var(--radius)';
+/** Radius for a group that names no value; the same `1r` as `radius: true`. */
+const DEFAULT_RADIUS = '1r';
 const SHARP = 'var(--sharp-radius)';
 
 const RADIUS_LONGHANDS = [
@@ -91,26 +92,28 @@ export function radiusStyle({
     return result;
   }
 
+  const defaultRadius = resolveDefaultValue(DEFAULT_RADIUS);
+
   if (mods.includes('round')) {
     values = ['9999rem'];
   } else if (mods.includes('ellipse')) {
     values = ['50%'];
   } else if (!values.length) {
-    values = [PROP];
+    values = [defaultRadius];
   }
 
   if (mods.includes('leaf')) {
     values = [
       values[1] || SHARP,
-      values[0] || PROP,
+      values[0] || defaultRadius,
       values[1] || SHARP,
-      values[0] || PROP,
+      values[0] || defaultRadius,
     ];
   } else if (mods.includes('backleaf')) {
     values = [
-      values[0] || PROP,
+      values[0] || defaultRadius,
       values[1] || SHARP,
-      values[0] || PROP,
+      values[0] || defaultRadius,
       values[1] || SHARP,
     ];
   } else if (mods.length) {
@@ -120,7 +123,7 @@ export function radiusStyle({
       const arr = ['0', '0', '0', '0'];
 
       for (const i of corners) {
-        arr[i] = values[0] || PROP;
+        arr[i] = values[0] || defaultRadius;
       }
 
       values = arr;

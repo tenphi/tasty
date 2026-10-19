@@ -4,6 +4,7 @@
  */
 
 import { resetStylesGenerated } from '../config';
+import { CUSTOM_UNITS, getGlobalParser } from '../utils/styles';
 
 import type { StateParserContext } from './index';
 import {
@@ -74,7 +75,7 @@ describe('Advanced State Mapping', () => {
       it('should expand tasty units in media queries', () => {
         const result = parseAdvancedState('@media(w < 40x)', defaultCtx);
         expect(result.type).toBe('media');
-        expect(result.condition).toBe('width < calc(var(--gap) * 40)');
+        expect(result.condition).toBe('width < 320px');
       });
 
       it('should handle prefers-color-scheme', () => {
@@ -321,15 +322,70 @@ describe('Advanced State Mapping', () => {
 
     describe('expandTastyUnits', () => {
       it('should expand x units', () => {
-        expect(expandTastyUnits('40x')).toBe('calc(var(--gap) * 40)');
+        expect(expandTastyUnits('40x')).toBe('320px');
       });
 
       it('should expand decimal x units', () => {
-        expect(expandTastyUnits('12.5x')).toBe('calc(var(--gap) * 12.5)');
+        expect(expandTastyUnits('12.5x')).toBe('100px');
       });
 
       it('should not affect other units', () => {
         expect(expandTastyUnits('920px')).toBe('920px');
+      });
+
+      // A query condition cannot read a custom property, so every unit has to
+      // reach it as a literal length — not only `x`, and not as
+      // `calc(var(--gap) * n)`, which @media and @container reject.
+      it.each([
+        ['2r', '12px'],
+        ['3bw', '3px'],
+        ['2ow', '6px'],
+        ['1cr', '10px'],
+        ['.5x', '4px'],
+      ])('should expand %s to %s', (input, expected) => {
+        expect(expandTastyUnits(input)).toBe(expected);
+      });
+
+      it('should expand every unit in a range condition', () => {
+        expect(expandTastyUnits('40x <= width < 200r')).toBe(
+          '320px <= width < 1200px',
+        );
+      });
+
+      it('should leave identifiers and native units alone', () => {
+        for (const condition of [
+          'width < 40em',
+          'width < 2rem',
+          'aspect-ratio > 16/9',
+          'style(--size-1x)',
+          'h1x',
+        ]) {
+          expect(expandTastyUnits(condition)).toBe(condition);
+        }
+      });
+
+      describe('with configured units', () => {
+        afterEach(() => {
+          getGlobalParser().setUnits(CUSTOM_UNITS);
+        });
+
+        it('should follow the configured scale', () => {
+          getGlobalParser().setUnits({
+            ...CUSTOM_UNITS,
+            x: '4px',
+            bp: '100px',
+          });
+
+          expect(expandTastyUnits('w < 40x')).toBe('w < 160px');
+          expect(expandTastyUnits('w < 6bp')).toBe('w < 600px');
+        });
+
+        it('should pass a custom-property unit through as calc()', () => {
+          // Nothing literal to expand to; reported in development.
+          getGlobalParser().setUnits({ ...CUSTOM_UNITS, x: 'var(--gap)' });
+
+          expect(expandTastyUnits('w < 40x')).toBe('w < calc(40 * var(--gap))');
+        });
       });
     });
 

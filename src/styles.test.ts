@@ -13,6 +13,7 @@ import { paddingStyle } from './styles/padding';
 import { presetStyle } from './styles/preset';
 import { radiusStyle } from './styles/radius';
 import { shadowStyle } from './styles/shadow';
+import { resetStyleWarnings } from './utils/warnings';
 
 describe('Tasty style tests', () => {
   beforeEach(() => {
@@ -97,6 +98,18 @@ describe('Tasty style tests', () => {
       });
     });
 
+    it('reads a hex literal the way every other color style does', () => {
+      // `#ddd` is also a valid token name, so it keeps the token lookup with
+      // the literal as its fallback — as `fill`, `border`, and the rest do.
+      expect(colorStyle({ color: '#ddd' })).toEqual({
+        color: 'var(--ddd-color, #ddd)',
+        '--current-color': 'var(--ddd-color, #ddd)',
+      });
+      expect(colorStyle({ color: '#FF8040' })!.color).toBe(
+        fillStyle({ fill: '#FF8040' })!['background-color'],
+      );
+    });
+
     it('republishes a keyword', () => {
       // `--current-color: inherit` takes the parent's published value, which is
       // what `color: inherit` does for the color itself.
@@ -135,6 +148,42 @@ describe('Tasty style tests', () => {
     ).toEqual({
       'background-color':
         'var(--primary-color, var(--secondary-color, var(--tertiary-color)))',
+    });
+  });
+
+  describe('`fill: true`', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it('emits no declaration for it', () => {
+      // There is no default fill color; passed through, it became
+      // `background-color: true`, which the browser drops.
+      expect(fillStyle({ fill: true })).toBeNull();
+    });
+
+    it('keeps the rest of the fill handler', () => {
+      expect(fillStyle({ fill: true, image: 'url(/image.png)' })).toEqual({
+        'background-image': 'url(/image.png)',
+      });
+      expect(fillStyle({ fill: true, backgroundColor: '#purple' })).toEqual({
+        'background-color': 'var(--purple-color)',
+      });
+    });
+
+    it('warns in development', () => {
+      resetStyleWarnings();
+      vi.stubEnv('NODE_ENV', 'development');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+
+      fillStyle({ fill: true });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('fill: true has no default color'),
+      );
     });
   });
 

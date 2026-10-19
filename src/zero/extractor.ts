@@ -22,6 +22,7 @@ import {
   formatFontFaceRule,
   hasLocalFontFace,
 } from '../font-face';
+import { getEffectivePropertiesByName } from '../config-resources';
 import { isFunctionsPolyfillEnabled } from '../config-state';
 import {
   extractLocalFunctions,
@@ -44,6 +45,7 @@ import {
   formatKeyframesCSS,
   formatKeyframesSteps,
 } from '../ssr/format-keyframes';
+import { formatPropertyCSS } from '../ssr/format-property';
 import { extractLocalProperties, hasLocalProperties } from '../properties';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
 import type { Styles } from '../styles/types';
@@ -489,6 +491,7 @@ export function extractPropertiesFromStyles(
   }
 
   const resolver = new PropertyTypeResolver();
+  const declared = getEffectivePropertiesByName();
 
   const registerProperty = (
     name: string,
@@ -497,6 +500,17 @@ export function extractPropertiesFromStyles(
   ) => {
     if (registered.has(name)) return;
     registered.add(name);
+
+    // A property Tasty already declares (`#current` → `--current-color`) keeps
+    // its own definition. The inferred one would guess its initial value —
+    // `transparent` for `--current-color`, which renders a reader invisible
+    // where nothing published the color.
+    const known = declared.get(name);
+    if (known) {
+      const css = formatPropertyCSS(known.token, known.definition);
+      if (css) results.push({ name, css });
+      return;
+    }
 
     const parts: string[] = [];
     parts.push(`syntax: "${syntax}";`);

@@ -66,8 +66,17 @@ const MAP: Record<string, string[]> = {
   width: ['max-width', 'min-width', 'width'],
   height: ['max-height', 'min-height', 'height'],
   gap: ['gap', 'margin'],
-  zIndex: ['z-index'],
   inset: ['inset', 'top', 'right', 'bottom', 'left'],
+};
+
+/**
+ * Names that reach the handler in a form other than the CSS property they
+ * stand for. The parser lowercases tokens, so the `zIndex` style name arrives
+ * as `zindex`, which is not a CSS property; it means `z-index`, timing token
+ * included, exactly as if the CSS name had been written.
+ */
+const NAME_ALIASES: Record<string, string> = {
+  zindex: 'z-index',
 };
 
 const DEFAULT_EASING = 'linear';
@@ -110,11 +119,13 @@ export function transitionStyle({ transition }: { transition?: string }) {
 
   for (const group of processed.groups) {
     const tokens = group.all;
-    const name = tokens[0];
+    let name = tokens[0];
 
     // The name doubles as the property to transition and as the timing token, so
     // a reference cannot stand in for it.
     if (!name || isTokenNameReference('transition', name)) continue;
+
+    name = NAME_ALIASES[name] ?? name;
 
     let timing: string | undefined;
     let easing: string | undefined;

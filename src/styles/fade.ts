@@ -2,7 +2,7 @@ import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import type { StyleDetails } from '../parser/types';
 import { DIRECTIONS, parseStyle } from '../utils/styles';
 
-import { warnExtraGroupValues } from './shared';
+import { resolveDefaultValue, warnExtraGroupValues } from './shared';
 
 // Positional counterparts to DIRECTIONS: top, right, bottom, left.
 const GRADIENT_DIRECTIONS = ['to bottom', 'to left', 'to top', 'to right'];
@@ -24,7 +24,7 @@ function processGroup(
   // Extract colors: first = transparent mask color, second = opaque mask color
   const transparentColor = colors[0] || DEFAULT_TRANSPARENT_COLOR;
   const opaqueColor = colors[1] || DEFAULT_OPAQUE_COLOR;
-  const firstSize = values.length ? values[0] : 'calc(2 * var(--gap))';
+  const firstSize = values.length ? values[0] : resolveDefaultValue('2x');
   let namedCount = 0;
 
   // A group that names edges takes a single width, applied to every edge it

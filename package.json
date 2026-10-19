@@ -256,7 +256,7 @@
       "name": "main (useRawCSS)",
       "path": "dist/index.js",
       "import": "{ useRawCSS }",
-      "limit": "31.2 kB"
+      "limit": "32.21 kB"
     },
     {
       "name": "core (import *)",
@@ -290,7 +290,7 @@
         "path",
         "crypto"
       ],
-      "limit": "42.44 kB"
+      "limit": "43.65 kB"
     },
     {
       "name": "astro client",

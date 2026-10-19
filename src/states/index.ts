@@ -8,6 +8,7 @@
 import { hasStylesGenerated } from '../config-state';
 import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
+import { getGlobalParser, parseStyle } from '../utils/styles';
 
 /**
  * Parsed advanced state information
@@ -377,14 +378,40 @@ export function expandDimensionShorthands(condition: string): string {
 }
 
 /**
- * Convert tasty units in a string (e.g., 40x -> calc(var(--gap) * 40))
+ * A number with a unit, standing on its own: the `40x` in `width < 40x`, not
+ * the `1x` inside an identifier such as `--size-1x`. Same shape as the parser's
+ * unit token.
+ */
+const RE_QUERY_UNIT_NUMBER = /(?<![\w.-])(?:\d*\.\d+|\d+)([a-z][a-z0-9]*)\b/g;
+
+/**
+ * Resolve Tasty units in a query condition (e.g. `40x` → `320px`).
+ *
+ * `@media` and `@container` conditions cannot read custom properties, so a unit
+ * has to reach them as a literal length. Every configured unit — built-in or
+ * from `configure({ units })` — resolves through the parser, as it does in a
+ * style value. Native CSS units are not in the unit table and pass through.
  */
 export function expandTastyUnits(value: string): string {
-  // Match number followed by 'x' unit (tasty gap unit)
-  return value.replace(
-    /(\d+(?:\.\d+)?)\s*x\b/g,
-    (_, num) => `calc(var(--gap) * ${num})`,
-  );
+  const units = getGlobalParser().getUnits();
+  if (!units) return value;
+
+  return value.replace(RE_QUERY_UNIT_NUMBER, (token, unit: string) => {
+    if (!Object.prototype.hasOwnProperty.call(units, unit)) return token;
+
+    const resolved = parseStyle(token).groups[0]?.values[0] ?? token;
+
+    if (resolved.includes('var(')) {
+      warnOnce(
+        `query-unit-var:${unit}`,
+        `[Tasty] Unit '${unit}' resolves to '${resolved}', which @media and ` +
+          `@container conditions cannot read: custom properties are not ` +
+          `available there. Write '${token}' as a px, em, or rem length.`,
+      );
+    }
+
+    return resolved;
+  });
 }
 
 /**

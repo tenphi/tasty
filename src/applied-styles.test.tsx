@@ -218,9 +218,10 @@ describe('generated CSS applies in the browser', () => {
     it('registers design tokens as inherited custom properties', () => {
       render(<div />);
 
-      // `$gap` is declared `syntax: '<length>'; inherits: true` with a `4px`
-      // initial value. An engine without `@property` reports an empty string.
-      expect(computed(document.documentElement, '--gap')).toBe('4px');
+      // `$gap` is declared `syntax: '<length>'; inherits: true` with an `8px`
+      // initial value, the `x` unit's default. An engine without `@property`
+      // reports an empty string.
+      expect(computed(document.documentElement, '--gap')).toBe('8px');
     });
 
     it('applies styles injected through the CSSOM rather than as text', () => {

@@ -198,6 +198,23 @@ describe('transitionStyle', () => {
     });
   });
 
+  describe('zIndex', () => {
+    // The parser lowercases tokens, so the style name arrives as `zindex`.
+    it('transitions z-index, timing token included', () => {
+      expect(transitionStyle({ transition: 'zIndex' })).toEqual({
+        transition: 'z-index var(--z-index-transition, var(--transition))',
+      });
+    });
+
+    it('matches the CSS name exactly', () => {
+      for (const value of [' 0.2s ease-in', '', ' 1s, opacity 2s']) {
+        expect(transitionStyle({ transition: `zIndex${value}` })).toEqual(
+          transitionStyle({ transition: `z-index${value}` }),
+        );
+      }
+    });
+  });
+
   describe('CSS custom property names ($$token / ##token)', () => {
     it('handles custom property with explicit timing', () => {
       const result = transitionStyle({ transition: '--angle 0.3s' });

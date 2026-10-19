@@ -470,10 +470,15 @@ export function classify(
       // anything a `<color>` can be — including a `color-mix()` or a
       // `light-dark()` with no channels to decompose, or a value written
       // straight into `--name-color` by hand-authored CSS that Tasty never
-      // defined — and relative color syntax fades all of them.
+      // defined — and relative color syntax fades all of them. A hex-shaped
+      // name keeps its literal fallback, as it does without an alpha.
+      const color = RE_HEX.test(base)
+        ? `var(--${base}-color, #${base})`
+        : `var(--${base}-color)`;
+
       return {
         bucket: Bucket.Color,
-        processed: fadeColor(`var(--${base}-color)`, rawAlpha),
+        processed: fadeColor(color, rawAlpha),
       };
     }
 

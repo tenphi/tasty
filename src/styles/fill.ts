@@ -1,4 +1,5 @@
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
+import { warnOnceDev } from '../utils/warnings';
 
 export function fillStyle({
   fill,
@@ -13,7 +14,7 @@ export function fillStyle({
   backgroundClip,
   background,
 }: {
-  fill?: string;
+  fill?: string | boolean;
   backgroundColor?: string;
   image?: string;
   backgroundImage?: string;
@@ -33,8 +34,20 @@ export function fillStyle({
 
   const result: Record<string, string> = {};
 
+  // `fill: true` names no color, and there is no default fill to stand in for
+  // one. Passed through, it became `background-color: true`, which the browser
+  // drops, so it is skipped and reported instead.
+  if (fill === true) {
+    warnOnceDev(
+      'fill-true',
+      'fill: true has no default color and is ignored. Write a color ' +
+        "(fill: '#surface'), or false for no fill.",
+    );
+  }
+
   // Priority: backgroundColor > fill
-  const colorValue = backgroundColor ?? fill;
+  const colorValue =
+    backgroundColor ?? (typeof fill === 'string' ? fill : undefined);
   if (colorValue) {
     const parsed = parseStyle(colorValue);
     const firstColor = parsed.groups[0]?.colors[0];

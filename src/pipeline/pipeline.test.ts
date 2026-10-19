@@ -2102,6 +2102,51 @@ describe('Integration: Exclusive conditions for media queries', () => {
   });
 });
 
+describe('container queries over other size features', () => {
+  function atRulesFor(stateKey: string): string[] {
+    return renderStyles(
+      { color: { '': 'red', [stateKey]: 'blue' } },
+      '.t',
+    ).flatMap((rule) => rule.atRules ?? []);
+  }
+
+  // Used to fall back to a pseudo-class, which emitted `@(…)` as a selector.
+  it.each([
+    ['@(aspect-ratio > 1)', '@container', '(aspect-ratio > 1)'],
+    [
+      '@(1/1 < aspect-ratio <= 16/9)',
+      '@container',
+      '(1/1 < aspect-ratio <= 16/9)',
+    ],
+    ['@(orientation: portrait)', '@container', '(orientation: portrait)'],
+    ['@(layout, aspect-ratio > 1)', '@container layout', '(aspect-ratio > 1)'],
+  ])('passes %s through as written', (stateKey, prelude, query) => {
+    expect(parseStateKey(stateKey)).toMatchObject({
+      type: 'container',
+      subtype: 'raw',
+      rawCondition: query,
+    });
+    expect(atRulesFor(stateKey)).toEqual([
+      `${prelude} (not ${query})`,
+      `${prelude} ${query}`,
+    ]);
+  });
+
+  it('still parses width, height, inline-size and block-size as dimensions', () => {
+    for (const stateKey of [
+      '@(w < 300px)',
+      '@(h > 1px)',
+      '@(is <= 2px)',
+      '@(bs >= 3px)',
+    ]) {
+      expect(parseStateKey(stateKey)).toMatchObject({
+        type: 'container',
+        subtype: 'dimension',
+      });
+    }
+  });
+});
+
 describe('rule finalization', () => {
   it('deduplicates expanded selectors while keeping @starting rules last', () => {
     const result = renderStyles(

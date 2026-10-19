@@ -556,6 +556,8 @@ const Panel = tasty({
 
 Container style queries use `$prop` (boolean) or `$prop=value` syntax, which maps to CSS `style(--prop)` or `style(--prop: "value")`.
 
+Other size features pass through as written: `@(aspect-ratio > 1)` → `@container (aspect-ratio > 1)`, `@(orientation: portrait)` → `@container (orientation: portrait)`. They need a container with `containerType: 'size'`, since an `inline-size` container has no block size to compare against.
+
 ### `@supports(...)` — Feature Queries
 
 Feature queries test CSS property support and accept CSS support functions such

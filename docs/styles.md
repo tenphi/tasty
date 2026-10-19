@@ -368,7 +368,7 @@ Border shorthand with directional and multi-group support. Use **comma-separated
 
 **Syntax:** `[width] [style] [color] [directions...]` — comma-separated for multiple groups
 
-**Defaults:** width = `1bw`, style = `solid`, color = `#border`
+**Defaults:** width = `1bw`, style = `solid`, color = `#border`, which is the text color (`currentColor`) until your tokens define `#border`
 
 **Styles:** `none`, `hidden`, `dotted`, `dashed`, `solid`, `double`, `groove`, `ridge`, `inset`, `outset`
 
@@ -480,7 +480,7 @@ Use `/` to separate the preset name from one or more space-separated modifiers. 
 
 | Modifier | Effect |
 |----------|--------|
-| `strong` (or `bold`) | Sets `font-weight` to bold (from `$bold-font-weight` token) |
+| `strong` (or `bold`) | Sets `font-weight` to bold (from `$bold-font-weight` token, `700` until your tokens define it) |
 | `italic` | Sets `font-style: italic` |
 | `icon` | Sets font-size and line-height to icon size |
 | `tight` | Sets line-height equal to font-size |
@@ -586,7 +586,7 @@ When easing is provided without a duration, the default timing variable is used 
 
 When two entries cover the same property, an entry that names that one property wins over a group such as `theme`, in either order: `opacity 120ms ease-in-out, theme` keeps the opacity timing. Otherwise the later entry wins, as in CSS.
 
-Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name). Prefer omitting the duration or using a duration token instead of repeating raw time values across components. Explicit zero can disable motion.
+Default timing: `$transition` (or `${name}-transition` with `$transition` fallback per semantic name). `$transition` is `80ms` until your tokens define it. Prefer omitting the duration or using a duration token instead of repeating raw time values across components. Explicit zero can disable motion.
 
 ```jsx
 transition="theme"

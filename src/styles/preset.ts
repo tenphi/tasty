@@ -1,4 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
+import { DEFAULT_BOLD_FONT_WEIGHT } from '../properties/defaults';
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import { isTokenNameReference } from './shared';
 import type { CSSMap } from '../utils/styles';
@@ -12,7 +13,14 @@ const PRESET_MODIFIERS = new Set([
   'normal',
 ]);
 
-const SANS_FONT = 'var(--font-sans, var(--font-sans-fallback))';
+// `$font-sans-fallback` / `$font-mono-fallback` hold full font stacks wherever
+// Tasty's default properties are registered. Zero-runtime CSS ships without
+// them, so each carries a short fallback of its own: without one, every `font`
+// value there would compute to the inherited font, `monospace` included.
+const SANS_FONT =
+  'var(--font-sans, var(--font-sans-fallback, system-ui, sans-serif))';
+const MONO_FONT =
+  'var(--font-mono, var(--font-mono-fallback, ui-monospace, monospace))';
 
 /**
  * Convert a value to CSS, handling numbers as pixels for numeric properties
@@ -78,9 +86,9 @@ interface PresetStyleProps {
 /**
  * Resolve font/fontFamily value to CSS font-family string.
  *
- * - `font="monospace"` → var(--font-mono, var(--font-mono-fallback))
- * - `font={true}` → var(--font-sans, var(--font-sans-fallback))
- * - `font="CustomFont"` → CustomFont, var(--font-sans, var(--font-sans-fallback))
+ * - `font="monospace"` → var(--font-mono, var(--font-mono-fallback, ui-monospace, monospace))
+ * - `font={true}` → var(--font-sans, var(--font-sans-fallback, system-ui, sans-serif))
+ * - `font="CustomFont"` → CustomFont, var(--font-sans, …)
  * - `fontFamily="Arial"` → Arial (direct, no fallback)
  */
 function resolveFontFamily(
@@ -97,7 +105,7 @@ function resolveFontFamily(
   }
 
   if (font === 'monospace') {
-    return 'var(--font-mono, var(--font-mono-fallback))';
+    return MONO_FONT;
   }
 
   if (font === true) {
@@ -206,7 +214,10 @@ export function presetStyle({
     setCSSValue(styles, 'icon-size', name, 'var');
 
     if (isStrong) {
-      styles['font-weight'] = 'var(--bold-font-weight)';
+      // Falls back to the `$bold-font-weight` default where it is not emitted
+      // (zero-runtime CSS); otherwise the weight would be inherited.
+      styles['font-weight'] =
+        `var(--bold-font-weight, ${DEFAULT_BOLD_FONT_WEIGHT})`;
     }
     if (isItalic) {
       styles['font-style'] = 'italic';

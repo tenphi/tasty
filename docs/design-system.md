@@ -42,14 +42,24 @@ configure({
     // Borders
     '#border': '#e0e0e0',
 
-    // Unit values
+    // Spacing and shape scale
     $gap: '8px',
     $radius: '4px',
     '$border-width': '1px',
     '$outline-width': '2px',
   },
+  // Built-in units compile to fixed values by default. Pointing them at the
+  // tokens above lets a theme or density mode change the scale at runtime.
+  units: {
+    x: 'var(--gap)', // 2x → calc(2 * var(--gap))
+    r: 'var(--radius)',
+    bw: 'var(--border-width)',
+    ow: 'var(--outline-width)',
+  },
 });
 ```
+
+Leave out the `units` block to keep the built-in fixed scale (`x` = `8px`, `r` = `6px`, `bw` = `1px`, `ow` = `3px`), or set fixed values there instead (`units: { x: '8px', r: '4px' }`). Always define the token a unit points at: `--gap` is registered with an initial value of `4px`, which would silently halve the default step. Boolean shorthands follow the same scale: `radius: true` is `1r`, `border: true` is `1bw`, and `outline: true` is `1ow`. See [Built-in Units](dsl.md#built-in-units).
 
 Tokens are injected as CSS custom properties on `:root` when the first style is rendered. They support state maps for theme-aware values:
 
@@ -66,7 +76,7 @@ configure({
 
 The `#on-*` convention names the text color that sits on top of a fill — `#on-primary` is the text color on a `#primary` background. This makes state maps self-documenting: `fill: '#primary'` and `color: '#on-primary'` clearly belong together.
 
-For OKHSL-based palette generation with automatic WCAG contrast solving, see [Glaze](https://github.com/tenphi/glaze).
+To generate the whole palette instead of hand-picking values, use [Glaze](https://github.com/tenphi/glaze): it builds light, dark, and high-contrast variants from one hue in the OKHST color space, solves WCAG and APCA contrast, and exports Tasty tokens you can pass straight to `configure({ tokens: theme.tasty() })`.
 
 ### Replace tokens for value aliases
 
@@ -176,10 +186,12 @@ const Card = tasty({
   styles: {
     padding: { '': '4x', '@mobile': '2x' },
     flow: { '': 'row', '@mobile': 'column' },
-    fill: { '': '#surface', '@dark': '#surface-dark' },
+    radius: { '': '1r', '@mobile': '0' },
   },
 });
 ```
+
+Theme switching belongs in tokens (`'#surface': { '': '#fff', '@dark': '#1c1c1e' }`) rather than in component state maps, so components stay theme-agnostic.
 
 Without aliases, the same component would need the full media query expression inlined in every state map — across every property, in every component. Aliases eliminate that duplication.
 
@@ -279,7 +291,7 @@ const Grid = tasty({
     display: 'grid',
     gap: '1x',
   },
-  styleProps: [...FLOW_STYLES, 'gridColumns', 'gridRows', 'gridAreas'],
+  styleProps: FLOW_STYLES, // includes gridColumns, gridRows, gridAreas
 });
 ```
 
@@ -298,18 +310,54 @@ Product engineers use these to compose layouts without writing CSS:
 </Grid>
 ```
 
+### Interactive components with variants
+
+Variants are named looks that replace each other. Combine them with `modProps` for states that stack, such as size or loading:
+
+```tsx
+const Button = tasty({
+  as: 'button',
+  modProps: { size: ['sm', 'md', 'lg'] as const },
+  styles: {
+    recipe: 'interactive',
+    padding: { '': '1.5x 3x', 'size=sm': '1x 2x', 'size=lg': '2x 4x' },
+    radius: '1r',
+  },
+  variants: {
+    default: {
+      fill: {
+        '': '#primary',
+        ':hover': '#primary-hover',
+        disabled: '#surface',
+      },
+      color: '#on-primary',
+    },
+    danger: {
+      fill: { '': '#danger', ':hover': '#danger-hover', disabled: '#surface' },
+      color: '#on-danger',
+    },
+  },
+});
+
+<Button variant="danger" size="lg">
+  Delete
+</Button>;
+```
+
+`variant` is typed from the keys, the `default` variant applies when no `variant` prop is passed, and only the variants that actually render emit CSS. See [React API — Variants](react-api.md#variants).
+
 ### Which styleProps to expose
 
 Match the prop set to the component's role:
 
-| Component category                         | Recommended styleProps                                         |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| Layout containers (`Space`, `Box`, `Grid`) | `FLOW_STYLES` — flow, gap, align, justify, padding, fill       |
-| Positioned elements (`Button`, `Badge`)    | `POSITION_STYLES` — placeSelf, gridArea, order                 |
-| Text elements                              | `['preset', 'color']` or a custom subset                       |
-| Compound components                        | Typically none — styling happens via sub-elements and wrapping |
+| Component category                         | Recommended styleProps                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Layout containers (`Space`, `Box`, `Grid`) | `FLOW_STYLES` — flow, gap, align/justify/place, grid templates (add `padding` or `fill` explicitly) |
+| Positioned elements (`Button`, `Badge`)    | `POSITION_STYLES` — placeSelf, gridArea, order                                                      |
+| Text elements                              | `['color', ...TEXT_STYLES]` (`preset` is always available)                                          |
+| Compound components                        | Typically none — styling happens via sub-elements and wrapping                                      |
 
-Exposing too many props weakens the design system's constraints. See [Methodology — styleProps as the public API](methodology.md#styleprops-as-the-public-api) for the rationale.
+`BASE_STYLES` (`display`, `font`, `preset`, `hide`, `whiteSpace`, `opacity`, `transition`) are accepted as props on every component without being listed. Exposing too many props weakens the design system's constraints. See [Methodology — styleProps as the public API](methodology.md#styleprops-as-the-public-api) for the rationale.
 
 ---
 
@@ -369,14 +417,14 @@ For sub-element syntax details (selector affix `$`, `@own()`, `elements` config)
 
 ## Defining the override contract
 
-A design system works best when the rules for customization are explicit. Tasty provides three levels of control:
+A design system works best when the rules for customization are explicit. Tasty gives product engineers four sanctioned ways to customize a component, and a few to discourage:
 
 ### What product engineers can do
 
 1. **Use styleProps** — adjust layout, spacing, positioning through the props the component exposes:
 
 ```tsx
-<Space flow="row" gap="3x" padding="2x">
+<Space flow="row" gap="3x" placeItems="center">
 ```
 
 2. **Use modProps** — control component states through typed props instead of `mods`:
@@ -398,7 +446,12 @@ A design system works best when the rules for customization are explicit. Tasty 
 ```tsx
 const DangerButton = tasty(Button, {
   styles: {
-    fill: { '': '#danger', ':hover': '#danger-hover' },
+    fill: {
+      '': '#danger',
+      ':hover': '#danger-hover',
+      ':active': '#danger-pressed',
+      disabled: '@inherit', // a map with '' replaces the parent's; keep its disabled branch
+    },
     color: '#on-danger',
   },
 });
@@ -414,6 +467,53 @@ See [Methodology — styles prop vs style prop](methodology.md#styles-prop-vs-st
 
 ---
 
+## Guardrails: linting and types
+
+A vocabulary only holds if mistakes surface early. Register the same names you pass to `configure()` with the ESLint plugin and with TypeScript:
+
+```ts
+// tasty.config.ts — read by @tenphi/eslint-plugin-tasty
+export default {
+  tokens: ['#surface', '#text', '#primary', '#danger', '$gap', '$radius'],
+  states: ['@mobile', '@tablet', '@desktop', '@dark', '@reduced-motion'],
+  presets: ['h1', 'h2', 'h3', 't2', 't3'],
+  recipes: ['card', 'elevated', 'input-reset', 'interactive'],
+  importSources: ['@my-org/ds'], // where product code imports tasty() from
+};
+```
+
+```js
+// eslint.config.js
+import tasty from '@tenphi/eslint-plugin-tasty';
+
+export default [tasty.configs.recommended]; // or tasty.configs.strict
+```
+
+```ts
+// tasty.d.ts
+import '@tenphi/tasty';
+
+declare module '@tenphi/tasty' {
+  interface TastyNamedColors {
+    surface: true;
+    text: true;
+    primary: true;
+    danger: true;
+  }
+  interface TastyPresetNames {
+    h1: true;
+    h2: true;
+    h3: true;
+    t2: true;
+    t3: true;
+  }
+}
+```
+
+Unknown colors, presets, and recipes then fail lint (`valid-color-token`, `valid-preset`, `valid-recipe`), and `strict` adds checks for unknown `$` tokens and state aliases (`valid-custom-property`, `no-unknown-state-alias`). The same names autocomplete in editors. Deriving both lists from the same token and recipe modules that `config.ts` imports keeps all three in sync.
+
+---
+
 ## Project structure
 
 A recommended structure for a design system built on Tasty:
@@ -421,6 +521,8 @@ A recommended structure for a design system built on Tasty:
 ```
 ds/
   config.ts              # configure() — tokens, units, states, recipes
+  tasty.config.ts        # Names the ESLint plugin validates against
+  tasty.d.ts             # TypeScript augmentation for autocomplete
   primitives/
     Space.tsx             # Layout: flex container with FLOW_STYLES
     Box.tsx               # Generic container
@@ -436,7 +538,7 @@ ds/
   tokens/
     colors.ts             # Color token definitions
     typography.ts         # Typography presets for configure({ presets })
-    spacing.ts            # Spacing token definitions
+    units.ts              # Spacing and shape scale for configure({ units })
   index.ts                # Public API: re-exports components + configure
 ```
 

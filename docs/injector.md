@@ -10,10 +10,10 @@ The Style Injector is the core engine behind Tasty's styling system, providing:
 
 - **Hash-based deduplication** - Identical CSS gets the same className
 - **DOM-driven lifetime** - Styles are collected once nothing renders them
-- **CSS nesting flattening** - Handles `&`, `.Class`, `SubElement` patterns
+- **Selector assembly** - Prepends the doubled `.tX.tX` class and root prefix to the pipeline's selector fragments (sub-element and `&` nesting is flattened earlier, by the pipeline)
 - **At-rule injection** - First-class `@keyframes`, `@property`, `@font-face`, `@counter-style`, and `@function` support
 - **Smart cleanup** - CSS rules batched cleanup, keyframes disposed immediately
-- **SSR support** - Deterministic class names and CSS extraction
+- **SSR support** - Deterministic class names shared with `ServerStyleCollector`, and hydration of server-rendered classes
 - **Multiple roots** - Works with Document and ShadowRoot
 - **Non-stacking cleanups** - Prevents timeout accumulation for better performance
 
@@ -55,13 +55,15 @@ Injects CSS rules and returns a className with dispose function.
 ```typescript
 import { inject } from '@tenphi/tasty';
 
-// Component styling - generates tasty class names
+// Rules flagged needsClassName get the generated class prepended (doubled)
 const result = inject([{
-  selector: '.t-abc123',
+  selector: '',
   declarations: 'color: red; padding: 10px;',
+  needsClassName: true,
 }]);
 
-console.log(result.className); // 't-abc123'
+console.log(result.className); // 'th8n0uh' — `t` + base36 hash of the rules
+// Injected: .th8n0uh.th8n0uh { color: red; padding: 10px; }
 
 // Release the pin; the class becomes collectible once nothing renders it
 result.dispose();
@@ -175,7 +177,7 @@ const result = testInjector.inject(rules);
 Injects CSS keyframes with automatic deduplication.
 
 ```typescript
-// Generated name (k0, k1, k2...)
+// Generated name (tk0, tk1, … — namePrefix + 'k' + counter)
 const fadeIn = keyframes({
   from: { opacity: 0 },
   to: { opacity: 1 },
@@ -253,6 +255,7 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 - **Configuration is locked after styles are generated** - calling `configure()` after first render will emit a warning and be ignored
 - `gc.touchInterval`: Number of renders between sweeps. When the counter reaches this value, a sweep is scheduled via `requestIdleCallback`; without idle callbacks nothing is collected automatically.
 - `gc.grace`: How long a class is left alone after collection first notices nothing is carrying it, in milliseconds (default `10000`).
+- Automatic sweeps are opt-in: they run only when `configure({ gc })` is set (`gc: {}` enables them with these defaults). Without it nothing is collected until you call `gc()` or `cleanup()`.
 
 **What a sweep does.** Everything the injector holds falls into one of five bands, and only the last is ever deleted:
 
@@ -289,7 +292,7 @@ Beyond ordinary rules, the injector has a dedicated entry point per at-rule. All
 
 Every one of these takes an optional `root` (a `Document` or `ShadowRoot`).
 
-`func()` also accepts `weak: true`, which registers the rule **without** overriding an existing one of the same name. `configure()` uses it for global `@function` definitions so a component-local definition always wins over the global default, regardless of which is injected first.
+`counterStyle()` and `func()` also accept `weak: true`, which registers the rule **without** overriding an existing one of the same name. `configure()` uses it for global `@counter-style` and `@function` definitions so a component-local definition always wins over the global default, regardless of which is injected first.
 
 ```ts
 import { counterStyle, fontFace, func, property } from '@tenphi/tasty';
@@ -306,22 +309,24 @@ func('$$negative', { args: ['$value'], result: '(-1 * $value)' });
 
 ### Style Result Format
 
-The injector works with `StyleResult` objects from the tasty parser:
+The injector works with `StyleResult` objects from the pipeline (`renderStyles`):
 
 ```typescript
 interface StyleResult {
-  selector: string;              // CSS selector
-  declarations: string;          // CSS declarations
-  atRules?: string[];           // @media, @supports, etc.
-  nestingLevel?: number;        // Nesting depth for specificity
+  selector: string;          // full selector, or a fragment when needsClassName
+  declarations: string;      // CSS declarations
+  atRules?: string[];        // @media, @container, @supports, …
+  needsClassName?: boolean;  // prepend the generated `.tX.tX` (OR'd fragments joined with '|||')
+  rootPrefix?: string;       // root-state prefix placed before the class
+  startingStyle?: boolean;   // wrap declarations in @starting-style
 }
 
 // Example StyleResult
 const styleRule: StyleResult = {
-  selector: '.t-button',
+  selector: ':where([data-hovered])',
   declarations: 'padding: 8px 16px; background: blue; color: white;',
   atRules: ['@media (min-width: 768px)'],
-  nestingLevel: 0,
+  needsClassName: true,
 };
 ```
 
@@ -339,28 +344,24 @@ API here calls it for you.
 ### Deduplication & Performance
 
 ```typescript
-// Identical CSS rules get the same className
-const button1 = inject([{
-  selector: '.t-btn1',
-  declarations: 'padding: 8px; color: red;'
-}]);
+const rule = { selector: '', declarations: 'padding: 8px; color: red;', needsClassName: true };
 
-const button2 = inject([{
-  selector: '.t-btn2', 
-  declarations: 'padding: 8px; color: red;' // Same declarations
-}]);
+const button1 = inject([rule], { cacheKey: 'button' });
+const button2 = inject([rule], { cacheKey: 'button' });
 
-// Both get the same className due to deduplication
+// One class, one copy of the CSS
 console.log(button1.className === button2.className); // true
 ```
+
+Without `cacheKey` the class name still matches (it hashes the rules), but the rule is inserted again and the pin count restarts at 1.
 
 ### Pinning
 
 ```typescript
 // Multiple callers using the same styles
-const comp1 = inject([commonStyle]);
-const comp2 = inject([commonStyle]);
-const comp3 = inject([commonStyle]);
+const comp1 = inject([commonStyle], { cacheKey: 'common' });
+const comp2 = inject([commonStyle], { cacheKey: 'common' });
+const comp3 = inject([commonStyle], { cacheKey: 'common' });
 
 // Style is pinned while any caller holds a handle
 comp1.dispose(); // pins: 3 → 2
@@ -439,15 +440,16 @@ const shadowAnimation = keyframes({
 
 ### Server-Side Rendering
 
+`getCSSText()` reads the injector's stylesheets, so it needs a DOM; on a server it throws. Collect server CSS with `ServerStyleCollector` from `@tenphi/tasty/ssr` (`collector.getCSS()`) — see [SSR](./ssr.md).
+
 ```typescript
 import { getCSSText, getCSSTextForNode } from '@tenphi/tasty';
+import { render } from '@testing-library/react';
 
-// Extract all CSS for SSR
-const cssText = getCSSText();
+const cssText = getCSSText(); // everything the injector holds (browser / test DOM)
 
-// Extract CSS for specific DOM subtree (like jest-styled-components)
-const container = render(<MyComponent />);
-const componentCSS = getCSSTextForNode(container);
+const { container } = render(<MyComponent />);
+const componentCSS = getCSSTextForNode(container); // only the CSS this subtree uses
 ```
 
 ### Test Environment Detection
@@ -520,16 +522,13 @@ console.log({
 ### Debug Information
 
 ```typescript
-// Get detailed information about injected styles
-const debugInfo = injector.instance.getDebugInfo();
+import { tastyDebug } from '@tenphi/tasty';
 
-console.log({
-  activeStyles: debugInfo.activeStyles,     // Currently active styles
-  unusedStyles: debugInfo.unusedStyles,     // Styles marked for cleanup
-  totalSheets: debugInfo.totalSheets,       // Number of stylesheets
-  totalRules: debugInfo.totalRules,         // Total CSS rules
-});
+const { activeClasses, unusedClasses, hotClasses, totalRuleCount } =
+  tastyDebug.summary({ raw: true });
 ```
+
+See [Debug Utilities](./debug.md).
 
 ### Cleanup History
 

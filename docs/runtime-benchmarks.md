@@ -197,8 +197,8 @@ The benchmarks above measure mounting and whole-tree updates. A running
 application spends most of its time on neither. It flips mods — hovered,
 pressed, selected, expanded — on elements whose styles never change, one
 element at a time, and it mounts and unmounts small styled subtrees as menus
-and dialogs open. Both paths go through the state-map and ref-counting
-machinery rather than the parser, so a regression in them is invisible to every
+and dialogs open. Both paths go through mod handling and the chunk cache
+rather than the parser, so a regression in them is invisible to every
 other benchmark here.
 
 [`tasty-interaction.bench.tsx`](https://github.com/tenphi/tasty/blob/main/src/tasty-interaction.bench.tsx) pairs each
@@ -371,8 +371,8 @@ blindly. They describe different paths:
   rule.
 - A genuinely new style pays generation and injection once, then becomes
   reusable.
-- A mod flip on an already-styled element pays neither; it is a class-name
-  change.
+- A mod flip on an already-styled element pays neither; it toggles a `data-*`
+  attribute and the class stays the same.
 - Browser style resolution, layout, and paint depend on the actual document and
   need application-level profiling.
 

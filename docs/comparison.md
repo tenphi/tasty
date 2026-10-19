@@ -6,7 +6,7 @@ Tasty is CSS-in-JS for React design systems. It is built for the point where reu
 
 Its distinctive guarantee is narrow and concrete: each property’s state map compiles into selectors that cannot compete, so one declared branch wins regardless of CSS source order.
 
-That does not require a big upfront configuration step. Tasty's built-in units and normal CSS color values work out of the box, and `okhsl(...)` is available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
+That does not require a big upfront configuration step. Tasty's built-in units and normal CSS color values work out of the box, and the built-in `okhsl(...)` and `okhst(...)` color functions are available immediately as the recommended path for color authoring. The extra setup comes later if a team wants shared tokens, aliases, recipes, or stricter conventions.
 
 Most styling tools focus on one of these layers:
 
@@ -95,11 +95,12 @@ That makes Tasty less of a "better way to write CSS objects" and more of a **sta
 
 Beyond state resolution, Tasty also provides several structural capabilities that reinforce the design-system layer:
 
-- **CSS properties as typed React props** — `styleProps` lets a component expose selected style properties as normal props (`<Button placeSelf="end">`), including state maps for responsive values. This keeps layout and composition controls inside a governed component API instead of pushing teams back to ad hoc styling escapes.
-- **Sub-element styling** — Compound components declare inner parts via capitalized keys in `styles` and `data-element` attributes. States, tokens, and recipes apply across the entire element tree from a single definition. See [React API — Sub-element Styling](react-api.md#sub-element-styling).
+- **Typed component APIs** — `styleProps` exposes selected style properties as normal props (`<Button placeSelf="end">`, with state maps for responsive values), `modProps` turns modifiers into typed props (`size: ['sm', 'md', 'lg'] as const`), `tokenProps` passes per-instance values without generating new CSS, and `variants` gives a typed `variant` prop. Layout and composition controls stay inside a governed component API instead of pushing teams back to ad hoc styling escapes.
+- **Sub-element styling** — Compound components declare inner parts via capitalized keys in `styles` and the `elements` option, which produces typed sub-components (`<Card.Title>`) that share the root's state context. States, tokens, and recipes apply across the entire element tree from a single definition. See [React API — Sub-element Styling](react-api.md#sub-element-styling).
+- **Modern CSS as state keys** — Container queries, `@supports`, `:has()`, root and parent states, and `@starting-style` live in the same state maps as `:hover`, and `@keyframes`, `@property`, `@font-face`, `@counter-style`, and `@function` are built in.
 - **Auto-inferred `@property`** — When a custom property is assigned a concrete value, Tasty infers the CSS `@property` syntax and registers it automatically, enabling smooth transitions on custom properties without manual declarations.
 - **AI-friendly style definitions** — Style definitions are declarative, self-contained, and structurally consistent. AI tools can read, refactor, and generate Tasty styles as confidently as a human — no hidden cascade logic or implicit ordering to second-guess.
-- **Companion ecosystem** — An [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) with 27 lint rules, a [VS Code extension](https://github.com/tenphi/tasty-vscode-extension) for syntax highlighting, and [Glaze](https://github.com/tenphi/glaze) for OKHSL color theme generation with automatic WCAG contrast solving.
+- **Companion ecosystem** — An [ESLint and oxlint plugin](https://github.com/tenphi/eslint-plugin-tasty) with 40+ rules that validate styles against your project's `tasty.config.ts`, TypeScript augmentation for autocompleting your own token and preset names, a [VS Code extension](https://github.com/tenphi/tasty-vscode-extension) for syntax highlighting and snippets, and [Glaze](https://github.com/tenphi/glaze) for OKHST palette generation with WCAG and APCA contrast solving.
 
 ---
 
@@ -184,7 +185,7 @@ Every new state doubles the selector count. Miss one intersection and you ship a
 )}>
 ```
 
-The `theme` branch is runtime JS, not CSS. Intersections like `disabled + hover` need manual `!important` or extra utilities to override correctly.
+The `theme` branch is runtime JS, not CSS. Tailwind resolves `hover:` against `disabled:` by its global variant order, not per component; when your priority differs from that order, or two base utilities conflict (`bg-primary` vs `bg-danger`), you need `tailwind-merge`, `!` modifiers, or more conditional class logic.
 
 **Tasty** — each property declares all its states in one map. The engine generates mutually exclusive selectors:
 
@@ -196,10 +197,10 @@ const Button = tasty({
       '': '#primary',
       ':hover': '#primary-hover',
       ':active': '#primary-pressed',
-      disabled: '#surface',
       'theme=danger': '#danger',
       'theme=danger & :hover': '#danger-hover',
       'theme=danger & :active': '#danger-pressed',
+      disabled: '#surface',
     },
     color: {
       '': '#on-primary',
@@ -213,7 +214,7 @@ const Button = tasty({
 });
 ```
 
-`disabled` always wins over `:hover` because Tasty emits negation selectors — no source-order dependence, no manual intersection management, no `!important`.
+`disabled` is declared last, so it wins over `:hover`, `:active`, and `theme=danger`: Tasty guards every earlier branch with `:not([data-disabled])` — no source-order dependence, no manual intersection management, no `!important`.
 
 ---
 
@@ -328,7 +329,7 @@ That makes it narrower in audience, but deeper in architectural ambition.
 
 There is also a fundamental architectural difference: Emotion and styled-components rely on React context and hooks internally, which means they require `'use client'` in modern React and cannot run as React Server Components. Tasty's style functions and `tasty()` components are hook-free, so they work as server components by default and ship no Tasty styling runtime in server-only contexts. This is not a minor compatibility detail — it means Tasty-based components stay as server components until _your_ code needs interactivity, while Emotion and styled-components force the client boundary at the styling layer.
 
-For teams evaluating runtime styling at scale, Tasty also documents its runtime benchmarks and caching model in the main [README](../README.md#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
+For teams evaluating runtime styling at scale, Tasty publishes reproducible [Runtime Benchmarks](runtime-benchmarks.md) and summarizes its caching model in the [README](../README.md#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
 
 ---
 

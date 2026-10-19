@@ -76,7 +76,7 @@ Output: CSSRule[]
 
 **Simplification** (`simplifyCondition` in `simplify.ts`) is not a separate numbered stage. It runs inside OR expansion, exclusive building, `expandExclusiveOrs` branch cleanup, combination ANDs, merge-by-value ORs, and materialization. Every call is cached by condition unique-id, so the repetition is cheap.
 
-**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle`, then **stable-sorts rules by their cascade `order` hint (ascending source priority)** so lower-priority rules come first and higher-priority rules win, and finally emits every `@starting-style` rule **after** all normal rules. The `order` hint is the highest source priority among the entries that produced each rule (threaded `ComputedRule → CSSRule`). This ordering is cascade-critical because Stage 7 equalizes specificity with `:where()`: once every state selector carries zero specificity, source order alone decides which of two overlapping rules wins — most importantly the `_` fallback floor (low order, emitted first) versus the states layered over it, and `@starting-style` versus its normal counterpart. Mutually-exclusive rules are unaffected by ordering (they never both match), so reordering them is safe.
+**Post-pass:** After `processStyles` collects rules from every handler, `runPipeline` (`index.ts`) filters duplicates using a key of `selector|declarations|atRules|rootPrefix|startingStyle`, then **stable-sorts rules by their cascade `order` hint (ascending source priority)** so lower-priority rules come first and higher-priority rules win, and finally emits every `@starting-style` rule **after** all normal rules. Each Stage 4 snapshot takes the highest source priority among its entries as its `order` hint; when Stage 6 merges same-output rules, the merged rule keeps the lowest `order` of its group, so a rule carrying the `_` floor's value keeps the floor's early position (threaded `ComputedRule → CSSRule`). This ordering is cascade-critical because Stage 7 equalizes specificity with `:where()`: once every state selector carries zero specificity, source order alone decides which of two overlapping rules wins — most importantly the `_` fallback floor (low order, emitted first) versus the states layered over it, and `@starting-style` versus its normal counterpart. Mutually-exclusive rules are unaffected by ordering (they never both match), so reordering them is safe.
 
 ---
 
@@ -197,7 +197,9 @@ Merging two same-value entries with conditions `C_h` (higher priority) and `C_l`
 
 The merge is safe iff for every entry `e_m` strictly between them in priority with a different value,
 
-    simplify(C_m & C_l & !C_h) = FALSE
+```
+simplify(C_m & C_l & !C_h) = FALSE
+```
 
 i.e. there is no scenario where the intermediate state could have matched, the lower same-value entry would also have matched, and the higher one would not. This is the only way the merge could leak through and shadow the intermediate state.
 
@@ -362,7 +364,7 @@ This is the companion to **Stage 2a** (user-OR expansion). The split exists beca
 
 | Stage | Runs on | Sees ORs from | Sorts branches? |
 |---|---|---|---|
-| 2a `expandOrConditions` | `ParsedStyleEntry.condition` | User-authored `|` in state keys | No — user order is stable |
+| 2a `expandOrConditions` | `ParsedStyleEntry.condition` | User-authored `\|` in state keys | No — user order is stable |
 | 3 `expandExclusiveOrs` | `ExclusiveStyleEntry.exclusiveCondition` | De Morgan negation inside `buildExclusiveConditions` | Yes — at-rule branches first |
 
 ### How It Works
@@ -545,12 +547,13 @@ interface CSSRule {
   declarations: string; // CSS declarations (e.g. 'color: red;')
   atRules?: string[]; // Wrapping at-rules
   rootPrefix?: string; // Root state prefix
+  rootState?: string; // Root-state segment without its :root anchor; lets a root selector take states directly
   startingStyle?: boolean; // Wrap declarations in @starting-style
   order?: number; // Internal cascade order hint (ascending source priority); stripped before injection
 }
 ```
 
-When `renderStyles` runs **without** a selector, returned rules include `needsClassName: true` (compatibility field for the injector); that flag is not part of `CSSRule` inside `materialize.ts`.
+When `renderStyles` runs **without** a selector, returned rules include `needsClassName: true` (compatibility field for the injector); that flag is not part of `CSSRule` (defined in `materialize-types.ts`).
 
 ---
 
@@ -642,7 +645,7 @@ LRU and small auxiliary caches:
 | Cache | Size | Key | Purpose |
 |-------|------|-----|---------|
 | `pipelineCache` | 5000 | `pipelineCacheKey \|\| stringifyStyles(styles)` | Skip full pipeline for identical styles |
-| `parseCache` | 5000 | `trimmedStateKey + '\\0' + isSubElement + '\\0' + JSON.stringify(localPredefinedStates)` | Skip re-parsing identical state keys in context |
+| `parseCache` | 5000 | `trimmedStateKey + '\0' + (isSubElement ? '1' : '0') + '\0' + (localPredefinedStates non-empty ? JSON.stringify(localPredefinedStates) : '')` | Skip re-parsing identical state keys in context |
 | `simplifyCache` | 5000 | `getConditionUniqueId(node)` | Skip re-simplifying identical conditions |
 | `conditionCache` | 3000 | `getConditionUniqueId(node)` in `conditionToCSS` | Skip re-materializing identical conditions |
 | `variantKeyCache` | — | `WeakMap<SelectorVariant, string>` | Stable string keys for variants during materialization |
@@ -702,24 +705,24 @@ Each snapshot yields distinct declarations; no merge.
 
 ### Stage 7: Materialize CSS
 
-Using `renderStyles(styles, '.t1')` (the class is doubled — `.t1.t1` — so Tasty owns specificity without `!important`):
+Using `renderStyles(styles, '.t1', { doubleSelector: true })`. The injector doubles the class the same way (`.t1.t1`) so Tasty owns specificity without `!important`, and every state is wrapped in `:where()` so it adds none. Rules come out in ascending priority:
 
 ```css
-.t1[data-hovered] {
-  color: var(--highlight-color);
-  --current-color: var(--highlight-color);
+@media (not (prefers-color-scheme: dark)) {
+  .t1.t1:where(:not([data-hovered])) {
+    color: var(--white-color);
+    --current-color: var(--white-color);
+  }
 }
 @media (prefers-color-scheme: dark) {
-  .t1:not([data-hovered]) {
+  .t1.t1:where(:not([data-hovered])) {
     color: var(--dark-color);
     --current-color: var(--dark-color);
   }
 }
-@media (not (prefers-color-scheme: dark)) {
-  .t1:not([data-hovered]) {
-    color: var(--white-color);
-    --current-color: var(--white-color);
-  }
+.t1.t1:where([data-hovered]) {
+  color: var(--highlight-color);
+  --current-color: var(--highlight-color);
 }
 ```
 

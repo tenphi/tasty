@@ -64,7 +64,7 @@ export default function App() {
 
 `tasty()` returns a normal React component. The keys in each state map define priority: later branches win over earlier ones. Because `disabled` is last, a disabled button keeps its disabled styles even while the pointer is over it.
 
-`disabled` and `checked` are built-in automatic states. Tasty activates them from the corresponding native prop or attribute, so `disabled` is the concise Tasty form of `[disabled]`, and `checked` is the concise form of `[checked]`.
+`disabled`, `checked`, and `hidden` are built-in automatic states. Tasty sets `data-disabled`, `data-checked`, and `data-hidden` from the matching native prop, so `disabled` in a state map is the concise form of `[disabled]` (it compiles to `[data-disabled]`).
 
 Tasty compiles that priority into selectors that exclude one another. The hover, active, and disabled background rules cannot all match and ask the CSS cascade to decide the winner.
 
@@ -101,9 +101,9 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-### Define shared tokens and override default unit values
+### Define shared tokens and units
 
-Color tokens like `#primary` resolve to CSS custom properties at runtime (e.g. `var(--primary-color)`). Built-in units like `x`, `r`, and `bw` already work without setup and multiply CSS custom properties by default. Use `configure({ tokens })` when you want to define shared token values or override the defaults your app uses:
+Color tokens like `#primary` and value tokens like `$sidebar-width` resolve to CSS custom properties (`var(--primary-color)`, `var(--sidebar-width)`). Define their values with `configure({ tokens })`:
 
 ```tsx
 // src/tasty-config.ts
@@ -114,10 +114,7 @@ configure({
     '#primary': 'oklch(55% 0.25 265)',
     '#surface': '#fff',
     '#text': '#111',
-    $gap: '8px',
-    $radius: '4px',
-    '$border-width': '1px',
-    '$outline-width': '2px',
+    '$sidebar-width': '280px',
   },
 });
 ```
@@ -135,7 +132,20 @@ configure({
 });
 ```
 
-Every component using `#primary`, `2x`, or `1r` adjusts automatically. Tokens are injected as `:root` CSS custom properties when the first style is rendered. You can also use standard CSS color values such as `rgb(...)`, `hsl(...)`, and named colors directly; `okhsl(...)` is the recommended choice when you want authored colors that stay aligned with Tasty's design-system-oriented workflow.
+Tokens are injected as `:root` CSS custom properties when the first style is rendered, and every component using `#primary` follows them. You can also use standard CSS color values such as `rgb(...)`, `hsl(...)`, and named colors directly; the built-in `okhsl(...)` and `okhst(...)` functions are the recommended choice when you want authored colors that stay aligned with Tasty's design-system-oriented workflow.
+
+Units work differently: `x`, `r`, `cr`, `bw`, and `ow` compile to plain values when styles are generated (`2x` → `16px` with the default `8px` step), so setting a `$gap` token does not change them. Change the scale with `configure({ units })`:
+
+```tsx
+configure({
+  units: {
+    x: '4px', // spacing step: 2x → 8px
+    r: '8px', // radius: 1r → 8px
+  },
+});
+```
+
+When the scale has to change at runtime, for example per theme or density, point the unit at a custom property and define that property as a token. With `units: { x: 'var(--gap)' }` and `tokens: { $gap: '8px' }`, `2x` compiles to `calc(2 * var(--gap))`. See [Built-in Units](dsl.md#built-in-units) for the defaults.
 
 > **Note:** `configure({ replaceTokens })` is a separate mechanism — it replaces tokens with literal values at parse time (baked into CSS). Use it for value aliases like `$card-padding: '4x'` that should be resolved during style generation, not for defining color or unit values. See [Configuration — Replace Tokens](configuration.md#replace-tokens-parse-time-substitution) for details.
 
@@ -145,7 +155,7 @@ See [Configuration](configuration.md) for the full `configure()` API — tokens,
 
 ## ESLint plugin
 
-The ESLint plugin catches invalid style properties, bad token references, malformed state keys, and other mistakes at lint time — before they reach the browser.
+The ESLint plugin catches invalid style properties, bad token references, malformed state keys, and other mistakes at lint time — before they reach the browser. It checks style objects and JSX style props alike, and runs under both ESLint 9+ and oxlint.
 
 ### Install
 
@@ -167,36 +177,80 @@ export default [
 ];
 ```
 
+### Tell it about your design system
+
+Without project configuration the plugin checks syntax and property names, but it cannot know which tokens, presets, or recipes exist. Add a `tasty.config.ts` at the project root to enable those checks for the names your `configure()` call defines:
+
+```ts
+// tasty.config.ts
+export default {
+  tokens: ['#primary', '#surface', '#text', '$sidebar-width'],
+  states: ['@mobile', '@dark'],
+  presets: ['h1', 'h2', 't1', 't2'],
+  recipes: ['card'],
+  importSources: ['@my-org/ui'], // modules that re-export tasty()
+};
+```
+
+Every list is optional; leaving one out skips that check. `importSources` matters when your design system re-exports `tasty()` from its own module: the plugin only lints calls whose import it can trace.
+
 ### What `recommended` catches
 
-The `recommended` config covers common correctness and style issues:
-
-| Category            | Rules                                                                                                  | Examples                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element`                                        | Flags typos like `pading` or invalid boolean usage                    |
-| Value validation    | `valid-value`, `valid-color-token`, `valid-custom-unit`                                                | Catches `#nonexistent` tokens, bad unit syntax                        |
-| State validation    | `valid-state-key`, `no-nested-state-map`, `require-default-state`                                      | Validates state key syntax, ensures `''` default exists               |
-| Structure           | `valid-styles-structure`, `no-important`, `no-nested-selector`                                         | Prevents `!important`, invalid nesting                                |
-| Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`                    |
-| Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax          |
-| Motion guidance     | `no-raw-transition-duration`                                                                           | Suggests timing tokens or the default timing for transition durations |
-| Dynamic styles      | `no-runtime-styles-mutation`, `no-style-spread`                                                         | Warns on JavaScript values and spreads inside runtime style objects   |
+| Category            | Rules                                                                                                  | Examples                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Property validation | `known-property`, `valid-boolean-property`, `valid-sub-element`                                        | Flags typos like `pading` or invalid boolean usage                       |
+| Value validation    | `valid-value`, `valid-color-token`, `valid-custom-unit`                                                | Catches `#nonexistent` tokens, bad unit syntax                           |
+| State validation    | `valid-state-key`, `no-nested-state-map`, `require-default-state`                                      | Validates state key syntax, ensures `''` default exists                  |
+| Structure           | `valid-styles-structure`, `no-important`, `no-nested-selector`                                         | Prevents `!important`, invalid nesting                                   |
+| Static mode         | `static-no-dynamic-values`, `static-valid-selector`                                                    | Enforces build-time constraints in `tastyStatic()`                       |
+| Style properties    | `valid-preset`, `valid-recipe`, `valid-transition`, `valid-directional-modifier`, `valid-radius-shape` | Validates preset names, recipe references, transition syntax             |
+| Token usage         | `no-raw-color-values`, `consistent-token-usage`, `no-raw-transition-duration`                          | Suggests `#color` tokens over raw colors, units over raw pixel lengths   |
+| Preferred syntax    | `prefer-shorthand-property`, `prefer-auto-calc`, `prefer-hide`, `prefer-state-negation`, and others    | Suggests `fill` over `backgroundColor`, `(...)` over `calc(...)`         |
+| Component props     | `no-style-prop`, `no-classname-prop`, `no-styles-prop`                                                 | Points escape hatches toward `tokens`, `mods`, and the component's props |
+| Dynamic styles      | `no-runtime-styles-mutation`, `no-style-spread`                                                        | Warns on JavaScript values and spreads inside runtime style objects      |
 
 ### Strict config
 
-For stricter governance, use `tasty.configs.strict`. It adds rules that flag direct `styles` prop usage and other patterns:
+For stricter governance, use `tasty.configs.strict`. It adds existence checks for `$` custom properties and `@` state aliases, and validates state definitions in `configure()` and `tasty.config.ts`:
 
 ```js
 export default [tasty.configs.strict];
 ```
 
+See the [plugin README](https://github.com/tenphi/eslint-plugin-tasty) for every rule, the oxlint setup, and the experimental type-aware mode for JSX props.
+
+---
+
+## TypeScript autocomplete
+
+Component props are typed from their definitions without extra setup: `modProps` value lists become unions, `variant` is typed from the variant keys, and sub-elements are typed components. To get autocomplete for your own token, preset, and theme names inside style values, register them with module augmentation:
+
+```ts
+// tasty.d.ts
+import '@tenphi/tasty';
+
+declare module '@tenphi/tasty' {
+  interface TastyNamedColors {
+    primary: true;
+    surface: true;
+    text: true;
+  }
+  interface TastyPresetNames {
+    h1: true;
+    t2: true;
+  }
+}
+```
+
+See [Configuration → TypeScript](configuration.md#typescript) for every augmentation interface and how component props are typed.
+
 ---
 
 ## Editor support
 
-**[VS Code Extension](https://github.com/tenphi/tasty-vscode-extension)** — Syntax highlighting for Tasty styles in TypeScript/TSX/JavaScript/JSX. Highlights color tokens, custom units, state keys, presets, and style properties inside `tasty()` and `tastyStatic()` calls. Install from the VS Code marketplace or from a `.vsix` file.
+**[VS Code Extension](https://github.com/tenphi/tasty-vscode-extension)** — Syntax highlighting for Tasty styles in TypeScript/TSX/JavaScript/JSX: color tokens, custom units, state keys, presets, and style properties inside `tasty()`, `tastyStatic()`, `styles` objects, and style functions. It also adds snippets for components, state maps, and `configure()`. Install the `.vsix` from the [latest GitHub release](https://github.com/tenphi/tasty-vscode-extension/releases/latest); the extension is not published to the marketplace.
 
-**[Glaze](https://github.com/tenphi/glaze)** — OKHSL-based color theme generator with automatic WCAG contrast solving. Generate light, dark, and high-contrast color palettes from a single hue and export them directly as Tasty color tokens. See the [Ecosystem section](../README.md#ecosystem) in the README.
+**[Glaze](https://github.com/tenphi/glaze)** — Not an editor tool, but the fastest way to fill `configure({ tokens })`: it generates light, dark, and high-contrast palettes from one hue in the OKHST color space, solves WCAG and APCA contrast, and exports them as Tasty tokens with `configure({ tokens: theme.tasty() })`. See [Glaze in the README](../README.md#glaze).
 
 ---
 
@@ -228,6 +282,7 @@ Both `tasty()` and `tastyStatic()` share the same DSL, tokens, units, and state 
 - **[Adoption Guide](adoption.md)** — Roll out Tasty inside an existing design system or platform team
 - **[Comparison](comparison.md)** — Evaluate Tasty against other styling systems
 - **[Configuration](configuration.md)** — Full `configure()` API: tokens, recipes, custom units, style handlers, TypeScript extensions
+- **[Plugins & Extension Points](plugins.md)** — Add your own style properties, units, functions, and component props
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
 - **[Debug Utilities](debug.md)** — Inspect generated CSS and debug runtime behavior when styles do not look right
 
@@ -237,4 +292,6 @@ Both `tasty()` and `tastyStatic()` share the same DSL, tokens, units, and state 
 
 - Styles are missing on first render: make sure the file that calls `configure()` is imported before any `tasty()` component renders.
 - Token or unit values are not what you expect: check your `configure({ tokens, units })` setup, then inspect the generated CSS variables with [Debug Utilities](debug.md).
+- Changing a `$gap` or `$radius` token does not change `2x` or `1r`: units compile to plain values from `configure({ units })`. Point a unit at the custom property (`units: { x: 'var(--gap)' }`) if it should follow the token.
+- The linter accepts unknown tokens or presets: list them in `tasty.config.ts` so the plugin knows what your design system defines.
 - You need zero-runtime delivery: use server-only [`tasty()` with server rendering](ssr.md) to keep the full React API, or use [`tastyStatic()` build-time extraction](tasty-static.md) when styles must be compiled before rendering.

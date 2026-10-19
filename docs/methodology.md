@@ -119,16 +119,17 @@ Style props accept state maps, so responsive values work through the same API:
 
 Tasty exports predefined style prop lists that group properties by role. Use them instead of hand-picking arrays:
 
-| Preset             | Properties                                                                                                                                                                     | Typical use                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `FLOW_STYLES`      | flow, gap, columnGap, rowGap, align, justify, placeItems, placeContent, alignItems, alignContent, justifyItems, justifyContent, gridColumns, gridRows, gridTemplate, gridAreas | Layout containers (`Space`, `Grid`)           |
-| `POSITION_STYLES`  | gridArea, gridColumn, gridRow, order, placeSelf, alignSelf, justifySelf, zIndex, physical/logical margin, inset, scroll margin/padding, position                                 | Positioned elements (`Button`, `Badge`)       |
-| `DIMENSION_STYLES` | width, height, blockSize, inlineSize, flexBasis, flexGrow, flexShrink, flex                                                                                                    | Sized elements                                |
-| `COLOR_STYLES`     | color, fill, fade, image                                                                                                                                                       | Color-customizable elements                   |
-| `BLOCK_STYLES`     | padding, blockPadding, inlinePadding, overflow, scrollbar, textAlign, border, blockBorder, inlineBorder, radius, shadow, outline                                               | Block-level containers                        |
-| `CONTAINER_STYLES` | All of the above combined (+ BASE_STYLES)                                                                                                                                      | Fully flexible containers                     |
-| `OUTER_STYLES`     | POSITION_STYLES + DIMENSION_STYLES + block outer (border, radius, shadow, outline)                                                                                             | Components whose outer shell is customizable  |
-| `INNER_STYLES`     | BASE_STYLES + COLOR_STYLES + block inner (padding, overflow, scrollbar) + FLOW_STYLES                                                                                          | Components whose inner layout is customizable |
+| Preset             | Properties                                                                                                                                                                            | Typical use                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `FLOW_STYLES`      | flow, gap, columnGap, rowGap, align, justify, place, placeItems, placeContent, alignItems, alignContent, justifyItems, justifyContent, gridColumns, gridRows, gridTemplate, gridAreas | Layout containers (`Space`, `Grid`)           |
+| `POSITION_STYLES`  | gridArea, gridColumn, gridRow, order, placeSelf, alignSelf, justifySelf, zIndex, physical/logical margin, inset, scroll margin/padding, position                                      | Positioned elements (`Button`, `Badge`)       |
+| `DIMENSION_STYLES` | width, height, blockSize, inlineSize, flexBasis, flexGrow, flexShrink, flex                                                                                                           | Sized elements                                |
+| `COLOR_STYLES`     | color, fill, fade, image                                                                                                                                                              | Color-customizable elements                   |
+| `BLOCK_STYLES`     | padding, blockPadding, inlinePadding, overflow, scrollbar, textAlign, border, blockBorder, inlineBorder, radius, shadow, outline                                                      | Block-level containers                        |
+| `TEXT_STYLES`      | textTransform, fontWeight, fontStyle                                                                                                                                                  | Text elements                                 |
+| `CONTAINER_STYLES` | All of the above combined (+ BASE_STYLES)                                                                                                                                             | Fully flexible containers                     |
+| `OUTER_STYLES`     | POSITION_STYLES + DIMENSION_STYLES + block outer (border, radius, shadow, outline)                                                                                                    | Components whose outer shell is customizable  |
+| `INNER_STYLES`     | BASE_STYLES + COLOR_STYLES + block inner (padding, overflow, scrollbar) + FLOW_STYLES                                                                                                 | Components whose inner layout is customizable |
 
 ```tsx
 import { tasty, FLOW_STYLES, POSITION_STYLES } from '@tenphi/tasty';
@@ -156,7 +157,10 @@ Match the preset to the component's role:
 
 - **Layout containers** (`Space`, `Box`, `Grid`) — `FLOW_STYLES`, optionally with `DIMENSION_STYLES`
 - **Positioned elements** (`Button`, `Badge`) — `POSITION_STYLES`
-- **Text elements** — custom: `['preset', 'color']`
+- **Text elements** — `['color', ...TEXT_STYLES]`
+
+`BASE_STYLES` (`display`, `font`, `preset`, `hide`, `whiteSpace`, `opacity`, `transition`) are accepted as props on every component without being listed; extend that set app-wide with [`configure({ baseStyleProps })`](configuration.md#base-style-props).
+
 - **Compound components** — typically none; styling happens via sub-elements and extension
 
 ### The governance trade-off
@@ -219,6 +223,26 @@ modProps: ['isLoading', 'isSelected'] as const,
 ```
 
 For the full API reference, see [React API — Mod Props](react-api.md#mod-props).
+
+### variants vs modProps
+
+Use `variants` for looks that replace each other (primary, danger, ghost) and `modProps` for states that combine (`isLoading`, `size`):
+
+```tsx
+const Button = tasty({
+  as: 'button',
+  modProps: { isLoading: Boolean, size: ['sm', 'md', 'lg'] as const },
+  styles: { padding: { '': '1.5x 3x', 'size=sm': '1x 2x' }, radius: '1r' },
+  variants: {
+    default: { fill: '#primary', color: '#on-primary' },
+    danger: { fill: '#danger', color: '#on-danger' },
+  },
+});
+
+<Button variant="danger" size="sm" isLoading />;
+```
+
+`variant` is typed from the variant keys, the `default` variant applies when no `variant` prop is passed, and only variants that render emit CSS. See [React API — Variants](react-api.md#variants).
 
 ---
 
@@ -335,10 +359,9 @@ const LargeCard = tasty(Card, {
 
 Why? Styled wrappers are:
 
-- **Faster** — styles are parsed and injected once at definition time, not on every render
-- **Stable** — the style object is defined once, not recreated on every render
+- **Stable** — the style object is defined once at module level, not recreated on every render
 - **Composable** — another engineer can extend `LargeCard` further
-- **Inspectable** — the component has a name in React DevTools
+- **Inspectable** — give it a `qa` (`tasty(Card, { qa: 'LargeCard', styles })`) and it appears as `TastyWrappedComponent(LargeCard)` in React DevTools and as `data-qa="LargeCard"` in the DOM
 - **Lint-friendly** — the ESLint plugin's `no-styles-prop` rule flags direct usage
 
 The `styles` prop exists as an escape hatch — for prototyping, one-off overrides during development, or cases where wrapping is impractical. It should not be the default way product engineers customize components.
@@ -453,10 +476,12 @@ const DangerCard = tasty(Card, {
 
 This is preferred over `<Card styles={{ border: '1bw solid #danger' }}>` because:
 
-1. Styles are parsed and injected once, not on every render
+1. The styles live in one module-level definition instead of being rebuilt inside render
 2. `DangerCard` can be extended further by others
-3. It has a meaningful name in DevTools and code search
+3. It is searchable in code, and named in DevTools once you give it a `qa`
 4. The ESLint `no-styles-prop` rule encourages this pattern
+
+A wrapper does not re-expose the base's sub-element components: `DangerCard.Title` is `undefined` and not part of its type. Keep using the base's parts inside it — `<DangerCard><Card.Title>…</Card.Title></DangerCard>`. The wrapper's `Title` styles still apply, because they target `[data-element="Title"]`.
 
 ---
 
@@ -554,7 +579,7 @@ fill: 'oklch(55% 0.25 265)',
 fill: '#primary',
 ```
 
-Tokens ensure consistency across components and make theme changes a one-line update.
+Tokens ensure consistency across components and make theme changes a one-line update. The recommended lint config flags this with `tasty/no-raw-color-values` and `tasty/consistent-token-usage`.
 
 ### Using CSS property names when Tasty alternatives exist
 
@@ -570,7 +595,7 @@ radius: '1r',
 flow: 'column',
 ```
 
-Tasty's enhanced properties provide concise syntax, better composability, and simpler overrides. See [recommended props](styles.md#recommended-props) for the full mapping.
+Tasty's enhanced properties provide concise syntax, better composability, and simpler overrides. See [recommended props](styles.md#recommended-props) for the full mapping. `tasty/prefer-shorthand-property` flags the native spellings.
 
 ### Changing styles prop at runtime
 
@@ -593,7 +618,7 @@ const Card = tasty({
 });
 ```
 
-Modifiers are compiled into exclusive selectors once. Changing `styles` at runtime forces Tasty to regenerate and re-inject CSS.
+Modifiers are compiled into exclusive selectors once. Changing `styles` at runtime forces Tasty to regenerate and re-inject CSS. `tasty/no-styles-prop` and `tasty/no-runtime-styles-mutation` flag these patterns.
 
 ### Overusing style prop
 
@@ -607,7 +632,7 @@ const DangerButton = tasty(Button, {
 });
 ```
 
-The `style` prop bypasses tokens, units, and state maps. It should only be used for third-party library integration.
+The `style` prop bypasses tokens, units, and state maps. It should only be used for third-party library integration. `tasty/no-style-prop` flags it on Tasty components.
 
 ### Skipping elements for compound components
 

@@ -12,6 +12,7 @@ import type {
   StyleHandlerDefinition,
 } from '../utils/styles';
 
+import { animationNameStyle, animationStyle } from './animation';
 import { borderStyle } from './border';
 import { blockSizeStyle } from './blockSize';
 import { colorStyle } from './color';
@@ -159,6 +160,8 @@ export function predefine() {
   [
     displayStyle,
     transitionStyle,
+    animationStyle,
+    animationNameStyle,
     fillStyle,
     svgFillStyle,
     widthStyle,

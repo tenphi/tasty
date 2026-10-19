@@ -7,6 +7,7 @@
 
 import type { KeyframesSteps } from '../injector/types';
 import type { StyleResult } from '../pipeline';
+import { scanAnimationNames } from '../styles/animation';
 import type { Styles } from '../styles/types';
 import { hashString } from '../utils/hash';
 
@@ -15,24 +16,6 @@ import { hashString } from '../utils/hash';
 // ============================================================================
 
 const KEYFRAMES_KEY = '@keyframes';
-
-/**
- * Pattern to extract animation names from CSS animation property values.
- * Animation name is typically the first identifier in the shorthand.
- * Handles: "fadeIn 300ms ease-in", "pulse 1s infinite", etc.
- *
- * CSS animation shorthand order (all optional except name):
- * animation: name | duration | timing | delay | iteration | direction | fill-mode | play-state
- *
- * Animation names must:
- * - Start with a letter, underscore, or hyphen (but not a digit or CSS keyword)
- * - Not be CSS keywords: none, initial, inherit, unset, revert
- */
-const NON_NAME_KEYWORDS = new Set(
-  'none initial inherit unset revert auto normal running paused reverse alternate alternate-reverse forwards backwards both ease linear ease-in ease-out ease-in-out step-start step-end'.split(
-    ' ',
-  ),
-);
 
 // ============================================================================
 // Extraction Functions
@@ -81,47 +64,14 @@ export function mergeKeyframes(
 // ============================================================================
 
 /**
- * Extract animation name from a single animation value.
- * Returns null if no valid name found.
- *
- * Examples:
- * - "fadeIn 300ms ease-in" → "fadeIn"
- * - "1s pulse infinite" → "pulse" (name can be anywhere)
- * - "none" → null (CSS keyword)
- * - "300ms ease-in" → null (no name, just duration/timing)
- */
-function extractAnimationNameFromValue(value: string): string | null {
-  for (const part of value.trim().split(/\s+/)) {
-    const lower = part.toLowerCase();
-    if (NON_NAME_KEYWORDS.has(lower)) continue;
-
-    // Skip time values, iteration counts, and timing functions with arguments.
-    if (
-      part === 'infinite' ||
-      /^(?:-?[\d.]+m?s|\d+|(?:cubic-bezier|steps)\()/i.test(part)
-    )
-      continue;
-
-    // Check if it looks like a valid animation name
-    const match = /^([a-zA-Z_-][a-zA-Z0-9_-]*)/.exec(part);
-    if (match) {
-      return match[1];
-    }
-  }
-
-  return null;
-}
-
-/**
  * Extract all animation names from an animation property value.
  * Handles multiple animations separated by commas.
  *
  * Example: "fadeIn 300ms, slideIn 500ms ease-out" → ["fadeIn", "slideIn"]
  */
 function collectAnimationNamesFromValue(value: string, names: Set<string>) {
-  for (const animation of value.split(',')) {
-    const name = extractAnimationNameFromValue(animation);
-    if (name) names.add(name);
+  for (const item of scanAnimationNames(value)) {
+    if (item) names.add(item.name);
   }
 }
 

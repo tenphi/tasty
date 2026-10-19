@@ -266,6 +266,34 @@ const button = tastyStatic({
       expect(css).toContain('block');
     });
 
+    it('should animate camelCase and stepped local keyframes under their hashed names', () => {
+      const outputPath = path.join(tempDir, 'output.css');
+
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const card = tastyStatic({
+  animation: 'fadeIn 1s, 2s steps(4, end) spin',
+  '@keyframes': {
+    fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+    spin: { from: { opacity: 0.5 }, to: { opacity: 1 } },
+  },
+});
+`;
+
+      transformCode(code, { output: outputPath });
+
+      const css = fs.readFileSync(outputPath, 'utf-8');
+      const names = [...css.matchAll(/@keyframes (tsk[a-f0-9]+)/g)].map(
+        (m) => m[1],
+      );
+
+      expect(names).toHaveLength(2);
+      expect(css).toContain(
+        `animation: ${names[0]} 1s, 2s steps(4, end) ${names[1]};`,
+      );
+    });
+
     it('should prefer config over configFile when both are set', () => {
       const configPath = path.join(tempDir, 'tasty-zero.config.ts');
       const outputPath = path.join(tempDir, 'output.css');

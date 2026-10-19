@@ -865,6 +865,8 @@ const Pulse = tasty({
 });
 ```
 
+Keyframes names are case-sensitive and keep their authored case in `animation` and `animationName` (`fadeIn`, not `fadein`), so they match `@keyframes` defined here, in `configure({ keyframes })`, or in plain CSS. Everything else in the value — durations, timing functions, keywords — is parsed as usual.
+
 ---
 
 ## Properties (`@property`)

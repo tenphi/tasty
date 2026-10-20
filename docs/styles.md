@@ -197,6 +197,9 @@ Element width with min/max control. One, two, or three values set `min-width`, `
 | `"min 2x"` | `2x` | auto | initial |
 | `"max 100%"` | initial | auto | `100%` |
 | `"fixed 200px"` | `200px` | `200px` | `200px` |
+| `"min"` | `1x` | auto | initial |
+| `"max"` | initial | auto | `100%` |
+| `"fixed"` | `max-content` | `max-content` | `max-content` |
 
 **Keywords:** `stretch`, `max-content`, `min-content`, `fit-content`
 
@@ -312,6 +315,8 @@ Background color with design token support. Preferred over `backgroundColor` and
 
 When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. With `image` or `backgroundImage` on the same element, the image is layered over the overlay color in one `background-image`.
 
+There is no default fill color, so `fill: true` is ignored with a development warning. Use `false` for no fill.
+
 **Related deprecated props:** `backgroundColor` (use `fill`), `background` (overrides all background props when set — avoid).
 
 ### `image`
@@ -341,6 +346,7 @@ Text color with design token support.
 | `"#current.5"` | Current inherited color at 50% opacity |
 | `"(#primary, #secondary)"` | Fallback: use `#primary`, fall back to `#secondary` |
 | `"light-dark(#dark, #light)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
+| `"#ddd"` | Hex literal, read as the `#ddd` token with the literal as fallback: `var(--ddd-color, #ddd)`, as in every color style |
 | `true` | `currentColor` |
 
 Also sets `$current-color` to the same color, for anything that needs the

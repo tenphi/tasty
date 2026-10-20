@@ -204,7 +204,7 @@ The build-time extraction Next.js wrapper already lived under the `zero` namespa
 
 **The `theme` prop is now implemented.** It maps to a `data-theme` attribute on the rendered element; previously it fell through and was spread onto the DOM raw. Augment `TastyThemeNames` for autocomplete.
 
-**`tasty(Component, options)` no longer leaks factory-only options.** `variants`, `elements`, `styleProps`, `modProps`, and `tokenProps` are stripped instead of being passed to the wrapped component as runtime props, matching the element factory.
+**`tasty(Component, options)` no longer leaks factory-only options.** `variants`, `elements`, `styleProps`, `modProps`, and `tokenProps` are stripped instead of being passed to the wrapped component as runtime props, matching the element factory. Since 3.11 the extension form applies them as the element factory does; see [Extend an existing component](react-api.md#extend-an-existing-component).
 
 **Replacing a built-in style handler now warns.** Built-in handlers are shared across style names, so `configure({ handlers: { fill } })` also takes over `image` and the whole `background-*` family, and `configure({ handlers: { display } })` takes down `flow`, `gap`, `hide`, `overflow`, `whiteSpace`, and `textOverflow`. This was always true; what's new is that a development-mode warning now names exactly what was displaced. If you see it, either declare the whole group and delegate the rest to `styleHandlers.*`, or pick a narrower name. See [Plugins](plugins.md#custom-style-handlers).
 

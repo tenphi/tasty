@@ -775,6 +775,7 @@ A handler returns a `CSSMap`, an array of them, or nothing:
 
 - Keys are **kebab-case** CSS property names (`'background-color'`, not `backgroundColor`) or `--custom-property` names. A camelCase key warns in development and is emitted verbatim, which the browser ignores.
 - Values are stringified, so numbers are fine (`{ '-webkit-line-clamp': 3 }`).
+- An array value emits one declaration per entry, in order, so the browser keeps the last one it supports: `{ width: ['-webkit-fill-available', '-moz-available', 'stretch'] }` emits three `width` declarations.
 - The reserved `$` key is a **selector suffix**: `{ $: '& > *:not(:last-child)', 'margin-right': gap }` applies the declarations to a nested selector. It accepts an array to fan out over several.
 - Return an array of maps to emit several declaration sets, each with its own `$`.
 
@@ -875,7 +876,7 @@ Component props are typed from the `tasty()` definition with no setup. Module au
 
 Write the array forms with `as const`. Without it, `modProps: ['isLoading']` widens to `string[]` and every prop on the component is typed `ModValue`, so an `onClick` handler no longer type-checks. A `modProps` value list without `as const` widens to `string`.
 
-`tasty(Base, { … })` keeps `Base`'s prop types and adds none for the options above, which that form ignores — see [Extend an existing component](react-api.md#extend-an-existing-component).
+`tasty(Base, { … })` keeps `Base`'s prop types and sub-elements, and adds the props and sub-elements its own options above declare. Its `variant` accepts both its own variant names and `Base`'s. See [Extend an existing component](react-api.md#extend-an-existing-component).
 
 ### Registering your names and extensions
 

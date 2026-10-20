@@ -170,7 +170,7 @@ const DangerButton = tasty(Button, {
 });
 ```
 
-A state map with a `''` key replaces the parent's map; a map without one extends it. `@inherit` pulls a single branch from the parent, `null` removes one, and `false` blocks it entirely. See [Extending vs. replacing state maps](docs/dsl.md#extending-vs-replacing-state-maps).
+A state map with a `''` key replaces the parent's map; a map without one extends it. `@inherit` pulls a single branch from the parent, `null` removes one, and `false` blocks it entirely. See [Extending vs. replacing state maps](docs/dsl.md#extending-vs-replacing-state-maps). An extension can also declare its own `styleProps`, `modProps`, `tokenProps`, `variants`, and `elements`, and it keeps the base's sub-elements.
 
 [Getting Started](docs/getting-started.md) continues from here with setup, linting, editor tooling, and choosing a rendering mode.
 
@@ -371,7 +371,7 @@ const Progress = tasty({
 
 ### Variants
 
-Variants are named style sets. `variant` is typed from their keys, `default` applies when no `variant` is passed, and only the variants actually rendered emit CSS:
+Variants are named style sets. `variant` is typed from their keys, `default` (or the variant named by the `variant` option) applies when no `variant` is passed, and only the variants actually rendered emit CSS:
 
 ```tsx
 const Badge = tasty({
@@ -519,7 +519,7 @@ Tasty also ships its own style properties (`fill`, `flow`, `radius`, `preset`, `
 
 ### Style functions
 
-When you don't need a component, call the style functions directly: `useStyles` for a class name, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction`. Apart from `useStyles`, which reads React context, they are plain functions despite the `use` prefix, so they work in React Server Components and outside React; `computeStyles` is the hook-free equivalent of `useStyles`. See [React API — Style Functions](docs/react-api.md#style-functions).
+When you don't need a component, call the style functions directly: `useStyles` for a class name, `useGlobalStyles` for selector-scoped global CSS, `useRawCSS` for raw rules, plus `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction`. All of them work in React Server Components. Apart from `useStyles`, which reads React context on the client, they are plain functions despite the `use` prefix, so they also work outside React; `computeStyles` is the hook-free equivalent of `useStyles`. See [React API — Style Functions](docs/react-api.md#style-functions).
 
 ## Rendering Modes
 
@@ -531,7 +531,7 @@ The DSL, tokens, units, state maps, and recipes are the same everywhere. What ch
 | **Hydrated React**        | `tasty()` plus `@tenphi/tasty/ssr/*`        | During SSR, then on demand in React | Only in hydrated components  | Interactive React apps, Next.js client components, Astro islands |
 | **Build-time extraction** | `tastyStatic()` from `@tenphi/tasty/static` | During the build                    | None in file mode            | Non-React frameworks, CSS needed before rendering                |
 
-- **`tasty()` renders on the server.** Components are hook-free and render as React Server Components by default. Rendered only on the server, they keep the full React API (`styleProps`, sub-elements, variants) and ship no styling runtime. Astro's `tastyIntegration({ islands: false })` is the verified zero-JavaScript setup; server-only Next.js RSC follows the same architecture. Without an integration, each element inlines its own CSS and configured tokens and global styles are not emitted, so use one for anything that relies on `configure()`.
+- **`tasty()` renders on the server.** Components are hook-free and render as React Server Components by default. Rendered only on the server, they keep the full React API (`styleProps`, sub-elements, variants) and ship no styling runtime. Astro's `tastyIntegration({ islands: false })` is the verified zero-JavaScript setup; server-only Next.js RSC follows the same architecture. Without an integration, each element inlines its own CSS, and configured tokens, global styles, and Tasty's default `@property` set are not emitted (Tasty warns in development), so use one for anything that relies on `configure()` or on those defaults.
 - **SSR integrations** add CSS batching, cross-tree deduplication, FOUC prevention, and client cache hydration for apps that also render on the client: `TastyRegistry` from `@tenphi/tasty/ssr/next` (plus `withTastyNext()` from `@tenphi/tasty/ssr/next-config` for a shared global stylesheet), `tastyIntegration()` from `@tenphi/tasty/ssr/astro`, and a core API for other React SSR setups. Streaming is supported.
 - **`tastyStatic()`** returns class names and extracts CSS during the build through a Babel plugin, with no React dependency. File mode ships no runtime; inject mode ships a tiny CSS injector.
 
@@ -593,13 +593,14 @@ Measured with [size-limit](https://github.com/ai/size-limit): minified and brotl
 
 | Entry point                                       | Size     |
 | ------------------------------------------------- | -------- |
-| `@tenphi/tasty`, importing `tasty`                | 50.79 kB |
-| `@tenphi/tasty`, everything                       | 57.54 kB |
-| `@tenphi/tasty/core`, everything (no SSR)         | 54.45 kB |
+| `@tenphi/tasty`, importing `tasty`                | 52.26 kB |
+| `@tenphi/tasty`, everything                       | 58.9 kB  |
+| `@tenphi/tasty/core`, everything (no SSR)         | 55.2 kB  |
 | `@tenphi/tasty/static` (build-time authoring API) | 920 B    |
+| `@tenphi/tasty/ssr/client`                        | 277 B    |
 | `@tenphi/tasty/ssr/astro-client`                  | 283 B    |
-| `@tenphi/tasty/zero` (Node, build time)           | 37.57 kB |
-| `@tenphi/tasty/babel-plugin` (Node, build time)   | 41.65 kB |
+| `@tenphi/tasty/zero` (Node, build time)           | 38.87 kB |
+| `@tenphi/tasty/babel-plugin` (Node, build time)   | 43.05 kB |
 
 Run `pnpm size` to reproduce; numbers shift slightly between releases.
 
@@ -620,6 +621,8 @@ Reproducible benchmarks cover the core pipeline, the React overhead of an empty 
 
 Exclusive selectors rely on `:is()`, `:where()`, and level-4 `:not()` with selector lists: Chrome and Edge 88+, Firefox 84+, Safari 14+. Internet Explorer is not supported.
 
+The defaults that style handlers read, such as the `#border` color and the `$transition` duration, are registered with `@property` (Chrome and Edge 85+, Firefox 128+, Safari 16.4+). For older engines, define those tokens yourself; see [Default properties](docs/dsl.md#default-properties).
+
 ## Entry Points
 
 | Import                           | Description                                                                                             | Platform       |
@@ -635,6 +638,7 @@ Exclusive selectors rely on `:is()`, `:where()`, and level-4 `:not()` with selec
 | `@tenphi/tasty/ssr/next`         | Next.js App Router SSR integration (`TastyRegistry`)                                                    | Node           |
 | `@tenphi/tasty/ssr/next-config`  | Next.js config wrapper for a shared global stylesheet (`withTastyNext`)                                 | Node           |
 | `@tenphi/tasty/ssr/astro`        | Astro integration and middleware                                                                        | Node           |
+| `@tenphi/tasty/ssr/client`       | Browser-safe SSR hydration for any framework (`hydrateTastyClasses`)                                    | Browser        |
 | `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration                                                                       | Browser        |
 
 ## Built with Tasty

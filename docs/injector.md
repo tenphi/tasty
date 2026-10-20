@@ -269,6 +269,8 @@ Dispose, ref-counted cleanup and GC therefore behave identically in every mode.
 
 `gc({ force: true })` and `cleanup()` take bands 4 and 5 together, ignoring capacity. Band 3 is spared even then: an explicit cleanup is still no reason to take rules from a render that has not committed yet.
 
+`tasty()` components cache the class names they computed, so a re-render with the same styles skips the pipeline. Whenever `gc()`, `cleanup()` or `destroy()` deletes rules, those caches are dropped too, so a component whose CSS was collected injects it again on its next render.
+
 > **Why band 3 exists.** Rendering is not commit-aware: a render can resolve a class and commit it a little later, and in between nothing on the page carries it. From outside React that is indistinguishable from a class that is finished, so collection does not try to tell them apart — it leaves alone anything only just noticed to be cold. A render would have to stay pending for the whole window to lose its rules, and it gets them back on its next render.
 >
 > The clock starts when a sweep *notices*, not when the element actually left — nothing observes that moment, so starting it at the sighting is what gives every class the same full window however long ago it went.
@@ -353,7 +355,7 @@ const button2 = inject([rule], { cacheKey: 'button' });
 console.log(button1.className === button2.className); // true
 ```
 
-Without `cacheKey` the class name still matches (it hashes the rules), but the rule is inserted again and the pin count restarts at 1.
+Without `cacheKey` the class name is a hash of the rules, so injecting the same rules again reuses the class the same way: the rules are written once, and each call adds a pin that its own `dispose()` releases.
 
 ### Pinning
 

@@ -344,7 +344,7 @@ const Button = tasty({
 </Button>;
 ```
 
-`variant` is typed from the keys, the `default` variant applies when no `variant` prop is passed, and only the variants that actually render emit CSS. See [React API — Variants](react-api.md#variants).
+`variant` is typed from the keys, the `default` variant applies when no `variant` prop is passed (or the variant the `variant` option names, such as `variant: 'danger'`), and only the variants that actually render emit CSS. See [React API — Variants](react-api.md#variants).
 
 ### Which styleProps to expose
 

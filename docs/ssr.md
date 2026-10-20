@@ -187,14 +187,14 @@ meaning; use root-relative, absolute, or data URLs.
 
 ### Using Tasty in Server Components
 
-Every Tasty style function except `useStyles()` is hook-free and needs no `'use client'`, so it can be used directly in React Server Components:
+Every Tasty style function needs no `'use client'`, so it can be used directly in React Server Components:
 
 - `tasty()` components — dynamic `styleProps` like `<Grid flow="column">` work normally
-- `computeStyles()` — the hook-free equivalent of `useStyles()`, which reads React context and cannot run in a Server Component
+- `useStyles()` and its hook-free equivalent `computeStyles()` — a class name for any element
 - `useGlobalStyles()`, `useRawCSS()` — inject styles by selector
 - `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, `useFunction()` — inject ancillary CSS rules
 
-Next.js renders Server Components in a separate module graph that cannot see the collector `TastyRegistry` registers, so their CSS takes the RSC inline path: it is accumulated in a per-request `React.cache` and emitted as an inline `<style>` tag by the next `tasty()` component in the tree. Standalone style functions cannot emit CSS on their own, so make sure a `tasty()` component renders after them in every RSC tree. The RSC path does not emit configured globals (tokens, `@property`, `globalStyles`); those come from `TastyRegistry`'s collector or the `withTastyNext()` shared stylesheet. For the same reason, import the module that calls `configure()` from `app/layout.tsx` as well as from the registry module, so the RSC graph sees the same states, recipes, and units.
+Next.js renders Server Components in a separate module graph that cannot see the collector `TastyRegistry` registers, so their CSS takes the RSC inline path: it is accumulated in a per-request `React.cache` and emitted as an inline `<style>` tag by the next `tasty()` component in the tree. Standalone style functions, `useStyles()` included, cannot emit CSS on their own, so make sure a `tasty()` component renders after them in every RSC tree. The RSC path does not emit configured globals (tokens, `@property`, `globalStyles`); those come from `TastyRegistry`'s collector or the `withTastyNext()` shared stylesheet. For the same reason, import the module that calls `configure()` from `app/layout.tsx` as well as from the registry module, so the RSC graph sees the same states, recipes, and units.
 
 ### Options
 
@@ -241,9 +241,9 @@ import { tasty } from '@tenphi/tasty';
 const Card = tasty({
   styles: {
     padding: '4x',
-    fill: '#surface',
+    fill: '#fff',
     radius: '1r',
-    border: true,
+    border: '1bw solid #ddd',
   },
 });
 
@@ -263,9 +263,9 @@ import Card from '../components/Card.tsx';
 </html>
 ```
 
-**Trade-offs**: Astro renders React with the standard `react` build, where `React.cache` does nothing, so there is no per-request style cache. Every `tasty()` element inlines the full CSS for its classes, even when the same component renders twice. Configured globals (`:root` tokens, `@property` defaults, `globalStyles`, `@font-face`) are never emitted, because only the SSR collector emits them, and CSS from `useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction` is dropped.
+**Trade-offs**: Astro renders React with the standard `react` build, where `React.cache` does nothing, so there is no per-request style cache. Every `tasty()` element inlines the full CSS for its classes, even when the same component renders twice. Configured globals (`:root` tokens, `@property` defaults, `globalStyles`, `@font-face`) are never emitted, because only the SSR collector emits them, and CSS from `useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, and `useFunction` is dropped. Without the [default properties](dsl.md#default-properties), styles that read them resolve to nothing: `border: true` and `outline: true` draw nothing, and `transition` with no duration does not animate. In development, Tasty warns once that it is rendering without a style collector.
 
-Best for trying Tasty out with unconfigured styles. Use `tastyIntegration()` for anything that relies on `configure()`.
+Best for trying Tasty out with plain values, as above. Use `tastyIntegration()` for anything that relies on `configure()` or on Tasty's default tokens.
 
 ### Astro Integration (recommended)
 
@@ -463,14 +463,14 @@ const fullHtml = `
 
 ```tsx
 // ── Client ──────────────────────────────────────────────
-// Browser-safe: runs hydrateTastyClasses() with window.__TASTY__ on import
-import '@tenphi/tasty/ssr/astro-client';
+import { hydrateTastyClasses } from '@tenphi/tasty/ssr/client';
 import { hydrateRoot } from 'react-dom/client';
 
+hydrateTastyClasses(); // reads window.__TASTY__
 hydrateRoot(document.getElementById('root'), <App />);
 ```
 
-`@tenphi/tasty/ssr` is server-only: it imports `node:async_hooks`, and in a browser bundle rendering throws `AsyncLocalStorage is not a constructor`. Despite its name, `@tenphi/tasty/ssr/astro-client` works with any framework.
+`@tenphi/tasty/ssr/client` is the browser half: it exports `hydrateTastyClasses()` and has no import side effects. A module shared by the server and the client can import `@tenphi/tasty/ssr` too. It is safe in a browser bundle, where there is no server collector to find, and only `runWithCollector()` throws there.
 
 ### Streaming SSR
 
@@ -517,14 +517,15 @@ runWithCollector(collector, () => {
 
 ### Entry points
 
-| Import path                                                                                                                                                                                      | Description                                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@tenphi/tasty/ssr`                                                                                                                                                                              | Core SSR API (server-only): `ServerStyleCollector`, `createServerStyleCollector`, `runWithCollector`, `getSSRCollector`, `hydrateTastyClasses`; types `ServerStyleArtifact`, `ServerStyleArtifactKind`          |
-| `@tenphi/tasty/ssr/next`                                                                                                                                                                         | Next.js App Router: `TastyRegistry` component                                                                                                                                                                   |
-| `@tenphi/tasty/ssr/next-config`                                                                                                                                                                  | Next.js config wrapper: shared, content-hashed global stylesheet                                                                                                                                                |
-| `@tenphi/tasty/ssr/astro`                                                                                                                                                                        | Astro: `tastyIntegration`, `tastyMiddleware`                                                                                                                                                                    |
-| `@tenphi/tasty/ssr/astro-client`                                                                                                                                                                 | Astro: client-side cache hydration (auto-injected by integration, or import manually)                                                                                                                           |
-| `@tenphi/tasty/ssr/astro-middleware`<br />`@tenphi/tasty/ssr/astro-middleware-static`<br />`@tenphi/tasty/ssr/astro-middleware-extract`<br />`@tenphi/tasty/ssr/astro-middleware-extract-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`. |
+| Import path                                                                                                                                                                                      | Description                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@tenphi/tasty/ssr`                                                                                                                                                                              | Core SSR API: `ServerStyleCollector`, `createServerStyleCollector`, `runWithCollector`, `getSSRCollector`, `hydrateTastyClasses`; types `ServerStyleArtifact`, `ServerStyleArtifactKind`. Safe to import in a browser bundle; `runWithCollector()` needs the server |
+| `@tenphi/tasty/ssr/client`                                                                                                                                                                       | Browser-safe client hydration for any framework: `hydrateTastyClasses`, no import side effects                                                                                                                                                                      |
+| `@tenphi/tasty/ssr/next`                                                                                                                                                                         | Next.js App Router: `TastyRegistry` component                                                                                                                                                                                                                       |
+| `@tenphi/tasty/ssr/next-config`                                                                                                                                                                  | Next.js config wrapper: shared, content-hashed global stylesheet                                                                                                                                                                                                    |
+| `@tenphi/tasty/ssr/astro`                                                                                                                                                                        | Astro: `tastyIntegration`, `tastyMiddleware`                                                                                                                                                                                                                        |
+| `@tenphi/tasty/ssr/astro-client`                                                                                                                                                                 | Astro: client-side cache hydration (auto-injected by integration, or import manually)                                                                                                                                                                               |
+| `@tenphi/tasty/ssr/astro-middleware`<br />`@tenphi/tasty/ssr/astro-middleware-static`<br />`@tenphi/tasty/ssr/astro-middleware-extract`<br />`@tenphi/tasty/ssr/astro-middleware-extract-static` | Astro: the middleware entrypoints `tastyIntegration()` registers via `addMiddleware()`. Exported so Astro can resolve them by specifier; you should not import them. For manual setups use `tastyMiddleware()`.                                                     |
 
 ### `ServerStyleCollector`
 
@@ -587,11 +588,11 @@ Astro middleware factory. Use for manual middleware composition.
 
 ### `hydrateTastyClasses(classes?)`
 
-Pre-populate the client injector's rules map with class names rendered on the server, marking them as already present in the DOM so `computeStyles()` skips re-injection during hydration. When called without arguments, reads the class list from `window.__TASTY__` (populated by the streaming `<script>` tags emitted during SSR).
+Exported from `@tenphi/tasty/ssr/client` and `@tenphi/tasty/ssr`. Pre-populate the client injector's rules map with class names rendered on the server, marking them as already present in the DOM so `computeStyles()` skips re-injection during hydration. When called without arguments, reads the class list from `window.__TASTY__` (populated by the streaming `<script>` tags emitted during SSR).
 
 ### `runWithCollector(collector, fn)`
 
-Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All style function calls within `fn` (and async continuations) — including `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — will find this collector. Returns `fn`'s return value, synchronously unless `fn` returns a promise.
+Run a function with a `ServerStyleCollector` bound to the current async context via `AsyncLocalStorage`. All style function calls within `fn` (and async continuations) — including `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — will find this collector. Returns `fn`'s return value, synchronously unless `fn` returns a promise. Throws where `AsyncLocalStorage` is unavailable, such as in a browser.
 
 ---
 
@@ -603,7 +604,7 @@ The `TastyRegistry` or `tastyIntegration` is missing. Ensure your layout wraps t
 
 ### Hydration mismatch warnings
 
-Class names are content hashes of the resolved styles, so render order does not affect them. Unnamed `useKeyframes()` and `useCounterStyle()` names are counters (`tk0`, `tc0`) on both server and client; pass `name` if the two sides can call them in a different order. If you see mismatches, ensure `hydrateTastyClasses()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, import `@tenphi/tasty/ssr/astro-client` before `hydrateRoot()`.
+Class names are content hashes of the resolved styles, so render order does not affect them. Unnamed `useKeyframes()` and `useCounterStyle()` names are counters (`tk0`, `tc0`) on both server and client; pass `name` if the two sides can call them in a different order. If you see mismatches, ensure `hydrateTastyClasses()` runs before React hydration. For Next.js, this is automatic. For Astro with `tastyIntegration()`, this is also automatic. For manual Astro middleware setups, import `@tenphi/tasty/ssr/astro-client` in your island components. For custom setups, call `hydrateTastyClasses()` from `@tenphi/tasty/ssr/client` before `hydrateRoot()`.
 
 Class names are also derived from the _resolved_ styles, so the server and the client must configure Tasty identically. Anything that changes what a component's styles resolve to will produce a mismatch if it is registered on only one side — `namePrefix`, `recipes`, `handlers`, and the `propHandlers` / `baseStyleProps` extension points described in [Plugins](plugins.md). Call the same `configure()` on both; global CSS is deduplicated automatically, so no `typeof window` guard is needed.
 
@@ -614,8 +615,9 @@ Class names are also derived from the _resolved_ styles, so the server and the c
 **Component CSS**: SSR `<style data-tasty-ssr>` tags remain in the DOM. The client injector creates separate `<style>` elements for any new styles. SSR styles are never modified or removed by the client. If this is a concern for very large apps, you can remove the SSR style tags and hydration scripts manually after hydration:
 
 ```tsx
-import '@tenphi/tasty/ssr/astro-client'; // runs hydrateTastyClasses()
+import { hydrateTastyClasses } from '@tenphi/tasty/ssr/client';
 
+hydrateTastyClasses();
 hydrateRoot(root, <App />);
 
 // Optional: remove SSR style tags and class-list scripts after hydration
@@ -627,4 +629,8 @@ document.querySelectorAll('script').forEach((el) => {
 
 ### `AsyncLocalStorage` not available
 
-`@tenphi/tasty/ssr` imports `node:async_hooks` and is server-only. In a browser bundle the module is stubbed and rendering throws `AsyncLocalStorage is not a constructor`. On the client, import `@tenphi/tasty/ssr/astro-client` (it works with any framework) or use `@tenphi/tasty/ssr/next`, which hydrates automatically.
+`runWithCollector()` throws `runWithCollector() needs AsyncLocalStorage from node:async_hooks` where the runtime has no `AsyncLocalStorage`, such as in a browser bundle. Call it on the server. The rest of `@tenphi/tasty/ssr` is safe to import in a browser bundle; on the client, call `hydrateTastyClasses()` from `@tenphi/tasty/ssr/client`, or use `@tenphi/tasty/ssr/next`, which hydrates automatically.
+
+### "Server rendering without a style collector" warning
+
+Tasty rendered on the server with no collector and no React Server Components request scope: Astro without `tastyIntegration()`, a client component server-rendered without `TastyRegistry`, or a custom setup that skips `runWithCollector()`. Each `tasty()` element then inlines all of its CSS, and configured globals (tokens, the default `@property` set, `globalStyles`, `@font-face`) and the CSS of the standalone style functions are not emitted. Add the integration for your framework. The warning is shown once, in development only.

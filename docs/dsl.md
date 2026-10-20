@@ -137,7 +137,7 @@ const List = tasty({
 // → .t1x29r0l.t1x29r0l > [data-element="Item"]::after { content: ""; }
 ```
 
-Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise.
+Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise. This works when `$` ends in a pseudo-element too: the condition attaches to the element the pseudo-element belongs to (see [`@own(...)`](#own--sub-elements-own-state)).
 
 ### Color Token
 
@@ -779,6 +779,18 @@ const Nav = tasty({
 | `@own(theme=dark)`                | `[data-theme="dark"]` on the sub-element selector |
 
 `@own()` is only valid inside sub-element styles. Using it on root styles emits a warning and is treated as a regular modifier.
+
+When `$` ends in a pseudo-element, the condition attaches to the originating element, before the pseudo-element. CSS accepts no `:where()` after a pseudo-element:
+
+```jsx
+Icon: {
+  $: 'a::before',
+  content: { '': 'none', '@own([rel="next"])': '"→"' },
+},
+// → .t0.t0 a:where([rel="next"])::before { content: "→"; }
+```
+
+This covers every pseudo-element form: `::before`, `::marker`, `::backdrop`, vendor-prefixed ones such as `::-webkit-details-marker`, functional ones such as `::part(label)`, and the legacy `:before`, `:after`, `:first-line`, `:first-letter`. In a `$` list, each item gets the condition before its own pseudo-element. A pseudo-class written after the pseudo-element in `$`, as in `'@::part(label):hover'`, qualifies the pseudo-element and stays after it.
 
 ### `@starting` — Entry Animation
 

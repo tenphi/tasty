@@ -189,6 +189,14 @@ export interface CSSComponents {
 export interface CSSRule {
   /** Single selector or array of selector fragments (for OR conditions) */
   selector: string | string[];
+  /**
+   * Per selector fragment, where its suffix begins: the root-element states
+   * (`:where(...)` root and `@parent` segments) come before it, the selector
+   * suffix (sub-element, `&` key, handler `$`) after. Lets a direct selector
+   * that ends in a pseudo-element take those states before the
+   * pseudo-element (`.card:where(:hover)::before`).
+   */
+  suffixStart?: number[];
   declarations: string;
   atRules?: string[];
   rootPrefix?: string;

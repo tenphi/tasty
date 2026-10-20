@@ -132,6 +132,82 @@ export function rootStateIndex(selector: string): number {
   return pseudoElementAt === -1 ? selector.length : pseudoElementAt;
 }
 
+/**
+ * Where the pseudo-element that ends `selector` begins: the first top-level
+ * `::name` (or legacy `:before`, `:after`, `:first-line`, `:first-letter`) in
+ * its last compound. Returns `selector.length` when that compound has none.
+ *
+ * A state for the element `selector` targets goes at this index. A
+ * pseudo-element takes no `:where()` after it, so the state attaches to the
+ * originating element instead: `a::before` takes `[rel]` as
+ * `a:where([rel])::before`. Everything from the pseudo-element on stays after
+ * the state, including pseudo-classes that qualify the pseudo-element itself
+ * (`::part(x):hover`, `::-webkit-scrollbar-thumb:hover`) and a chained
+ * pseudo-element (`::after::marker`).
+ *
+ * Expects one complex selector; split a list with `splitSelectorsSafely`.
+ *
+ * @example
+ * pseudoElementIndex('a::before')                  // → 1
+ * pseudoElementIndex('dialog::backdrop')           // → 6
+ * pseudoElementIndex('::part(x):hover')            // → 0
+ * pseudoElementIndex('li:first-child:before')      // → 14
+ * pseudoElementIndex('a:hover')                    // → 7
+ * pseudoElementIndex('::before > span')            // → 15
+ */
+export function pseudoElementIndex(selector: string): number {
+  let pseudoElementAt = -1;
+  // Set after a combinator; the next compound clears what came before it.
+  let newCompound = false;
+  let squareDepth = 0;
+  let parenDepth = 0;
+  let quote = '';
+
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i];
+
+    if (quote) {
+      if (char === '\\') i++;
+      else if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '/' && selector[i + 1] === '*') {
+      const end = selector.indexOf('*/', i + 2);
+      if (end === -1) break;
+      i = end + 1;
+      continue;
+    }
+
+    if (squareDepth === 0 && parenDepth === 0) {
+      // Whitespace counts only once another compound follows it, so
+      // trailing whitespace keeps the last compound's pseudo-element.
+      if (/[\s>+~,]/.test(char)) {
+        newCompound = true;
+        continue;
+      }
+      if (newCompound) {
+        pseudoElementAt = -1;
+        newCompound = false;
+      }
+      if (pseudoElementAt === -1 && char === ':') {
+        const name = /^:[\w-]+/.exec(selector.slice(i))?.[0] ?? '';
+        if (selector[i + 1] === ':' || LEGACY_PSEUDO_ELEMENT_RE.test(name)) {
+          pseudoElementAt = i;
+        }
+      }
+    }
+
+    if (char === '\\') i++;
+    else if (char === '"' || char === "'") quote = char;
+    else if (char === '[') squareDepth++;
+    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (char === '(') parenDepth++;
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+  }
+
+  return pseudoElementAt === -1 ? selector.length : pseudoElementAt;
+}
+
 /** Split a CSS selector list at commas outside strings, brackets, and functions. */
 export function splitSelectorsSafely(selectorList: string): string[] {
   if (!selectorList.includes(',')) {

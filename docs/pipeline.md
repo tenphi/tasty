@@ -522,7 +522,7 @@ Converts condition trees into actual CSS selectors and at-rules.
 
 5. **`:where()` specificity equalization**: Every stateful part of the selector is wrapped in `:where(...)` so it contributes **zero specificity**:
    - the flat root modifiers + pseudos and the root element's `:is()`/`:not()` groups are combined into one `:where(...)` (`buildSelectorFromVariant`);
-   - the sub-element (`@own`) groups are wrapped in a **separate** `:where(...)` so the sub-element's structural `[data-element="X"]` specificity is preserved while its states are zeroed;
+   - the sub-element (`@own`) groups are wrapped in a **separate** `:where(...)` so the sub-element's structural `[data-element="X"]` specificity is preserved while its states are zeroed. When the suffix ends in a pseudo-element, that `:where(...)` goes before it, on the originating element (`a:where([rel])::before`), because nothing but some pseudo-classes may follow a pseudo-element. `pseudoElementIndex` (`src/utils/selector-transform.ts`) finds the split: the first pseudo-element in the last compound, with any pseudo-class after it (`::part(x):hover`) staying after it. A direct selector that ends in a pseudo-element (`.card::before`) takes the root and `@parent` segments the same way, using the `suffixStart` each `CSSRule` records;
    - `@parent` ancestors (`parentGroupsToCSS`) become `:where(... *)` / `:where(:not(... *))`;
    - the `@root` context prefix (`rootStateToPrefix`) becomes `:where(:root...)` (zeroing the `:root` pseudo too). When a direct selector can only match the root itself (`:root`, `html`, `:where(:root)`), the state segment joins it instead — `:root:where([data-schema="dark"])` — since an ancestor prefix would ask for a `:root` inside the root.
 

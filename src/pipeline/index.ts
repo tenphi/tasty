@@ -33,6 +33,7 @@ import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 import { isSelector } from '../utils/is-selector';
 import {
+  pseudoElementIndex,
   rootStateIndex,
   splitSelectorsSafely,
 } from '../utils/selector-transform';
@@ -1181,12 +1182,15 @@ function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
 }
 
 /**
- * Build selector fragment from a variant (without className prefix)
+ * Build selector fragment from a variant (without className prefix).
+ *
+ * `suffixStart` is where the selector suffix begins: everything before it
+ * attaches to the root element itself.
  */
 function buildSelectorFromVariant(
   variant: SelectorVariant,
   selectorSuffix: string,
-): string {
+): { selector: string; suffixStart: number } {
   let selector = '';
 
   // Root-element state segment: flat modifiers/pseudos + :is()/:not()
@@ -1209,7 +1213,7 @@ function buildSelectorFromVariant(
     selector += parentGroupsToCSS(variant.parentGroups);
   }
 
-  selector += selectorSuffix;
+  const suffixStart = selector.length;
 
   // Sub-element (own) state segment: wrapped in its own separate
   // `:where(...)` so the sub-element's own structural specificity
@@ -1219,9 +1223,21 @@ function buildSelectorFromVariant(
   for (const group of ownOptimized) {
     ownSegment += selectorGroupToCSS(group);
   }
-  selector += wrapWhere(ownSegment);
 
-  return selector;
+  if (ownSegment) {
+    // When the suffix ends in a pseudo-element (`a::before`, `@::marker`),
+    // own states attach to its originating element: no `:where()` may follow
+    // a pseudo-element. See `pseudoElementIndex` for the exact split.
+    const at = pseudoElementIndex(selectorSuffix);
+    selector +=
+      selectorSuffix.slice(0, at) +
+      wrapWhere(ownSegment) +
+      selectorSuffix.slice(at);
+  } else {
+    selector += selectorSuffix;
+  }
+
+  return { selector, suffixStart };
 }
 
 /**
@@ -1292,16 +1308,17 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
     const mergedVariants = mergeVariantsIntoSelectorGroups(group.variants);
 
     // Build selector fragments for each variant (will be joined with className later)
-    const selectorFragments = mergedVariants.map((v) =>
+    const built = mergedVariants.map((v) =>
       buildSelectorFromVariant(v, rule.selectorSuffix),
     );
 
     // Store as array if multiple, string if single
     const selector =
-      selectorFragments.length === 1 ? selectorFragments[0] : selectorFragments;
+      built.length === 1 ? built[0].selector : built.map((b) => b.selector);
 
     const cssRule: CSSRule = {
       selector,
+      suffixStart: built.map((b) => b.suffixStart),
       declarations,
       order: rule.order,
     };
@@ -1438,7 +1455,17 @@ export function renderStyles(
     // just the last one a plain suffix would land on.
     const items = splitSelectorsSafely(classNameOrSelector);
     const bases = (items.length > 0 ? items : [classNameOrSelector]).map(
-      (base) => ({ base, rootAt: rootStateIndex(base) }),
+      (base) => {
+        // A base that ends in a pseudo-element (`.card::before`) takes the
+        // root-element states on its originating element, before the
+        // pseudo-element. `rootAt`, when set, is never past this point.
+        const at = pseudoElementIndex(base);
+        return {
+          head: base.slice(0, at),
+          pseudoElement: base.slice(at),
+          rootAt: rootStateIndex(base),
+        };
+      },
     );
 
     const results = rules.map((rule): StyleResult => {
@@ -1450,14 +1477,18 @@ export function renderStyles(
           : [''];
 
       const finalSelector = selectorParts
-        .flatMap((part) =>
-          bases.map(({ base, rootAt }) => {
+        .flatMap((part, index) =>
+          bases.map(({ head, pseudoElement, rootAt }) => {
             // A selector that is itself the root takes root states directly:
             // as an ancestor prefix they would ask for a root inside the root.
             const joinsRoot = rule.rootState !== undefined && rootAt !== -1;
-            let sel = joinsRoot
-              ? `${base.slice(0, rootAt)}${wrapWhere(rule.rootState!)}${base.slice(rootAt)}${part}`
-              : `${base}${part}`;
+            const base = joinsRoot
+              ? `${head.slice(0, rootAt)}${wrapWhere(rule.rootState!)}${head.slice(rootAt)}`
+              : head;
+            // Root-element states before the base's pseudo-element, the
+            // selector suffix after it.
+            const at = rule.suffixStart?.[index] ?? part.length;
+            let sel = `${base}${part.slice(0, at)}${pseudoElement}${part.slice(at)}`;
 
             // Double class selector for increased specificity if requested
             // This is used when the caller explicitly wants higher specificity

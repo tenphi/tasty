@@ -494,7 +494,9 @@ function ThemeStyles() {
 The selector can be a list (`'.uni-checkbox, uni-checkbox'`) — every item gets
 the states and sub-elements, with no `:is()` wrapping needed. Root states
 (`@root(...)`) on a selector that is the root itself (`:root`, `html`) apply to
-that element. Local `@keyframes` are injected with the rules, under the same
+that element. A selector that ends in a pseudo-element takes its states on the
+originating element: `'.card::before'` with a `:hover` state gives
+`.card:where(:hover)::before`. Local `@keyframes` are injected with the rules, under the same
 resolved names `tasty()` components use, and `@starting` states emit
 `@starting-style`.
 

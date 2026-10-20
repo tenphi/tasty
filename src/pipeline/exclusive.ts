@@ -249,7 +249,7 @@ export function parseStyleEntries(
  * (`&`, `|`, `^`, `,`) or grouping parens. A `_` embedded in a longer token
  * (e.g. a modifier named `_private`) is not a misuse.
  */
-function isMisusedFallbackKey(stateKey: string): boolean {
+export function isMisusedFallbackKey(stateKey: string): boolean {
   if (stateKey === '_' || !stateKey.includes('_')) return false;
   return /(?:^|[\s&|^,(])_(?:[\s&|^,)]|$)/.test(stateKey);
 }

@@ -1,9 +1,12 @@
 /**
- * States on a selector that ends in a pseudo-element, checked in Chromium
- * (tenphi/tasty#406). Written after a pseudo-element, a state never matched:
- * Chromium keeps such a rule but empties its `:where()`, or rejects it outright
- * for `::slotted()`, so even the default branch never applied.
- * `pseudo-element-states.test.ts` pins the text.
+ * States on a pseudo-element target, checked in Chromium (tenphi/tasty#406).
+ *
+ * A state that tests what a pseudo-element has none of (an attribute,
+ * modifier, or class) used to come out as `a::before:where([rel])`. Chromium
+ * keeps that rule but empties the `:where()`, so neither it nor its negated
+ * default ever matched. Those states are now dropped, so the default
+ * applies. A pseudo-class state goes after the pseudo-element, where
+ * `::part()` can take it. `pseudo-element-states.test.ts` pins the text.
  */
 import { cleanup, render } from '@testing-library/react';
 
@@ -16,12 +19,23 @@ import type { Styles } from '../styles/types';
 import { tasty } from '../tasty';
 
 import { renderStyles } from './index';
+import { setWarningHandler } from './warnings';
 
 const ON = 'rgb(0, 128, 0)';
 const OFF = 'rgb(255, 0, 0)';
 const color = { '': 'rgb(255 0 0)', '@own([data-on])': 'rgb(0 128 0)' };
 
 const styles: Styles = {
+  // Pseudo-class states the pseudo-element itself is in.
+  Part: {
+    $: '@::part(label)',
+    color: { '': 'rgb(255 0 0)', '@own(:focus)': 'rgb(0 128 0)' },
+  },
+  Thumb: {
+    $: '@::-webkit-scrollbar-thumb',
+    color: { '': 'rgb(255 0 0)', '@own(:hover)': 'rgb(0 128 0)' },
+  },
+  // Attribute states a pseudo-element can't have: dropped, default kept.
   Link: {
     $: 'a::before',
     content: { '': '"off"', '@own([rel="next"])': '"on"' },
@@ -31,22 +45,9 @@ const styles: Styles = {
   Item: { $: '@::marker', color },
   Field: { $: '@::placeholder', color },
   Summary: { $: 'summary::marker, summary::-webkit-details-marker', color },
-  Host: { $: '@::part(label)', color },
   Dialog: { $: '@::backdrop', opacity: { '': '0.25', '@own([open])': '0.75' } },
-  // Not observable through computed styles; the rules must keep their state.
-  Thumb: { $: '@::-webkit-scrollbar-thumb:hover', color },
-  Slot: { $: '@::slotted(span)', color },
-  Found: { $: '@::highlight(found)', color },
   '&::after': { content: { '': '"off"', '@own([data-root-on])': '"on"' } },
 };
-
-/** Selectors that only the parser can vouch for. */
-const KEPT = [
-  /\[data-element="Thumb"\]:where\(\[data-on\]\)::-webkit-scrollbar-thumb:hover/,
-  /\[data-element="Slot"\]:where\(\[data-on\]\)::slotted\(span\)/,
-  /\[data-element="Found"\]:where\(\[data-on\]\)::highlight\(found\)/,
-  /summary:where\(\[data-on\]\)::-webkit-details-marker/,
-];
 
 const FIXTURE = `
   <a rel="next"></a><a></a>
@@ -57,17 +58,27 @@ const FIXTURE = `
   <input data-element="Field" placeholder="off" />
   <details><summary data-on>on</summary></details>
   <details><summary>off</summary></details>
-  <div data-element="Host" data-on></div><div data-element="Host"></div>
+  <div data-element="Part"></div>
+  <div data-element="Thumb"></div>
   <dialog data-element="Dialog"></dialog>
 `;
+
+let restoreWarnings: () => void;
+
+beforeEach(() => {
+  restoreWarnings = setWarningHandler(() => {
+    /* dropped states warn; asserted in the Node suite */
+  });
+});
+
+afterEach(() => restoreWarnings());
 
 function fill(root: HTMLElement) {
   root.setAttribute('data-root-on', '');
   root.innerHTML = FIXTURE;
-  for (const host of root.querySelectorAll('[data-element="Host"]')) {
-    host.attachShadow({ mode: 'open' }).innerHTML =
-      '<span part="label"></span>';
-  }
+  root
+    .querySelector('[data-element="Part"]')!
+    .attachShadow({ mode: 'open' }).innerHTML = '<input part="label" />';
 }
 
 function pseudo(el: Element, name: string) {
@@ -93,54 +104,47 @@ function keptSelectors(): string[] {
 }
 
 function expectStatesApplied(root: HTMLElement) {
-  const q = (selector: string) => root.querySelectorAll(selector);
+  const q = (selector: string) => [...root.querySelectorAll(selector)];
 
-  const [linkOn, linkOff] = q('a');
-  expect(pseudo(linkOn, '::before').content).toBe('"on"');
-  expect(pseudo(linkOff, '::before').content).toBe('"off"');
+  // The part's own focus.
+  const input = q('[data-element="Part"]')[0].shadowRoot!.querySelector(
+    'input',
+  )!;
+  expect(getComputedStyle(input).color).toBe(OFF);
+  input.focus();
+  expect(getComputedStyle(input).color).toBe(ON);
+  input.blur();
+  expect(getComputedStyle(input).color).toBe(OFF);
 
-  const [bOn, bOff] = q('b');
-  expect(pseudo(bOn, '::after').content).toBe('"on"');
-  expect(pseudo(bOff, '::after').content).toBe('"off"');
-
-  const [pOn, pOff] = q('p');
-  expect(pseudo(pOn, '::first-letter').color).toBe(ON);
-  expect(pseudo(pOff, '::first-letter').color).toBe(OFF);
-
-  const [liOn, liOff] = q('li');
-  expect(pseudo(liOn, '::marker').color).toBe(ON);
-  expect(pseudo(liOff, '::marker').color).toBe(OFF);
-
-  const [inputOn, inputOff] = q('input');
-  expect(pseudo(inputOn, '::placeholder').color).toBe(ON);
-  expect(pseudo(inputOff, '::placeholder').color).toBe(OFF);
-
-  const [summaryOn, summaryOff] = q('summary');
-  expect(pseudo(summaryOn, '::marker').color).toBe(ON);
-  expect(pseudo(summaryOff, '::marker').color).toBe(OFF);
-
-  const [hostOn, hostOff] = q('[data-element="Host"]');
-  const part = (host: Element) => host.shadowRoot!.querySelector('span')!;
-  expect(getComputedStyle(part(hostOn)).color).toBe(ON);
-  expect(getComputedStyle(part(hostOff)).color).toBe(OFF);
+  // Dropped attribute states: the default applies to every element.
+  for (const a of q('a')) expect(pseudo(a, '::before').content).toBe('"off"');
+  for (const b of q('b')) expect(pseudo(b, '::after').content).toBe('"off"');
+  for (const p of q('p')) expect(pseudo(p, '::first-letter').color).toBe(OFF);
+  for (const li of q('li')) expect(pseudo(li, '::marker').color).toBe(OFF);
+  for (const field of q('input')) {
+    expect(pseudo(field, '::placeholder').color).toBe(OFF);
+  }
+  for (const summary of q('summary')) {
+    expect(pseudo(summary, '::marker').color).toBe(OFF);
+  }
+  expect(pseudo(root, '::after').content).toBe('"off"');
 
   const dialog = root.querySelector('dialog')!;
   dialog.showModal();
-  expect(pseudo(dialog, '::backdrop').opacity).toBe('0.75');
-  dialog.close();
   expect(pseudo(dialog, '::backdrop').opacity).toBe('0.25');
-
-  expect(pseudo(root, '::after').content).toBe('"on"');
-  root.removeAttribute('data-root-on');
-  expect(pseudo(root, '::after').content).toBe('"off"');
+  dialog.close();
 
   const kept = keptSelectors();
-  for (const pattern of KEPT) {
-    expect(kept.some((selector) => pattern.test(selector))).toBe(true);
-  }
-  expect(kept.filter((s) => /::[\w-]+(\([^)]*\))?:where\(/.test(s))).toEqual(
-    [],
-  );
+  // The thumb's own hover survives parsing after the pseudo-element.
+  expect(
+    kept.some((s) =>
+      /\[data-element="Thumb"\]::-webkit-scrollbar-thumb:where\(:hover\)/.test(
+        s,
+      ),
+    ),
+  ).toBe(true);
+  // Nothing was emitted that the engine had to empty.
+  expect(kept.filter((s) => s.includes(':where()'))).toEqual([]);
 }
 
 describe('states on a sub-element that ends in a pseudo-element', () => {
@@ -206,35 +210,44 @@ describe('states on a sub-element that ends in a pseudo-element', () => {
 describe('states on a global selector that ends in a pseudo-element', () => {
   afterEach(() => destroy());
 
-  it('attach to the originating element', () => {
-    useGlobalStyles('.pe-before::before, .pe-after:after', {
-      content: { '': '"off"', '[data-on]': '"on"' },
+  it('apply to the pseudo-element, with ancestry on its element', () => {
+    useGlobalStyles('.pe-host::part(label)', {
+      color: { '': 'rgb(255 0 0)', ':focus': 'rgb(0 128 0)' },
     });
     useGlobalStyles('.pe-field::placeholder', {
       color: { '': 'rgb(255 0 0)', '@parent([data-on])': 'rgb(0 128 0)' },
     });
+    useGlobalStyles('.pe-before::before', {
+      content: { '': '"off"', '[data-on]': '"on"' },
+    });
 
     const host = document.createElement('div');
     host.innerHTML = `
-      <i class="pe-before" data-on></i><i class="pe-before"></i>
-      <i class="pe-after" data-on></i><i class="pe-after"></i>
+      <div class="pe-host"></div>
       <div data-on><input class="pe-field" placeholder="on" /></div>
       <div><input class="pe-field" placeholder="off" /></div>
+      <i class="pe-before" data-on></i><i class="pe-before"></i>
     `;
+    host.querySelector('.pe-host')!.attachShadow({ mode: 'open' }).innerHTML =
+      '<input part="label" />';
     document.body.append(host);
 
     try {
-      const [beforeOn, beforeOff] = host.querySelectorAll('.pe-before');
-      expect(pseudo(beforeOn, '::before').content).toBe('"on"');
-      expect(pseudo(beforeOff, '::before').content).toBe('"off"');
-
-      const [afterOn, afterOff] = host.querySelectorAll('.pe-after');
-      expect(pseudo(afterOn, '::after').content).toBe('"on"');
-      expect(pseudo(afterOff, '::after').content).toBe('"off"');
+      const part = host
+        .querySelector('.pe-host')!
+        .shadowRoot!.querySelector('input')!;
+      expect(getComputedStyle(part).color).toBe(OFF);
+      part.focus();
+      expect(getComputedStyle(part).color).toBe(ON);
+      part.blur();
 
       const [fieldOn, fieldOff] = host.querySelectorAll('.pe-field');
       expect(pseudo(fieldOn, '::placeholder').color).toBe(ON);
       expect(pseudo(fieldOff, '::placeholder').color).toBe(OFF);
+
+      for (const el of host.querySelectorAll('.pe-before')) {
+        expect(pseudo(el, '::before').content).toBe('"off"');
+      }
     } finally {
       host.remove();
     }

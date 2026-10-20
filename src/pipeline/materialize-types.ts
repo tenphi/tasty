@@ -190,13 +190,12 @@ export interface CSSRule {
   /** Single selector or array of selector fragments (for OR conditions) */
   selector: string | string[];
   /**
-   * Per selector fragment, where its suffix begins: the root-element states
-   * (`:where(...)` root and `@parent` segments) come before it, the selector
-   * suffix (sub-element, `&` key, handler `$`) after. Lets a direct selector
-   * that ends in a pseudo-element take those states before the
-   * pseudo-element (`.card:where(:hover)::before`).
+   * Set when rendering for a direct selector that ends in a pseudo-element:
+   * per selector fragment, where that pseudo-element goes. Its ancestor
+   * context (`@parent`) comes before it, its own states and the selector
+   * suffix after: `.card:where(.dark *)::before:where(:hover)`.
    */
-  suffixStart?: number[];
+  pseudoElementAt?: number[];
   declarations: string;
   atRules?: string[];
   rootPrefix?: string;

@@ -214,7 +214,7 @@ styles: { Title: { preset: 'h3' }, Icon: { $: '>', color: { '': '#text', '@own(:
 
 ❌ nested-selector keys (`'& .title'`, `'&:hover'`) → ✅ sub-elements and state maps. Use the `$` affix property inside a sub-element to control how its selector attaches (`>` direct child, `@` placeholder for the element itself, `&::before` for a root pseudo-element).
 
-When `$` ends in a pseudo-element, `@own(…)` attaches to the originating element: `$: 'a::before'` with `'@own([rel="next"])'` → `a:where([rel="next"])::before`. Keep such conditions in `@own(…)`, not in `$`.
+When `$` ends in a pseudo-element, `@own(…)` is the pseudo-element's own state (`'@own(:focus)'` → `::part(label):where(:focus)`). A pseudo-element has no attributes, classes, or tree position, so `@own([open])`, `@own(hovered)`, or `@own(:first-child)` there is ignored with a warning. Put a condition on the element before the pseudo-element in `$`: `$: 'a[rel="next"]::before'`.
 
 ## 6. Special top-level keys
 

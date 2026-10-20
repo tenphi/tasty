@@ -11,6 +11,7 @@ import type {
   FontFaceInput,
   FunctionDefinition,
   KeyframesSteps,
+  PropertyDefinition,
 } from '../injector/types';
 import {
   extractLocalCounterStyle,
@@ -44,8 +45,14 @@ import {
   formatKeyframesCSS,
   formatKeyframesSteps,
 } from '../ssr/format-keyframes';
-import { extractLocalProperties, hasLocalProperties } from '../properties';
+import {
+  extractLocalProperties,
+  getEffectiveDefinition,
+  hasLocalProperties,
+} from '../properties';
+import { DEFAULT_PROPERTIES } from '../properties/defaults';
 import { PropertyTypeResolver } from '../properties/property-type-resolver';
+import { formatPropertyCSS } from '../ssr/format-property';
 import type { Styles } from '../styles/types';
 import {
   DEFAULT_ZERO_NAME_PREFIX,
@@ -449,22 +456,55 @@ export interface ExtractedProperty {
   css: string;
 }
 
+export interface PropertyExtractionOptions {
+  /** `false` turns automatic `@property` inference off. */
+  autoPropertyTypes?: boolean;
+  /**
+   * CSS names (`--gap`, `--white-color`) already registered elsewhere, such as
+   * by {@link extractConfigProperties}. Inference leaves them alone, so the
+   * explicit definition is the one that applies.
+   */
+  defined?: ReadonlySet<string>;
+}
+
+/**
+ * The `@property` rules a configuration registers: Tasty's defaults (`#white`,
+ * `#border`, `$gap`, `$radius`, …) overlaid with `config.properties`, the same
+ * set the runtime registers.
+ */
+export function extractConfigProperties(
+  properties: Record<string, PropertyDefinition> = {},
+): ExtractedProperty[] {
+  const results: ExtractedProperty[] = [];
+
+  for (const [token, definition] of Object.entries({
+    ...DEFAULT_PROPERTIES,
+    ...properties,
+  })) {
+    const { cssName, isValid } = getEffectiveDefinition(token, definition);
+    const css = isValid ? formatPropertyCSS(token, definition) : '';
+    if (css) results.push({ name: cssName, css });
+  }
+
+  return results;
+}
+
 /**
  * Extract auto-inferred @property declarations from styles.
  * Scans rendered style declarations and keyframe declarations for custom properties
  * whose types can be inferred from their values.
  *
  * @param styles - The styles object
- * @param options - Options including autoPropertyTypes flag
+ * @param options - Whether inference is on, and which properties to leave alone
  * @returns Array of @property CSS rules to inject
  */
 export function extractPropertiesFromStyles(
   styles: Styles,
-  options?: { autoPropertyTypes?: boolean },
+  options?: PropertyExtractionOptions,
 ): ExtractedProperty[] {
   if (options?.autoPropertyTypes === false) return [];
 
-  const registered = new Set<string>();
+  const registered = new Set<string>(options?.defined);
   const results: ExtractedProperty[] = [];
 
   // Collect explicitly declared properties (they take precedence)

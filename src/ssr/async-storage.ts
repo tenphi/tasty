@@ -10,22 +10,48 @@
  * across module instances — frameworks like Astro may load middleware
  * and page components from separate module graphs.
  *
- * This module imports from 'node:async_hooks' — it must be excluded
- * from client bundles via the build configuration.
+ * This module imports from 'node:async_hooks', which a browser bundle stubs
+ * out. Nothing reads the import until a collector is looked up, and a stub
+ * reads as "no storage", so `@tenphi/tasty/ssr` can still be imported there
+ * (for `hydrateTastyClasses()`) without breaking rendering.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
+import * as asyncHooks from 'node:async_hooks';
+import type { AsyncLocalStorage } from 'node:async_hooks';
 
 import type { ServerStyleCollector } from './collector';
 
 const ALS_KEY = '__tasty_ssr_als__';
 
-function getSharedStorage(): AsyncLocalStorage<ServerStyleCollector> {
+type Storage = AsyncLocalStorage<ServerStyleCollector>;
+
+/** The `AsyncLocalStorage` class, or null where the module is stubbed out. */
+function getStorageClass(): typeof AsyncLocalStorage | null {
+  try {
+    const Storage = asyncHooks.AsyncLocalStorage;
+    return typeof Storage === 'function' ? Storage : null;
+  } catch {
+    // Some development stubs throw on any property access.
+    return null;
+  }
+}
+
+/**
+ * Whether this environment has `AsyncLocalStorage` — a server runtime rather
+ * than a browser bundle.
+ */
+export function isAsyncStorageAvailable(): boolean {
+  return getStorageClass() !== null;
+}
+
+function getSharedStorage(): Storage | null {
   const g = globalThis as Record<string, unknown>;
   if (!g[ALS_KEY]) {
-    g[ALS_KEY] = new AsyncLocalStorage<ServerStyleCollector>();
+    const StorageClass = getStorageClass();
+    if (!StorageClass) return null;
+    g[ALS_KEY] = new StorageClass<ServerStyleCollector>();
   }
-  return g[ALS_KEY] as AsyncLocalStorage<ServerStyleCollector>;
+  return g[ALS_KEY] as Storage;
 }
 
 /**
@@ -37,7 +63,13 @@ export function runWithCollector<T>(
   collector: ServerStyleCollector,
   fn: () => T,
 ): T {
-  return getSharedStorage().run(collector, fn);
+  const storage = getSharedStorage();
+  if (!storage) {
+    throw new Error(
+      '[Tasty] runWithCollector() needs AsyncLocalStorage from node:async_hooks, which this environment does not provide. Call it on the server.',
+    );
+  }
+  return storage.run(collector, fn);
 }
 
 /**

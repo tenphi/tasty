@@ -379,7 +379,7 @@ export interface StylesInterface extends Omit<
    * Corner modifiers: `top-left`, `top-right`, `bottom-right`, `bottom-left` — a single corner
    *
    * Examples:
-   * - `radius="2r"` // border-radius: calc(var(--radius) * 2)
+   * - `radius="2r"` // border-radius: 12px
    * - `radius={true}` // default radius (1r)
    * - `radius="round"` // fully rounded (9999rem)
    * - `radius="leaf"` // asymmetric leaf shape

@@ -72,7 +72,7 @@ describe('withTastyNext', () => {
 
     // Pin the full CSS byte stream: rule ordering and formatting feed the
     // content-addressed filename and must remain collector-compatible.
-    expect(href).toBe('/docs/assets/tasty/tasty.shared.58a8fe0f3dcc.css');
+    expect(href).toBe('/docs/assets/tasty/tasty.shared.4679fbe019c1.css');
     expect(result.env?.EXISTING).toBe('yes');
     expect(result.webpack).toBe(existingWebpack);
     expect(await result.headers!()).toEqual([

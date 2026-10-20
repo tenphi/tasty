@@ -144,6 +144,19 @@ describe('tasty component and filtered prop types', () => {
         const missingElement = <Extended.Missing />;
         const plainExtension = factory(Card, { styles: { padding: '2x' } });
         const plainTitle = <plainExtension.Title />;
+
+        // The extension's variant option names its own variants or the base's.
+        const OwnDefault = factory(Card, { variants: { danger: { color: '#danger' } }, variant: 'danger' });
+        const baseDefault = factory(Card, { variants: { danger: { color: '#danger' } }, variant: 'primary' });
+        const baseOnlyDefault = factory(Card, { variant: 'primary' });
+        const ownDefaultProp = <OwnDefault variant="primary" />;
+        // @ts-expect-error The variant option names a variant one of them defines.
+        const unknownDefault = factory(Card, { variants: { danger: { color: '#danger' } }, variant: 'unknown' });
+        // @ts-expect-error Without its own variants, the option names the base's.
+        const unknownBaseDefault = factory(Card, { variant: 'unknown' });
+        const factoryDefault = factory({ variants: { a: { color: '#red' } }, variant: 'a' });
+        // @ts-expect-error The element factory's option names its own variants.
+        const unknownFactoryDefault = factory({ variants: { a: { color: '#red' } }, variant: 'b' });
       }
 
       const ColoredBox = tasty({ styleProps: ['color', 'width'] as const });

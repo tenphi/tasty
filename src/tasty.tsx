@@ -519,8 +519,22 @@ type TastyBaseProps<
   tokens?: Tokens;
   /** Sub-element definitions for compound components */
   elements?: E;
-} & Pick<BaseProps, 'qa' | 'qaVal'> &
-  WithVariant<V>;
+} & Pick<BaseProps, 'qa' | 'qaVal'>;
+
+/**
+ * The names the `variant` option of `tasty(Base, options)` accepts: the
+ * extension's own variants and the base's, as its `variant` prop does. A
+ * union, not an intersection of the two, so an extension can default to a
+ * variant only one of them defines.
+ */
+type ExtensionVariantName<V extends VariantMap, Props> = string extends keyof V
+  ? 'variant' extends keyof Props
+    ? NonNullable<Props['variant' & keyof Props]>
+    : keyof V
+  : | keyof V
+    | ('variant' extends keyof Props
+        ? NonNullable<Props['variant' & keyof Props]>
+        : never);
 
 export type TastyProps<
   K extends StyleList,
@@ -533,10 +547,21 @@ export type TastyProps<
   /** The tag name of the element or a React component. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: string | ComponentType<any>;
+  /**
+   * The variant applied when the `variant` prop is omitted or names no
+   * variant: one of `variants`, or one of the base component's.
+   */
+  variant?: ExtensionVariantName<V, DefaultProps>;
 } & Partial<
     Omit<
       DefaultProps,
-      'as' | 'styles' | 'styleProps' | 'modProps' | 'tokenProps' | 'tokens'
+      | 'as'
+      | 'styles'
+      | 'styleProps'
+      | 'modProps'
+      | 'tokenProps'
+      | 'tokens'
+      | 'variant'
     >
   >;
 
@@ -569,10 +594,11 @@ export type TastyElementOptions<
   AsType extends ElementType = 'div',
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
-> = TastyBaseProps<K, V, E, M, TP> & {
-  /** The tag name of the element or a React component. */
-  as?: AsType;
-} & Record<string, unknown>;
+> = TastyBaseProps<K, V, E, M, TP> &
+  WithVariant<V> & {
+    /** The tag name of the element or a React component. */
+    as?: AsType;
+  } & Record<string, unknown>;
 
 export type AllBasePropsWithMods<
   K extends StyleList,

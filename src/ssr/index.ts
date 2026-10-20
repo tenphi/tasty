@@ -20,7 +20,10 @@ export { hydrateTastyClasses } from './hydrate';
 // Register the ALS getter so hooks can find the collector
 // without importing 'node:async_hooks' in the browser bundle.
 // Uses globalThis so the getter is visible across separate module graphs.
-import { getSSRCollector } from './async-storage';
+// A browser bundle that imports this entry has no storage to look in.
+import { getSSRCollector, isAsyncStorageAvailable } from './async-storage';
 import { registerSSRCollectorGetterGlobal } from './ssr-collector-ref';
 
-registerSSRCollectorGetterGlobal(getSSRCollector);
+if (isAsyncStorageAvailable()) {
+  registerSSRCollectorGetterGlobal(getSSRCollector);
+}

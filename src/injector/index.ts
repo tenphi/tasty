@@ -186,7 +186,9 @@ export function func(
 }
 
 /**
- * Get CSS text from all sheets (for SSR)
+ * Get the CSS text of every sheet the injector holds. Reads the live
+ * stylesheets, so it needs a DOM: on the server, collect CSS with
+ * `ServerStyleCollector` from `@tenphi/tasty/ssr` instead.
  */
 export function getCSSText(options?: { root?: Document | ShadowRoot }): string {
   return getGlobalInjector().getCSSText(options);

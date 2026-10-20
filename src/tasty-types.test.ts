@@ -119,6 +119,31 @@ describe('tasty component and filtered prop types', () => {
         const wrapped = <Wrapped position="top-right" color="brand" width={12} />;
         // @ts-expect-error The component-extension form retains the wrapped prop domain.
         const invalidWrapped = <Wrapped position="absolute" color="brand" width={12} />;
+
+        // The extension form's own options add props, and it keeps the base's sub-elements.
+        const Card = factory({
+          elements: { Title: 'h2' },
+          variants: { primary: { color: '#primary' } },
+        });
+        const Extended = factory(Card, {
+          styleProps: ['padding'] as const,
+          modProps: { isActive: Boolean } as const,
+          tokenProps: ['progress'] as const,
+          variants: { danger: { color: '#danger' } },
+          elements: { Icon: 'span' },
+        });
+        const extended = <Extended padding="2x" isActive progress={0.5} variant="danger" />;
+        const baseVariant = <Extended variant="primary" />;
+        const title = <Extended.Title>Title</Extended.Title>;
+        const icon = <Extended.Icon />;
+        // @ts-expect-error Variants are those of the base and the extension.
+        const unknownExtendedVariant = <Extended variant="unknown" />;
+        // @ts-expect-error Typed modProps keep their value types.
+        const invalidMod = <Extended isActive="yes" />;
+        // @ts-expect-error Undeclared sub-elements are absent.
+        const missingElement = <Extended.Missing />;
+        const plainExtension = factory(Card, { styles: { padding: '2x' } });
+        const plainTitle = <plainExtension.Title />;
       }
 
       const ColoredBox = tasty({ styleProps: ['color', 'width'] as const });

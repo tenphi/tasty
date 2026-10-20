@@ -30,9 +30,8 @@ import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import { createJiti } from 'jiti';
-
 import type { TastyZeroBabelOptions, TastyZeroConfig } from './babel';
+import { loadConfigFile } from './config-file';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -239,13 +238,8 @@ export function withTastyZero(options: TastyZeroNextOptions = {}) {
         };
 
         if (wpAbsoluteConfigFile) {
-          const jiti = createJiti(wpProjectDir, {
-            moduleCache: false,
-          });
-
-          babelPluginOptions.config = () => {
-            return jiti(wpAbsoluteConfigFile) as TastyZeroConfig;
-          };
+          babelPluginOptions.config = () =>
+            loadConfigFile<TastyZeroConfig>(wpAbsoluteConfigFile, wpProjectDir);
         } else if (tastyConfig) {
           babelPluginOptions.config = tastyConfig;
         }

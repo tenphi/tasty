@@ -25,6 +25,7 @@ const sharedConfig = {
     'ssr/astro-middleware-extract-static':
       'src/ssr/astro-middleware-extract-static.ts',
     'ssr/astro-client': 'src/ssr/astro-client.ts',
+    'ssr/client': 'src/ssr/client.ts',
   },
   format: 'esm',
   outDir: 'dist',

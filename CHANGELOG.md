@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.11.1
+
+### Patch Changes
+
+- [#402](https://github.com/tenphi/tasty/pull/402) [`1d2c397`](https://github.com/tenphi/tasty/commit/1d2c397e86dafd25a2667fce077f063d24826d0c) Thanks [@tenphi](https://github.com/tenphi)! - The `variant` option of `tasty(Base, options)` now type-checks against both sets of variants when the base component defines its own. Before, `tasty(Card, { variants: { plain: … }, variant: 'plain' })` failed with "No overload matches this call" if `Card` had variants of its own, and so did naming one of `Card`'s variants. The option now accepts a variant from either set, as the extension's `variant` prop already did. Runtime behaviour is unchanged.
+
 ## 3.11.0
 
 ### Minor Changes

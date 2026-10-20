@@ -6,7 +6,7 @@ An opacity suffix now compiles to `color-mix()` instead of relative color syntax
 
 An opaque token fades to the same color as before. Two things change:
 
-- **Alpha composes.** The mix is premultiplied, so a token that is already translucent is faded further. A token holding `rgb(255 0 0 / .8)` faded to `.5` is now alpha `.4`; before, it was `.5`.
+- **Alpha composes.** The mix is premultiplied, so a token that is already translucent is faded further. A token holding `rgb(255 0 0 / .8)` faded to `.5` is now alpha `.4`; before, it was `.5`. A replace token holding a literal channel color (`replaceTokens: { '#overlay': 'rgba(0, 0, 0, .8)' }`) is still faded in place, so its alpha is still replaced.
 - **A `$prop` alpha must hold a number.** `#purple.$fade` emits `calc(var(--fade) * 100%)`, because a mix percentage can't be a `<number>`. `$fade: '.5'` works; `$fade: '50%'` no longer does. This is the rule `#current.$fade` already had.
 
 `parseColor()` reads the token name and the opacity back from the new form.

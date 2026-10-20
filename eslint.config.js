@@ -55,11 +55,6 @@ export default tseslint.config(
       // assert the errors and fallbacks.
       'tasty/valid-value': 'off',
       'tasty/valid-custom-unit': 'off',
-      // Off only until the plugin's v3 release lands: from v1 this rule reports
-      // the v2 at-rule spellings (`@fontFace` -> `@font-face`) with a fix, which
-      // is worth having on. The published 0.11.x still checks the v2 names, so
-      // enabling it now would just flag the extract-from-invalid-value tests.
-      'tasty/valid-styles-structure': 'off',
       // State-map tests deliberately omit or misorder the default/`_` keys to
       // assert the warnings and autocorrection.
       'tasty/require-default-state': 'off',
@@ -73,6 +68,16 @@ export default tseslint.config(
       'tasty/consistent-token-usage': 'off',
       // Cannot see through the `as` casts these tests use for sub-element values.
       'tasty/valid-sub-element': 'off',
+      // Tests and benchmarks build style objects from parameters (`it.each`,
+      // loops over values) to exercise many inputs through one code path.
+      'tasty/no-runtime-styles-mutation': 'off',
+      // `mergeStyles()` is implemented here, and tests spread style objects to
+      // assert where shallow replacement and `mergeStyles()` differ.
+      'tasty/no-style-spread': 'off',
+      // The parser still supports state conditions inside `$` selectors and
+      // the `:not()` spelling of negation, and the pipeline tests cover both.
+      'tasty/no-state-in-selector': 'off',
+      'tasty/prefer-state-negation': 'off',
     },
   },
   {

@@ -1,4 +1,6 @@
-import { useInsertionEffect } from 'react';
+// A default import: React's `react-server` build has no `useInsertionEffect`,
+// and a named import would stop the main entry loading in Server Components.
+import React from 'react';
 import type { ReactNode } from 'react';
 
 import { closeBatchWindow, openBatchWindow } from './injector/batch';
@@ -63,7 +65,7 @@ export function TastyBatchProvider({ children }: TastyBatchProviderProps) {
 
   // Fires in the mutation phase, before any layout effect. No dependency array:
   // it must run on every commit this provider is part of.
-  useInsertionEffect(() => {
+  React.useInsertionEffect(() => {
     closeBatchWindow();
   });
 

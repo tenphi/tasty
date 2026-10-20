@@ -31,6 +31,7 @@ const entries = [
   'ssr/next-config.js',
   'ssr/astro.js',
   'ssr/astro-client.js',
+  'ssr/client.js',
   'ssr/astro-middleware.js',
   'ssr/astro-middleware-static.js',
   'ssr/astro-middleware-extract.js',
@@ -125,6 +126,24 @@ function assertGraphOnlyLoads(entry, allowedPrefixes) {
 
 for (const entry of entries) {
   await import(new URL(`../dist/${entry}`, import.meta.url));
+}
+
+// Server Components import React's `react-server` build, which has no
+// `createContext`, `useContext` or `useInsertionEffect`. A named import of any
+// of them fails to link there, and bundlers do not catch that.
+for (const entry of ['index.js', 'core/index.js', 'ssr/index.js']) {
+  const url = new URL(`../dist/${entry}`, import.meta.url).href;
+  execFileSync(
+    process.execPath,
+    [
+      '--conditions',
+      'react-server',
+      '--input-type=module',
+      '-e',
+      `await import(${JSON.stringify(url)});`,
+    ],
+    { stdio: 'pipe' },
+  );
 }
 
 // Source tests cannot catch NODE_ENV being folded to "development" while the
@@ -269,6 +288,7 @@ assertGraphSizeAtMost('core/index.js', 522_650);
 assertGraphSizeAtMost('ssr/index.js', 375_350);
 assertGraphSizeAtMost('ssr/astro.js', 389_750);
 assertGraphOnlyLoads('ssr/astro-client.js', ['hydration-']);
+assertGraphOnlyLoads('ssr/client.js', ['hydration-']);
 
 const chunkFiles = readdirSync(join(distDir, 'chunks'));
 for (const prefix of expectedChunks) {
@@ -280,15 +300,22 @@ for (const prefix of expectedChunks) {
 }
 
 const emitted = walk(distDir);
-if (emitted.length > 31) {
+if (emitted.length > 33) {
   throw new Error(
-    `Runtime build emitted ${emitted.length} JavaScript files; expected at most 31.`,
+    `Runtime build emitted ${emitted.length} JavaScript files; expected at most 33.`,
   );
 }
 
 for (const file of emitted) {
-  if (readFileSync(file, 'utf8').includes('.d.ts')) {
+  const source = readFileSync(file, 'utf8');
+  if (source.includes('.d.ts')) {
     throw new Error(`Runtime file references a declaration artifact: ${file}`);
+  }
+  // `jiti` is an optional peer, resolved on demand for `configFile` only.
+  if (/^(?:import|export)\b[^;]*?["']jiti["']/m.test(source)) {
+    throw new Error(
+      `Runtime file statically imports the optional jiti: ${file}`,
+    );
   }
 }
 

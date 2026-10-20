@@ -67,12 +67,12 @@ export default defineConfig({
           exclude: [...defaultExclude, ...BROWSER_TESTS],
           benchmark: {
             include: ['src/**/*.bench.{ts,tsx}'],
+            // Every `.bench.tsx` renders React, and the injection benchmark
+            // writes to a real stylesheet; all of them need a browser.
             exclude: [
               ...defaultExclude,
-              'src/tasty.bench.tsx',
+              'src/**/*.bench.tsx',
               'src/tasty-injection.bench.ts',
-              'src/tasty-overhead.bench.tsx',
-              'src/tasty-tree.bench.tsx',
             ],
           },
         },

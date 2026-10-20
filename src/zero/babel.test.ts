@@ -5,6 +5,7 @@ import * as path from 'path';
 import { transformSync } from '@babel/core';
 
 import { resetConfig } from '../config';
+import { DEFAULT_PROPERTIES } from '../properties/defaults';
 
 import babelPlugin from './babel';
 import {
@@ -693,6 +694,86 @@ tastyStatic('.card', { padding: { '': '2u', '@narrow': '1u' } });
 
       expect(after).not.toContain('8px');
       expect(after).not.toContain('@media (width < 600px)');
+    });
+  });
+
+  describe('registered properties', () => {
+    let tempDir: string;
+    let outputPath: string;
+
+    beforeEach(() => {
+      tempDir = createTempDir();
+      outputPath = path.join(tempDir, 'output.css');
+    });
+
+    afterEach(() => {
+      clearWriterCache();
+      resetConfig();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    const propertyRule = (css: string, name: string) =>
+      [...css.matchAll(/@property (\S+) \{[^}]*\}/g)]
+        .filter((m) => m[1] === name)
+        .map((m) => m[0]);
+
+    const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const card = tastyStatic({ fill: '#white', gap: '$gap', '$gap': '10px' });
+`;
+
+    it("emits Tasty's default properties, as the runtime registers them", () => {
+      transformCode(code, { output: outputPath });
+      const css = fs.readFileSync(outputPath, 'utf-8');
+
+      expect(propertyRule(css, '--white-color')).toEqual([
+        '@property --white-color { syntax: "<color>"; inherits: true; initial-value: rgb(255 255 255); }',
+      ]);
+      expect(propertyRule(css, '--border-color')).toHaveLength(1);
+      expect(propertyRule(css, '--radius')).toHaveLength(1);
+      // Inference sees `--gap: 10px` but leaves the registered property alone.
+      expect(propertyRule(css, '--gap')).toEqual([
+        `@property --gap { syntax: "<length>"; inherits: true; initial-value: ${DEFAULT_PROPERTIES.$gap.initialValue}; }`,
+      ]);
+      // Registered ahead of every rule that reads them.
+      expect(css.indexOf('@property --white-color')).toBeLessThan(
+        css.indexOf('--white-color)'),
+      );
+    });
+
+    it('emits config.properties, overriding a default of the same name', () => {
+      transformCode(code, {
+        output: outputPath,
+        config: {
+          properties: {
+            '$card-size': { syntax: '<length>', initialValue: '10px' },
+            $gap: { syntax: '<length>', inherits: false, initialValue: '8px' },
+          },
+        },
+      });
+      const css = fs.readFileSync(outputPath, 'utf-8');
+
+      expect(propertyRule(css, '--card-size')).toEqual([
+        '@property --card-size { syntax: "<length>"; inherits: true; initial-value: 10px; }',
+      ]);
+      expect(propertyRule(css, '--gap')).toEqual([
+        '@property --gap { syntax: "<length>"; inherits: false; initial-value: 8px; }',
+      ]);
+    });
+
+    it('injects them once per file in inject mode', () => {
+      const result = transformCode(code, {
+        output: outputPath,
+        mode: 'inject',
+        config: {
+          properties: { '$card-size': { syntax: '<length>' } },
+        },
+      });
+
+      expect(result?.match(/_\$i\("@property"/g)).toHaveLength(1);
+      expect(result).toContain('@property --white-color');
+      expect(result).toContain('@property --card-size');
     });
   });
 });

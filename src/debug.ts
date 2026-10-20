@@ -861,8 +861,8 @@ export const tastyDebug = {
     console.log(`tastyDebug API:
   .summary()            — overview (classes, rules, sizes)
   .css("active")        — CSS for classes in DOM
-  .css("t42")           — CSS for a specific class
-  .css("t42",{source:1})— original CSS before browser parsing (dev only)
+  .css("t3a5f")         — CSS for a specific class
+  .css("t3a5f",{source:true}) — original CSS before browser parsing (dev only)
   .css(".selector")     — CSS for a DOM element
   .inspect(".selector") — element details (classes, chunks, rules)
   .chunks()             — style chunk breakdown

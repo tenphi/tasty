@@ -153,6 +153,14 @@ function registerHydratedClass(
   registry.pinCounts.set(className, 0);
 }
 
+/** A class name reserved by `allocateClassName()` whose CSS was never injected. */
+function isPreAllocated(ruleInfo: RuleInfo): boolean {
+  return (
+    ruleInfo.ruleIndex === PLACEHOLDER_RULE_INDEX &&
+    ruleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX
+  );
+}
+
 export class StyleInjector {
   private sheetManager: SheetManager;
   private config: StyleInjectorConfig;
@@ -162,6 +170,13 @@ export class StyleInjector {
   private namePrefix: string;
   private classRegex: RegExp;
   private rscClassRegex: RegExp;
+
+  /**
+   * Bumped whenever class rules are deleted — by `gc()`, `cleanup()` or
+   * `destroy()` — so a cache of class names handed out earlier, such as a
+   * `tasty()` factory's, knows they may no longer have rules behind them.
+   */
+  evictions = 0;
 
   /** @internal — exposed for debug utilities only */
   get _sheetManager(): SheetManager {
@@ -357,6 +372,37 @@ export class StyleInjector {
   }
 
   /**
+   * Hand a class that is already injected — or queued for a batched write — to
+   * another caller: record the reference, write nothing.
+   */
+  private reuseInjected(
+    registry: RootRegistry,
+    className: string,
+    pin: boolean,
+  ): InjectResult {
+    // Handing the class to a render makes it wanted again: clearing the cold
+    // mark puts it back in band 1/3, so a sweep cannot take it out from under
+    // a render that has not committed yet. A `delete` that misses is what the
+    // live case costs, which is nothing.
+    registry.unusedSince.delete(className);
+
+    if (pin) {
+      const pins = registry.pinCounts.get(className) || 0;
+      registry.pinCounts.set(className, pins + 1);
+    }
+
+    // Update metrics
+    if (registry.metrics) {
+      registry.metrics.hits++;
+    }
+
+    return {
+      className,
+      dispose: pin ? () => this.unpin(className, registry) : noop,
+    };
+  }
+
+  /**
    * Inject styles from StyleResult objects
    */
   inject(rules: StyleResult[], options?: InjectOptions): InjectResult {
@@ -384,58 +430,13 @@ export class StyleInjector {
     if (cacheKey && registry.cacheKeyToClassName.has(cacheKey)) {
       // Reuse existing class for this cache key
       className = registry.cacheKeyToClassName.get(cacheKey)!;
-      const existingRuleInfo = registry.rules.get(className)!;
 
-      // Rules are already queued for a batched write. Record the pin and let
-      // the queued write land — injecting again would duplicate every rule.
-      if (existingRuleInfo.ruleIndex === PENDING_RULE_INDEX) {
-        registry.unusedSince.delete(className);
-        if (pin) {
-          registry.pinCounts.set(
-            className,
-            (registry.pinCounts.get(className) || 0) + 1,
-          );
-        }
-
-        if (registry.metrics) {
-          registry.metrics.hits++;
-        }
-
-        return {
-          className,
-          dispose: pin ? () => this.unpin(className, registry) : noop,
-        };
-      }
-
-      // A placeholder means the class name was pre-allocated but its CSS was
-      // never injected, so fall through and inject it now. Anything else is
-      // already in a sheet.
-      const isPreAllocated =
-        existingRuleInfo.ruleIndex === PLACEHOLDER_RULE_INDEX &&
-        existingRuleInfo.sheetIndex === PLACEHOLDER_RULE_INDEX;
-
-      if (!isPreAllocated) {
-        // Handing the class to a render makes it wanted again: clearing the
-        // cold mark puts it back in band 1/3, so a sweep cannot take it out
-        // from under a render that has not committed yet. A `delete` that
-        // misses is what the live case costs, which is nothing.
-        registry.unusedSince.delete(className);
-
-        // Already injected — nothing to write, only the reference to record.
-        if (pin) {
-          const pins = registry.pinCounts.get(className) || 0;
-          registry.pinCounts.set(className, pins + 1);
-        }
-
-        // Update metrics
-        if (registry.metrics) {
-          registry.metrics.hits++;
-        }
-
-        return {
-          className,
-          dispose: pin ? () => this.unpin(className, registry) : noop,
-        };
+      // Queued for a batched write or already in a sheet: record the
+      // reference. Injecting again would duplicate every rule. A placeholder
+      // means the name was pre-allocated but its CSS never injected, so that
+      // falls through and is injected now.
+      if (!isPreAllocated(registry.rules.get(className)!)) {
+        return this.reuseInjected(registry, className, pin);
       }
     } else if (cacheKey) {
       // Generate deterministic className from cache key
@@ -463,6 +464,14 @@ export class StyleInjector {
       // No cache key — generate from rules content
       const parts = rules.map((r) => `${r.selector}\0${r.declarations}`);
       className = makeClassName(this.namePrefix, hashString(parts.join('\n')));
+
+      // The same rules name the same class, so this is a repeat: reuse it,
+      // as a cache key hit does, rather than write every rule a second time
+      // and reset the pins its earlier callers hold.
+      const existing = registry.rules.get(className);
+      if (existing && !isPreAllocated(existing)) {
+        return this.reuseInjected(registry, className, pin);
+      }
     }
 
     // Process rules: handle needsClassName flag and apply specificity
@@ -844,7 +853,7 @@ export class StyleInjector {
   }
 
   /**
-   * Get CSS text from all sheets (for SSR)
+   * Get the CSS text of every sheet for `root`. Needs a DOM.
    */
   getCSSText(options?: { root?: Document | ShadowRoot }): string {
     flushStyles();
@@ -1588,7 +1597,9 @@ export class StyleInjector {
 
     if (doomed.length === 0) return 0;
 
-    return this.sheetManager.deleteClasses(registry, doomed);
+    const deleted = this.sheetManager.deleteClasses(registry, doomed);
+    if (deleted > 0) this.evictions++;
+    return deleted;
   }
 
   /**
@@ -1598,6 +1609,7 @@ export class StyleInjector {
     flushStyles();
     const targetRoot = root || document;
     this.sheetManager.cleanup(targetRoot);
+    this.evictions++;
 
     // Clear pending GC when no active roots remain
     if (this.cancelPendingGC && !this.sheetManager.hasActiveRoots()) {

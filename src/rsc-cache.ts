@@ -16,6 +16,7 @@ import type { ServerStyleCollector } from './ssr/collector';
 import { getRegisteredSSRCollector } from './ssr/ssr-collector-ref';
 import { hashString } from './utils/hash';
 import { makeClassName } from './utils/name-prefix';
+import { warnOnceDev } from './utils/warnings';
 
 export interface RSCStyleCache {
   cacheKeyToClassName: Map<string, string>;
@@ -26,6 +27,8 @@ export interface RSCStyleCache {
   keyToIndex: Map<string, number>;
   /** Maps dedup key -> generated name for keyframes and counter-styles in RSC mode. */
   generatedNames: Map<string, string>;
+  /** Set once {@link checkRequestScope} has looked at this cache. */
+  scopeChecked?: boolean;
 }
 
 /**
@@ -49,6 +52,48 @@ export const getRSCCache =
   typeof React.cache === 'function'
     ? React.cache(createRSCCache)
     : createRSCCache;
+
+let requestScopeMissing = false;
+
+/**
+ * Warn, once and in development, when server rendering finds no request scope:
+ * no SSR collector, and `React.cache` does not cache. That is React's standard
+ * build — Astro without `tastyIntegration()`, or a client component server
+ * rendered without `TastyRegistry` — where `cache` only caches in Server
+ * Components. Each call then gets a fresh cache, so every `tasty()` element
+ * inlines all of its CSS, and nothing emits the configured globals (tokens,
+ * `@property` defaults such as `--gap`, `globalStyles`, `@font-face`) or the CSS
+ * of the standalone style functions.
+ *
+ * Nothing here can stand in for the missing scope: a cache shared beyond one
+ * call would leak between requests, or lose CSS rendered into a Suspense
+ * boundary that falls back.
+ *
+ * Called from React rendering only (`tasty()`, `useStyles()`, the style
+ * functions). A script calling `computeStyles()` directly gets the CSS back
+ * and owns emitting it.
+ */
+export function checkRequestScope(): void {
+  if (requestScopeMissing) return;
+
+  const rscCache = getRSCCache();
+  if (rscCache.scopeChecked) return;
+  rscCache.scopeChecked = true;
+
+  if (getRSCCache() === rscCache) return;
+
+  // The React build does not change at runtime, so one miss settles it.
+  requestScopeMissing = true;
+  warnOnceDev(
+    'rsc-request-scope',
+    'Server rendering without a style collector, outside React Server Components. ' +
+      'Each tasty() element inlines all of its CSS, and configured globals (tokens, ' +
+      '@property defaults such as --gap, globalStyles, @font-face) and the CSS of ' +
+      'useGlobalStyles(), useRawCSS(), useKeyframes() and the other style functions ' +
+      'are not emitted. Use tastyIntegration() in Astro, TastyRegistry in Next.js, ' +
+      'or runWithCollector() from @tenphi/tasty/ssr elsewhere.',
+  );
+}
 
 export function rscAllocateClassName(
   rscCache: RSCStyleCache,
@@ -109,6 +154,15 @@ export function pushRSCCSS(
   return true;
 }
 
+/**
+ * Queue CSS that `computeStyles()` already deduplicated and returned, for a
+ * caller that renders no `<style>` of its own (`useStyles()`). The next
+ * `tasty()` element emits it.
+ */
+export function queueRSCCSS(rscCache: RSCStyleCache, css: string): void {
+  rscCache.pendingCSS.push(css);
+}
+
 type StyleTarget =
   | { mode: 'ssr'; collector: ServerStyleCollector }
   | { mode: 'rsc'; cache: RSCStyleCache }
@@ -122,7 +176,9 @@ type StyleTarget =
 export function getStyleTarget(): StyleTarget {
   const collector = getRegisteredSSRCollector();
   if (collector) return { mode: 'ssr', collector };
-  if (typeof document === 'undefined')
+  if (typeof document === 'undefined') {
+    checkRequestScope();
     return { mode: 'rsc', cache: getRSCCache() };
+  }
   return { mode: 'client' };
 }

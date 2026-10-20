@@ -76,17 +76,23 @@ describe('StyleInjector', () => {
       expect(typeof result.dispose).toBe('function');
     });
 
-    it('should handle repeated identical CSS without active dedupe', () => {
+    it('reuses the class for repeated identical rules without a cacheKey', () => {
       const css = '&{ color: red; }';
+      const registry = injector._sheetManager.getRegistry(document);
 
       const result1 = injector.inject(cssToStyleResults(css));
       const result2 = injector.inject(cssToStyleResults(css));
+      const { className } = result1;
 
-      expect(result1.className).toMatch(/^t[a-z0-9]+$/);
-      expect(result2.className).toMatch(/^t[a-z0-9]+$/);
+      expect(className).toMatch(/^t[a-z0-9]+$/);
+      expect(result2.className).toBe(className);
 
-      const styleElements = document.head.querySelectorAll('[data-tasty]');
-      expect(styleElements.length).toBe(1);
+      // Written once, and both callers hold it.
+      expect(injector.getCSSText().match(/color: red/g)).toHaveLength(1);
+      expect(registry.pinCounts.get(className)).toBe(2);
+
+      result1.dispose();
+      expect(registry.pinCounts.get(className)).toBe(1);
     });
 
     it('should generate different classNames for different CSS', () => {

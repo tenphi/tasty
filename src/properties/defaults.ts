@@ -49,10 +49,10 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'currentcolor',
   },
-  // Default outline color: the text color, the same as the `outline` handler's
-  // `var(--outline-color, currentColor)` fallback, which zero-runtime CSS
-  // relies on. Registering it keeps auto-inference from claiming
-  // `--outline-color` as a `transparent` <color> once any style sets `#outline`.
+  // Default outline color: the text color, as in plain CSS, so an `outline`
+  // with no color is drawn until the app defines `#outline`. Declaring it also
+  // keeps auto-inference from registering `--outline-color` as a `transparent`
+  // <color> once any style sets `#outline`.
   '#outline': {
     inherits: true,
     initialValue: 'currentcolor',

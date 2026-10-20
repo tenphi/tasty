@@ -2,4 +2,4 @@
 '@tenphi/tasty': patch
 ---
 
-`outline` with no color is now drawn in the text color until your tokens define `#outline`. It used to emit `var(--outline-color)` with no fallback, so `outline: true` drew nothing unless the app defined `#outline`. Tasty also registers `#outline` by default (`initial-value: currentcolor`), so a style that sets `#outline` locally no longer turns every other outline transparent at runtime. `radius: 'leaf'` / `'backleaf'` now render their sharp corners in zero-runtime CSS too: `var(--sharp-radius)` falls back to `0` where the default `$sharp-radius` property is not emitted.
+`outline` with no color is now drawn in the text color until your tokens define `#outline`. Tasty registers `#outline` by default (`initial-value: currentcolor`), as it does `#border`; before, `outline: true` or `outline: '2px dashed'` drew nothing unless the app defined the token. A style that sets `#outline` locally also no longer turns every other outline transparent in runtime or zero-runtime CSS.

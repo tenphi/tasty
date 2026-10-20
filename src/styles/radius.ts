@@ -3,9 +3,7 @@ import { DIRECTIONS, parseStyle } from '../utils/styles';
 import { extractCSSWideKeyword } from './shared';
 
 const PROP = 'var(--radius)';
-// Falls back where the default `$sharp-radius` @property is not emitted
-// (zero-runtime CSS); without it the whole `border-radius` is invalid.
-const SHARP = 'var(--sharp-radius, 0)';
+const SHARP = 'var(--sharp-radius)';
 
 const RADIUS_LONGHANDS = [
   'border-top-left-radius',

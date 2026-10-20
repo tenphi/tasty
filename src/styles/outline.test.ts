@@ -13,27 +13,27 @@ describe('outlineStyle', () => {
       // In production, UI-kit reconfigures this to 'var(--outline-width)'
       const result = outlineStyle({ outline: true });
       expect(result).toEqual({
-        outline: '3px solid var(--outline-color, currentColor)',
+        outline: '3px solid var(--outline-color)',
       });
     });
 
     it('handles width value', () => {
       const result = outlineStyle({ outline: '2px' });
       expect(result).toEqual({
-        outline: '2px solid var(--outline-color, currentColor)',
+        outline: '2px solid var(--outline-color)',
       });
     });
 
     it('handles width and style', () => {
       const result = outlineStyle({ outline: '2px dashed' });
       expect(result).toEqual({
-        outline: '2px dashed var(--outline-color, currentColor)',
+        outline: '2px dashed var(--outline-color)',
       });
     });
 
     it('keeps the first recognized line style', () => {
       expect(outlineStyle({ outline: '2px dashed solid' })).toEqual({
-        outline: '2px dashed var(--outline-color, currentColor)',
+        outline: '2px dashed var(--outline-color)',
       });
     });
 
@@ -47,21 +47,21 @@ describe('outlineStyle', () => {
     it('handles numeric 0 to remove outline', () => {
       const result = outlineStyle({ outline: 0 });
       expect(result).toEqual({
-        outline: '0 solid var(--outline-color, currentColor)',
+        outline: '0 solid var(--outline-color)',
       });
     });
 
     it('handles string "0" to remove outline', () => {
       const result = outlineStyle({ outline: '0' });
       expect(result).toEqual({
-        outline: '0 solid var(--outline-color, currentColor)',
+        outline: '0 solid var(--outline-color)',
       });
     });
 
     it('handles outline: 0 with outlineOffset', () => {
       const result = outlineStyle({ outline: 0, outlineOffset: 1 });
       expect(result).toEqual({
-        outline: '0 solid var(--outline-color, currentColor)',
+        outline: '0 solid var(--outline-color)',
         'outline-offset': '1px',
       });
     });
@@ -69,7 +69,7 @@ describe('outlineStyle', () => {
     it('handles outline: "none" style', () => {
       const result = outlineStyle({ outline: 'none' });
       expect(result).toEqual({
-        outline: 'var(--outline-width) none var(--outline-color, currentColor)',
+        outline: 'var(--outline-width) none var(--outline-color)',
       });
     });
   });
@@ -94,7 +94,7 @@ describe('outlineStyle', () => {
     it('handles width only with offset', () => {
       const result = outlineStyle({ outline: '2px / 4px' });
       expect(result).toEqual({
-        outline: '2px solid var(--outline-color, currentColor)',
+        outline: '2px solid var(--outline-color)',
         'outline-offset': '4px',
       });
     });
@@ -111,7 +111,7 @@ describe('outlineStyle', () => {
       // Note: The default CUSTOM_UNITS has ow: '3px', so 1ow resolves to 3px
       const result = outlineStyle({ outline: '1ow / 5px' });
       expect(result).toEqual({
-        outline: '3px solid var(--outline-color, currentColor)',
+        outline: '3px solid var(--outline-color)',
         'outline-offset': '5px',
       });
     });
@@ -143,9 +143,7 @@ describe('outlineStyle', () => {
 
     it('uses default color when not specified', () => {
       const result = outlineStyle({ outline: '2px solid' });
-      expect(result!.outline).toBe(
-        '2px solid var(--outline-color, currentColor)',
-      );
+      expect(result!.outline).toBe('2px solid var(--outline-color)');
     });
   });
 
@@ -205,13 +203,13 @@ describe('outlineStyle', () => {
     it('fills the style slot with a reference past the width', () => {
       // Colors are authored as `#name`, so a plain reference is a line style.
       expect(outlineStyle({ outline: '2px $my-style' })).toEqual({
-        outline: '2px var(--my-style) var(--outline-color, currentColor)',
+        outline: '2px var(--my-style) var(--outline-color)',
       });
     });
 
     it('fills the style slot alongside a slash offset', () => {
       expect(outlineStyle({ outline: '2px $my-style / 4px' })).toEqual({
-        outline: '2px var(--my-style) var(--outline-color, currentColor)',
+        outline: '2px var(--my-style) var(--outline-color)',
         'outline-offset': '4px',
       });
     });

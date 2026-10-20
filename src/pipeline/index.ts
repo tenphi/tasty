@@ -33,6 +33,7 @@ import type { Styles } from '../styles/types';
 import { isDevEnv } from '../utils/is-dev-env';
 import { isSelector } from '../utils/is-selector';
 import {
+  pseudoElementIndex,
   rootStateIndex,
   splitSelectorsSafely,
 } from '../utils/selector-transform';
@@ -53,6 +54,7 @@ import {
   expandExclusiveOrs,
   expandOrConditions,
   extractCompoundStates,
+  isMisusedFallbackKey,
   isValueMapping,
   mergeEntriesByValue,
   parseStyleEntries,
@@ -71,6 +73,8 @@ import {
   wrapWhere,
 } from './materialize';
 import { parseStateKey } from './parseStateKey';
+import type { PseudoElementTarget } from './pseudo-element-states';
+import { pseudoElementMismatch } from './pseudo-element-states';
 import { simplifyCondition } from './simplify';
 import { emitWarning } from './warnings';
 
@@ -142,14 +146,21 @@ export function clearPipelineCache(): void {
 // Pipeline Implementation
 // ============================================================================
 
+/**
+ * `pseudoElementRoot` renders for a selector-mode base that ends in a
+ * pseudo-element (`.card::before`): its root states describe the
+ * pseudo-element, and each rule records where the base's pseudo-element goes
+ * (`CSSRule.pseudoElementAt`).
+ */
 function runPipeline(
   styles: Styles,
   parserContext: StateParserContext,
+  pseudoElementRoot = false,
 ): CSSRule[] {
   const allRules: CSSRule[] = [];
 
   // Process styles recursively (including nested selectors)
-  processStyles(styles, '', parserContext, allRules);
+  processStyles(styles, '', parserContext, allRules, pseudoElementRoot);
 
   // Deduplicate and partition in one pass. @starting-style rules must come
   // after normal rules for the same selector because source order decides
@@ -199,6 +210,7 @@ function processStyles(
   selectorSuffix: string,
   parserContext: StateParserContext,
   allRules: CSSRule[],
+  pseudoElementRoot: boolean,
 ): void {
   const keys = Object.keys(styles);
 
@@ -240,11 +252,18 @@ function processStyles(
     selectorSuffix,
     parserContext,
     allRules,
+    pseudoElementRoot,
   );
 
   // Process the handler queue for this level's style keys
   const handlerQueue = buildHandlerQueue(styleKeys, styles);
-  processHandlerQueue(handlerQueue, selectorSuffix, parserContext, allRules);
+  processHandlerQueue(
+    handlerQueue,
+    selectorSuffix,
+    parserContext,
+    allRules,
+    pseudoElementRoot,
+  );
 }
 
 /**
@@ -258,6 +277,7 @@ function processNestedSelectors(
   selectorSuffix: string,
   parserContext: StateParserContext,
   allRules: CSSRule[],
+  pseudoElementRoot: boolean,
 ): void {
   for (const key of selectorKeys) {
     const nestedStyles = styles[key] as Styles;
@@ -288,6 +308,7 @@ function processNestedSelectors(
         selectorSuffix + suffix,
         subContext,
         allRules,
+        pseudoElementRoot,
       );
     }
   }
@@ -302,7 +323,15 @@ function processHandlerQueue(
   selectorSuffix: string,
   parserContext: StateParserContext,
   allRules: CSSRule[],
+  pseudoElementRoot: boolean,
 ): void {
+  // Own states describe a pseudo-element when the suffix ends in one
+  // (`a::before`, `@::marker`, an `&::after` key).
+  const target: PseudoElementTarget = {
+    own: pseudoElementIndex(selectorSuffix) < selectorSuffix.length,
+    root: pseudoElementRoot,
+  };
+
   for (const { handler, styleMap, hasStateMap } of handlerQueue) {
     const lookupStyles = handler.__lookupStyles;
 
@@ -310,7 +339,12 @@ function processHandlerQueue(
     // exclusive-condition and Cartesian-product pipeline in this common case.
     const stateSnapshots = hasStateMap
       ? computeStateCombinations(
-          buildExclusivesForHandler(lookupStyles, styleMap, parserContext),
+          buildExclusivesForHandler(
+            lookupStyles,
+            styleMap,
+            parserContext,
+            target,
+          ),
           lookupStyles,
         )
       : [
@@ -333,7 +367,7 @@ function processHandlerQueue(
 
     // Stage 7: Materialize to CSS
     for (const rule of mergedRules) {
-      const cssRules = materializeComputedRule(rule);
+      const cssRules = materializeComputedRule(rule, pseudoElementRoot);
       allRules.push(...cssRules);
     }
   }
@@ -348,6 +382,7 @@ function buildExclusivesForHandler(
   lookupStyles: readonly string[],
   styleMap: StyleMap,
   parserContext: StateParserContext,
+  target: PseudoElementTarget,
 ): Map<string, ExclusiveStyleEntry[]> {
   const exclusiveByStyle = new Map<string, ExclusiveStyleEntry[]>();
 
@@ -360,7 +395,14 @@ function buildExclusivesForHandler(
       // E.g. { '': A, '@dark': B, '@hc': A, '@dark & @hc': B }
       // reduces to { '': A, '@dark': B } because @hc is irrelevant.
       const reduced = extractCompoundStates(
-        value as Record<string, StyleValue>,
+        target.own || target.root
+          ? dropPseudoElementMismatches(
+              styleName,
+              value as Record<string, StyleValue>,
+              parserContext,
+              target,
+            )
+          : (value as Record<string, StyleValue>),
       );
 
       // Stage 1: Parse entries from value mapping.
@@ -403,6 +445,43 @@ function buildExclusivesForHandler(
   }
 
   return exclusiveByStyle;
+}
+
+/**
+ * Remove the state keys that test something a pseudo-element target has
+ * none of (`@own([open])` on `a::before`), with a warning. They could never
+ * match, and their negation would hide the default.
+ */
+function dropPseudoElementMismatches(
+  styleName: string,
+  valueMap: Record<string, StyleValue>,
+  parserContext: StateParserContext,
+  target: PseudoElementTarget,
+): Record<string, StyleValue> {
+  let kept: Record<string, StyleValue> | undefined;
+
+  for (const stateKey of Object.keys(valueMap)) {
+    if (stateKey === '' || stateKey === '_' || isMisusedFallbackKey(stateKey))
+      continue;
+
+    const mismatch = pseudoElementMismatch(
+      parseStateKey(stateKey, { context: parserContext }),
+      target,
+    );
+    if (!mismatch) continue;
+
+    emitWarning(
+      'PSEUDO_ELEMENT_STATE_IGNORED',
+      `State "${stateKey}" (in "${styleName}") applies to a pseudo-element, ` +
+        `which has no ${mismatch}, so it can never match. The state has been ` +
+        `ignored. To condition on the element the pseudo-element belongs to, ` +
+        `write it in the selector before the pseudo-element.`,
+    );
+    kept ??= { ...valueMap };
+    delete kept[stateKey];
+  }
+
+  return kept ?? valueMap;
 }
 
 /**
@@ -1181,14 +1260,18 @@ function mergeByValue(rules: ComputedRule[]): ComputedRule[] {
 }
 
 /**
- * Build selector fragment from a variant (without className prefix)
+ * Build selector fragment from a variant (without className prefix).
+ *
+ * With `pseudoElementRoot`, the root is a pseudo-element (`.card::before`):
+ * its ancestor context goes first and its own states after the point
+ * `pseudoElementAt`, where `renderStyles` puts the base's pseudo-element.
+ * Giving `.card` + `:where(.dark *)` + `::before` + `:where(:hover)`.
  */
 function buildSelectorFromVariant(
   variant: SelectorVariant,
   selectorSuffix: string,
-): string {
-  let selector = '';
-
+  pseudoElementRoot: boolean,
+): { selector: string; pseudoElementAt: number } {
   // Root-element state segment: flat modifiers/pseudos + :is()/:not()
   // groups, all attaching to the root element. Combine into a single
   // `:where(...)` so the whole segment carries zero specificity (the
@@ -1200,20 +1283,27 @@ function buildSelectorFromVariant(
   for (const group of variant.selectorGroups) {
     rootSegment += selectorGroupToCSS(group);
   }
-  selector += wrapWhere(rootSegment);
 
-  // Add parent selectors (before sub-element suffix). parentGroupsToCSS
+  // Parent selectors (before sub-element suffix). parentGroupsToCSS
   // already wraps each group in :where() so ancestor state adds no
   // specificity.
-  if (variant.parentGroups.length > 0) {
-    selector += parentGroupsToCSS(variant.parentGroups);
-  }
+  const parents =
+    variant.parentGroups.length > 0
+      ? parentGroupsToCSS(variant.parentGroups)
+      : '';
+
+  const pseudoElementAt = pseudoElementRoot ? parents.length : 0;
+  let selector = pseudoElementRoot
+    ? parents + wrapWhere(rootSegment)
+    : wrapWhere(rootSegment) + parents;
 
   selector += selectorSuffix;
 
   // Sub-element (own) state segment: wrapped in its own separate
   // `:where(...)` so the sub-element's own structural specificity
-  // ([data-element="X"]) is preserved while its states are zeroed.
+  // ([data-element="X"]) is preserved while its states are zeroed. When the
+  // suffix ends in a pseudo-element, these are the pseudo-element's own
+  // states and belong after it, as here.
   const ownOptimized = optimizeGroups(variant.ownGroups);
   let ownSegment = '';
   for (const group of ownOptimized) {
@@ -1221,7 +1311,7 @@ function buildSelectorFromVariant(
   }
   selector += wrapWhere(ownSegment);
 
-  return selector;
+  return { selector, pseudoElementAt };
 }
 
 /**
@@ -1230,7 +1320,10 @@ function buildSelectorFromVariant(
  * Returns an array because OR conditions may generate multiple CSS rules
  * (when different branches have different at-rules)
  */
-function materializeComputedRule(rule: ComputedRule): CSSRule[] {
+function materializeComputedRule(
+  rule: ComputedRule,
+  pseudoElementRoot: boolean,
+): CSSRule[] {
   const components = conditionToCSS(rule.condition);
 
   if (components.isImpossible || components.variants.length === 0) {
@@ -1292,19 +1385,23 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
     const mergedVariants = mergeVariantsIntoSelectorGroups(group.variants);
 
     // Build selector fragments for each variant (will be joined with className later)
-    const selectorFragments = mergedVariants.map((v) =>
-      buildSelectorFromVariant(v, rule.selectorSuffix),
+    const built = mergedVariants.map((v) =>
+      buildSelectorFromVariant(v, rule.selectorSuffix, pseudoElementRoot),
     );
 
     // Store as array if multiple, string if single
     const selector =
-      selectorFragments.length === 1 ? selectorFragments[0] : selectorFragments;
+      built.length === 1 ? built[0].selector : built.map((b) => b.selector);
 
     const cssRule: CSSRule = {
       selector,
       declarations,
       order: rule.order,
     };
+
+    if (pseudoElementRoot) {
+      cssRule.pseudoElementAt = built.map((b) => b.pseudoElementAt);
+    }
 
     if (group.atRules.length > 0) {
       cssRule.atRules = group.atRules;
@@ -1419,16 +1516,17 @@ export function renderStyles(
   // Use pre-computed cache key when available (from chunk path),
   // falling back to stringifyStyles for direct renderStyles() calls
   const cacheKey = pipelineCacheKey || stringifyStyles(styles!);
-  if (!rules) {
-    rules = pipelineCache.get(cacheKey);
-  }
-
-  if (!rules) {
-    // styles is guaranteed non-null here: early return above handles (!rules && !styles)
-    const parserContext = createStateParserContext(styles!);
-    rules = runPipeline(styles!, parserContext);
-    pipelineCache.set(cacheKey, rules);
-  }
+  const rulesFor = (pseudoElementRoot: boolean): CSSRule[] => {
+    const key = pseudoElementRoot ? `${cacheKey}\0::` : cacheKey;
+    let cached = pipelineCache.get(key);
+    if (!cached) {
+      // styles is guaranteed non-null here: early return above handles (!rules && !styles)
+      const parserContext = createStateParserContext(styles!);
+      cached = runPipeline(styles!, parserContext, pseudoElementRoot);
+      pipelineCache.set(key, cached);
+    }
+    return cached;
+  };
 
   // Direct selector/className mode: return StyleResult[] directly
   if (directSelector) {
@@ -1438,65 +1536,92 @@ export function renderStyles(
     // just the last one a plain suffix would land on.
     const items = splitSelectorsSafely(classNameOrSelector);
     const bases = (items.length > 0 ? items : [classNameOrSelector]).map(
-      (base) => ({ base, rootAt: rootStateIndex(base) }),
+      (base) => {
+        // `rootAt`, when set, is never past the pseudo-element.
+        const at = pseudoElementIndex(base);
+        return {
+          head: base.slice(0, at),
+          pseudoElement: base.slice(at),
+          rootAt: rootStateIndex(base),
+        };
+      },
     );
 
-    const results = rules.map((rule): StyleResult => {
-      // Handle selector as array (OR conditions) or string
-      const selectorParts = Array.isArray(rule.selector)
-        ? rule.selector
-        : rule.selector
-          ? [rule.selector]
-          : [''];
+    const toResults = (
+      groupRules: CSSRule[],
+      group: typeof bases,
+    ): StyleResult[] =>
+      groupRules.map((rule): StyleResult => {
+        // Handle selector as array (OR conditions) or string
+        const selectorParts = Array.isArray(rule.selector)
+          ? rule.selector
+          : rule.selector
+            ? [rule.selector]
+            : [''];
 
-      const finalSelector = selectorParts
-        .flatMap((part) =>
-          bases.map(({ base, rootAt }) => {
-            // A selector that is itself the root takes root states directly:
-            // as an ancestor prefix they would ask for a root inside the root.
-            const joinsRoot = rule.rootState !== undefined && rootAt !== -1;
-            let sel = joinsRoot
-              ? `${base.slice(0, rootAt)}${wrapWhere(rule.rootState!)}${base.slice(rootAt)}${part}`
-              : `${base}${part}`;
+        const finalSelector = selectorParts
+          .flatMap((part, index) =>
+            group.map(({ head, pseudoElement, rootAt }) => {
+              // A selector that is itself the root takes root states directly:
+              // as an ancestor prefix they would ask for a root inside the root.
+              const joinsRoot = rule.rootState !== undefined && rootAt !== -1;
+              const base = joinsRoot
+                ? `${head.slice(0, rootAt)}${wrapWhere(rule.rootState!)}${head.slice(rootAt)}`
+                : head;
+              // Ancestor context before the base's pseudo-element, its own
+              // states and the selector suffix after it.
+              const at = rule.pseudoElementAt?.[index] ?? 0;
+              let sel = pseudoElement
+                ? `${base}${part.slice(0, at)}${pseudoElement}${part.slice(at)}`
+                : `${base}${part}`;
 
-            // Double class selector for increased specificity if requested
-            // This is used when the caller explicitly wants higher specificity
-            if (shouldDouble && sel.startsWith('.')) {
-              const classMatch = sel.match(/^\.[a-zA-Z_-][a-zA-Z0-9_-]*/);
-              if (classMatch) {
-                const baseClass = classMatch[0];
-                sel = baseClass + sel;
+              // Double class selector for increased specificity if requested
+              // This is used when the caller explicitly wants higher specificity
+              if (shouldDouble && sel.startsWith('.')) {
+                const classMatch = sel.match(/^\.[a-zA-Z_-][a-zA-Z0-9_-]*/);
+                if (classMatch) {
+                  const baseClass = classMatch[0];
+                  sel = baseClass + sel;
+                }
               }
-            }
 
-            // Handle root prefix for this selector
-            if (rule.rootPrefix && !joinsRoot) {
-              sel = `${rule.rootPrefix} ${sel}`;
-            }
+              // Handle root prefix for this selector
+              if (rule.rootPrefix && !joinsRoot) {
+                sel = `${rule.rootPrefix} ${sel}`;
+              }
 
-            return sel;
-          }),
-        )
-        .join(', ');
+              return sel;
+            }),
+          )
+          .join(', ');
 
-      const result: StyleResult = {
-        selector: finalSelector,
-        declarations: rule.declarations,
-      };
+        const result: StyleResult = {
+          selector: finalSelector,
+          declarations: rule.declarations,
+        };
 
-      if (rule.atRules && rule.atRules.length > 0) {
-        result.atRules = rule.atRules;
-      }
+        if (rule.atRules && rule.atRules.length > 0) {
+          result.atRules = rule.atRules;
+        }
 
-      if (rule.startingStyle) {
-        result.startingStyle = true;
-      }
+        if (rule.startingStyle) {
+          result.startingStyle = true;
+        }
 
-      return result;
-    });
+        return result;
+      });
 
-    return mergeStyleResults(results);
+    // A base that ends in a pseudo-element (`.card::before`) renders
+    // separately: its root states describe the pseudo-element.
+    const plain = bases.filter((base) => !base.pseudoElement);
+    const pseudo = bases.filter((base) => base.pseudoElement);
+    return mergeStyleResults([
+      ...(plain.length > 0 ? toResults(rulesFor(false), plain) : []),
+      ...(pseudo.length > 0 ? toResults(rulesFor(true), pseudo) : []),
+    ]);
   }
+
+  rules ??= rulesFor(false);
 
   // No className mode: return RenderResult with needsClassName flag
   // Normalize selector to string (join array with placeholder that injector will handle)

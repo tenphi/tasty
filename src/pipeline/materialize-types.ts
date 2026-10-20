@@ -189,6 +189,13 @@ export interface CSSComponents {
 export interface CSSRule {
   /** Single selector or array of selector fragments (for OR conditions) */
   selector: string | string[];
+  /**
+   * Set when rendering for a direct selector that ends in a pseudo-element:
+   * per selector fragment, where that pseudo-element goes. Its ancestor
+   * context (`@parent`) comes before it, its own states and the selector
+   * suffix after: `.card:where(.dark *)::before:where(:hover)`.
+   */
+  pseudoElementAt?: number[];
   declarations: string;
   atRules?: string[];
   rootPrefix?: string;

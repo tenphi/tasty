@@ -1,4 +1,8 @@
-import { rootStateIndex, splitSelectorsSafely } from './selector-transform';
+import {
+  pseudoElementIndex,
+  rootStateIndex,
+  splitSelectorsSafely,
+} from './selector-transform';
 
 describe('splitSelectorsSafely', () => {
   it.each([
@@ -59,5 +63,51 @@ describe('rootStateIndex', () => {
     ':where()',
   ])('treats %s as a selector the root is not the subject of', (selector) => {
     expect(rootStateIndex(selector)).toBe(-1);
+  });
+});
+
+describe('pseudoElementIndex', () => {
+  it.each([
+    ['a::before', 1],
+    ['dialog::backdrop', 6],
+    ['::after', 0],
+    [' [data-element="X"]::marker', 19],
+    ['summary::-webkit-details-marker', 7],
+    ['input::placeholder', 5],
+    // Functional pseudo-elements.
+    ['::part(label)', 0],
+    ['x-el::part(a b)', 4],
+    ['::slotted(span.x)', 0],
+    ['p::highlight(found)', 1],
+    // Legacy single-colon pseudo-elements, in any case.
+    ['a:before', 1],
+    ['a:AFTER', 1],
+    ['p:first-line', 1],
+    ['p:first-letter', 1],
+    // Pseudo-classes before the pseudo-element stay with the originating
+    // element; those after it qualify the pseudo-element and stay after it.
+    ['li:first-child::marker', 14],
+    ['li:first-child:before', 14],
+    ['::part(label):hover', 0],
+    ['div::-webkit-scrollbar-thumb:hover', 3],
+    ['li::after::marker', 2],
+    // Only the last compound counts.
+    ['a::before > b::after', 13],
+    ['a::before ~ b', 13],
+    ['::before span', 13],
+    ['a::before ', 1],
+    // Lookalikes inside brackets, functions, strings, and escapes.
+    ['a[title="x::y"]', 15],
+    ['a:not(::before)', 15],
+    ['a:is(:before)', 13],
+    [String.raw`a\:\:before`, 11],
+    ['a/* ::before */', 15],
+    // Pseudo-classes whose names start like a legacy pseudo-element.
+    ['a:before-x', 10],
+    ['a:after-x', 9],
+    ['a:hover', 7],
+    ['', 0],
+  ] as const)('finds the pseudo-element of %j at %i', (selector, index) => {
+    expect(pseudoElementIndex(selector)).toBe(index);
   });
 });

@@ -137,7 +137,7 @@ const List = tasty({
 // → .t1x29r0l.t1x29r0l > [data-element="Item"]::after { content: ""; }
 ```
 
-Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise.
+Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise. When `$` ends in a pseudo-element, `@own()` describes the pseudo-element instead (see [`@own(...)`](#own--sub-elements-own-state)), so a condition on the element it belongs to stays in `$`, before the pseudo-element: `$: 'a[rel="next"]::before'`.
 
 ### Color Token
 
@@ -779,6 +779,20 @@ const Nav = tasty({
 | `@own(theme=dark)`                | `[data-theme="dark"]` on the sub-element selector |
 
 `@own()` is only valid inside sub-element styles. Using it on root styles emits a warning and is treated as a regular modifier.
+
+When `$` ends in a pseudo-element, `@own()` is the pseudo-element's own state and goes after it:
+
+```jsx
+Label: {
+  $: '@::part(label)',
+  color: { '': '#text', '@own(:focus)': '#primary' },
+},
+// → .t0.t0 [data-element="Label"]::part(label):where(:focus) { … }
+```
+
+A pseudo-element has no attributes, classes, or place in the DOM tree. So a state that tests a modifier (`@own(hovered)`), an attribute (`@own([open])`), a class, or a tree position (`@own(:first-child)`, `@own(:has(…))`) can never match it. Tasty ignores such a state and warns. To condition on the element the pseudo-element belongs to, write it in `$` before the pseudo-element (`$: 'a[rel="next"]::before'`), or use `@parent()` for its ancestors.
+
+This covers every pseudo-element form: `::before`, `::marker`, `::backdrop`, vendor-prefixed ones such as `::-webkit-details-marker`, functional ones such as `::part(label)`, and the legacy `:before`, `:after`, `:first-line`, `:first-letter`. Each item of a `$` list is judged on its own. Tasty emits pseudo-class states regardless of browser support. Only some pseudo-elements, such as `::part()` and `::-webkit-scrollbar-thumb`, match states like `:hover` or `:focus` today.
 
 ### `@starting` — Entry Animation
 

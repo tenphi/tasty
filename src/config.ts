@@ -148,8 +148,8 @@ export interface TastyConfig {
    *
    * A `#name` token's value used to be rewritten into this color space so an
    * opacity suffix had numeric channels to write an alpha into. Opacity now uses
-   * relative color syntax — `oklch(from var(--name-color) l c h / .5)` — which
-   * has the browser read the channels, so a color is emitted exactly as
+   * `color-mix(in oklab, var(--name-color) 50%, transparent)`, which the
+   * browser resolves against any color, so a color is emitted exactly as
    * authored and there is nothing left for the setting to decide.
    *
    * To address a token's channels yourself, write relative color syntax against

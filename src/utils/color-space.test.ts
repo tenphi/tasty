@@ -1,121 +1,115 @@
 import { configure, resetConfig } from '../config';
 import { createStyle } from '../styles/createStyle';
 
-import {
-  mixColorAlpha,
-  overrideColorAlpha,
-  parseAlphaOverride,
-} from './color-space';
+import { alphaToPercentage, mixColorAlpha, parseAlphaMix } from './color-space';
 
 afterEach(() => {
   resetConfig();
 });
 
-describe('overrideColorAlpha — replaces the alpha', () => {
-  it('writes the alpha slot with relative color syntax', () => {
-    expect(overrideColorAlpha('var(--purple-color)', '.5')).toBe(
-      'oklch(from var(--purple-color) l c h / .5)',
+describe('mixColorAlpha', () => {
+  it('mixes the color against transparent in oklab', () => {
+    expect(mixColorAlpha('var(--purple-color)', '50%')).toBe(
+      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
     );
   });
 
-  it('passes a percentage alpha through as authored', () => {
-    expect(overrideColorAlpha('var(--purple-color)', '50%')).toBe(
-      'oklch(from var(--purple-color) l c h / 50%)',
-    );
-  });
-
-  it('passes a var() alpha through as authored', () => {
-    expect(overrideColorAlpha('var(--purple-color)', 'var(--fade)')).toBe(
-      'oklch(from var(--purple-color) l c h / var(--fade))',
-    );
-  });
-
-  it('takes any color as the origin, including ones with no decomposable channels', () => {
-    // The point of relative color syntax: the browser resolves the channels, so
-    // the engine never has to evaluate the color.
+  it('takes any color, including ones with no decomposable channels', () => {
+    // The browser resolves the color, so the engine never has to evaluate it.
     for (const color of [
       'color-mix(in oklab, red 50%, blue)',
       'light-dark(#fff, #000)',
       'color(display-p3 1 .5 0)',
       'var(--from-hand-authored-css)',
+      'currentcolor',
       'red',
     ]) {
-      expect(overrideColorAlpha(color, '.5')).toBe(
-        `oklch(from ${color} l c h / .5)`,
+      expect(mixColorAlpha(color, '50%')).toBe(
+        `color-mix(in oklab, ${color} 50%, transparent)`,
       );
     }
   });
 
-  it('always uses oklch, which is unbounded', () => {
-    // A gamut-limited space would clamp a wide-gamut origin. Nothing configures
-    // this — `colorSpace` has no say in it.
+  it('always mixes in oklab, whatever colorSpace says', () => {
+    // oklab is unbounded, so a wide-gamut color is not clamped, and rectangular,
+    // so there is no hue to interpolate against `transparent`.
     configure({ colorSpace: 'rgb' });
 
-    expect(overrideColorAlpha('oklch(0.7 0.35 30)', '.5')).toBe(
-      'oklch(from oklch(0.7 0.35 30) l c h / .5)',
+    expect(mixColorAlpha('oklch(0.7 0.35 30)', '50%')).toBe(
+      'color-mix(in oklab, oklch(0.7 0.35 30) 50%, transparent)',
     );
   });
 });
 
-describe('mixColorAlpha — composes the alpha', () => {
-  it('mixes against transparent so an inherited alpha multiplies', () => {
-    expect(mixColorAlpha('currentcolor', '40%')).toBe(
-      'color-mix(in oklab, currentcolor 40%, transparent)',
-    );
-  });
-
-  it('is distinct from overrideColorAlpha, which replaces', () => {
-    // `#current.N` composes and `#token.N` replaces; unifying them would double
-    // the opacity of every nested step in a `currentcolor` ramp.
-    expect(mixColorAlpha('currentcolor', '50%')).not.toBe(
-      overrideColorAlpha('currentcolor', '.5'),
-    );
-  });
-});
-
-describe('parseAlphaOverride', () => {
-  it('splits a faded color into the color and the alpha', () => {
+describe('parseAlphaMix', () => {
+  it('splits a faded color into the color and the percentage', () => {
     expect(
-      parseAlphaOverride('oklch(from var(--purple-color) l c h / .5)'),
-    ).toEqual({ color: 'var(--purple-color)', alpha: '.5' });
+      parseAlphaMix(
+        'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+      ),
+    ).toEqual({ color: 'var(--purple-color)', percentage: '50%' });
   });
 
-  it('keeps a var() alpha whole', () => {
+  it('keeps a scaled custom property percentage whole', () => {
     expect(
-      parseAlphaOverride('oklch(from var(--a-color) l c h / var(--fade))'),
-    ).toEqual({ color: 'var(--a-color)', alpha: 'var(--fade)' });
+      parseAlphaMix(
+        'color-mix(in oklab, var(--a-color) calc(var(--fade) * 100%), transparent)',
+      ),
+    ).toEqual({
+      color: 'var(--a-color)',
+      percentage: 'calc(var(--fade) * 100%)',
+    });
   });
 
   it('splits a doubly faded color on its outer layer', () => {
     expect(
-      parseAlphaOverride(
-        'oklch(from oklch(from var(--a-color) l c h / .5) l c h / .25)',
+      parseAlphaMix(
+        'color-mix(in oklab, color-mix(in oklab, var(--a-color) 50%, transparent) 25%, transparent)',
       ),
     ).toEqual({
-      color: 'oklch(from var(--a-color) l c h / .5)',
-      alpha: '.25',
+      color: 'color-mix(in oklab, var(--a-color) 50%, transparent)',
+      percentage: '25%',
     });
   });
 
   it('handles a derived color as the origin', () => {
     expect(
-      parseAlphaOverride(
-        'oklch(from light-dark(var(--a-color),var(--b-color)) l c h / .5)',
+      parseAlphaMix(
+        'color-mix(in oklab, light-dark(var(--a-color),var(--b-color)) 50%, transparent)',
       ),
     ).toEqual({
       color: 'light-dark(var(--a-color),var(--b-color))',
-      alpha: '.5',
+      percentage: '50%',
     });
   });
 
-  it('returns null for anything else', () => {
-    expect(parseAlphaOverride('oklab(0.5 0.1 0.1)')).toBeNull();
-    expect(parseAlphaOverride('var(--a-color)')).toBeNull();
+  it('reads a fade the parser has normalized', () => {
+    // Color functions lose the space after their commas on the way through.
     expect(
-      parseAlphaOverride(
-        'color-mix(in oklab, var(--a-color) 50%, transparent)',
-      ),
+      parseAlphaMix('color-mix(in oklab,var(--purple-color) 40%,transparent)'),
+    ).toEqual({ color: 'var(--purple-color)', percentage: '40%' });
+  });
+
+  it('returns null for anything else', () => {
+    expect(parseAlphaMix('oklab(0.5 0.1 0.1)')).toBeNull();
+    expect(parseAlphaMix('var(--a-color)')).toBeNull();
+    // A mix of two colors is not a fade.
+    expect(
+      parseAlphaMix('color-mix(in oklab, var(--a-color) 50%, var(--b-color))'),
     ).toBeNull();
+    expect(parseAlphaMix('oklch(from var(--a-color) l c h / .5)')).toBeNull();
+  });
+});
+
+describe('alphaToPercentage', () => {
+  it.each([
+    [0.5, '50%'],
+    [0.07, '7%'],
+    [0.075, '7.5%'],
+    [0, '0%'],
+    [1, '100%'],
+  ])('%s → %s', (alpha, expected) => {
+    expect(alphaToPercentage(alpha)).toBe(expected);
   });
 });
 

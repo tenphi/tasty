@@ -106,11 +106,13 @@ describe('strToRgb', () => {
 
 describe('parseColor with a faded color', () => {
   it('reads the name and the opacity through the fade', () => {
-    // `#purple.5` parses to `oklch(from var(--purple-color) l c h / .5)`. The
-    // whole thing is the color, but the name and the opacity are its parts.
+    // `#purple.5` parses to a `color-mix()` of `var(--purple-color)`. The whole
+    // thing is the color, but the name and the opacity are its parts.
     const parsed = parseColor('#purple.5');
 
-    expect(parsed.color).toBe('oklch(from var(--purple-color) l c h / .5)');
+    expect(parsed.color).toBe(
+      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+    );
     expect(parsed.name).toBe('purple');
     expect(parsed.opacity).toBe(50);
   });
@@ -124,7 +126,8 @@ describe('parseColor with a faded color', () => {
 
   it('reads a percentage alpha as itself', () => {
     expect(
-      parseColor('oklch(from var(--purple-color) l c h / 40%)').opacity,
+      parseColor('color-mix(in oklab, var(--purple-color) 40%, transparent)')
+        .opacity,
     ).toBe(40);
   });
 
@@ -147,7 +150,7 @@ describe('color() helper', () => {
 
   it('fades the colour variable with relative color syntax', () => {
     expect(color('purple', 0.5)).toBe(
-      'oklch(from var(--purple-color) l c h / 0.5)',
+      'color-mix(in oklab, var(--purple-color) 50%, transparent)',
     );
   });
 
@@ -155,13 +158,13 @@ describe('color() helper', () => {
     // The alpha slot takes a `<number>`, so there is no percentage conversion to
     // introduce a float artifact — `0.07 * 100` is `7.000000000000001`.
     expect(color('purple', 0.07)).toBe(
-      'oklch(from var(--purple-color) l c h / 0.07)',
+      'color-mix(in oklab, var(--purple-color) 7%, transparent)',
     );
     expect(color('purple', 0.29)).toBe(
-      'oklch(from var(--purple-color) l c h / 0.29)',
+      'color-mix(in oklab, var(--purple-color) 29%, transparent)',
     );
     expect(color('purple', 0.025)).toBe(
-      'oklch(from var(--purple-color) l c h / 0.025)',
+      'color-mix(in oklab, var(--purple-color) 2.5%, transparent)',
     );
   });
 });

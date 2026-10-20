@@ -1,5 +1,5 @@
 import { getNamedColorHex } from '../utils/color-math';
-import { mixColorAlpha, overrideColorAlpha } from '../utils/color-space';
+import { mixColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 
@@ -20,27 +20,6 @@ import type { ParserOptions, ProcessedStyle } from './types';
 import { Bucket } from './types';
 
 /**
- * Convert an opacity suffix to the alpha value it denotes.
- *
- * The authored digits are kept verbatim — `.07` stays `.07` rather than being
- * multiplied into `7.000000000000001%` — and a `$prop` suffix passes the
- * reference straight through, so it works whether the property holds a
- * `<number>` or a `<percentage>`. Both are what the alpha slot accepts.
- */
-function alphaSuffixToAlpha(rawAlpha: string): string {
-  // Custom property: $disabled -> var(--disabled)
-  if (rawAlpha.startsWith('$')) return `var(--${rawAlpha.slice(1)})`;
-  if (rawAlpha === '0') return '0';
-
-  return `.${rawAlpha}`;
-}
-
-/** Apply an opacity suffix to a color, replacing any alpha it already carries. */
-function fadeColor(color: string, rawAlpha: string): string {
-  return overrideColorAlpha(color, alphaSuffixToAlpha(rawAlpha));
-}
-
-/**
  * Convert an opacity suffix to the percentage `color-mix()` needs, by shifting
  * the decimal point rather than multiplying: `.07` is `7%`, not the
  * `7.000000000000001%` that `parseFloat('.07') * 100` produces.
@@ -54,18 +33,14 @@ function alphaSuffixToPercentage(rawAlpha: string): string {
 
   const digits = rawAlpha.length === 1 ? `${rawAlpha}0` : rawAlpha;
   const whole = String(Number(digits.slice(0, 2)));
-  const fraction = digits.slice(2);
+  const fraction = digits.slice(2).replace(/0+$/, '');
 
   return `${fraction ? `${whole}.${fraction}` : whole}%`;
 }
 
-/**
- * Apply an opacity suffix to `currentcolor`, composing with any alpha an
- * ancestor already applied. See {@link mixColorAlpha} for why this differs from
- * how a token is faded.
- */
-function fadeCurrentColor(rawAlpha: string): string {
-  return mixColorAlpha('currentcolor', alphaSuffixToPercentage(rawAlpha));
+/** Apply an opacity suffix to a color. See {@link mixColorAlpha}. */
+function fadeColor(color: string, rawAlpha: string): string {
+  return mixColorAlpha(color, alphaSuffixToPercentage(rawAlpha));
 }
 
 /**
@@ -231,19 +206,17 @@ export function classify(
 
   // #current with opacity: #current.5 or #current.$opacity
   //
-  // `color-mix()` rather than the relative color syntax a token fade uses.
-  // Fading a token *names* a color, so it replaces the alpha; `currentcolor` is
-  // the color an element inherits, which an ancestor may already have faded, so
-  // `#current.4` means "40% of what reaches me" and composes — `#current.4` with
-  // `#current.18` under it lands at `.072`. `color-mix()` with `currentcolor`
-  // has worked since Safari 16.2.
+  // Faded like any color. `currentcolor` is the color an element inherits,
+  // which an ancestor may already have faded, and the mix composes with that:
+  // `#current.4` means "40% of what reaches me", and `#current.4` with
+  // `#current.18` under it lands at `.072`.
   const currentAlphaMatch = token.match(
     /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
   );
   if (currentAlphaMatch) {
     return {
       bucket: Bucket.Color,
-      processed: fadeCurrentColor(currentAlphaMatch[1]),
+      processed: fadeColor('currentcolor', currentAlphaMatch[1]),
     };
   }
 
@@ -476,8 +449,8 @@ export function classify(
       // anything a `<color>` can be — including a `color-mix()` or a
       // `light-dark()` with no channels to decompose, or a value written
       // straight into `--name-color` by hand-authored CSS that Tasty never
-      // defined — and relative color syntax fades all of them. A hex-shaped
-      // name keeps its literal fallback, as it does without an alpha.
+      // defined — and mixing against `transparent` fades all of them. A
+      // hex-shaped name keeps its literal fallback, as it does without an alpha.
       const color = RE_HEX.test(base)
         ? `var(--${base}-color, #${base})`
         : `var(--${base}-color)`;

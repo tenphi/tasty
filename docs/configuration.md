@@ -212,9 +212,9 @@ useLayoutEffect(() => {
 A `#name` token's value used to be rewritten into a configured color space, so
 `#brand: '#ff8800'` declared `--brand-color: oklch(0.75 0.16 55)`. That existed
 to serve the opacity suffix, which needed numeric channels to write an alpha
-into. Opacity now uses CSS relative color syntax —
-`oklch(from var(--brand-color) l c h / .5)` — which has the browser read the
-channels, so there is nothing left for the setting to decide.
+into. Opacity now mixes the token with `transparent` —
+`color-mix(in oklab, var(--brand-color) 50%, transparent)` — which the browser
+resolves against any color, so there is nothing left for the setting to decide.
 
 A color is emitted exactly as authored:
 
@@ -235,9 +235,10 @@ background: oklch(from var(--brand-color) calc(l * 1.2) c h);
 ```
 
 This works on any `<color>`, including the ones no build-time conversion could
-have evaluated — and it is what the [opacity suffix](dsl.md#color-tokens--opacity)
-itself uses. Its space is always `oklch`, which is unbounded, so a wide-gamut
-color survives a round trip a narrower space would clamp.
+have evaluated, and `oklch` is unbounded, so a wide-gamut color survives a round
+trip a narrower space would clamp. Relative color syntax is Baseline 2024 (Chrome
+125, Firefox 128, Safari 18), so the [opacity suffix](dsl.md#color-tokens--opacity)
+uses the widely available `color-mix()` instead.
 
 ### Migrating off `colorSpace`
 
@@ -270,14 +271,15 @@ color: oklch(var(--brand-color-oklch) / 0.5);
 background: oklch(var(--brand-color-oklch));
 
 /* after */
-color: oklch(from var(--brand-color) l c h / 0.5);
+color: color-mix(in oklab, var(--brand-color) 50%, transparent);
 background: var(--brand-color);
 ```
 
 The replacement is strictly more capable — the companion could only be
-decomposed for a color the engine could evaluate at build time, while relative
-color syntax works on every `<color>`, including a `color-mix()`, a
-`light-dark()`, and a variable Tasty never defined.
+decomposed for a color the engine could evaluate at build time, while
+`color-mix()` works on every `<color>`, including a `color-mix()`, a
+`light-dark()`, and a variable Tasty never defined. It is also what
+`#brand.5` emits.
 
 ---
 

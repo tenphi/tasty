@@ -62,10 +62,10 @@ describe('generated CSS applies in the browser', () => {
         'Box',
       );
 
-      // `#black.5` becomes `oklch(from var(--black-color) l c h / .5)` — the
-      // channels copied over and the alpha slot written — so this is black at
-      // half alpha.
-      expect(computed(el, 'background-color')).toBe('oklch(0 0 0 / 0.5)');
+      // `#black.5` becomes `color-mix(in oklab, var(--black-color) 50%,
+      // transparent)`. The mix is premultiplied, so the channels come through
+      // untouched and this is black at half alpha.
+      expect(computed(el, 'background-color')).toBe('oklab(0 0 0 / 0.5)');
     });
 
     it('fades a colour variable Tasty never registered', () => {
@@ -81,7 +81,8 @@ describe('generated CSS applies in the browser', () => {
       // Compared against the same fade written by hand rather than a literal, so
       // the assertion is about the colour and not the engine's channel precision.
       const control = document.createElement('div');
-      control.style.backgroundColor = 'oklch(from rgb(0 0 255) l c h / .5)';
+      control.style.backgroundColor =
+        'color-mix(in oklab, rgb(0 0 255) 50%, transparent)';
       document.body.append(control);
 
       expect(computed(el, 'background-color')).toBe(
@@ -93,39 +94,40 @@ describe('generated CSS applies in the browser', () => {
       sheet.remove();
     });
 
-    it('replaces an alpha the colour already carries', () => {
-      // The regression this guards: composing with `color-mix()` against
-      // `transparent` would *multiply* the two alphas, so a token holding
-      // `rgb(255 0 0 / .8)` faded to `.5` would come out at `.4`. Writing the
-      // alpha slot replaces it, which is what the channel-components form did
-      // and what a statically-known colour still does.
+    it('composes with an alpha the colour already carries', () => {
+      // `color-mix()` against `transparent` multiplies the two alphas, so a
+      // token holding `rgb(255 0 0 / .8)` faded to `.5` comes out at `.4`. The
+      // channels are untouched: it is still red.
       const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
       const el = render(
         <Box styles={{ '#half': 'rgb(255 0 0 / .8)', fill: '#half.5' }} />,
       ).getByTestId('Box');
 
-      expect(computed(el, 'background-color')).toMatch(/\/ 0\.5\)$/);
+      // The same as opaque red at 40%: `.8` faded by `.5`, channels untouched.
+      const control = document.createElement('div');
+      control.style.backgroundColor =
+        'color-mix(in oklab, rgb(255 0 0) 40%, transparent)';
+      document.body.append(control);
+
+      expect(computed(el, 'background-color')).toBe(
+        computed(control, 'background-color'),
+      );
+      expect(computed(el, 'background-color')).toMatch(/\/ 0\.4\)$/);
+
+      control.remove();
     });
 
-    it('takes an opacity variable in either number or percentage form', () => {
-      // The alpha slot accepts both, and `--*-opacity` properties are registered
-      // as `<number> | <percentage>`. Scaling the reference into a percentage
-      // would make one of the two forms invalid and drop the declaration.
+    it('takes an opacity variable that holds a number', () => {
+      // A mix percentage cannot be a `<number>`, so `#black.$fade` scales the
+      // property by `100%`: it has to hold a unitless number.
       const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{ '$fade-opacity': '0.5', fill: '#black.$fade-opacity' }}
+        />,
+      ).getByTestId('Box');
 
-      for (const fade of ['0.5', '50%']) {
-        const { getByTestId, unmount } = render(
-          <Box
-            styles={{ '$fade-opacity': fade, fill: '#black.$fade-opacity' }}
-          />,
-        );
-
-        expect(computed(getByTestId('Box'), 'background-color')).toBe(
-          'oklch(0 0 0 / 0.5)',
-        );
-
-        unmount();
-      }
+      expect(computed(el, 'background-color')).toBe('oklab(0 0 0 / 0.5)');
     });
 
     it('composes a nested `#current` fade instead of replacing it', () => {
@@ -159,26 +161,71 @@ describe('generated CSS applies in the browser', () => {
     });
 
     it('fades without clamping a colour to sRGB', () => {
-      // The channels are copied, not converted into a gamut-limited space, so a
-      // display-p3 red keeps a chroma sRGB cannot hold. `rgb(from …)` — or a mix
-      // `in srgb` — would clamp it.
-      const p3 = document.createElement('div');
-      p3.style.backgroundColor =
-        'oklch(from color(display-p3 1 0.2 0) l c h / .5)';
-      const srgb = document.createElement('div');
-      srgb.style.backgroundColor = 'oklch(from rgb(255 0 0) l c h / .5)';
-      document.body.append(p3, srgb);
+      // The mix is `in oklab`, which is unbounded, so a display-p3 red keeps a
+      // chroma sRGB cannot hold. A mix in a gamut-limited space would clamp it.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const p3 = render(
+        <Box
+          styles={{ '#wide': 'color(display-p3 1 0.2 0)', fill: '#wide.5' }}
+        />,
+      ).getByTestId('Box');
+      const srgb = render(
+        <Box styles={{ '#narrow': 'rgb(255 0 0)', fill: '#narrow.5' }} />,
+      ).getAllByTestId('Box')[1];
 
-      const chroma = (el: Element) =>
-        parseFloat(
-          computed(el, 'background-color').match(/^oklch\([^ ]+ ([^ ]+)/)![1],
-        );
+      const chroma = (el: Element) => {
+        const [, a, b] = computed(el, 'background-color')
+          .match(/^oklab\(([^ ]+) ([^ ]+) ([^ ]+)/)!
+          .slice(1)
+          .map(parseFloat);
+
+        return Math.hypot(a, b);
+      };
 
       expect(chroma(p3)).toBeGreaterThan(chroma(srgb));
       expect(computed(p3, 'background-color')).toContain('/ 0.5)');
+    });
 
-      p3.remove();
-      srgb.remove();
+    describe('fades an opaque colour exactly as relative color syntax did', () => {
+      // `color-mix()` replaced `oklch(from <color> l c h / <alpha>)` because it
+      // is Baseline widely available. For an opaque colour the two must resolve
+      // to the same colour; both are read back in oklab and compared channel by
+      // channel.
+      const oklab = (value: string) => {
+        const probe = document.body.appendChild(document.createElement('div'));
+        probe.style.backgroundColor = `color-mix(in oklab, ${value} 100%, transparent)`;
+        const channels = computed(probe, 'background-color')
+          .match(/^oklab\(([^ ]+) ([^ ]+) ([^ ]+)(?: \/ ([^)]+))?\)$/)!
+          .slice(1)
+          .map((channel) => (channel === undefined ? 1 : parseFloat(channel)));
+        probe.remove();
+
+        return channels;
+      };
+
+      it.each([
+        ['#ff8800', '.5', '.5'],
+        ['rebeccapurple', '.05', '.05'],
+        ['hsl(220 90% 50%)', '.9', '.9'],
+        ['color(display-p3 1 0.2 0)', '.5', '.5'],
+        ['oklch(0.7 0.2 140)', '.25', '.25'],
+        ['light-dark(#fff, #000)', '.3', '.3'],
+        ['color-mix(in srgb, red 30%, blue)', '.75', '.75'],
+      ])('%s at %s', (color, suffix, alpha) => {
+        const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+        const el = render(
+          <Box styles={{ '#probe': color, fill: `#probe${suffix}` }} />,
+        ).getByTestId('Box');
+
+        const mixed = oklab(computed(el, 'background-color'));
+        const relative = oklab(`oklch(from ${color} l c h / ${alpha})`);
+
+        // Within .005: the relative form round-trips through oklch, which the
+        // engine rounds, and a visible difference in oklab is around .02.
+        mixed.forEach((channel, i) => {
+          expect(channel).toBeCloseTo(relative[i], 2);
+        });
+      });
     });
 
     it('applies a color-mix() as the background colour', () => {
@@ -205,13 +252,13 @@ describe('generated CSS applies in the browser', () => {
 
       // Opacity applies to the token's colour directly, so a colour the engine
       // cannot decompose into channels at build time needs nothing extra to
-      // fade — the browser copies its channels.
+      // fade — the browser mixes whatever it resolves to.
       expect(computed(el, '--brand-color')).toBe('color(srgb 0.5 0.5 0.5)');
 
       // Mid-grey at half alpha. Channel precision is up to the engine, so only
       // the lightness band and the alpha are asserted.
       const background = computed(el, 'background-color');
-      expect(background).toMatch(/^oklch\(0\.59\d+ /);
+      expect(background).toMatch(/^oklab\(0\.59\d+ /);
       expect(background).toMatch(/\/ 0\.5\)$/);
     });
 
@@ -691,11 +738,9 @@ describe('generated CSS applies in the browser', () => {
       expect(computed(el, 'background-color')).toBe('rgb(0, 128, 0)');
     });
 
-    it('fades a token defined as `#current` where the origin allows it', () => {
-      // A token *holding* the keyword is faded by relative color syntax, whose
-      // origin is then `currentcolor` — supported here and in Firefox, but only
-      // from Safari 18. Portable alternative: put the fade in the token itself
-      // (`'#ink': '#current.5'`), which composes through `color-mix()`.
+    it('fades a token defined as `#current`', () => {
+      // A token *holding* the keyword is mixed with `currentcolor` inside it,
+      // which `color-mix()` has resolved since Safari 16.2.
       configure({ tokens: { '#purple': 'rgb(128 0 255)' } });
 
       const Outer = tasty({
@@ -711,7 +756,7 @@ describe('generated CSS applies in the browser', () => {
       ).getByTestId('Box');
 
       expect(computed(el, '--ink-color')).toBe('currentcolor');
-      expect(computed(el, 'background-color')).toMatch(/^oklch\(0\.53\d+ /);
+      expect(computed(el, 'background-color')).toMatch(/^oklab\(0\.53\d+ /);
       expect(computed(el, 'background-color')).toContain('/ 0.5');
     });
   });

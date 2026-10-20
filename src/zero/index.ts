@@ -42,3 +42,7 @@ export type {
 // CSS output utilities
 export { CSSWriter, createCSSWriter } from './css-writer';
 export type { CSSWriterOptions } from './css-writer';
+
+// Style merging, with the rules `tasty(Base, { styles })` extends by
+export { mergeStyles } from '../utils/merge-styles';
+export type { Styles } from '../styles/types';

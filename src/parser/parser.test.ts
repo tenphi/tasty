@@ -1604,3 +1604,65 @@ describe('Modern color functions', () => {
     );
   });
 });
+
+describe('Color keywords', () => {
+  let setGlobalPredefinedTokens: (tokens: Record<string, string>) => void;
+  let resetGlobalPredefinedTokens: () => void;
+
+  beforeAll(async () => {
+    const styles = await vi.importActual<any>('../utils/styles');
+    setGlobalPredefinedTokens = styles.setGlobalPredefinedTokens;
+    resetGlobalPredefinedTokens = styles.resetGlobalPredefinedTokens;
+  });
+
+  afterEach(() => {
+    resetGlobalPredefinedTokens();
+  });
+
+  test.each(['red', 'rebeccapurple', 'Canvas', 'CanvasText', 'Highlight'])(
+    '%s is a color',
+    (keyword) => {
+      const [group] = parser.process(`1bw ${keyword}`).groups;
+
+      expect(group.colors).toEqual([keyword.toLowerCase()]);
+      expect(group.mods).toEqual([]);
+    },
+  );
+
+  test('a deprecated system color is not a color keyword', () => {
+    // `Menu`, `Window`, `Background`, … would collide with names authors pick.
+    expect(parser.process('menu').groups[0].mods).toEqual(['menu']);
+  });
+
+  test.each([
+    ['var(--accent, Highlight)', 'var(--accent, highlight)'],
+    ['var(--accent, #purple)', 'var(--accent, var(--purple-color))'],
+    ['var(--accent, var(--other, red))', 'var(--accent, var(--other, red))'],
+  ])('a reference with a color fallback is a color: %s', (input, color) => {
+    expect(parser.process(input).groups[0].colors).toEqual([color]);
+  });
+
+  test.each(['var(--accent)', 'var(--accent, 2x)', 'var(--x, 1px solid red)'])(
+    'a reference without a single color fallback stays a value: %s',
+    (input) => {
+      const [group] = parser.process(input).groups;
+
+      expect(group.colors).toEqual([]);
+      expect(group.values).toHaveLength(1);
+    },
+  );
+
+  test('a token aliasing a color keyword resolves to the keyword', () => {
+    setGlobalPredefinedTokens({ '#forced': 'Highlight' });
+
+    expect(parser.process('#forced').groups[0].colors).toEqual(['highlight']);
+  });
+
+  test('an opacity suffix fades a token aliasing a color keyword', () => {
+    setGlobalPredefinedTokens({ '#forced': 'Highlight' });
+
+    expect(parser.process('#forced.5').output).toBe(
+      'oklch(from highlight l c h / .5)',
+    );
+  });
+});

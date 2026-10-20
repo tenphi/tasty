@@ -322,6 +322,33 @@ fill: '#solid.5'; // → hsl(220 90% 50% / .5)
 fill: '#adaptive.5'; // → oklch(from light-dark(…) l c h / .5)
 ```
 
+### Color keywords
+
+CSS named colors (`rebeccapurple`) and system colors (`Canvas`, `CanvasText`,
+`Highlight`, `ButtonText`, `GrayText`, `LinkText`, …) are colors too: they land
+in the color slot of any style and can be a color token's value. System colors
+are what `forced-colors` styles are written in:
+
+```jsx
+const Checkbox = tasty({
+  styles: {
+    '#forced-border': 'CanvasText',
+    border: {
+      '': '1bw #border',
+      '@media(forced-colors: active)': '1bw #forced-border',
+    },
+    outline: { '': false, focused: '2px Highlight' },
+  },
+});
+```
+
+A custom property whose fallback is a single color is read as a color, so it
+also fills the color slot: `border: '1bw var(--accent, Highlight)'`. Keywords
+are case-insensitive; inside a style they are emitted lowercase.
+
+The deprecated system colors (`Menu`, `Window`, `ButtonHighlight`, …) are not
+recognized.
+
 ---
 
 ## Built-in Units

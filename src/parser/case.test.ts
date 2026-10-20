@@ -48,6 +48,19 @@ describe('DSL name case', () => {
       );
     });
 
+    it('keeps a custom property name written out as CSS exactly', () => {
+      // The browser matches `var(--myVar)` against `--myVar` as written, so a
+      // name spelled out in CSS keeps its case — leading capital included.
+      expect(parseStyle('var(--myVar)').output).toBe('var(--myVar)');
+      expect(parseStyle('var(--MyVar, 2X)').output).toBe('var(--MyVar, 16px)');
+      expect(parseStyle('VAR(--myBrand-color)').output).toBe(
+        'var(--myBrand-color)',
+      );
+      expect(parseStyle('var(--myAccent, Highlight)').output).toBe(
+        'var(--myAccent, highlight)',
+      );
+    });
+
     it('still folds everything that is not a name', () => {
       // Keywords, units and hex literals are matched lowercase, so they must fold
       // exactly as they did before.
@@ -121,6 +134,9 @@ describe('DSL name case', () => {
       expect(foldDslCase('1BW SOLID $myVar')).toBe('1bw solid $myVar');
       expect(foldDslCase('NO SIGILS HERE')).toBe('no sigils here');
       expect(foldDslCase('#FF0000 $Foo')).toBe('#ff0000 $foo');
+      expect(foldDslCase('CALC(VAR(--myGap) * 2X)')).toBe(
+        'calc(var(--myGap) * 2x)',
+      );
     });
   });
 });

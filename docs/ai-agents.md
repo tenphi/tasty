@@ -78,6 +78,7 @@ The last row goes the other way — longhands over the shorthand — because `fl
 | `$$name(…)`           | call a CSS `@function` declared via `@function`, `useFunction`, or config                          |
 
 - ❌ `#f5f5f5`, `rgb(0 0 0)`, `oklch(…)`, `okhsl(…)`, `okhst(…)`, `red` → ✅ `#surface` (add the token to the config if it doesn't exist).
+- CSS system colors (`Canvas`, `CanvasText`, `Highlight`, `ButtonText`, `GrayText`, …) are the exception, for `forced-colors` styles: hold one in a token (`'#forced-border': 'CanvasText'`) or write it under a `@media(forced-colors: active)` state.
 - ❌ `var(--gap)` → ✅ `$gap` · ❌ `$accent-color` → ✅ `#accent` · ❌ `transparent` → ✅ `#clear` · ❌ `currentColor` → ✅ `#current`.
 - `#clear` is a default replace token for `transparent`, so `#clear.5` and `#clear.$opacity` stay transparent. It does not read `--clear-color`; override it through `replaceTokens` if needed.
 - A `$name` must be declared as a `'$name': value` key in the same styles object, or in the config.

@@ -48,6 +48,13 @@ describe('transitionStyle', () => {
         transition: 'inherit',
       });
     });
+
+    it.each(['none', 'None', ' none '])(
+      'passes %j through as the whole value',
+      (transition) => {
+        expect(transitionStyle({ transition })).toEqual({ transition: 'none' });
+      },
+    );
   });
 
   describe('easing without duration', () => {

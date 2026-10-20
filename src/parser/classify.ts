@@ -1,4 +1,4 @@
-import { getNamedColorHex } from '../utils/color-math';
+import { isColorKeyword } from '../utils/color-math';
 import { mixColorAlpha, overrideColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
@@ -68,17 +68,27 @@ function fadeCurrentColor(rawAlpha: string): string {
   return mixColorAlpha('currentcolor', alphaSuffixToPercentage(rawAlpha));
 }
 
-/**
- * Whether parsed function arguments hold a color. Colors reach either the color
- * bucket (`#token`, a nested color function, `transparent`) or — for the CSS
- * named colors, which the parser has no token syntax for — the modifier bucket.
- */
+/** Whether parsed function arguments hold a color. */
 function hasColorArgs(parsed: ProcessedStyle): boolean {
-  const namedColors = getNamedColorHex();
+  return parsed.groups.some((group) => group.colors.length > 0);
+}
 
-  return parsed.groups.some(
-    (group) =>
-      group.colors.length > 0 || group.mods.some((mod) => namedColors.has(mod)),
+/**
+ * Whether the arguments of a `var()` give it a color fallback: the name, then a
+ * single color — `var(--accent, Highlight)`, `var(--accent, #purple)`.
+ *
+ * A reference can hold anything, so the parser cannot type it from its name, but
+ * its fallback is a value of the type the reference is used as. A fallback made
+ * of more than one token (`var(--x, 1px solid red)`) is a whole shorthand, not a
+ * color, and leaves the reference untyped.
+ */
+function hasColorFallback(parsed: ProcessedStyle): boolean {
+  const fallback = parsed.groups[1];
+
+  return (
+    parsed.groups.length === 2 &&
+    fallback.all.length === 1 &&
+    fallback.colors.length === 1
   );
 }
 
@@ -427,6 +437,18 @@ export function classify(
               return { bucket: Bucket.Color, processed: constructed };
             }
 
+            // A color keyword (`red`, `Canvas`) has no channels to write into
+            // either, so it is faded as a whole, the same way a token is.
+            if (isColorKeyword(resolvedValue.trim())) {
+              return {
+                bucket: Bucket.Color,
+                processed: fadeColor(
+                  resolvedValue.trim().toLowerCase(),
+                  rawAlpha,
+                ),
+              };
+            }
+
             // Fallback: try appending .alpha (may not work for all cases)
             return classify(`${resolvedValue}.${rawAlpha}`, opts, recurse);
           }
@@ -536,10 +558,14 @@ export function classify(
     }
 
     // generic: process inner and rebuild
-    const argProcessed = recurse(inner).output;
+    const parsedInner = recurse(inner);
     return {
-      bucket: Bucket.Value,
-      processed: `${canonicalFuncName(fname)}(${argProcessed})`,
+      // A reference with a color fallback is a color, as `(#name, fallback)` is.
+      bucket:
+        fname === 'var' && hasColorFallback(parsedInner)
+          ? Bucket.Color
+          : Bucket.Value,
+      processed: `${canonicalFuncName(fname)}(${parsedInner.output})`,
     };
   }
 
@@ -637,8 +663,13 @@ export function classify(
     return { bucket: Bucket.Value, processed: token };
   }
 
-  // 10b. Special keyword colors
-  if (token === 'transparent' || token === 'currentcolor') {
+  // 10b. Keyword colors: the special ones, the CSS named colors and the system
+  // colors. None has a token form, so the keyword itself is the color.
+  if (
+    token === 'transparent' ||
+    token === 'currentcolor' ||
+    isColorKeyword(token)
+  ) {
     return { bucket: Bucket.Color, processed: token };
   }
 

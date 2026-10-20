@@ -19,12 +19,22 @@ const STRETCH_FALLBACKS = [
 ];
 
 /**
+ * `false` sets nothing, exactly as `null` does: it is how a state map says a
+ * state writes no declaration. Only `true` stands for a value (the reset).
+ */
+function isUnset(
+  value: string | number | boolean | undefined,
+): value is undefined | false {
+  return value == null || value === false;
+}
+
+/**
  * Parse a dimension value (string, number, or boolean) into a CSS value
  */
 function parseDimensionValue(
   val: string | number | boolean | undefined,
 ): string | null {
-  if (val == null) return null;
+  if (isUnset(val)) return null;
   if (typeof val === 'number') return `${val}px`;
   if (val === true) return 'initial';
 
@@ -54,13 +64,9 @@ export function dimensionStyle(
   const maxStyle = `max-${name}`;
 
   return ({ value, min, max }: DimensionProps) => {
-    if (value == null && min == null && max == null) return null;
+    if (isUnset(value) && isUnset(min) && isUnset(max)) return null;
 
-    if (
-      value != null &&
-      typeof value === 'string' &&
-      CSS_WIDE_KEYWORDS.has(value)
-    ) {
+    if (typeof value === 'string' && CSS_WIDE_KEYWORDS.has(value)) {
       const styles: Record<string, string> = {
         [name]: value,
         [minStyle]: value,
@@ -98,7 +104,7 @@ export function dimensionStyle(
     };
 
     // Process main dimension value
-    if (value != null) {
+    if (!isUnset(value)) {
       let val = value;
       if (typeof val === 'number') {
         val = `${val}px`;

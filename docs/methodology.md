@@ -242,7 +242,7 @@ const Button = tasty({
 <Button variant="danger" size="sm" isLoading />;
 ```
 
-`variant` is typed from the variant keys, the `default` variant applies when no `variant` prop is passed, and only variants that render emit CSS. See [React API — Variants](react-api.md#variants).
+`variant` is typed from the variant keys, the `default` variant applies when no `variant` prop is passed (set the `variant` option, as in `variant: 'danger'`, to fall back to another one), and only variants that render emit CSS. See [React API — Variants](react-api.md#variants).
 
 ---
 
@@ -359,9 +359,9 @@ const LargeCard = tasty(Card, {
 
 Why? Styled wrappers are:
 
-- **Stable** — the style object is defined once at module level, not recreated on every render
+- **Stable** — the style object is defined once at module level, so Tasty merges and computes it once instead of on every render
 - **Composable** — another engineer can extend `LargeCard` further
-- **Inspectable** — give it a `qa` (`tasty(Card, { qa: 'LargeCard', styles })`) and it appears as `TastyWrappedComponent(LargeCard)` in React DevTools and as `data-qa="LargeCard"` in the DOM
+- **Inspectable** — give it a `qa` (`tasty(Card, { qa: 'LargeCard', styles })`) and it appears as `data-qa="LargeCard"` in the DOM; React DevTools shows it as `TastyWrappedComponent(…)` around the base's name
 - **Lint-friendly** — the ESLint plugin's `no-styles-prop` rule flags direct usage
 
 The `styles` prop exists as an escape hatch — for prototyping, one-off overrides during development, or cases where wrapping is impractical. It should not be the default way product engineers customize components.
@@ -382,7 +382,7 @@ See [Best practices](#best-practices) below for the full list of do's and don'ts
 
 ## Wrapping and extension
 
-`tasty(Base, { styles })` is the primary extension mechanism. It creates a new component whose styles are merged with the base component's styles.
+`tasty(Base, { styles })` is the primary extension mechanism. It creates a new component whose styles are merged with the base component's styles. The extension can also declare its own `styleProps`, `modProps`, `tokenProps`, `variants`, and `elements`, and it keeps the base's sub-elements — see [React API — Extend an existing component](react-api.md#extend-an-existing-component).
 
 ```tsx
 import { Button } from 'my-ds';
@@ -478,10 +478,10 @@ This is preferred over `<Card styles={{ border: '1bw solid #danger' }}>` because
 
 1. The styles live in one module-level definition instead of being rebuilt inside render
 2. `DangerCard` can be extended further by others
-3. It is searchable in code, and named in DevTools once you give it a `qa`
+3. It is searchable in code, and carries `data-qa` in the DOM once you give it a `qa`
 4. The ESLint `no-styles-prop` rule encourages this pattern
 
-A wrapper does not re-expose the base's sub-element components: `DangerCard.Title` is `undefined` and not part of its type. Keep using the base's parts inside it — `<DangerCard><Card.Title>…</Card.Title></DangerCard>`. The wrapper's `Title` styles still apply, because they target `[data-element="Title"]`.
+A wrapper keeps the base's sub-element components, typed: `DangerCard.Title` is `Card.Title`, so `<DangerCard><DangerCard.Title>…</DangerCard.Title></DangerCard>` works. The wrapper's `Title` styles apply to it, because they target `[data-element="Title"]`.
 
 ---
 
@@ -618,7 +618,7 @@ const Card = tasty({
 });
 ```
 
-Modifiers are compiled into exclusive selectors once. Changing `styles` at runtime forces Tasty to regenerate and re-inject CSS. `tasty/no-styles-prop` and `tasty/no-runtime-styles-mutation` flag these patterns.
+Modifiers are compiled into exclusive selectors once. A `styles` object that stays the same between renders (a module-level constant or a memoized object) is merged and computed once, but a new object on every render is merged and computed on every render, and each new value generates and injects new CSS. `tasty/no-styles-prop` and `tasty/no-runtime-styles-mutation` flag these patterns.
 
 ### Overusing style prop
 

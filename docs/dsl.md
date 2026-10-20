@@ -134,7 +134,7 @@ const List = tasty({
     },
   },
 });
-// → .t0.t0 > [data-element="Item"]::after { content: "" }
+// → .t1x29r0l.t1x29r0l > [data-element="Item"]::after { content: ""; }
 ```
 
 Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise.
@@ -171,7 +171,9 @@ fill: '#current',           // → currentcolor
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
-`#white`, `#black`, `#border`, and `#outline` are registered by default, and `#clear` is a built-in alias for `transparent` (see [below](#clear-is-transparent)), so they work before you define any tokens.
+`#white`, `#black`, `#border`, and `#outline` are registered by default (see [Default properties](#default-properties)), and `#clear` is a built-in alias for `transparent` (see [below](#clear-is-transparent)), so they work before you define any tokens.
+
+A name that is also a hex color is read as a token with the literal as its fallback, in every color style: `color: '#ddd'` emits `var(--ddd-color, #ddd)`, and `#ddd.5` emits `oklch(from var(--ddd-color, #ddd) l c h / .5)`. A `#ddd` token, if you define one, wins over the literal.
 
 The suffix sets the alpha on the token's color with CSS relative color syntax:
 
@@ -553,10 +555,13 @@ fill: {
 | `@media:speech`                      | `@media speech`                       |
 | `@media(prefers-color-scheme: dark)` | `@media (prefers-color-scheme: dark)` |
 | `@media(prefers-reduced-motion)`     | `@media (prefers-reduced-motion)`     |
+| `@media(aspect-ratio > 16/9)`        | `@media (aspect-ratio > 16/9)`        |
 
 Tasty units resolve to their literal length inside query conditions, built-in and configured units alike: `@media(w < 40x)` emits `@media (width < 320px)`. A query condition cannot read a custom property, so a unit configured as one (`units: { x: 'var(--gap)' }`) cannot be used there; write that length in `px`, `em`, or `rem`.
 
 Units are only converted in features that take a length: `width`, `height`, `inline-size`, and `block-size`, with or without `min-`/`max-` (`@media(min-width: 40x)` converts too). Every other feature keeps its value as written, so `@media(min-resolution: 2x)` and `@media(resolution >= 2x)` reach the browser unchanged: there `x` is CSS's own resolution unit, an alias of `dppx`.
+
+When it combines or orders conditions, Tasty compares bounds only within one unit. `@media(w >= 600px) & @media(w < 40em)` keeps both bounds, because a query `em` follows the user's font size, so `600px` and `40em` cannot be ordered at build time.
 
 In practice, define state aliases via `configure({ states })` and use `@mobile` instead of writing the full query in every component.
 
@@ -932,6 +937,26 @@ Use explicit `@property` when you need non-default settings like `inherits: fals
   '$gradient-angle': { syntax: '<angle>', inherits: false, initialValue: '0deg' },
 },
 ```
+
+### Default properties
+
+Tasty registers these properties itself. Style handlers read their defaults from them rather than repeating the values inline, so styles work before you define any tokens, and defining a token replaces the initial value.
+
+| Token                                                | Initial value                            | Read by                                                        |
+| ---------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------- |
+| `#current`                                           | `currentcolor`                           | anything reading `$current-color`, which `color` sets          |
+| `#white`, `#black`                                   | `rgb(255 255 255)`, `rgb(0 0 0)`         | your styles                                                    |
+| `#border`                                            | `currentcolor`                           | `border` with no color                                         |
+| `#outline`                                           | `currentcolor`                           | `outline` with no color                                        |
+| `$gap`, `$radius`, `$border-width`, `$outline-width` | `8px`, `6px`, `1px`, `3px`               | units you point at them, as in `units: { x: 'var(--gap)' }`    |
+| `$transition`                                        | `80ms`                                   | `transition` with no duration                                  |
+| `$sharp-radius`                                      | `0px`                                    | the sharp corners of `radius: 'leaf'` and `radius: 'backleaf'` |
+| `$bold-font-weight`                                  | `700`                                    | `preset: 'name / strong'`                                      |
+| `$font-sans-fallback`, `$font-mono-fallback`         | a `system-ui` and a `ui-monospace` stack | `font` and presets, after `$font-sans` / `$font-mono`          |
+
+Every rendering path emits them: the client injector, the SSR collector (`TastyRegistry`, `tastyIntegration()`, `runWithCollector()`), the `withTastyNext()` shared stylesheet, and the Babel plugin. CSS written with the programmatic API needs [`extractConfigProperties()`](tasty-static.md#programmatic-api), once per stylesheet. Server rendering without a collector, such as Astro without `tastyIntegration()`, emits none of them.
+
+The initial values need `@property` support: Chrome and Edge 85+, Firefox 128+, Safari 16.4+. In older engines a handler that reads one of these tokens resolves to nothing unless your tokens define it: a `border` with no color draws no border, and a `transition` with no duration does not animate. To support those engines, define the tokens your styles rely on in `configure({ tokens })`.
 
 ---
 

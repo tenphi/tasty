@@ -69,7 +69,7 @@ Two distinctions do most of the work:
 A handler receives a map of the style properties it declared and returns CSS declarations. See [Configuration → Custom Style Handlers](configuration.md#custom-style-handlers) for the definition forms, return shape, the shared-handler groups you must be careful of, and chunk membership. The essentials:
 
 - Values arrive **state-resolved but unparsed** — the raw authored DSL string (`'2x'`, `'#purple.5'`, `true`, `4`). Call the exported `parseStyle()` / `parseColor()` yourself.
-- Return a `CSSMap` with **kebab-case** keys, an array of them, or nothing. `$` is a selector suffix, not a property.
+- Return a `CSSMap` with **kebab-case** keys, an array of them, or nothing. `$` is a selector suffix, not a property. A property whose value is an array gets one declaration per entry, for fallback chains.
 - Handlers must be pure and synchronous. They are called once per state combination and the results are cached.
 - Use `defineHandler(deps, fn)` for multi-dependency handlers so the dependency types are inferred.
 

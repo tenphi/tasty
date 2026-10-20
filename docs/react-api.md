@@ -2,7 +2,7 @@
 
 Use `tasty()` to turn state-aware style definitions into normal React components, extend existing Tasty components, and expose typed styling APIs to consumers.
 
-Every Tasty style function except `useStyles()` — `tasty()` components, `computeStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — is hook-free and works in React Server Components with no `'use client'` directive. `useStyles()` reads the `TastyRegistry` collector from React context, so it is a real hook; in Server Components and outside React, call `computeStyles()` instead. For state maps, tokens, units, and extension semantics, see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+Every Tasty style function — `tasty()` components, `computeStyles()`, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — works in React Server Components with no `'use client'` directive. All of them except `useStyles()` are hook-free. `useStyles()` reads the `TastyRegistry` collector from React context on the client, so it is a real hook there; outside React, call `computeStyles()` instead. For state maps, tokens, units, and extension semantics, see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 > **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
@@ -44,7 +44,29 @@ const PrimaryButton = tasty(Button, {
 
 Style maps merge intelligently — see [Style DSL — Extending vs. Replacing State Maps](dsl.md#extending-vs-replacing-state-maps) for extend mode, replace mode, `@inherit`, `null`, and `false` tombstones.
 
-The extension form forwards props; it does not re-run the factory. `styleProps`, `modProps`, `tokenProps`, `variants`, and `elements` passed to `tasty(Component, …)` are ignored even though they type-check, and the base's sub-components are not copied (`tasty(Card, …).Title` is `undefined`). Declare them on the base component, or create the component with `tasty({ … })` directly.
+The extension form takes the same component options as `tasty({ … })`:
+
+```jsx
+const ActionCard = tasty(Card, {
+  styles: { fill: { '': '#surface', isRaised: '#surface-raised' } },
+  styleProps: ['gap'] as const, // gap="2x" becomes a style
+  modProps: ['isRaised'] as const, // isRaised becomes a mod (data-is-raised)
+  tokenProps: ['accentColor'] as const, // accentColor sets the #accent token
+  variants: {
+    plain: { border: 0 },
+    framed: { border: '2bw #accent' },
+  },
+  variant: 'framed', // applied when no variant prop is passed
+  elements: { Footer: 'footer' },
+});
+
+<ActionCard gap="2x" isRaised accentColor="#purple">
+  <ActionCard.Title>Kept from Card</ActionCard.Title>
+  <ActionCard.Footer>Added here</ActionCard.Footer>
+</ActionCard>;
+```
+
+The extension turns its own `styleProps`, `modProps`, and `tokenProps` into the `styles`, `mods`, and `tokens` it passes to the base, which renders them as usual: mods as `data-*` attributes, tokens as inline custom properties. Its `variants` merge over its `styles`, and the `variant` prop is still forwarded, so it selects the base's own variants too and accepts either set's names. `elements` adds sub-components, and the base's are kept: `ActionCard.Title` is `Card.Title`. The returned component is typed with all of these props and sub-components.
 
 `tasty(Component, ...)` always wraps `Component` and forwards every prop to it, so `Component` must be Tasty-aware (i.e. it accepts `styles`, `mods`, `qa`, etc. and renders them through its own Tasty pipeline). To apply styles to a third-party component or a string DOM tag via `className`, use the options-only form with `as`:
 
@@ -303,6 +325,22 @@ const Button = tasty({
 
 With `variant` omitted, or set to a key `variants` does not define, the `default` variant applies; without a `default` key only the base `styles` apply. `variant` is typed from the variant keys.
 
+To fall back to another variant instead, name it in the `variant` option:
+
+```jsx
+const Button = tasty({
+  styles: { padding: '2x 4x' },
+  variants: {
+    primary: { fill: '#blue', color: '#white' },
+    danger: { fill: '#red', color: '#white' },
+  },
+  variant: 'primary',
+});
+
+<Button>Save</Button>; // primary
+<Button variant="danger">Delete</Button>;
+```
+
 ### Extending Variants with Base State Maps
 
 When base `styles` contain an extend-mode state map (an object **without** a `''` key), it is applied **after** the variant merge. This lets you add or override states across all variants without repeating yourself:
@@ -413,13 +451,13 @@ On the client, CSS is injected synchronously into the DOM (idempotent via the in
 
 ## Style Functions
 
-All style functions below except `useStyles()` are plain functions, not React hooks, and work in client components, SSR with a `ServerStyleCollector`, and React Server Components. They keep the `use` prefix for backward compatibility.
+All style functions below work in client components, SSR with a `ServerStyleCollector`, and React Server Components. All except `useStyles()` are plain functions, not React hooks; they keep the `use` prefix for backward compatibility.
 
 In server-only contexts, components that use only Tasty style functions ship no Tasty styling runtime. Astro without `client:*` directives produces no client JavaScript; server-only Next.js RSC follows the same Tasty architecture, while final output depends on the application deployment. Tasty never forces the `'use client'` boundary — that decision belongs to your component when it needs React interactivity (state, effects, event handlers).
 
 ### useStyles
 
-Generate a className from a style object. A thin wrapper around `computeStyles()` that also picks up the `TastyRegistry` collector through React context. That makes it a hook: call it inside a component, and not in a Server Component — use `computeStyles()` there.
+Generate a className from a style object. A thin wrapper around `computeStyles()` that also picks up the `TastyRegistry` collector through React context. That makes it a hook on the client: call it inside a component, and use `computeStyles()` outside React. It also works in a Server Component, where it skips the context lookup; like the other style functions there, it cannot emit CSS itself, so the next `tasty()` element in the tree emits it.
 
 ```tsx
 import { useStyles } from '@tenphi/tasty';
@@ -685,9 +723,10 @@ See the [Functions section of the DSL reference](dsl.md#functions-function) for 
 
 - Styles are not updating: make sure `configure()` runs before first render, and verify the generated class name or global rule with [Debug Utilities](debug.md).
 - SSR output looks wrong: check the [SSR guide](ssr.md) for collector setup. All style functions discover the SSR collector via `AsyncLocalStorage` or the global getter registered by `TastyRegistry`.
+- "Server rendering without a style collector" in development: the server render has no request scope, so each `tasty()` element inlines its own CSS and configured globals are not emitted. Add `tastyIntegration()` (Astro), `TastyRegistry` (Next.js), or `runWithCollector()` — see the [SSR guide](ssr.md).
 - Animation/custom property issues: prefer `useKeyframes()` and `useProperty()` over raw CSS when you want Tasty to manage injection and SSR collection for you.
 - For dynamic styles that change over the component lifecycle, use the `id` option in `useGlobalStyles()` and `useRawCSS()` to enable update tracking.
-- RSC inline mode: CSS accumulated by standalone style functions (`useGlobalStyles`, `useRawCSS`, etc.) is flushed into inline `<style>` tags by the next `tasty()` component in the render tree. If your page uses only standalone style functions without any `tasty()` component, the CSS will not be emitted. Ensure at least one `tasty()` component is present in each RSC render tree.
+- RSC inline mode: CSS accumulated by standalone style functions (`useStyles`, `useGlobalStyles`, `useRawCSS`, etc.) is flushed into inline `<style>` tags by the next `tasty()` component in the render tree. If your page uses only standalone style functions without any `tasty()` component, the CSS will not be emitted. Ensure at least one `tasty()` component is present in each RSC render tree.
 
 ---
 

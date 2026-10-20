@@ -25,6 +25,7 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm bench:injection` | Run the cold generation + injection benchmark against equivalent CSS already present (production, headless Chromium) |
 | `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
 | `pnpm bench:interaction` | Run the steady-state interaction benchmark — mod flips and subtree churn (production React, headless Chromium) |
+| `pnpm bench:tree` | Run the 1,000-element tree update benchmark (production React, headless Chromium) |
 | `pnpm bench:cold-start` | Run the page-load cold-start benchmark — transfer, compile, execute, first paint under CDP throttling (needs `pnpm build` first) |
 | `pnpm size` | Check bundle sizes (size-limit) |
 | `pnpm check:test-only` | Verify test-only code stays out of the build (run after `pnpm build`) |
@@ -80,6 +81,7 @@ Any necessary consumer support change must be called out and reviewed explicitly
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
 | `@tenphi/tasty/ssr/next-config` | Next.js config wrapper for a shared global stylesheet (`withTastyNext`) | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
+| `@tenphi/tasty/ssr/client` | Browser-safe `hydrateTastyClasses()` for any framework, no side effects | Browser |
 | `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
 | `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static`<br>`@tenphi/tasty/ssr/astro-middleware-extract`<br>`@tenphi/tasty/ssr/astro-middleware-extract-static` | Middleware entrypoints `tastyIntegration()` hands to Astro's `addMiddleware()`. Exported only so Astro can resolve them by specifier — never reference them directly. | Node |
 
@@ -139,7 +141,7 @@ src/
 ## Core API
 
 - `tasty(options)` — create a styled React component
-- `tasty(BaseComponent, options)` — extend an existing component with styles
+- `tasty(BaseComponent, options)` — extend an existing component: styles, plus its own `styleProps` / `modProps` / `tokenProps` / `variants` / `elements`; keeps the base's sub-elements
 - `configure(opts)` — set global config (tokens, replaceTokens, units, states, functions, polyfills, keyframes, properties, fontFaces, counterStyles, recipes, presets, handlers, propHandlers, baseStyleProps, globalStyles, plugins)
 - `useStyles(styles)` — generate a className from a style object
 - `useGlobalStyles(selector, styles)` — inject global styles
@@ -211,7 +213,7 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 ## Key Design Decisions
 
-- **One runtime dependency**: `csstype` (types only). `jiti` is an optional peer dependency used by the build-time entries (`babel-plugin`, `zero/next`, `ssr/next-config`) to load config files; `react`, `next`, and the Babel packages are optional peers too
+- **One runtime dependency**: `csstype` (types only). `jiti` is an optional peer dependency used by the build-time entries (`babel-plugin`, `zero/next`, `ssr/next-config`) to load config files, and only when `configFile` is set; `react`, `next`, and the Babel packages are optional peers too
 - **Content-addressed class names** (`t` + base36 hash, e.g. `t5zq1f7`; prefix set by `namePrefix`) — identical on server and client for the same config, so equivalent styles share one class
 - **DOM-driven style lifetime** — the render path (`tasty()`, `useStyles`, `computeStyles`) injects unpinned; a class becomes collectible once no element carries it (after a `gc.grace` window, default 10 s). Automatic sweeps run only when `configure({ gc })` is set; otherwise call `gc()` / `cleanup()`. Direct `inject()` callers pin until `dispose()`. Styles from the standalone functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, …) are *not* cleaned up on unmount; they are replaced per slot (`id`/selector/`name`, per `root`)
 - **Streaming-compatible SSR** — works with `renderToPipeableStream` and framework streaming

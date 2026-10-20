@@ -19,22 +19,25 @@ If the styles depend on props, keep `tasty()`: rendered only on the server, it a
 
 Build-time extraction is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
 
-| Dependency                   | Version | Required for                                                                   |
-| ---------------------------- | ------- | ------------------------------------------------------------------------------ |
-| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)                                    |
-| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                                                   |
-| `@babel/types`               | >= 7.24 | Babel plugin                                                                   |
-| `jiti`                       | >= 2.6  | Babel plugin and Next.js wrapper (imported on load, even without `configFile`) |
-| `babel-loader`               | any     | Next.js wrapper (`@tenphi/tasty/zero/next`)                                    |
+| Dependency                   | Version | Required for                                         |
+| ---------------------------- | ------- | ---------------------------------------------------- |
+| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)          |
+| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                         |
+| `@babel/types`               | >= 7.24 | Babel plugin                                         |
+| `jiti`                       | >= 2.6  | `configFile` only (Babel plugin and Next.js wrapper) |
+| `babel-loader`               | any     | Next.js wrapper (`@tenphi/tasty/zero/next`)          |
 
-The Babel packages and `jiti` are optional peer dependencies of `@tenphi/tasty`; `babel-loader` is resolved from your project. Install what your setup requires:
+The Babel packages and `jiti` are optional peer dependencies of `@tenphi/tasty`; `babel-loader` is resolved from your project. `jiti` is loaded only to read a `configFile`, so a setup that passes `config` directly does not need it; without it, `configFile` fails with an error that says to install it. Install what your setup requires:
 
 ```bash
 # Any Babel-based setup (Vite, custom Babel config, etc.)
-pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types jiti
+pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types
 
 # Next.js
-pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types jiti babel-loader
+pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types babel-loader
+
+# Either, with configFile
+pnpm add -D jiti
 ```
 
 ---
@@ -173,7 +176,7 @@ module.exports = {
 | -------------------------- | ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `output`                   | `string`                                         | `'tasty.css'` | Path for generated CSS file                                                                                                                                                                      |
 | `mode`                     | `'file' \| 'inject'`                             | `'file'`      | `'file'` writes CSS to disk; `'inject'` embeds CSS inline in JS (see [Inject Mode](#inject-mode))                                                                                                |
-| `configFile`               | `string`                                         | —             | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack.                                             |
+| `configFile`               | `string`                                         | —             | Absolute path to a TS/JS module that default-exports a `TastyZeroConfig` object. JSON-serializable alternative to `config` — required for Turbopack. Loaded with the optional `jiti` peer.       |
 | `config`                   | `TastyZeroConfig \| () => TastyZeroConfig`       | `{}`          | Inline config object or factory function. Takes precedence over `configFile`.                                                                                                                    |
 | `configDeps`               | `string[]`                                       | `[]`          | Absolute file paths that affect config (for cache invalidation)                                                                                                                                  |
 | `injectImport`             | `boolean`                                        | `true`        | Replace `@tenphi/tasty/static` imports with an import of the generated CSS file. Set to `false` to manage CSS imports manually.                                                                  |
@@ -185,7 +188,8 @@ module.exports = {
 | `config.keyframes`         | `Record<string, KeyframesSteps>`                 | —             | Global `@keyframes` definitions available to all `tastyStatic` calls                                                                                                                             |
 | `config.fontFaces`         | `Record<string, FontFaceInput>`                  | —             | Global `@font-face` definitions                                                                                                                                                                  |
 | `config.counterStyles`     | `Record<string, CounterStyleDescriptors>`        | —             | Global `@counter-style` definitions                                                                                                                                                              |
-| `config.units`             | `Record<string, string \| UnitHandler>`          | —             | Custom units for the style parser (merged with built-ins). E.g. `{ em: 'em', vw: 'vw' }`                                                                                                         |
+| `config.properties`        | `Record<string, PropertyDefinition>`             | —             | Global `@property` definitions, written with Tasty's [default properties](dsl.md#default-properties)                                                                                             |
+| `config.units`             | `Record<string, string \| UnitHandler>`          | —             | Custom units for the style parser (merged with built-ins). E.g. `{ u: 'var(--u)' }` makes `2u` compile to `calc(2 * var(--u))`. Native CSS units need no entry                                   |
 | `config.functions`         | `Record<string, FunctionDefinition \| Function>` | —             | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions                                                                                  |
 | `config.polyfills`         | `{ functions?: boolean }`                        | `{}`          | Opt-in polyfills. `functions: true` inlines `@function` calls into plain CSS at build time                                                                                                       |
 | `config.plugins`           | `TastyPlugin[]`                                  | —             | Plugins that extend tasty with custom functions, units, states, and handlers                                                                                                                     |
@@ -286,7 +290,7 @@ export default withTastyZero({
 
 Starting with Next.js 16, Turbopack is the default bundler. `withTastyZero` supports it out of the box by injecting `turbopack.rules` with `babel-loader` and JSON-serializable options.
 
-The `configFile` option is key for Turbopack — it passes a file path (JSON-serializable) instead of a function, and the Babel plugin loads the config internally via jiti.
+The `configFile` option is key for Turbopack — it passes a file path (JSON-serializable) instead of a function, and the Babel plugin loads the config internally via `jiti`, which must be installed.
 
 **Requirements**: `babel-loader` must be installed in your project (see [Requirements](#requirements)):
 
@@ -331,7 +335,7 @@ extractStylesWithChunks({ display: 'flex', gap: '1u' });
 
 `configure()` takes the same options as the Babel plugin's `config` (see [Plugin Options](#plugin-options)) and replaces the previous configuration on each call; `resetConfig()` returns to the defaults. Options that shape the extracted rules apply — `states`, `units`, parse `functions`, `handlers`, `replaceTokens`, `recipes`, `plugins`, `namePrefix`. Definitions that become at-rules or global CSS of their own are not emitted with the rules: `tokens`, `globalStyles`, `fontFaces`, `counterStyles`, `properties` and `$$` `@function` definitions. Render tokens and global styles with `extractStylesForSelector(':root', tokens)` and `extractStylesForSelector(selector, styles)`.
 
-`extractConfigProperties()` returns the `@property` rules the Babel plugin writes at the top of its output: Tasty's default set (`#border`, `#outline`, `$gap`, `$radius`, `$transition`, …) overlaid with the configured `properties`. Emit them once per stylesheet. Style handlers read several of these tokens with no fallback of their own (`border: true` reads `#border`, `transition` reads `$transition`), so without them those declarations resolve to nothing.
+`extractConfigProperties()` returns the `@property` rules the Babel plugin writes at the top of its output: Tasty's [default set](dsl.md#default-properties) (`#border`, `#outline`, `$gap`, `$radius`, `$transition`, …) overlaid with the configured `properties`, or with the `properties` map you pass it. Emit them once per stylesheet. Style handlers read several of these tokens with no fallback of their own (`border: true` reads `#border`, `transition` reads `$transition`), so without them those declarations resolve to nothing.
 
 The configuration is process-wide and shared with the Babel plugin and the runtime `configure()` from `@tenphi/tasty`. The extractors re-apply their own configuration when the Babel plugin replaced it, but not after a runtime `configure()` — don't mix the runtime and build-time configuration in one process.
 
@@ -438,13 +442,19 @@ The `@tenphi/tasty/static` import becomes an import of the generated file (relat
 ```css
 /* Generated by @tenphi/tasty/zero - DO NOT EDIT */
 
+@property --tasty-second-fill-color {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
 @property --current-color {
   syntax: '<color>';
   inherits: true;
   initial-value: currentcolor;
 }
 
-/* …the rest of Tasty's default @property rules (--gap, --radius, --white-color, …) */
+/* …the rest of Tasty's default @property rules (--white-color, --border-color, --gap, --transition, …), then config.properties */
 
 .ts3f783b.ts3f783b {
   color: var(--white-color);
@@ -465,7 +475,7 @@ The `@tenphi/tasty/static` import becomes an import of the generated file (relat
 }
 ```
 
-Styles are split into chunks (here appearance and spacing), each with its own class. Color tokens compile to custom properties: `#purple` becomes `var(--purple-color)`. Define it in `config.tokens` and the plugin writes it to `:root` at the top of the same file. Units are literal (`2x` is `16px`). Selector-mode rules use the selector as written, without the doubled specificity of class rules.
+The file starts with Tasty's [default `@property` rules](dsl.md#default-properties) and your `config.properties`, written once. Styles are split into chunks (here appearance and spacing), each with its own class. Color tokens compile to custom properties: `#purple` becomes `var(--purple-color)`. Define it in `config.tokens` and the plugin writes it to `:root` at the top of the same file. Units are literal (`2x` is `16px`). Selector-mode rules use the selector as written, without the doubled specificity of class rules.
 
 ---
 
@@ -537,6 +547,11 @@ tastyStatic('.heading', { preset: 'h1' });
 ```tsx
 import { injectCSS as _$i } from '@tenphi/tasty/static/inject';
 
+_$i(
+  '@property',
+  '@property --tasty-second-fill-color { … }\n@property --current-color { … }\n…',
+);
+
 const button =
   (_$i(
     'tsa903d6 ts070801',
@@ -552,6 +567,8 @@ const button =
 
 _$i('.heading', '.heading { font-size: var(--h1-font-size, …); … }');
 ```
+
+Each file that calls `tastyStatic()` starts by injecting Tasty's default `@property` rules and your `config.properties` under the `@property` id. `injectCSS()` skips an id it has already injected, so the page gets them once.
 
 ### Dev Mode / HMR
 

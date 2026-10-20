@@ -10,6 +10,8 @@ Notation: ❌ wrong → ✅ correct.
 
 Color tokens (`#name`), custom properties (`$name`), `preset` names, `recipe` names, state aliases (`@mobile`) and extra units are **project-defined** in `tasty.config.ts` or a `configure({ … })` call. Look them up before writing styles. Never invent a name — reuse an existing one, or add it to the config.
 
+Only Tasty's built-ins exist without config: `#white`, `#black`, `#border`, `#outline`, `#current`, `#clear`, and `$gap`, `$radius`, `$border-width`, `$outline-width`, `$transition`, `$sharp-radius`, `$bold-font-weight`, `$font-sans-fallback`, `$font-mono-fallback`.
+
 ## 1. Where styles go
 
 ```jsx
@@ -85,7 +87,7 @@ The last row goes the other way — longhands over the shorthand — because `fl
 
 ### Units
 
-Tasty units and their defaults: `x` 8px spacing step, `r` 6px radius, `cr` 10px card radius, `bw` 1px border width, `ow` 3px outline width, `sf` → `minmax(0, Nfr)`. They compile to literal values; change them through `units` in the config, not with `$gap`/`$radius` tokens. All CSS units work too, plus anything in `units` in the config. Any other unit is an error. Units are not resolved inside `@media(…)` / `@(…)` conditions — write query lengths in `px`, `em`, or `rem`.
+Tasty units and their defaults: `x` 8px spacing step, `r` 6px radius, `cr` 10px card radius, `bw` 1px border width, `ow` 3px outline width, `sf` → `minmax(0, Nfr)`. They compile to literal values; change them through `units` in the config, not with `$gap`/`$radius` tokens. All CSS units work too, plus anything in `units` in the config. Any other unit is an error. Inside `@media(…)` / `@(…)` conditions units resolve to their literal length (`@media(w < 40x)` → `width < 320px`), unless the project points that unit at a custom property; then write query lengths in `px`, `em`, or `rem`.
 
 Prefer units over raw pixels: `8px` → `1x` … `64px` → `8x`; `radius: '6px'` → `'1r'`; `border: '1px …'` → `'1bw …'`.
 

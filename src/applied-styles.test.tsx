@@ -451,6 +451,34 @@ describe('generated CSS applies in the browser', () => {
       expect(computed(getByTestId('Child'), 'padding')).toBe('32px');
     });
 
+    it.each([
+      ['400px', '8px'],
+      ['100px', '32px'],
+    ])(
+      'applies an aspect-ratio container query to a %s-wide, 200px-tall container',
+      (width, padding) => {
+        const Wrapper = tasty({
+          qa: 'Wrapper',
+          styles: { display: 'block', containerType: 'size', height: '200px' },
+        });
+        const Child = tasty({
+          qa: 'Child',
+          styles: {
+            display: 'block',
+            padding: { '': '4x', '@(aspect-ratio > 1)': '1x' },
+          },
+        });
+
+        const { getByTestId } = render(
+          <Wrapper styles={{ width }}>
+            <Child />
+          </Wrapper>,
+        );
+
+        expect(computed(getByTestId('Child'), 'padding')).toBe(padding);
+      },
+    );
+
     it('applies the branch whose media query matches the viewport', async () => {
       const Box = tasty({
         qa: 'Box',

@@ -788,8 +788,14 @@ class Parser {
       this.parseDimensionCondition(expandedCondition);
 
     if (!dimension) {
-      // Fallback
-      return createPseudoCondition(raw, false, raw);
+      // Another size feature: @(aspect-ratio > 1), @(orientation: portrait).
+      // Passed through as written.
+      return createContainerRawCondition(
+        `(${expandedCondition.trim()})`,
+        containerName,
+        false,
+        raw,
+      );
     }
 
     return createContainerDimensionCondition(

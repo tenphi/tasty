@@ -1,5 +1,82 @@
 # @tenphi/tasty
 
+## 3.11.0
+
+### Minor Changes
+
+- [#400](https://github.com/tenphi/tasty/pull/400) [`0e98c14`](https://github.com/tenphi/tasty/commit/0e98c1464e73a0ebab91e14b611ea98c564f99c4) Thanks [@tenphi](https://github.com/tenphi)! - Tasty's default `@property` set is now the only source of the defaults style handlers read. The handlers no longer repeat them as inline `var()` fallbacks:
+
+  - `transition` emits `var(--name-transition, var(--transition))` instead of `var(--name-transition, var(--transition, 80ms))`.
+  - `preset: 'name / strong'` emits `font-weight: var(--bold-font-weight)` instead of `var(--bold-font-weight, 700)`.
+  - `font` emits `var(--font-sans, var(--font-sans-fallback))` and `var(--font-mono, var(--font-mono-fallback))` without the short inner font stacks.
+  - `border` and the logical border styles emit `var(--border-color)` instead of `var(--border-color, currentColor)` for a border with no color, as `outline` already does for `var(--outline-color)`.
+
+  Every rendering path emits the default set: the runtime injector, the SSR collector, and the Babel plugin. **`extractConfigProperties()` is now exported from `@tenphi/tasty/zero`**, so CSS built with the programmatic API can include it too. It returns Tasty's default `@property` rules overlaid with the `properties` set through `configure()`, or with the ones you pass.
+
+  If you write CSS with `extractStylesWithChunks()` or `extractStylesForSelector()`, emit `extractConfigProperties()` once per stylesheet. Otherwise a border with no color, `transition`, and `preset` with `strong` resolve to nothing. In engines without `@property` support (Firefox before 128, Safari before 16.4), these defaults no longer apply unless the app defines the tokens itself.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - Set `variant` in `tasty({ variants, variant: 'primary' })` to choose the variant applied when the `variant` prop is omitted or names no variant. Before, that option was passed to the DOM as a `variant` attribute, and without a `default` key an omitted `variant` applied only the base styles.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - The extension form, `tasty(Base, options)`, now does what its options type-check for, instead of silently ignoring them:
+
+  - `styleProps` turns the listed props into styles, `modProps` into mods and `tokenProps` into tokens. Before, they reached `Base` as unknown props, and `modProps` ended up as DOM attributes.
+  - `variants` apply on top of the extension's `styles` (the `variant` it forwards still selects the base's own variants), and the `variant` option sets the default.
+  - `elements` adds sub-elements, and the base's sub-elements are kept: `tasty(Card, …).Title` is `Card.Title`.
+
+  The returned component is typed with the props these options add, its own sub-elements, and the base's.
+
+  `getDisplayName()` now looks through `forwardRef()` and `memo()` to the component they wrap, and names a tag after itself, so an extension of a `forwardRef` component is no longer named `TastyWrappedComponent(Anonymous)`.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - Add `@tenphi/tasty/ssr/client`, a framework-neutral, browser-safe entry that exports `hydrateTastyClasses()` with no import side effects. Call it before `hydrateRoot()`.
+
+  `@tenphi/tasty/ssr` is also safe to import in a browser bundle now. It used to break rendering with "AsyncLocalStorage is not a constructor" once the bundler stubbed out `node:async_hooks`; the collector lookup now treats a stub as "no server collector", and `runWithCollector()` throws a clear error there instead.
+
+### Patch Changes
+
+- [#394](https://github.com/tenphi/tasty/pull/394) [`f898b31`](https://github.com/tenphi/tasty/commit/f898b3112b5f0053a4f3f77305a838c81f98418a) Thanks [@tenphi](https://github.com/tenphi)! - Container queries over size features other than width/height/inline-size/block-size now work: `@(aspect-ratio > 1)` and `@(orientation: portrait)` compile to `@container (aspect-ratio > 1)` and `@container (orientation: portrait)`. Before, they became an invalid selector and the style never applied.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - `tasty()` components no longer render unstyled after `gc()`, `cleanup()` or `destroy()` deleted their rules: the class name cached for the component's styles is dropped with them, and the next render injects the CSS again.
+
+  Re-rendering also does less work. Instance `styles` that stay the same object between renders — an extension's defaults, a module-level constant, a memoized object — are merged and computed once, where they used to go through `mergeStyles()` and `computeStyles()` on every render. Every `tasty(Base, { styles })` extension benefits.
+
+- [#400](https://github.com/tenphi/tasty/pull/400) [`0e98c14`](https://github.com/tenphi/tasty/commit/0e98c1464e73a0ebab91e14b611ea98c564f99c4) Thanks [@tenphi](https://github.com/tenphi)! - Fix style handlers that emitted CSS the browser dropped or resolved inconsistently:
+
+  - **`transition: 'zIndex'`** compiled to `zindex`, which names no property. It now transitions `z-index`, with the `$z-index-transition` timing token, exactly as `transition: 'z-index'` does.
+  - **A group that names no value** (`padding: 'top'`, `margin: 'top'`, `radius: 'top-right'`, `border: 'dotted left'`, `outline: 'dotted'`, `fade: 'top'`, `width: 'min'`, and the logical `blockPadding` / `inlineMargin` forms) read token variables (`var(--gap)`, `var(--radius)`, `var(--border-width)`, `var(--outline-width)`) instead of the units. It now uses the same unit as the boolean form (`1x`, `1r`, `1bw`, `1ow`; `2x` for `fade`), so `configure({ units })` applies to both, and `padding: 'top'` is no longer half of `padding: true` when no `$gap` token is set.
+  - **Units in `@media` and `@container` conditions.** `@media(w < 40x)` emitted `calc(var(--gap) * 40)`, which no browser evaluates, so neither branch applied, and units other than `x` passed through raw. Every unit, built-in or configured, now resolves to its literal value (`320px`). A unit configured as a custom property still cannot work in a query condition and is reported in development.
+  - **`stretch` on `width`, `height`, `blockSize` and `inlineSize`.** `width: 'stretch'` emitted one comma-joined value that browsers drop, and the other sizes became `auto`. Each now emits `-webkit-fill-available`, `-moz-available` and `stretch` as separate declarations, so every engine keeps the last one it supports. More generally, a style handler that returns an array for a property now gets one declaration per entry, as the `CSSMap` type already allowed.
+  - **`fill` with `image`.** `image`, `backgroundImage`, `backgroundColor`, `background` and the other background longhands rendered in a different chunk from `fill`, so a two-color `fill` and an `image` each wrote `background-image` from their own class and rule order picked one. They now render together, and the image is layered over the second fill color as intended.
+  - **`fill: true`** emitted `background-color: true`. There is no default fill color, so it is now ignored with a development warning.
+  - **`@property --current-color` was registered twice** in SSR output, once with its default `initial-value: currentcolor` and again, auto-inferred, as `transparent`. SSR and RSC auto-inference now skips properties Tasty already declares (its defaults and `configure({ properties })`), as zero-runtime extraction already does.
+  - **`$gap` now starts at `8px`,** matching the `x` unit like `$radius`, `$border-width` and `$outline-width` already match theirs. Pointing the unit at the token (`units: { x: 'var(--gap)' }`) no longer halves every `x` value until `$gap` is defined.
+  - **Hex literals.** `color: '#ddd'` stayed a bare literal while every other color style emitted `var(--ddd-color, #ddd)`, and an opacity suffix (`#ddd.5`) dropped the literal fallback entirely, so it resolved to nothing without a `#ddd` token. `color` now reads hex the same way as the other styles, and the opacity form keeps its fallback.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - `inject()` without a `cacheKey` reuses the class when the same rules are injected again, as it does for a repeated `cacheKey`. It used to write every rule a second time and reset the class's pin count to 1, so disposing one caller's handle could let `gc()` delete rules another caller still held.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - Correct stale JSDoc in the published type declarations: units are literal (`2x` → `16px`, `2r` → `12px`) rather than `calc(… var(--gap))`, the `units` example no longer redefines native `em`/`vw`, `tastyDebug.help()` shows a hash-based class name, and `getCSSText()` is documented as needing a DOM rather than being "for SSR".
+
+- [#393](https://github.com/tenphi/tasty/pull/393) [`62579c7`](https://github.com/tenphi/tasty/commit/62579c703b9fa71297f71ade2cd89acfbf42faf4) Thanks [@tenphi](https://github.com/tenphi)! - Resolution queries now keep CSS's own `x` unit: `@media(min-resolution: 2x)` and `@media(resolution >= 2x)` reach the browser as written instead of having `2x` rewritten as a spacing length, which stopped them from ever matching. Tasty units are still converted in `width`, `height`, `inline-size` and `block-size` conditions, including `min-width: 40x`. Range syntax over other features (`@media(aspect-ratio > 16/9)`) now passes through as a media query instead of becoming an invalid selector.
+
+- [#390](https://github.com/tenphi/tasty/pull/390) [`a177eaf`](https://github.com/tenphi/tasty/commit/a177eaf9f10c333a886a98c995b4b63a4f0efbce) Thanks [@tenphi](https://github.com/tenphi)! - Make `#clear` a default replace token for `transparent`. Numeric and custom-property opacity suffixes on transparent aliases are ignored, so `#clear.5` stays transparent. Remove the predefined `@property --clear-color`; CSS and local token overrides of `--clear-color` no longer affect `#clear`. Use another color token or explicitly override `replaceTokens['#clear']` to customize it.
+
+- [#395](https://github.com/tenphi/tasty/pull/395) [`384af41`](https://github.com/tenphi/tasty/commit/384af413d91d21b493a4c4c116545cc5931af668) Thanks [@tenphi](https://github.com/tenphi)! - `outline` with no color is now drawn in the text color until your tokens define `#outline`. Tasty registers `#outline` by default (`initial-value: currentcolor`), as it does `#border`; before, `outline: true` or `outline: '2px dashed'` drew nothing unless the app defined the token. A style that sets `#outline` locally also no longer turns every other outline transparent in runtime or zero-runtime CSS.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - React Server Components fixes:
+
+  - **The main entry loads under the `react-server` condition.** React's server build has no `createContext`, `useContext` or `useInsertionEffect`, and named imports of them stopped `@tenphi/tasty` from loading in a plain Node process run with `--conditions react-server`.
+  - **`useStyles()` works in Server Components.** It skips the `TastyRegistry` context lookup there, and queues its CSS for the next `tasty()` element to emit, as the other style functions do.
+  - **Rendering on the server without a request scope now warns in development.** In React's standard build — Astro without `tastyIntegration()`, or a client component server-rendered without `TastyRegistry` — `React.cache` does not cache, so each `tasty()` element inlines all of its CSS, and configured globals (tokens, `@property` defaults, `globalStyles`, `@font-face`) and the CSS of the standalone style functions are not emitted. Tasty now says so once, and points to `tastyIntegration()`, `TastyRegistry` or `runWithCollector()`.
+
+- [#397](https://github.com/tenphi/tasty/pull/397) [`89ee2ac`](https://github.com/tenphi/tasty/commit/89ee2acae42a49a767bb06dd15aac2917c408164) Thanks [@tenphi](https://github.com/tenphi)! - Media and container query bounds in different units are no longer compared as plain numbers. Before, `600px` and `40em` were ordered as 600 vs 40, so `@media(w >= 600px) & @media(w < 40em)` was dropped as an empty range. `@media(w > 600px) & @media(w > 40em)` lost its `em` bound, and a `w < 40em` branch followed by `w < 600px` never applied. Bounds are now compared, merged and pruned only within one unit, and `calc()` bounds are kept instead of being dropped next to a numeric one.
+
+- [#398](https://github.com/tenphi/tasty/pull/398) [`fdf1401`](https://github.com/tenphi/tasty/commit/fdf14011be238c027150837a9a14b5564bb532fd) Thanks [@tenphi](https://github.com/tenphi)! - Zero-runtime CSS now keeps the defaults that style handlers read from Tasty's default tokens. That CSS ships without the default `@property` set, so several handler `var()`s had no value there. `transition` with no duration now falls back to `80ms` (`var(--transition, 80ms)`) instead of producing an invalid `transition` that disabled the animation. `preset: '… / strong'` now bolds to `700` instead of inheriting the weight. `font: true`, `font: 'monospace'`, a custom `font` and preset font families now fall back to `system-ui, sans-serif` or `ui-monospace, monospace` instead of the inherited font (a custom `font` was dropped entirely). Define `$font-sans` / `$font-mono` (or the `-fallback` tokens) for the full stacks runtime uses. Runtime and SSR output renders the same as before for all three.
+
+  **Visible change:** a `border` with no color is now drawn in the text color (`currentColor`) in every mode until your tokens define `#border`. Tasty's default `#border` property now starts at `currentcolor` instead of `rgb(0 0 0)`. Before, those borders were black at runtime and in SSR but used the text color in zero-runtime CSS. Apps that define `#border`, as most design systems do, see no change. To keep black borders, define `#border` in your tokens.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - The Babel plugin (`@tenphi/tasty/babel-plugin`) and the Next.js wrappers (`@tenphi/tasty/zero/next`, `@tenphi/tasty/ssr/next-config`) no longer import the optional `jiti` peer up front. It is loaded only when `configFile` is used, so a project that passes `config` directly no longer needs `jiti` installed. Without it, `configFile` fails with an error that says to install it.
+
+- [#396](https://github.com/tenphi/tasty/pull/396) [`1a6711d`](https://github.com/tenphi/tasty/commit/1a6711d50c208a8e115cc5e76696d6cefd4ffc30) Thanks [@tenphi](https://github.com/tenphi)! - The Babel plugin now emits the `@property` rules the runtime registers: Tasty's defaults (`#white`, `#black`, `#clear`, `#border`, `$gap`, `$radius`, `$border-width`, `$outline-width`, …) and `config.properties`, which previously type-checked but was ignored. Static CSS that reads `var(--white-color)` or `var(--radius)` no longer depends on the token being configured. In file mode the rules are written once at the top of the output; in inject mode they are injected once per file that calls `tastyStatic()`. Automatic `@property` inference leaves these properties alone, so the declared definition is the one that applies.
+
 ## 3.10.0
 
 ### Minor Changes

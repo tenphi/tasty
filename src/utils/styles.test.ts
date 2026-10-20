@@ -148,15 +148,15 @@ describe('color() helper', () => {
     expect(color('purple')).toBe('var(--purple-color)');
   });
 
-  it('fades the colour variable with relative color syntax', () => {
+  it('fades the colour variable with color-mix()', () => {
     expect(color('purple', 0.5)).toBe(
       'color-mix(in oklab, var(--purple-color) 50%, transparent)',
     );
   });
 
-  it('passes the opacity through without arithmetic', () => {
-    // The alpha slot takes a `<number>`, so there is no percentage conversion to
-    // introduce a float artifact — `0.07 * 100` is `7.000000000000001`.
+  it('converts the opacity to an exact percentage', () => {
+    // The mix takes a percentage, and a bare multiplication would leave a float
+    // artifact in it — `0.07 * 100` is `7.000000000000001`.
     expect(color('purple', 0.07)).toBe(
       'color-mix(in oklab, var(--purple-color) 7%, transparent)',
     );
@@ -165,6 +165,15 @@ describe('color() helper', () => {
     );
     expect(color('purple', 0.025)).toBe(
       'color-mix(in oklab, var(--purple-color) 2.5%, transparent)',
+    );
+  });
+
+  it('clamps an opacity outside 0–1', () => {
+    expect(color('purple', 1.5)).toBe(
+      'color-mix(in oklab, var(--purple-color) 100%, transparent)',
+    );
+    expect(color('purple', -1)).toBe(
+      'color-mix(in oklab, var(--purple-color) 0%, transparent)',
     );
   });
 });

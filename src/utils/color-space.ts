@@ -69,7 +69,13 @@ export function parseAlphaMix(
 /**
  * Convert an alpha to the percentage {@link mixColorAlpha} takes, without the
  * float artifact of a bare multiplication (`.07 * 100` is `7.000000000000001`).
+ *
+ * The alpha is clamped to `[0, 1]`: a mix percentage outside `0%`–`100%` is a
+ * parse error that drops the declaration, where an alpha slot would clamp it. A
+ * `NaN` is treated as fully opaque.
  */
 export function alphaToPercentage(alpha: number): string {
-  return `${Number((alpha * 100).toFixed(6))}%`;
+  const clamped = Number.isNaN(alpha) ? 1 : Math.min(1, Math.max(0, alpha));
+
+  return `${Number((clamped * 100).toFixed(6))}%`;
 }

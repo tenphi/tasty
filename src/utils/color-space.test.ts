@@ -111,6 +111,15 @@ describe('alphaToPercentage', () => {
   ])('%s → %s', (alpha, expected) => {
     expect(alphaToPercentage(alpha)).toBe(expected);
   });
+
+  it.each([
+    [1.5, '100%'],
+    [-0.1, '0%'],
+    [NaN, '100%'],
+  ])('clamps %s to %s', (alpha, expected) => {
+    // A mix percentage outside 0%–100% is a parse error, not a clamp.
+    expect(alphaToPercentage(alpha)).toBe(expected);
+  });
 });
 
 describe('the colorSpace option is inert', () => {

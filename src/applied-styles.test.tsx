@@ -494,6 +494,29 @@ describe('generated CSS applies in the browser', () => {
       await page.viewport(900, 600);
       expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
     });
+
+    // `x` here is CSS's resolution unit (an alias of `dppx`), not Tasty's
+    // spacing unit. Rewriting it to a length makes the query invalid, so it
+    // never matches.
+    it.each(['@media(min-resolution: 1x)', '@media(resolution >= 1x)'])(
+      'applies the branch whose resolution query matches: %s',
+      (stateKey) => {
+        // devicePixelRatio is at least 1, so both queries hold.
+        expect(window.matchMedia('(min-resolution: 1x)').matches).toBe(true);
+
+        const Box = tasty({
+          qa: 'Box',
+          styles: {
+            display: 'block',
+            padding: { '': '4x', [stateKey]: '1x' },
+          },
+        });
+
+        const el = render(<Box />).getByTestId('Box');
+
+        expect(computed(el, 'padding')).toBe('8px');
+      },
+    );
   });
 
   /* eslint-disable tasty/prefer-custom-property-syntax --

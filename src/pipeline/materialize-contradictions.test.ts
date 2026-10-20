@@ -122,4 +122,48 @@ describe('hasMediaContradiction()', () => {
 
     expect(hasMediaContradiction(conditions)).toBe(false);
   });
+
+  describe('dimension ranges', () => {
+    function width(
+      bound: 'lowerBound' | 'upperBound',
+      value: string,
+    ): ParsedMediaCondition {
+      const op = bound === 'lowerBound' ? '>=' : '<';
+      return {
+        subtype: 'dimension',
+        condition: `(width ${op} ${value})`,
+        dimension: 'width',
+        [bound]: {
+          value,
+          valueNumeric: /^\d/.test(value) ? parseFloat(value) : null,
+          inclusive: bound === 'lowerBound',
+        },
+        negated: false,
+      };
+    }
+
+    it('detects an empty range in one unit', () => {
+      expect(
+        hasMediaContradiction([
+          width('lowerBound', '800px'),
+          width('upperBound', '600px'),
+        ]),
+      ).toBe(true);
+    });
+
+    // 150em is 2400px at the default font size, but the user's can differ.
+    it.each([
+      ['200px', '150em'],
+      ['200em', '150px'],
+      ['200px', '150rem'],
+      ['200px', 'calc(var(--gap) * 150)'],
+    ])('does not compare %s with %s', (lower, upper) => {
+      expect(
+        hasMediaContradiction([
+          width('lowerBound', lower),
+          width('upperBound', upper),
+        ]),
+      ).toBe(false);
+    });
+  });
 });

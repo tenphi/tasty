@@ -24,7 +24,8 @@ Product code
 - The DSL and value parser (tokens, custom units, auto-calc, color opacity)
 - State compilation (mutually exclusive selectors from state maps)
 - Style injection and deduplication (runtime or build-time)
-- The `tasty()` component factory and hooks API
+- The `tasty()` component factory and style functions (`useStyles`, `useGlobalStyles`, …)
+- The lint rules and TypeScript extension interfaces that check usage against your vocabulary
 
 **What the DS team owns:**
 
@@ -64,16 +65,18 @@ For a detailed comparison with Tailwind, Panda CSS, vanilla-extract, StyleX, Sti
 
 Tasty provides the engine. The DS team defines the language that runs on it. Here is what that typically involves:
 
-| Layer              | What you define                                            | Where                                      |
-| ------------------ | ---------------------------------------------------------- | ------------------------------------------ |
-| **Tokens**         | Color names, spacing scale, border widths, radii           | `configure({ tokens })`                    |
-| **Units**          | Custom multiplier units (`x`, `r`, `bw`, or your own)      | `configure({ units })`                     |
-| **State aliases**  | Responsive breakpoints, theme modes, feature flags         | `configure({ states })`                    |
-| **Recipes**        | Reusable style bundles (card, elevated, input-reset)       | `configure({ recipes })`                   |
-| **Typography**     | Preset definitions (h1-h6, t1-t4, etc.)                    | `configure({ presets: { ... } })`          |
-| **Style props**    | Which CSS properties each component exposes as React props | `styleProps` in each component             |
-| **Sub-elements**   | Inner parts of compound components (Title, Icon, Content)  | `elements` + capitalized keys in `styles`  |
-| **Override rules** | How product engineers extend or constrain components       | Styled wrappers via `tasty(Base, { ... })` |
+| Layer              | What you define                                                                     | Where                                               |
+| ------------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Tokens**         | Color names and named values (`#surface`, `$sidebar-width`)                         | `configure({ tokens })`                             |
+| **Units**          | Spacing step, radius, border and outline widths (`x`, `r`, `bw`, `ow`, or your own) | `configure({ units })`                              |
+| **State aliases**  | Responsive breakpoints, theme modes, feature flags                                  | `configure({ states })`                             |
+| **Recipes**        | Reusable style bundles (card, elevated, input-reset)                                | `configure({ recipes })`                            |
+| **Typography**     | Preset definitions (h1-h6, t1-t4, etc.)                                             | `configure({ presets: { ... } })`                   |
+| **Style props**    | Which CSS properties each component exposes as React props                          | `styleProps` in each component                      |
+| **Sub-elements**   | Inner parts of compound components (Title, Icon, Content)                           | `elements` + capitalized keys in `styles`           |
+| **Component API**  | Typed props for states, values, and looks                                           | `modProps`, `tokenProps`, `variants`                |
+| **Override rules** | How product engineers extend or constrain components                                | Styled wrappers via `tasty(Base, { ... })`          |
+| **Guardrails**     | The names the linter and TypeScript check against                                   | `tasty.config.ts`, `declare module '@tenphi/tasty'` |
 
 The same engine can power a minimal design system with a handful of tokens:
 
@@ -155,17 +158,22 @@ configure({
     '#surface': '#white',
     '#text': '#111',
     '$card-padding': '4x',
+    $gap: '8px',
+    $radius: '6px',
+    '$border-width': '1px',
   },
-  // Common units (x, r, bw, ow, cr) are built-in.
-  // A DS typically redefines them to use CSS custom properties
-  // so that the actual scale is controlled via CSS, not JS:
+  // Built-in units (x, r, cr, bw, ow) compile to fixed values by default.
+  // A DS often points them at the custom properties above, so the scale
+  // is controlled by CSS at runtime rather than fixed at build time:
   units: {
-    x: 'var(--gap)', // 2x → calc(var(--gap) * 2)
+    x: 'var(--gap)', // 2x → calc(2 * var(--gap))
     r: 'var(--radius)',
     bw: 'var(--border-width)',
   },
 });
 ```
+
+Turn on the guardrails in the same step. Add [`@tenphi/eslint-plugin-tasty`](https://github.com/tenphi/eslint-plugin-tasty) with `tasty.configs.recommended` and a `tasty.config.ts` that lists the tokens, units, states, presets, and recipes as you define them, and register the same color and preset names for TypeScript autocomplete (`TastyNamedColors`, `TastyPresetNames`). Every component you migrate from here on is checked against the vocabulary. See [Getting Started — ESLint plugin](getting-started.md#eslint-plugin).
 
 ### Phase 3 -- State aliases and recipes
 
@@ -175,7 +183,7 @@ Define the state vocabulary your components will share. This is where you start 
 configure({
   states: {
     '@mobile': '@media(w < 768px)',
-    '@tablet': '@media(w < 1024px)',
+    '@tablet': '@media(768px <= w < 1024px)',
     '@dark':
       '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
   },
@@ -252,7 +260,7 @@ const Card = tasty({
 
 ### Phase 7 -- Expand to full DS coverage
 
-Migrate the remaining components, add the [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) to enforce style conventions at lint time, and choose between [server-only `tasty()`](ssr.md) and [`tastyStatic()` build-time extraction](tasty-static.md) when a page should ship no Tasty styling runtime.
+Migrate the remaining components, switch the [ESLint plugin](https://github.com/tenphi/eslint-plugin-tasty) to `tasty.configs.strict` to also catch unknown `$` tokens and state aliases, and choose between [server-only `tasty()`](ssr.md) and [`tastyStatic()` build-time extraction](tasty-static.md) when a page should ship no Tasty styling runtime.
 
 ---
 

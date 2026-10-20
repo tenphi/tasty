@@ -10,7 +10,7 @@ Repository: <https://github.com/tenphi/tasty>
 
 | Command | Purpose |
 |---|---|
-| `pnpm build` | Build via tsdown (ESM, browser + node targets) |
+| `pnpm build` | Build via tsdown (ESM chunks + .d.ts) |
 | `pnpm test` | Run tests (vitest — both projects) |
 | `pnpm test:node` | Run only the `node` project (pure logic, no DOM) |
 | `pnpm test:browser` | Run only the `browser` project (headless Chromium) |
@@ -20,7 +20,9 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm lint:fix` | Lint and auto-fix |
 | `pnpm format` | Format with Prettier |
 | `pnpm format:check` | Check formatting |
-| `pnpm bench` | Run pipeline benchmarks (Node project — the numbers quoted in the README) |
+| `pnpm bench` | Run Node pipeline/parser benchmarks (results in docs/runtime-benchmarks.md) |
+| `pnpm bench:overhead` | Run the empty `tasty({})` wrapper overhead benchmark (production React, headless Chromium) |
+| `pnpm bench:injection` | Run the cold generation + injection benchmark against equivalent CSS already present (production, headless Chromium) |
 | `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
 | `pnpm bench:interaction` | Run the steady-state interaction benchmark — mod flips and subtree churn (production React, headless Chromium) |
 | `pnpm bench:cold-start` | Run the page-load cold-start benchmark — transfer, compile, execute, first paint under CDP throttling (needs `pnpm build` first) |
@@ -56,7 +58,7 @@ Any necessary consumer support change must be called out and reviewed explicitly
 ## Stack
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)
-- **Build**: tsdown — ESM, unbundled, dts + sourcemaps, browser + node targets
+- **Build**: tsdown — ESM, code-split into shared chunks (`dist/chunks/`), `platform: 'browser'` with Node built-ins external, sourcemaps; a second pass emits `.d.ts` only
 - **Test**: Vitest 4, globals enabled, split into two projects (see [Test environments](#test-environments))
 - **Lint**: ESLint 10 + typescript-eslint + prettier + `@tenphi/eslint-plugin-tasty` (dogfooded on the repo's own style objects; see `eslint.config.js` for the rules disabled because this repo tests the parser)
 - **Format**: Prettier — single quotes, semicolons, trailing commas, 80 cols
@@ -67,18 +69,19 @@ Any necessary consumer support change must be called out and reviewed explicitly
 
 | Import path | Description | Platform |
 |---|---|---|
-| `@tenphi/tasty` | Runtime style engine (tasty, hooks, configure) | Browser |
-| `@tenphi/tasty/core` | Core engine without SSR | Browser |
-| `@tenphi/tasty/static` | Build-time static style generation (tastyStatic) | Browser |
+| `@tenphi/tasty` | React style engine (`tasty`, style functions, `configure`) | Browser / Node |
+| `@tenphi/tasty/core` | Framework-agnostic engine without React (config, parser, pipeline, injector, style handlers) | Browser / Node |
+| `@tenphi/tasty/static` | Build-time static style generation (tastyStatic) | Build time |
 | `@tenphi/tasty/static/inject` | Runtime helper the Babel plugin rewrites `tastyStatic` imports to in inject mode | Browser |
 | `@tenphi/tasty/babel-plugin` | Babel plugin for zero-runtime CSS extraction | Node |
 | `@tenphi/tasty/zero` | Programmatic zero-runtime extraction API | Node |
 | `@tenphi/tasty/zero/next` | Next.js integration wrapper for zero-runtime | Node |
 | `@tenphi/tasty/ssr` | Server-side rendering collector + hydration | Node |
 | `@tenphi/tasty/ssr/next` | Next.js App Router SSR integration | Node |
+| `@tenphi/tasty/ssr/next-config` | Next.js config wrapper for a shared global stylesheet (`withTastyNext`) | Node |
 | `@tenphi/tasty/ssr/astro` | Astro integration + middleware | Node |
 | `@tenphi/tasty/ssr/astro-client` | Astro client-side cache hydration | Browser |
-| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static` | Middleware entrypoints `tastyIntegration()` hands to Astro's `addMiddleware()`. Exported only so Astro can resolve them by specifier — never reference them directly. | Node |
+| `@tenphi/tasty/ssr/astro-middleware`<br>`@tenphi/tasty/ssr/astro-middleware-static`<br>`@tenphi/tasty/ssr/astro-middleware-extract`<br>`@tenphi/tasty/ssr/astro-middleware-extract-static` | Middleware entrypoints `tastyIntegration()` hands to Astro's `addMiddleware()`. Exported only so Astro can resolve them by specifier — never reference them directly. | Node |
 
 ## Project Structure
 
@@ -98,7 +101,7 @@ src/
     extractor.ts         Style extraction logic
     css-writer.ts        CSS file writer
 
-  hooks/                 React hooks
+  hooks/                 Style functions (`useStyles` is the only real hook; the rest are plain functions)
     useStyles.ts         Generate className from style definitions
     useGlobalStyles.ts   Inject global styles for a selector
     useRawCSS.ts         Inject raw CSS strings
@@ -109,13 +112,15 @@ src/
     useFunction.ts       Inject CSS @function (custom function) definitions
 
   injector/              Runtime CSS injection engine
-    injector.ts          Core injector (hash dedup, ref counting, cleanup)
+    injector.ts          Core injector (content-hash classes, pinning, DOM-driven GC, at-rules)
+    batch.ts             Batched sheet writes (configure({ batchInjection }))
+    chunk-sheet-registry.ts  Per-chunk stylesheet bookkeeping
     sheet-manager.ts     CSSStyleSheet management
   pipeline/              Style rendering pipeline (parse → exclusives → materialize); see docs/pipeline.md
   parser/                Style value parser & tokenizer (custom DSL)
   styles/                Style property handlers (fill, padding, border, etc.)
   chunks/                Style chunking system
-  states/                Predefined state mappings (@hover, @media, etc.)
+  states/                State-alias registry (global configure({ states }) and local @name aliases)
   plugins/               Plugin system (OKHSL color support, etc.)
   keyframes/             @keyframes support
   properties/            CSS @property support
@@ -123,6 +128,10 @@ src/
   font-face/             @font-face support
   counter-style/         @counter-style support
   prop-handlers.ts       Props middleware registry (configure({ propHandlers }))
+  compute-styles.ts      Hook-free computeStyles(), the render core shared by tasty() and style functions
+  batch-provider.tsx     TastyBatchProvider (flushes batched writes in useInsertionEffect)
+  rsc-cache.ts           Per-request React.cache for inline RSC styles
+  test/                  Test helpers (state oracle, dev-env switch, browser setup)
   ssr/                   Server-side rendering (collector, hydration, framework bindings)
   utils/                 Shared utilities
 ```
@@ -155,8 +164,9 @@ src/
 | [`docs/styles.md`](docs/styles.md) | Style properties reference — documents all custom style handlers (`fill`, `padding`, `margin`, `border`, `radius`, `flow`, `preset`, `shadow`, `outline`, `display`, `width`/`height`, `gap`, `inset`, `fade`, `scrollbar`) with their enhanced syntax and modifiers. |
 | [`docs/tasty-static.md`](docs/tasty-static.md) | Zero-runtime mode (`tastyStatic`) — build-time CSS generation for static sites and performance-critical pages. Covers Babel plugin setup, Next.js integration, static config files, and limitations. |
 | [`docs/pipeline.md`](docs/pipeline.md) | Style rendering pipeline — stages from parsed state keys through exclusive conditions, handler snapshots, merge-by-value, and CSS materialization; condition types, simplification, and caching. Implementation in `src/pipeline/`. |
-| [`docs/injector.md`](docs/injector.md) | Internal style injector architecture — hash-based deduplication, reference counting, CSS nesting flattening, keyframes injection, sheet management, SSR support, and Shadow DOM roots. Low-level infrastructure doc. |
+| [`docs/injector.md`](docs/injector.md) | Internal style injector architecture — content-hash class names, pinning and DOM-driven garbage collection, selector assembly, at-rule injection, sheet management, SSR support, and Shadow DOM roots. Low-level infrastructure doc. |
 | [`docs/debug.md`](docs/debug.md) | Debug utilities (`tastyDebug`) — runtime CSS inspection, cache performance metrics, style chunk analysis, and troubleshooting via browser console. Development-only diagnostics. |
+| [`docs/runtime-benchmarks.md`](docs/runtime-benchmarks.md) | Runtime benchmarks — methodology, results, and reproduction for the Node pipeline, empty-wrapper overhead, cold generation and injection, steady-state interaction, and page-load cold start. |
 | [`docs/ssr.md`](docs/ssr.md) | Server-side rendering guide — zero-cost hydration, `ServerStyleCollector`, framework integrations (Next.js App Router, Astro), streaming compatibility. Requires React 18+. |
 | [`docs/comparison.md`](docs/comparison.md) | Comparison with other styling systems — Tailwind, Panda CSS, vanilla-extract, StyleX, Stitches, Emotion. Covers positioning, abstraction levels, trade-offs, and when Tasty fits vs. alternatives. |
 | [`docs/adoption.md`](docs/adoption.md) | Adoption guide — where Tasty sits in the stack, who should use it, what the DS team defines, incremental adoption phases, and what changes for product engineers. |
@@ -167,7 +177,7 @@ src/
 - Test files: `*.test.ts` / `*.test.tsx`, co-located in `src/`
 - Unused variables prefixed with `_` are allowed
 - JSX transform: `react-jsx` (no `import React` needed)
-- Functional API pattern: factory functions + hooks, no class components. The *styling* API (`tasty`, `useStyles`, `configure`, etc.) is entirely functional. Stateful infrastructure services (`ServerStyleCollector`, `CSSWriter`, `StyleInjector`) are classes but each exposes a `create*()` factory wrapper (`createServerStyleCollector`, `createCSSWriter`) as the canonical public entry point; the class is also exported for advanced/internal use.
+- Functional API pattern: factory functions + hooks, no class components. The *styling* API (`tasty`, `useStyles`, `configure`, etc.) is entirely functional. Stateful infrastructure services (`ServerStyleCollector`, `CSSWriter`, `StyleInjector`) are classes but each exposes a `create*()` factory wrapper (`createServerStyleCollector`, `createCSSWriter`, `createInjector`) as the canonical public entry point; the class is also exported for advanced/internal use.
 - All style values go through the Tasty parser — supports design tokens (`#color`, `$token`), custom units (`2x`, `1r`), auto-calc, and color opacity (`#purple.5`)
 
 ## Test environments
@@ -194,15 +204,15 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 ## CI/CD
 
-- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
+- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), built-entry check (`check:build`), React compatibility check (`check:react-compat`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
 - **Release**: Changesets — on push to `main`, either creates a version PR or publishes to npm
-- **Snapshots**: comment `/snapshot` on a PR for `0.0.0-snapshot.<sha>` release
+- **Snapshots**: every PR push publishes `0.0.0-snapshot.<sha>` under the `pr_<number>` dist-tag and comments the install command on the PR
 - **npm trusted publishing**: OIDC provenance via the `release` GitHub environment
 
 ## Key Design Decisions
 
-- **No runtime dependencies** except `csstype` (CSS type definitions) and `jiti` (config file loading)
-- **Hash-based class names** (`t0`, `t1`, ...) — deterministic within a render, deduped by content hash
-- **Reference counting** for component styles (`tasty()`, `useStyles`) — swept by GC once unreferenced. Styles from the standalone functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, …) are *not* cleaned up on unmount; they are replaced per slot (`id`/selector/`name`, per `root`)
+- **One runtime dependency**: `csstype` (types only). `jiti` is an optional peer dependency used by the build-time entries (`babel-plugin`, `zero/next`, `ssr/next-config`) to load config files; `react`, `next`, and the Babel packages are optional peers too
+- **Content-addressed class names** (`t` + base36 hash, e.g. `t5zq1f7`; prefix set by `namePrefix`) — identical on server and client for the same config, so equivalent styles share one class
+- **DOM-driven style lifetime** — the render path (`tasty()`, `useStyles`, `computeStyles`) injects unpinned; a class becomes collectible once no element carries it (after a `gc.grace` window, default 10 s). Automatic sweeps run only when `configure({ gc })` is set; otherwise call `gc()` / `cleanup()`. Direct `inject()` callers pin until `dispose()`. Styles from the standalone functions (`useGlobalStyles`, `useRawCSS`, `useKeyframes`, …) are *not* cleaned up on unmount; they are replaced per slot (`id`/selector/`name`, per `root`)
 - **Streaming-compatible SSR** — works with `renderToPipeableStream` and framework streaming
 - **Plugin system** — extensible via `configure({ plugins: [...] })` for custom color spaces, style handlers, props middleware, and more; see `docs/plugins.md`

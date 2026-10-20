@@ -6,6 +6,8 @@ The same value syntax, state maps, tokens, units, extension semantics, and speci
 
 For the React API (`tasty()`, style functions, component props), see [React API](react-api.md). For all enhanced style properties, see [Style Properties](styles.md). For global configuration, see [Configuration](configuration.md).
 
+To autocomplete your own token and preset names, see [TypeScript autocomplete](getting-started.md#typescript-autocomplete); to check state keys, tokens, units, and values at lint time, see [ESLint plugin](getting-started.md#eslint-plugin).
+
 ---
 
 ## Dictionary
@@ -16,6 +18,15 @@ Object where keys represent states and values are the styles to apply:
 
 ```jsx
 fill: { '': '#white', hovered: '#gray.05', 'theme=danger': '#red' }
+```
+
+Define an alias for one component by adding an `'@name': '<state expression>'` key to its styles. It works like a global alias from [`configure({ states })`](configuration.md#options), scoped to that component:
+
+```jsx
+styles: {
+  '@narrow': '@media(w < 600px)',
+  fill: { '': '#surface', '@narrow': '#surface-mobile' },
+}
 ```
 
 #### State Key Types
@@ -34,16 +45,19 @@ fill: { '': '#white', hovered: '#gray.05', 'theme=danger': '#red' }
 
 #### Automatic Native States
 
-`disabled` and `checked` are built-in automatic states. On a Tasty component, they track the corresponding native prop or attribute, so these pairs express the same component state:
+`disabled`, `checked`, and `hidden` are built-in automatic states. A Tasty component sets `data-disabled`, `data-checked`, and `data-hidden` from the native `disabled`, `checked`, and `hidden` props (or `isDisabled`, `isChecked`, `isHidden`), so each pair below expresses the same component state:
 
-| Concise Tasty state | Explicit attribute selector |
-| ------------------- | --------------------------- |
-| `disabled`          | `[disabled]`                |
-| `checked`           | `[checked]`                 |
+| Concise Tasty state | Compiles to       | Explicit attribute selector |
+| ------------------- | ----------------- | --------------------------- |
+| `disabled`          | `[data-disabled]` | `[disabled]`                |
+| `checked`           | `[data-checked]`  | `[checked]`                 |
+| `hidden`            | `[data-hidden]`   | `[hidden]`                  |
 
 Prefer the concise form when authoring Tasty component styles. Explicit attribute selectors remain valid and can be useful when targeting arbitrary attributes or when CSS-shaped syntax makes an introductory example easier to recognize.
 
 Operator precedence (highest to lowest): `!` (NOT) > `^` (XOR) > `|` (OR) > `&` (AND). Use parentheses to override: `hovered & (pressed ^ focused)`.
+
+A top-level comma is the same as `|`: `'hovered, focused'` is `'hovered | focused'`.
 
 `^` (XOR) means "exactly one of" — `A ^ B` expands to `(A & !B) | (!A & B)`. This is useful for mutually exclusive states where exactly one should be active:
 
@@ -76,9 +90,7 @@ Element styled using a capitalized key. Identified by `data-element` attribute:
 
 ```jsx
 styles: {
-  Title: {
-    preset: 'h3';
-  }
+  Title: { preset: 'h3' },
 }
 // Targets: <div data-element="Title">
 ```
@@ -117,13 +129,15 @@ The `@` placeholder marks exactly where `[data-element="..."]` is injected, allo
 const List = tasty({
   styles: {
     Item: {
-      $: '>@:last-child',
-      border: 'none',
+      $: '>@::after',
+      content: '""',
     },
   },
 });
-// → .t0 > [data-element="Item"]:last-child { border: none }
+// → .t0.t0 > [data-element="Item"]::after { content: "" }
 ```
+
+Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-child)` in a state map; `tasty/no-state-in-selector` warns otherwise.
 
 ### Color Token
 
@@ -156,6 +170,8 @@ color: '#purple.$fade',     // Opacity from a custom property
 fill: '#current',           // → currentcolor
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
+
+`#white`, `#black`, `#clear` (transparent), and `#border` are registered by default, so they work before you define any tokens.
 
 The suffix sets the alpha on the token's color with CSS relative color syntax:
 
@@ -236,9 +252,10 @@ step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
 custom property used as `#current.$fade` must hold a unitless number; a token
 accepts either form.
 
-The space is always `oklch`: it is unbounded, so a wide-gamut color survives a
-round trip that a gamut-limited space would clamp. Nothing configures this —
-see [Color space](configuration.md#color-space).
+Token fades always use `oklch(from …)`: it is unbounded, so a wide-gamut color
+survives a round trip that a gamut-limited space would clamp. `#current` fades
+mix `in oklab`. Nothing configures either — see
+[Color space](configuration.md#color-space).
 
 ---
 
@@ -255,6 +272,9 @@ fill: 'color(display-p3 1 .5 0)',
 border: '1bw solid oklch(from #primary l c h / 50%)',  // relative color syntax
 shadow: '0 0 1x color-mix(in oklab, #dark 20%, transparent)',
 ```
+
+Tasty also ships `okhsl()` and `okhst()`, which compile to `rgb()` at parse
+time: `fill: 'okhsl(280 80% 50%)'` → `rgb(40% 38.5% 88.2%)`.
 
 `light-dark()` is the one exception to "always a color": CSS lets it pick between
 values of any type, so it is treated as a color only when its arguments are
@@ -293,16 +313,16 @@ fill: '#adaptive.5'; // → oklch(from light-dark(…) l c h / .5)
 
 ## Built-in Units
 
-| Unit | Description        | Example | CSS Output                      |
-| ---- | ------------------ | ------- | ------------------------------- |
-| `x`  | Gap multiplier     | `2x`    | `calc(var(--gap) * 2)`          |
-| `r`  | Border radius      | `1r`    | `var(--radius)`                 |
-| `cr` | Card border radius | `1cr`   | `var(--card-radius)`            |
-| `bw` | Border width       | `2bw`   | `calc(var(--border-width) * 2)` |
-| `ow` | Outline width      | `1ow`   | `var(--outline-width)`          |
-| `sf` | Stable fraction    | `1sf`   | `minmax(0, 1fr)`                |
+| Unit | Description        | Default          | Example | CSS output       |
+| ---- | ------------------ | ---------------- | ------- | ---------------- |
+| `x`  | Spacing step       | `8px`            | `2x`    | `16px`           |
+| `r`  | Border radius      | `6px`            | `1r`    | `6px`            |
+| `cr` | Card border radius | `10px`           | `1cr`   | `10px`           |
+| `bw` | Border width       | `1px`            | `2bw`   | `2px`            |
+| `ow` | Outline width      | `3px`            | `1ow`   | `3px`            |
+| `sf` | Stable fraction    | `minmax(0, Nfr)` | `1sf`   | `minmax(0, 1fr)` |
 
-You can register additional custom units via [`configure()`](configuration.md#options).
+Units compile to plain values. Change the scale with `configure({ units: { x: '4px' } })`, or point a unit at a custom property when it must change at runtime: with `units: { x: 'var(--gap)' }`, `2x` compiles to `calc(2 * var(--gap))`. Setting a `$gap` or `$radius` token does not change the units. Register additional units the same way via [`configure()`](configuration.md#options).
 
 ---
 
@@ -359,7 +379,7 @@ const CardWithPanel = tasty({
 });
 ```
 
-At each level, base recipes are collected in name order (later recipes replace earlier values for the same property), then local styles are merged, then post recipes are merged. The merges with local styles and post recipes follow the [state-map extension and replacement rules](#extending-vs-replacing-state-maps).
+At each level, base recipes are collected in the order listed (later recipes replace earlier values for the same property), then local styles are merged, then post recipes are merged. The merges with local styles and post recipes follow the [state-map extension and replacement rules](#extending-vs-replacing-state-maps).
 
 Recipe definitions themselves cannot contain a `recipe` reference to another recipe: there is no recursive expansion or recipe inheritance. Compose names in the root or sub-element `recipe` property instead. See [Configuration — Recipes](configuration.md#recipes) for an unsupported nesting example.
 
@@ -439,12 +459,14 @@ fill: {
 Use `null` inside a state map to remove a state, or `false` to block it entirely (tombstone):
 
 ```jsx
-fill: {
-  pressed: null;
-} // removes pressed from the result
-fill: {
-  disabled: false;
-} // tombstone — no CSS for disabled, blocks recipe too
+const MyButton = tasty(Button, {
+  styles: {
+    fill: {
+      hovered: null, // removes the parent's hovered state
+      disabled: false, // tombstone — no CSS for disabled, blocks recipe too
+    },
+  },
+});
 ```
 
 ### Resetting Properties with `null` and `false`
@@ -494,7 +516,7 @@ const SimpleButton = tasty(Button, {
 
 ### `@media(...)` — Media Queries
 
-Media queries support dimension shorthands and custom unit expansion:
+Media queries support dimension shorthands:
 
 | Shorthand | Expands to |
 | --------- | ---------- |
@@ -516,10 +538,12 @@ fill: {
 | `@media(600px <= w < 1200px)`        | `@media (600px <= width < 1200px)`    |
 | `@media:print`                       | `@media print`                        |
 | `@media:screen`                      | `@media screen`                       |
+| `@media:all`                         | `@media all`                          |
+| `@media:speech`                      | `@media speech`                       |
 | `@media(prefers-color-scheme: dark)` | `@media (prefers-color-scheme: dark)` |
 | `@media(prefers-reduced-motion)`     | `@media (prefers-reduced-motion)`     |
 
-Custom units work inside media queries: `@media(w < 40x)` → `@media (width < calc(var(--gap) * 40))`.
+Tasty units are not resolved inside query conditions: `@media(w < 40x)` currently emits `calc(var(--gap) * 40)`, which browsers reject in `@media` and `@container`, so neither branch applies. Write query lengths in `px`, `em`, or `rem`.
 
 Units are only converted in features that take a length: `width`, `height`, `inline-size`, and `block-size`, with or without `min-`/`max-` (`@media(min-width: 40x)` converts too). Every other feature keeps its value as written, so `@media(min-resolution: 2x)` and `@media(resolution >= 2x)` reach the browser unchanged: there `x` is CSS's own resolution unit, an alias of `dppx`.
 
@@ -547,28 +571,30 @@ const Panel = tasty({
 });
 ```
 
-| Tasty syntax                       | CSS output                                     |
-| ---------------------------------- | ---------------------------------------------- |
-| `@(layout, w < 600px)`             | `@container layout (width < 600px)`            |
-| `@(w < 600px)`                     | `@container (width < 600px)`                   |
-| `@(layout, $variant=danger)`       | `@container layout style(--variant: "danger")` |
-| `@(layout, $compact)`              | `@container layout style(--compact)`           |
-| `@(scroll-state(stuck: top))`      | `@container scroll-state(stuck: top)`          |
-| `@(nav, scroll-state(stuck: top))` | `@container nav scroll-state(stuck: top)`      |
+| Tasty syntax                       | CSS output                                   |
+| ---------------------------------- | -------------------------------------------- |
+| `@(layout, w < 600px)`             | `@container layout (width < 600px)`          |
+| `@(w < 600px)`                     | `@container (width < 600px)`                 |
+| `@(layout, $variant=danger)`       | `@container layout style(--variant: danger)` |
+| `@(layout, $compact)`              | `@container layout style(--compact)`         |
+| `@(scroll-state(stuck: top))`      | `@container scroll-state(stuck: top)`        |
+| `@(nav, scroll-state(stuck: top))` | `@container nav scroll-state(stuck: top)`    |
 
-Container style queries use `$prop` (boolean) or `$prop=value` syntax, which maps to CSS `style(--prop)` or `style(--prop: "value")`.
+Container style queries use `$prop` (boolean) or `$prop=value` syntax, which maps to CSS `style(--prop)` or `style(--prop: value)`. The value is emitted unquoted, so it matches a custom property set to the identifier `danger`, not the string `"danger"`.
+
+Other size features pass through as written: `@(aspect-ratio > 1)` → `@container (aspect-ratio > 1)`, `@(orientation: portrait)` → `@container (orientation: portrait)`. They need a container with `containerType: 'size'`, since an `inline-size` container has no block size to compare against.
 
 ### `@supports(...)` — Feature Queries
 
 Feature queries test CSS property support and accept CSS support functions such
 as `at-rule()`. Use `$` as the first argument to test selector support:
 
-| Tasty syntax                 | CSS output                         |
-| ---------------------------- | ---------------------------------- |
-| `@supports(display: grid)`   | `@supports (display: grid)`        |
-| `@supports($, :has(*))`       | `@supports selector(:has(*))`      |
-| `@supports(at-rule(@scope))`  | `@supports (at-rule(@scope))`      |
-| `!@supports(display: grid)`  | `@supports (not (display: grid))`  |
+| Tasty syntax                  | CSS output                          |
+| ----------------------------- | ----------------------------------- |
+| `@supports(display: grid)`    | `@supports (display: grid)`         |
+| `@supports($, :has(*))`       | `@supports selector(:has(*))`       |
+| `@supports(at-rule(@scope))`  | `@supports (at-rule(@scope))`       |
+| `!@supports(display: grid)`   | `@supports (not (display: grid))`   |
 | `!@supports(at-rule(@scope))` | `@supports (not (at-rule(@scope)))` |
 
 ```jsx
@@ -622,12 +648,12 @@ inset: {
 
 ```css
 .t0.t0 {
-  inset: 0...;
+  inset: 0 auto auto auto;
 }
-@container scroll-state(scrolled: block-end) {
-  @supports (container-type: scroll-state) {
+@supports (container-type: scroll-state) {
+  @container scroll-state(scrolled: block-end) {
     .t0.t0 {
-      inset: -80px...;
+      inset: -640px auto auto auto;
     }
   }
 }
@@ -636,7 +662,7 @@ inset: {
 The floor is emitted as a bare rule (no negated `@supports` / container branches),
 so it always applies. When the override matches it wins because it is emitted
 later and all state selectors share the same specificity (see the note on
-`:where()` below).
+`:where()` above).
 
 Notes:
 
@@ -708,7 +734,7 @@ color: {
 | `@root([lang="en"])`   | `:root[lang="en"]`                |
 | `!@root(schema=dark)`  | `:root:not([data-schema="dark"])` |
 
-Root conditions are prepended to the component selector: `:root[data-schema="dark"] .t0.t0 { ... }`.
+Root conditions are prepended to the component selector inside `:where()`: `:where(:root[data-schema="dark"]) .t0.t0 { ... }`.
 
 ### `@own(...)` — Sub-element's Own State
 
@@ -754,11 +780,11 @@ const FadeIn = tasty({
 
 | Tasty syntax | CSS output                           |
 | ------------ | ------------------------------------ |
-| `@starting`  | `@starting-style { .t0.t0 { ... } }` |
+| `@starting`  | `.t0.t0 { @starting-style { ... } }` |
 
 ### `@parent(...)` — Parent Element States
 
-Style based on ancestor element attributes. Uses `:is([selector] *)` / `:not([selector] *)` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`, `^`) is supported inside `@parent()`.
+Style based on ancestor element attributes. Uses `:where([selector] *)` / `:where(:not([selector] *))` for symmetric, composable parent checks. Boolean logic (`&`, `|`, `!`, `^`) is supported inside `@parent()`.
 
 ```jsx
 const Highlight = tasty({
@@ -772,15 +798,15 @@ const Highlight = tasty({
 });
 ```
 
-| Syntax                                | CSS Output                                                           |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| `@parent(hovered)`                    | `:is([data-hovered] *)`                                              |
-| `!@parent(hovered)`                   | `:not([data-hovered] *)`                                             |
-| `@parent(hovered, >)`                 | `:is([data-hovered] > *)` (direct parent)                            |
-| `@parent(.active)`                    | `:is(.active *)`                                                     |
-| `@parent(hovered & focused)`          | `:is([data-hovered][data-focused] *)` (same ancestor)                |
-| `@parent(hovered) & @parent(focused)` | `:is([data-hovered] *):is([data-focused] *)` (independent ancestors) |
-| `@parent(hovered \| focused)`         | `:is([data-hovered] *, [data-focused] *)` (OR inside single wrapper) |
+| Syntax                                | CSS Output                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `@parent(hovered)`                    | `:where([data-hovered] *)`                                                 |
+| `!@parent(hovered)`                   | `:where(:not([data-hovered] *))`                                           |
+| `@parent(hovered, >)`                 | `:where([data-hovered] > *)` (direct parent)                               |
+| `@parent(.active)`                    | `:where(.active *)`                                                        |
+| `@parent(hovered & focused)`          | `:where([data-hovered][data-focused] *)` (same ancestor)                   |
+| `@parent(hovered) & @parent(focused)` | `:where([data-hovered] *):where([data-focused] *)` (independent ancestors) |
+| `@parent(hovered \| focused)`         | `:where([data-hovered] *, [data-focused] *)` (OR inside single wrapper)    |
 
 For sub-elements, the parent check applies to the root element's ancestors:
 
@@ -795,12 +821,12 @@ const Card = tasty({
     },
   },
 });
-// → .t0.t0:is([data-hovered] *) [data-element="Label"]
+// → .t0.t0:where([data-hovered] *) [data-element="Label"]
 ```
 
 ### `:is()`, `:has()` — CSS Structural Pseudo-classes
 
-Use CSS structural pseudo-classes directly in state keys. Capitalized words become `[data-element="..."]` selectors; lowercase words are HTML tags. A trailing combinator (`>`, `+`, `~`) is auto-completed with `*`.
+Use CSS structural pseudo-classes directly in state keys. Capitalized words become `[data-element="..."]` selectors; lowercase words are HTML tags. A trailing combinator (`>`, `+`, `~`) is auto-completed with `*`. Leading combinators (`> Icon`, `+ Icon`) are relative selectors and are valid only inside `:has()`.
 
 `:where()` and `:not()` are also supported but rarely needed — use `:is()` and `!` negation instead.
 
@@ -823,18 +849,18 @@ const Card = tasty({
 });
 ```
 
-| Syntax                 | CSS Output                              | Meaning                                 |
-| ---------------------- | --------------------------------------- | --------------------------------------- |
-| `:has(> Icon)`         | `:has(> [data-element="Icon"])`         | Has Icon as direct child                |
-| `:has(+ Icon)`         | `:has(+ [data-element="Icon"])`         | Immediately followed by an Icon sibling |
-| `:has(~ Icon)`         | `:has(~ [data-element="Icon"])`         | Has an Icon sibling somewhere after     |
-| `:has(Icon +)`         | `:has([data-element="Icon"] + *)`       | Immediately preceded by an Icon sibling |
-| `:has(Icon ~)`         | `:has([data-element="Icon"] ~ *)`       | Has an Icon sibling somewhere before    |
-| `:has(>)`              | `:has(> *)`                             | Has any direct child                    |
-| `:is(> Field + input)` | `:is(> [data-element="Field"] + input)` | Structural match                        |
-| `:has(button)`         | `:has(button)`                          | HTML tag (lowercase, unchanged)         |
-| `!:has(> Icon)`        | `:not(:has(> [data-element="Icon"]))`   | Negation (use `!`)                      |
-| `!:is(Panel)`          | `:not([data-element="Panel"])`          | Negation (use `!:is`)                   |
+| Syntax               | CSS Output                            | Meaning                                 |
+| -------------------- | ------------------------------------- | --------------------------------------- |
+| `:has(> Icon)`       | `:has(> [data-element="Icon"])`       | Has Icon as direct child                |
+| `:has(+ Icon)`       | `:has(+ [data-element="Icon"])`       | Immediately followed by an Icon sibling |
+| `:has(~ Icon)`       | `:has(~ [data-element="Icon"])`       | Has an Icon sibling somewhere after     |
+| `:has(Icon +)`       | `:has([data-element="Icon"] + *)`     | Immediately preceded by an Icon sibling |
+| `:has(Icon ~)`       | `:has([data-element="Icon"] ~ *)`     | Has an Icon sibling somewhere before    |
+| `:has(>)`            | `:has(> *)`                           | Has any direct child                    |
+| `:is(Field + input)` | `:is([data-element="Field"] + input)` | Is an input right after a Field sibling |
+| `:has(button)`       | `:has(button)`                        | HTML tag (lowercase, unchanged)         |
+| `!:has(> Icon)`      | `:not(:has(> [data-element="Icon"]))` | Negation (use `!`)                      |
+| `!:is(Panel)`        | `:not([data-element="Panel"])`        | Negation (use `!:is`)                   |
 
 Combine with other states using boolean logic (`&`, `|`, `!`, `^`):
 
@@ -956,7 +982,7 @@ Define custom list markers via the CSS `@counter-style` at-rule. Keys are counte
 
 ```ts
 const EmojiList = tasty({
-  tag: 'ol',
+  as: 'ol',
   styles: {
     '@counter-style': {
       thumbs: {
@@ -1048,7 +1074,7 @@ Generated CSS:
 
 A `FunctionParameter` is one of: `true` (bare param), a string CSS type shorthand (`'<length>'`), or `{ syntax?: string; default?: string | number }`.
 
-Functions can also be registered with the [`useFunction`](react-api.md#usefunction) hook or globally via [`configure({ functions })`](configuration.md#functions) (the same map also accepts bare-key parse functions).
+Functions can also be registered with the [`useFunction`](react-api.md#usefunction) style function or globally via [`configure({ functions })`](configuration.md#functions) (the same map also accepts bare-key parse functions).
 
 > `@function` is permanent — injected once and never cleaned up, like `@counter-style`. It is an experimental CSS feature ([Chrome 139+](https://developer.mozilla.org/en-US/docs/Web/CSS/@function)); unsupported browsers safely ignore the native rule, so use it as progressive enhancement — or enable the [`configure({ polyfills: { functions: true } })`](configuration.md#polyfills) inline polyfill to expand `$$name(...)` calls into plain CSS for full cross-browser support.
 

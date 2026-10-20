@@ -2103,6 +2103,67 @@ describe('Integration: Exclusive conditions for media queries', () => {
   });
 });
 
+describe('query bounds in different units', () => {
+  // `em` in a query follows the user's default font size, so `40em` has no
+  // fixed place relative to `600px`: such bounds are never compared, merged,
+  // or found contradictory.
+  function rulesFor(color: Record<string, string>): [string, string[]][] {
+    return renderStyles({ color }, '.t').map((rule) => [
+      rule.declarations.split(';')[0],
+      rule.atRules ?? [],
+    ]);
+  }
+
+  it('keeps a branch that only an em bound separates from a px one', () => {
+    expect(
+      rulesFor({
+        '': 'red',
+        '@media(w < 40em)': 'green',
+        '@media(w < 600px)': 'blue',
+      }),
+    ).toEqual([
+      ['color: red', ['@media (not (width < 40em)) and (not (width < 600px))']],
+      ['color: green', ['@media (not (width < 600px)) and (width < 40em)']],
+      ['color: blue', ['@media (width < 600px)']],
+    ]);
+  });
+
+  it.each([
+    ['@media(w >= 600px) & @media(w < 40em)', '@media'],
+    ['@(w >= 600px) & @(w < 40em)', '@container'],
+  ])('does not treat %s as an empty range', (stateKey, atRule) => {
+    expect(rulesFor({ '': 'red', [stateKey]: 'blue' })).toContainEqual([
+      'color: blue',
+      [`${atRule} (width < 40em) and (width >= 600px)`],
+    ]);
+  });
+
+  it.each([
+    [
+      '@media(w > 600px) & @media(w > 40em)',
+      '(width > 40em) and (width > 600px)',
+    ],
+    [
+      '@media(w > 40x) & @media(w > 600px)',
+      '(width > 600px) and (width > calc(var(--gap) * 40))',
+    ],
+  ])('keeps both bounds of %s', (stateKey, query) => {
+    expect(rulesFor({ '': 'red', [stateKey]: 'blue' })).toContainEqual([
+      'color: blue',
+      [`@media ${query}`],
+    ]);
+  });
+
+  it('still merges and prunes bounds in one unit', () => {
+    expect(
+      rulesFor({ '': 'red', '@media(w > 400px) & @media(w > 600px)': 'blue' }),
+    ).toContainEqual(['color: blue', ['@media (width > 600px)']]);
+    expect(
+      rulesFor({ '': 'red', '@media(w >= 800px) & @media(w < 600px)': 'blue' }),
+    ).toEqual([['color: red', []]]);
+  });
+});
+
 describe('Tasty units in query conditions', () => {
   // CSS has its own `x` unit for resolution (an alias of `dppx`), so a unit
   // token only means a Tasty length in a feature that takes a length.
@@ -2183,6 +2244,51 @@ describe('Tasty units in query conditions', () => {
     expect(rules.flatMap((rule) => rule.atRules ?? [])).toContain(
       '@media (min-resolution: 2x)',
     );
+  });
+});
+
+describe('container queries over other size features', () => {
+  function atRulesFor(stateKey: string): string[] {
+    return renderStyles(
+      { color: { '': 'red', [stateKey]: 'blue' } },
+      '.t',
+    ).flatMap((rule) => rule.atRules ?? []);
+  }
+
+  // Used to fall back to a pseudo-class, which emitted `@(…)` as a selector.
+  it.each([
+    ['@(aspect-ratio > 1)', '@container', '(aspect-ratio > 1)'],
+    [
+      '@(1/1 < aspect-ratio <= 16/9)',
+      '@container',
+      '(1/1 < aspect-ratio <= 16/9)',
+    ],
+    ['@(orientation: portrait)', '@container', '(orientation: portrait)'],
+    ['@(layout, aspect-ratio > 1)', '@container layout', '(aspect-ratio > 1)'],
+  ])('passes %s through as written', (stateKey, prelude, query) => {
+    expect(parseStateKey(stateKey)).toMatchObject({
+      type: 'container',
+      subtype: 'raw',
+      rawCondition: query,
+    });
+    expect(atRulesFor(stateKey)).toEqual([
+      `${prelude} (not ${query})`,
+      `${prelude} ${query}`,
+    ]);
+  });
+
+  it('still parses width, height, inline-size and block-size as dimensions', () => {
+    for (const stateKey of [
+      '@(w < 300px)',
+      '@(h > 1px)',
+      '@(is <= 2px)',
+      '@(bs >= 3px)',
+    ]) {
+      expect(parseStateKey(stateKey)).toMatchObject({
+        type: 'container',
+        subtype: 'dimension',
+      });
+    }
   });
 });
 

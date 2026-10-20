@@ -37,7 +37,7 @@ configure({ plugins: [spacingPlugin()] });
 
 **Configuration is locked after the first render.** `configure()` warns and does nothing once any style has been generated, so it must run before your first component renders — at module scope in your entry file, or in a design-system module every component imports. `resetConfig()` reopens it, but it exists for tests.
 
-**Repeated `configure()` calls merge** for `tokens` and `globalStyles` (per selector). See [Configuration](configuration.md) for the current per-key semantics.
+**Repeated `configure()` calls merge.** Each call adds to what earlier calls registered, key by key, in every registry (`states`, `units`, `functions`, `handlers`, `propHandlers`, `baseStyleProps`, `tokens`, `replaceTokens`, `recipes`, `keyframes`, `properties`, `fontFaces`, `counterStyles`); `globalStyles` merges per selector. A later value for the same key wins.
 
 ---
 
@@ -108,6 +108,7 @@ configure({
 
 ```ts
 import { configure, mergeStyles } from '@tenphi/tasty';
+import type { Styles } from '@tenphi/tasty';
 
 configure({
   propHandlers: {
@@ -115,7 +116,11 @@ configure({
       const { glaze, ...rest } = props;
       if (!glaze) return rest;
 
-      return { ...rest, styles: mergeStyles(glazeStyles(glaze), rest.styles) };
+      // glazeStyles: see the worked example below
+      return {
+        ...rest,
+        styles: mergeStyles(glazeStyles(glaze), rest.styles as Styles),
+      };
     },
   },
 });
@@ -159,7 +164,7 @@ configure({ baseStyleProps: ['radius', 'shadow'] });
 <Card radius="1r" shadow />
 ```
 
-Names must be real style properties, must start with a lowercase letter, and must not collide with a prop `tasty()` consumes itself (`as`, `styles`, `variant`, `mods`, `tokens`, …); invalid entries are dropped with a development warning.
+Names must start with a lowercase letter and contain only letters and digits, and must not collide with a prop `tasty()` consumes itself (`as`, `styles`, `variant`, `mods`, `tokens`, …); invalid entries are dropped with a development warning. Names are not checked against the style registry, so a misspelled name is still harvested as a style prop.
 
 `configure()` may run _after_ your components are defined — each factory resolves its prop list lazily and refreshes when the registry changes.
 
@@ -169,39 +174,9 @@ Names must be real style properties, must start with a lowercase letter, and mus
 
 ## Typing your extension
 
-Four augmentation points, each matching a runtime registry:
+Every extension point has a matching augmentation interface: `StylesInterface` for `handlers`, `TastyCustomProps` for `propHandlers`, `TastyBaseStylePropNames` for `baseStyleProps`, and `TastyNamedColors`, `TastyPresetNames`, and `TastyThemeNames` for the names your `tokens` and `presets` define. [Configuration → TypeScript](configuration.md#typescript) covers all six and the rules that go with them.
 
-```ts
-// tasty.d.ts
-import type { StylePropValue } from '@tenphi/tasty';
-
-declare module '@tenphi/tasty' {
-  // configure({ handlers }) — a new style property
-  interface StylesInterface {
-    stripe?: StylePropValue<string>;
-  }
-
-  // configure({ propHandlers }) — a new component prop
-  interface TastyCustomProps {
-    glaze: 'soft' | 'strong' | { tone: string; intensity?: number };
-  }
-
-  // configure({ baseStyleProps }) — promoted style names, typed like the style
-  interface TastyBaseStylePropNames {
-    radius: true;
-    shadow: true;
-  }
-
-  // configure({ tokens }) / recipes / presets — autocomplete for names
-  interface TastyNamedColors {
-    'glaze-bg': true;
-  }
-}
-```
-
-`TastyCustomProps` keys become optional props on every component. `TastyBaseStylePropNames` entries are typed exactly like the style they name, so `radius="1r"` accepts the same values as `styles={{ radius: '1r' }}`.
-
-**Also update `tasty.config.ts`.** The ESLint plugin and VS Code extension validate style and token names against it, and neither is derived from the runtime registries:
+**Also update `tasty.config.ts`.** The ESLint plugin and VS Code extension validate style and token names against it, and neither reads the runtime registries or your augmentations:
 
 ```ts
 // tasty.config.ts
@@ -299,6 +274,8 @@ configure({ plugins: [glazePlugin()] });
 
 ```ts
 // tasty.d.ts
+import '@tenphi/tasty';
+
 declare module '@tenphi/tasty' {
   interface TastyCustomProps {
     glaze: import('./glaze-plugin').GlazeConfig | string;
@@ -327,17 +304,20 @@ The object value is unambiguous here precisely because `glaze` is a **prop**. A 
 ## Testing a plugin
 
 ```ts
-import { configure, resetConfig, renderStyles } from '@tenphi/tasty';
+import { resetConfig, renderStyles } from '@tenphi/tasty';
+import type { PropHandler, Styles } from '@tenphi/tasty';
 
 describe('glaze plugin', () => {
   beforeEach(() => resetConfig());
   afterEach(() => resetConfig());
 
-  it('expands into a color token declaration', () => {
-    configure({ plugins: [glazePlugin()] });
+  it('turns the glaze prop into styles', () => {
+    const glaze = glazePlugin().propHandlers!.glaze as PropHandler;
+    const out = glaze({ glaze: 'purple' })!;
 
-    const rules = renderStyles({ '#glaze-bg': '#purple.10' }, '.test');
+    expect(out).not.toHaveProperty('glaze');
 
+    const rules = renderStyles(out.styles as Styles, '.test');
     expect(rules[0].declarations).toContain('--glaze-bg-color');
   });
 });
@@ -345,7 +325,7 @@ describe('glaze plugin', () => {
 
 Two things to know:
 
-- **Create components inside each test.** `resetConfig()` does not clear the per-factory class-name cache or prop-list memo, so a module-scope component created in one test carries state into the next.
+- **Create components inside each test.** `resetConfig()` does not clear a component's own class-name cache, which `tasty()` keeps in DOM environments, so a module-scope component can keep returning a class whose CSS the reset removed.
 - **Dev-mode warnings may not fire.** `isDevEnv()` reports `false` for `NODE_ENV=test`. Warnings that check it lazily can be enabled with `vi.stubEnv('NODE_ENV', 'development')`; some older ones capture it at module load and cannot be triggered from a test at all.
 
 ---

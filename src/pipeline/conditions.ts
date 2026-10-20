@@ -47,6 +47,35 @@ export interface NumericBound {
 }
 
 /**
+ * The unit a range's bounds share, which is what lets them compare by
+ * `valueNumeric`. Bounds in different units never compare: `600px` and `40em`
+ * can't be ordered, because a query `em` follows the user's default font size.
+ *
+ * Returns `null` when the bounds can't be compared with anything: a bound with
+ * no numeric value (`calc(…)`), or a range whose two bounds use different units.
+ */
+export function getRangeUnit(range: {
+  lowerBound?: NumericBound;
+  upperBound?: NumericBound;
+}): string | null {
+  const lower = range.lowerBound && getBoundUnit(range.lowerBound);
+  const upper = range.upperBound && getBoundUnit(range.upperBound);
+
+  if (lower === null || upper === null) return null;
+  if (lower !== undefined && upper !== undefined && lower !== upper) {
+    return null;
+  }
+
+  return lower ?? upper ?? null;
+}
+
+function getBoundUnit(bound: NumericBound): string | null {
+  if (bound.valueNumeric == null) return null;
+
+  return /[a-z%]*$/i.exec(bound.value)![0].toLowerCase();
+}
+
+/**
  * Media query condition
  */
 export interface MediaCondition extends BaseStateCondition {

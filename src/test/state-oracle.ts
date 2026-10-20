@@ -31,6 +31,11 @@ export const STATIC_ATOMS: Readonly<Record<string, boolean>> = {
   '@media(w < 99999px)': true,
   '@media(w < 1px)': false,
   '@media(1px < w < 99999px)': true,
+  // `em` and `px` bounds never compare: 150em (2400px at the default 16px
+  // font) is past 200px, though 150 < 200.
+  '@media(w > 200px)': true,
+  '@media(w < 150em)': true,
+  '@media(w > 150em)': false,
   '@supports(display: grid)': true,
   '@supports(display: frobnicate)': false,
 };

@@ -78,7 +78,7 @@ Retrieves CSS text for a given target. Logs the result with rule count and size.
 |---|---|
 | `'all'` | All tasty CSS (component + global + raw) |
 | `'active'` | CSS for classes currently in the DOM |
-| `'unused'` | CSS for injected classes no element carries (cached but not rendered) |
+| `'unused'` | CSS for classes `gc({ force: true })` would delete now — not rendered, not pinned, past the `gc.grace` window |
 | `'global'` | Only global CSS (from `injectGlobal`) |
 | `'page'` | All CSS on the page (including non-tasty) |
 | `'t3a5f'` | CSS for a specific tasty class (class names are `t` + base36 hash) |
@@ -154,7 +154,8 @@ One-shot overview of the entire Tasty CSS state. Logs a compact report.
 ```typescript
 interface Summary {
   activeClasses: string[];
-  unusedClasses: string[];
+  unusedClasses: string[]; // classes gc({ force: true }) would delete now
+  hotClasses: string[]; // not rendered, but pinned or inside gc.grace — not yet collectable
   totalStyledClasses: string[];
 
   activeCSSSize: number;

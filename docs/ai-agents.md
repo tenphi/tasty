@@ -64,18 +64,18 @@ The last row goes the other way — longhands over the shorthand — because `fl
 
 ### Tokens
 
-| Syntax                | Meaning                                                                   |
-| --------------------- | ------------------------------------------------------------------------- |
-| `#name`               | color token → `var(--name-color)`                                         |
-| `#name.50`            | token at 50% opacity (`0`–`100`)                                          |
-| `#name.$opacity`      | opacity from a custom property                                            |
-| `#clear` / `#current` | `transparent` / `currentcolor`                                            |
-| `$name`               | custom property → `var(--name)`                                           |
-| `(#a, #b)`            | fallback chain                                                            |
-| `$$name` / `##name`   | the custom property _name_ (not its value) — inside `transition`          |
-| `$$name(…)`           | call a CSS `@function` declared via `@function`, `useFunction`, or config |
+| Syntax                | Meaning                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `#name`               | color token → `var(--name-color)`                                                                  |
+| `#name.50`            | token at 50% opacity — digits are a decimal fraction: `.5` = `.50` = 50%, `.05` = 5%, `.100` = 10% |
+| `#name.$opacity`      | opacity from a custom property                                                                     |
+| `#clear` / `#current` | `transparent` / `currentcolor`                                                                     |
+| `$name`               | custom property → `var(--name)`                                                                    |
+| `(#a, #b)`            | fallback chain                                                                                     |
+| `$$name` / `##name`   | the custom property _name_ (not its value) — inside `transition`                                   |
+| `$$name(…)`           | call a CSS `@function` declared via `@function`, `useFunction`, or config                          |
 
-- ❌ `#f5f5f5`, `rgb(0 0 0)`, `oklch(…)`, `okhsl(…)`, `red` → ✅ `#surface` (add the token to the config if it doesn't exist).
+- ❌ `#f5f5f5`, `rgb(0 0 0)`, `oklch(…)`, `okhsl(…)`, `okhst(…)`, `red` → ✅ `#surface` (add the token to the config if it doesn't exist).
 - ❌ `var(--gap)` → ✅ `$gap` · ❌ `$accent-color` → ✅ `#accent` · ❌ `transparent` → ✅ `#clear` · ❌ `currentColor` → ✅ `#current`.
 - A `$name` must be declared as a `'$name': value` key in the same styles object, or in the config.
 - Names are case-sensitive and start lowercase — `$myVar` → `--myVar`; a leading capital folds (`$Foo` → `--foo`). Prefer kebab-case.
@@ -84,7 +84,7 @@ The last row goes the other way — longhands over the shorthand — because `fl
 
 ### Units
 
-Tasty units: `x` (gap multiple), `r` (radius), `cr` (card radius), `bw` (border width), `ow` (outline width), `sf` (`minmax(0, Nfr)`). All CSS units work too, plus anything in `units` in the config. Any other unit is an error.
+Tasty units and their defaults: `x` 8px spacing step, `r` 6px radius, `cr` 10px card radius, `bw` 1px border width, `ow` 3px outline width, `sf` → `minmax(0, Nfr)`. They compile to literal values; change them through `units` in the config, not with `$gap`/`$radius` tokens. All CSS units work too, plus anything in `units` in the config. Any other unit is an error. Units are not resolved inside `@media(…)` / `@(…)` conditions — write query lengths in `px`, `em`, or `rem`.
 
 Prefer units over raw pixels: `8px` → `1x` … `64px` → `8x`; `radius: '6px'` → `'1r'`; `border: '1px …'` → `'1bw …'`.
 
@@ -94,7 +94,7 @@ Prefer units over raw pixels: `8px` → `1x` … `64px` → `8x`; `radius: '6px'
 
 ### `true`
 
-`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `fill`, `color`, `fade`, `preset`, `font`, `scrollbar`, `scrollMargin`, `scrollPadding`, and the enhanced logical category styles listed above, plus `hide`. Anywhere else it is an error.
+`true` means "the design-system default" and is accepted **only** by: `border`, `radius`, `outline`, `shadow`, `padding`, `margin`, `gap`, `inset`, `width`, `height`, `color`, `fade`, `preset`, `font`, `scrollbar`, `scrollMargin`, `scrollPadding`, and the enhanced logical category styles listed above, plus `hide`. Anywhere else it is an error.
 
 ### `!important`
 
@@ -104,21 +104,23 @@ Never use it. Tasty owns specificity through doubled selectors and state orderin
 
 A value is `[values…] [modifiers…]`, and several groups can be comma-separated (later groups override earlier ones). A group that names **direction** modifiers takes a **single** value, applied to every direction it names — per-side values come from comma groups. A group naming no direction keeps plain CSS shorthand order (1–4 values). (`inset` + `dock` is the one exception: a second value insets the spanned sides.) Only the modifiers a property knows are valid:
 
-| Property                             | Modifiers                                                                                                  |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `padding`, `margin`, `inset`, `fade` | `top` `right` `bottom` `left`                                                                              |
-| `border`                             | the four directions + `solid` `dashed` `dotted` `double` `groove` `ridge` `inset` `outset` `none` `hidden` |
-| logical axis spacing/inset styles    | `start` `end`                                                                                              |
-| `blockBorder`, `inlineBorder`         | `start` `end` + the border style keywords above                                                            |
-| `outline`                            | the style keywords above                                                                                   |
-| `radius`                             | `top` `right` `bottom` `left` + shapes `round` `ellipse` `leaf` `backleaf`                                 |
-| `width`, `height`, `blockSize`, `inlineSize` | `min` `max` `fixed`                                                                                |
-| `flow`                               | `row` `column` `row-reverse` `column-reverse` `wrap` `nowrap` `dense`                                      |
-| `overflow`                           | `visible` `hidden` `scroll` `clip` `auto` `overlay`                                                        |
-| `position`                           | `static` `relative` `absolute` `fixed` `sticky`                                                            |
-| `shadow`                             | `inset`                                                                                                    |
-| `preset`                             | `name / strong` (or `bold`) `italic` `icon` `tight`                                                        |
-| box properties                       | `longhand` — emit CSS longhands instead of the shorthand                                                   |
+| Property                                     | Modifiers                                                                                                                                          |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `padding`, `margin`, `fade`                  | `top` `right` `bottom` `left`                                                                                                                      |
+| `inset`                                      | the four directions + `dock`                                                                                                                       |
+| `border`                                     | the four directions + `solid` `dashed` `dotted` `double` `groove` `ridge` `inset` `outset` `none` `hidden`                                         |
+| logical axis spacing/inset styles            | `start` `end`                                                                                                                                      |
+| `blockBorder`, `inlineBorder`                | `start` `end` + the border style keywords above                                                                                                    |
+| `outline`                                    | the style keywords above                                                                                                                           |
+| `radius`                                     | `top` `right` `bottom` `left`, corners `top-left` `top-right` `bottom-right` `bottom-left`, `inherit` + shapes `round` `ellipse` `leaf` `backleaf` |
+| `width`, `height`, `blockSize`, `inlineSize` | `min` `max` `fixed`                                                                                                                                |
+| `flow`                                       | `row` `column` `row-reverse` `column-reverse` `wrap` `nowrap` `dense`                                                                              |
+| `overflow`                                   | `visible` `hidden` `scroll` `clip` `auto` `overlay`                                                                                                |
+| `position`                                   | `static` `relative` `absolute` `fixed` `sticky`                                                                                                    |
+| `shadow`                                     | `inset`                                                                                                                                            |
+| `preset`                                     | `name / strong` (or `bold`) `italic` `icon` `tight` `normal`                                                                                       |
+| `scrollbar`                                  | `thin` `auto` `none` `stable` `both-edges` `always`                                                                                                |
+| box properties                               | `longhand` — emit CSS longhands instead of the shorthand                                                                                           |
 
 Directional modifiers beat placeholder zeros:
 
@@ -128,11 +130,11 @@ Directional modifiers beat placeholder zeros:
 - ❌ `padding: '2x 4x top right'` — a directional group takes one value, so `4x` is dropped → ✅ `padding: '2x top, 4x right'`
 - ❌ `fade: '3x 1x top bottom'` → ✅ `fade: '3x top, 1x bottom'`
 
-Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill` and `color` take a color (plus `none` / `transparent`); `caretColor` and `accentColor` take a color only.
+Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill`, `color`, `caretColor`, and `accentColor` take a color only (use `#clear` for transparent).
 
 ### `transition`
 
-Use semantic names, not CSS property names: `fade` `fill` `color` `theme` `border` `radius` `shadow` `outline` `preset` `text` `gap` `opacity` `translate` `rotate` `scale` `filter` `image` `background` `width` `height` `zIndex` `inset` `flow` `dimension`.
+Use semantic names, not CSS property names: `fade` `fill` `color` `theme` `border` `radius` `shadow` `outline` `preset` `text` `gap` `opacity` `translate` `rotate` `scale` `filter` `image` `background` `width` `height` `inset`. For `z-index`, write the CSS name (`transition: 'z-index'`); `zIndex` currently compiles to an invalid `zindex`.
 
 ❌ `transition: 'background-color 0.2s'` → ✅ `transition: 'fill'`
 
@@ -168,13 +170,13 @@ Precedence `!` > `^` > `|` > `&`; use parentheses to override.
 
 Rules:
 
-1. **`''` comes first.** The bare default is the lowest-priority state; placing it later would override everything above it.
+1. **`''` comes first.** The bare default is the lowest-priority state. Written later, it triggers a `MISPLACED_DEFAULT_STATE` warning and Tasty moves it to the front.
 2. **Every state map needs `''` or `_`** — except when extending (`tasty(Parent, …)`), where omitting `''` merges into the parent's states and including `''` replaces them wholesale.
 3. **`_` is standalone-only** and always first (with `''` right after it, if present). `_` is a never-negated fallback floor for cases where a higher-priority branch may be _unknown_ (`@supports`, container queries). If a map contains only `_` and `''`, drop the `''`.
 4. **No nested maps:** ❌ `{ hovered: { pressed: 'x' } }` → ✅ `{ 'hovered & pressed': 'x' }`
 5. **State keys never sit at the top level** of a styles object — `:hover`, `.active`, `[open]` belong inside a property value.
 6. **Write keys Tasty can fully read.** Names start with a letter (a single letter is fine: `x` → `[data-x]`); join states with an operator (`hovered & focused`, not `hovered focused`); no space between `@media` and `(`. Tasty warns (`INVALID_STATE_KEY`) and skips what it cannot read.
-7. **Prefer automatic native states:** use `disabled` and `checked` in Tasty component styles instead of `[disabled]` and `[checked]`. The concise states track the corresponding native prop or attribute automatically.
+7. **Prefer automatic native states:** use `disabled`, `checked`, and `hidden` in Tasty component styles instead of `[disabled]`, `[checked]`, and `[hidden]`. Tasty sets `data-disabled`, `data-checked`, and `data-hidden` from the native props automatically.
 
 ```jsx
 color: { '': '#text', hovered: '#accent', disabled: '#text.40' }
@@ -204,7 +206,7 @@ When extending a parent's state map: `'@inherit'` reuses the parent's value for 
 A **capitalized** key targets `[data-element="Name"]`, and its value must be a style object.
 
 ```jsx
-styles: { Title: { preset: 'h3' }, Icon: { $: '>@:last-child', color: '#accent' } }
+styles: { Title: { preset: 'h3' }, Icon: { $: '>', color: { '': '#text', '@own(:last-child)': '#accent' } } }
 ```
 
 ❌ nested-selector keys (`'& .title'`, `'&:hover'`) → ✅ sub-elements and state maps. Use the `$` affix property inside a sub-element to control how its selector attaches (`>` direct child, `@` placeholder for the element itself, `&::before` for a root pseudo-element).

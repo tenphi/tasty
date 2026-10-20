@@ -16,7 +16,7 @@ Use this hub to move from the core idea to a working component, then into design
 
 - **Application developer using an existing design system**: [Getting Started](getting-started.md), then [React API](react-api.md).
 - **Design-system author**: [Methodology](methodology.md), [Building a Design System](design-system.md), [Configuration](configuration.md), and [Adoption Guide](adoption.md).
-- **Platform or tooling engineer**: [Configuration](configuration.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
+- **Platform or tooling engineer**: [Configuration](configuration.md), [Plugins & Extension Points](plugins.md), [Build-Time Extraction (`tastyStatic`)](tasty-static.md), [Server-Side Rendering](ssr.md), and [Debug Utilities](debug.md).
 
 ## By Styling Approach
 
@@ -29,6 +29,9 @@ Use this hub to move from the core idea to a working component, then into design
 ## By Task
 
 - **Learn the style language**: [Style DSL](dsl.md)
+- **Set up linting and autocomplete**: [Getting Started — ESLint plugin](getting-started.md#eslint-plugin) and [TypeScript autocomplete](getting-started.md#typescript-autocomplete)
+- **Design a component's public API** (`styleProps`, `modProps`, `tokenProps`, variants, sub-elements): [React API](react-api.md), then [Methodology](methodology.md)
+- **Generate a color palette with contrast solving**: [Glaze](../README.md#glaze)
 - **Brief an AI agent (or yourself) on writing correct styles**: [Style Rules for AI Agents](ai-agents.md)
 - **Look up a property handler**: [Style Properties](styles.md)
 - **Define tokens, units, recipes, keyframes, properties, functions, or polyfills globally**: [Configuration](configuration.md)

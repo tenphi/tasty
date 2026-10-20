@@ -10,6 +10,8 @@ The properties documented below have **custom handlers** with enhanced syntax. T
 
 Other CSS properties (e.g. `opacity`, `transform`, `cursor`, `position`, `zIndex`) are passed through with standard Tasty value parsing but no special handler logic.
 
+[`@tenphi/eslint-plugin-tasty`](getting-started.md#eslint-plugin) reports raw CSS properties that have a handler here (`prefer-shorthand-property`) and modifiers a property does not accept (`valid-directional-modifier`, `valid-radius-shape`).
+
 ---
 
 ## Recommended Props
@@ -64,7 +66,7 @@ Standard CSS display values. Handled together with `hide`, `textOverflow`, `over
 | `display` | Any CSS display value | Overridden by `hide` or multi-line `textOverflow` |
 | `hide` | `true` / `false` | Shortcut for `display: none`. Highest priority |
 | `overflow` | Any CSS overflow value | Overridden when `textOverflow` sets `hidden` |
-| `whiteSpace` | Any CSS white-space value | Overridden when `textOverflow` sets `nowrap` or `initial` |
+| `whiteSpace` | Any CSS white-space value | Explicit value wins over the `nowrap` / `initial` that `textOverflow` sets |
 
 ### `textOverflow`
 
@@ -78,7 +80,7 @@ Text truncation with optional multi-line clamping.
 | `"ellipsis / 3"` | Multi-line clamp (3 lines) with ellipsis, sets `overflow: hidden` and `white-space: initial` |
 | `"clip"` | Single-line truncation without ellipsis, sets `overflow: hidden` and `white-space: nowrap` |
 | `"clip / 2"` | Multi-line clip (2 lines), sets `overflow: hidden` and `white-space: initial` |
-| `true` or `"initial"` | Reset text-overflow to initial |
+| `"initial"` | Reset text-overflow to initial |
 
 Explicit `whiteSpace` overrides the default white-space set by `textOverflow`.
 
@@ -144,6 +146,8 @@ A group that names *no* direction keeps plain CSS shorthand order, which is unam
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
+A group with directions but no value (`padding: 'top'`) uses `var(--gap)` rather than the `x` unit, so it ignores `configure({ units })`; with no `$gap` token it resolves to `4px`, not `1x` (`8px`). Write the value: `padding: '1x top'`.
+
 Individual physical props `paddingTop`, `paddingRight`, `paddingBottom`, and `paddingLeft` are supported, but `padding` with modifiers is recommended. Use `blockPadding` or `inlinePadding` for an enhanced logical-axis shorthand; native declarations such as `paddingInlineStart` remain ordinary CSS properties. See [Logical properties](#logical-properties).
 
 ### `margin`
@@ -194,11 +198,10 @@ Element width with min/max control. One, two, or three values set `min-width`, `
 | `"max 100%"` | initial | auto | `100%` |
 | `"fixed 200px"` | `200px` | `200px` | `200px` |
 
-**Keywords:** `stretch`, `max-content`, `min-content`, `fit-content`
+**Keywords:** `max-content`, `min-content`, `fit-content`
 
 | Value | Effect |
 |-------|--------|
-| `"stretch"` | Fill available space (cross-browser) |
 | `true` | Reset to `auto` / `initial` / `initial` |
 | Number | Converted to `px` |
 
@@ -207,6 +210,8 @@ Separate `minWidth` and `maxWidth` props are supported and override values from 
 ### `height`
 
 Element height. Same syntax, modifiers, and positional patterns as `width`.
+
+Avoid `stretch` for now on `width` and `height`: `width: 'stretch'` emits a comma-joined fallback list that browsers drop, and `height: 'stretch'` becomes `auto`.
 
 Separate `minHeight` and `maxHeight` props are supported and override values from the `height` syntax.
 
@@ -305,9 +310,8 @@ Background color with design token support. Preferred over `backgroundColor` and
 | `"#surface #primary.10"` | Background `#surface` with `#primary.10` overlay (two colors enable smooth transitions between both) |
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
-| `true` | Default fill color |
 
-When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. The overlay is only applied when no explicit `image` or `backgroundImage` is set.
+When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. Avoid combining a two-color `fill` with `image` or `backgroundImage` on the same element: both set `background-image` from separate rules, so which one shows depends on rule order.
 
 **Related deprecated props:** `backgroundColor` (use `fill`), `background` (overrides all background props when set — avoid).
 
@@ -388,6 +392,8 @@ Border shorthand with directional and multi-group support. Use **comma-separated
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
+A directional group without a width (`'dotted left'`) uses `var(--border-width)` rather than the `bw` unit, so it ignores `configure({ units })`; `border: true` uses the unit. Both default to `1px`.
+
 ### `radius`
 
 Border radius with shape presets and directional modifiers.
@@ -426,6 +432,8 @@ Use these when an edge modifier would round one corner too many. Edge and corner
 | `"top-right"` | Top-right corner `1r`, every other corner `0` |
 | `"4px top-left"` | Top-left corner `4px`, every other corner `0` |
 | `"top bottom-right"` | Both top corners and bottom-right `1r`, bottom-left `0` |
+
+A value-less corner group (`'top-right'`, `'top bottom-right'`) uses `var(--radius)` rather than the `r` unit, so it ignores `configure({ units })`; `radius: true` uses the unit. Both default to `6px`. Write the value (`'1r top-right'`) when you change the `r` unit.
 
 ### `outline`
 
@@ -468,7 +476,7 @@ Multiple shadows: `shadow="1x 1x 2x #dark.20, inset 0 0 4x #dark.10"`
 
 ### `preset`
 
-Typography preset that sets font-size, line-height, letter-spacing, font-weight, font-style, and text-transform from named design tokens.
+Typography preset that sets font-size, line-height, letter-spacing, font-weight, font-style, text-transform, and font-family (unless `font` or `fontFamily` is set) from named design tokens. It also sets the `--bold-font-weight` and `--icon-size` variables that `strong` and `icon` read.
 
 **Syntax:** `name`, `name / modifier...`, or `modifier...` (shorthand)
 
@@ -484,6 +492,7 @@ Use `/` to separate the preset name from one or more space-separated modifiers. 
 | `italic` | Sets `font-style: italic` |
 | `icon` | Sets font-size and line-height to icon size |
 | `tight` | Sets line-height equal to font-size |
+| `normal` | Sets `line-height: normal` |
 
 ```jsx
 preset="h1"                    // heading 1
@@ -503,9 +512,9 @@ Font family with design-system fallback. Preferred over `fontFamily`.
 
 | Value | Effect |
 |-------|--------|
-| `"monospace"` | Monospace font stack (from `$monospace-font` token) |
-| `true` | Default system font (from `$font` token) |
-| `"CustomFont"` | Custom font with system font fallback |
+| `"monospace"` | Monospace stack from `$font-mono`, falling back to the built-in `$font-mono-fallback` |
+| `true` | Default sans stack from `$font-sans`, falling back to `$font-sans-fallback` |
+| `"CustomFont"` | Custom font followed by the `$font-sans` stack |
 
 `fontFamily` is supported as a direct pass-through without fallback logic.
 
@@ -581,8 +590,9 @@ When easing is provided without a duration, the default timing variable is used 
 | `width` | `width`, `min-width`, `max-width` |
 | `height` | `height`, `min-height`, `max-height` |
 | `gap` | `gap`, `margin` |
-| `zIndex` | `z-index` |
 | `inset` | `inset`, `top`, `right`, `bottom`, `left` |
+
+Any other name passes through as a CSS property. Write `z-index` in its CSS form: `transition: 'z-index'` works, while `zIndex` is currently lowercased to the invalid `zindex`.
 
 When two entries cover the same property, an entry that names that one property wins over a group such as `theme`, in either order: `opacity 120ms ease-in-out, theme` keeps the opacity timing. Otherwise the later entry wins, as in CSS.
 
@@ -674,11 +684,11 @@ plain CSS shorthand order, like `padding`. See the [`padding` rule](#padding).
 
 | Value | Effect |
 |-------|--------|
-| `"top"` | Fade top edge, default width (`2x`), all other edges unfaded |
+| `"top"` | Fade top edge, default width `calc(2 * var(--gap))` (`8px` unless `$gap` is set), all other edges unfaded |
 | `"2x left right"` | Fade left and right edges with `2x` width, top/bottom unfaded |
 | `"3x 1x"` | All edges faded — top/bottom `3x`, left/right `1x` (CSS shorthand order) |
 | `"3x top, 1x bottom"` | Fade top with `3x` width, bottom with `1x` width |
-| `"2x #transparent #dark"` | All edges faded with `2x` width, from `#transparent` to `#dark` |
+| `"2x #clear #dark"` | All edges faded with `2x` width, from `#clear` to `#dark` |
 | `"top #a #b, bottom #c #d"` | Top fades from `#a` to `#b`, bottom fades from `#c` to `#d` |
 
 Colors are optional: first = transparent mask start, second = opaque mask end.

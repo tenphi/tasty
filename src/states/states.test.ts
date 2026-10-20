@@ -10,6 +10,7 @@ import {
   clearGlobalPredefinedStates,
   createStateParserContext,
   expandDimensionShorthands,
+  expandQueryUnits,
   expandTastyUnits,
   extractLocalPredefinedStates,
   extractPredefinedStateRefs,
@@ -84,6 +85,24 @@ describe('Advanced State Mapping', () => {
         );
         expect(result.type).toBe('media');
         expect(result.condition).toBe('prefers-color-scheme: dark');
+      });
+
+      // CSS's `x` is a resolution unit (an alias of `dppx`), not Tasty's gap.
+      it.each([
+        'min-resolution: 2x',
+        'max-resolution: 1.5x',
+        'resolution: 2x',
+        'resolution >= 2x',
+        '1x < resolution <= 3x',
+      ])('should keep the resolution unit in @media(%s)', (condition) => {
+        const result = parseAdvancedState(`@media(${condition})`, defaultCtx);
+        expect(result.type).toBe('media');
+        expect(result.condition).toBe(condition);
+      });
+
+      it('should expand tasty units in the min-width: form', () => {
+        const result = parseAdvancedState('@media(min-width: 40x)', defaultCtx);
+        expect(result.condition).toBe(`min-width: ${expandTastyUnits('40x')}`);
       });
     });
 
@@ -330,6 +349,35 @@ describe('Advanced State Mapping', () => {
 
       it('should not affect other units', () => {
         expect(expandTastyUnits('920px')).toBe('920px');
+      });
+    });
+
+    describe('expandQueryUnits', () => {
+      it.each([
+        'width < 40x',
+        '40x <= width < 80x',
+        '40x > height',
+        'inline-size >= 2x',
+        'block-size = 10x',
+        'min-width: 40x',
+        'max-height: 12.5x',
+        'min-inline-size: 2x',
+      ])('should expand units in a length feature: %s', (condition) => {
+        const expanded = expandQueryUnits(condition);
+        expect(expanded).toBe(expandTastyUnits(condition));
+        expect(expanded).not.toBe(condition);
+      });
+
+      it.each([
+        'min-resolution: 2x',
+        'max-resolution: 3x',
+        'resolution: 1x',
+        'resolution >= 2x',
+        '2x <= resolution',
+        '1x < resolution < 3x',
+        'prefers-reduced-motion',
+      ])('should leave a non-length feature alone: %s', (condition) => {
+        expect(expandQueryUnits(condition)).toBe(condition);
       });
     });
 

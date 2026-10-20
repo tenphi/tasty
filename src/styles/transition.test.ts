@@ -55,9 +55,9 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'fill ease-in' });
       expect(result).toEqual({
         transition: [
-          'background-color var(--fill-transition, var(--transition)) ease-in',
-          'background-image var(--fill-transition, var(--transition)) ease-in',
-          '--tasty-second-fill-color var(--fill-transition, var(--transition)) ease-in',
+          'background-color var(--fill-transition, var(--transition, 80ms)) ease-in',
+          'background-image var(--fill-transition, var(--transition, 80ms)) ease-in',
+          '--tasty-second-fill-color var(--fill-transition, var(--transition, 80ms)) ease-in',
         ].join(', '),
       });
     });
@@ -66,14 +66,15 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'radius ease-in-out' });
       expect(result).toEqual({
         transition:
-          'border-radius var(--radius-transition, var(--transition)) ease-in-out',
+          'border-radius var(--radius-transition, var(--transition, 80ms)) ease-in-out',
       });
     });
 
     it('handles ease without duration', () => {
       const result = transitionStyle({ transition: 'color ease' });
       expect(result).toEqual({
-        transition: 'color var(--color-transition, var(--transition)) ease',
+        transition:
+          'color var(--color-transition, var(--transition, 80ms)) ease',
       });
     });
 
@@ -81,7 +82,7 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'opacity linear' });
       expect(result).toEqual({
         transition:
-          'opacity var(--opacity-transition, var(--transition)) linear',
+          'opacity var(--opacity-transition, var(--transition, 80ms)) linear',
       });
     });
 
@@ -91,9 +92,9 @@ describe('transitionStyle', () => {
       });
       expect(result).toEqual({
         transition: [
-          'background-color var(--fill-transition, var(--transition)) ease-in 0.1s',
-          'background-image var(--fill-transition, var(--transition)) ease-in 0.1s',
-          '--tasty-second-fill-color var(--fill-transition, var(--transition)) ease-in 0.1s',
+          'background-color var(--fill-transition, var(--transition, 80ms)) ease-in 0.1s',
+          'background-image var(--fill-transition, var(--transition, 80ms)) ease-in 0.1s',
+          '--tasty-second-fill-color var(--fill-transition, var(--transition, 80ms)) ease-in 0.1s',
         ].join(', '),
       });
     });
@@ -102,7 +103,7 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'opacity step-start' });
       expect(result).toEqual({
         transition:
-          'opacity var(--opacity-transition, var(--transition)) step-start',
+          'opacity var(--opacity-transition, var(--transition, 80ms)) step-start',
       });
     });
 
@@ -110,7 +111,7 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'opacity step-end' });
       expect(result).toEqual({
         transition:
-          'opacity var(--opacity-transition, var(--transition)) step-end',
+          'opacity var(--opacity-transition, var(--transition, 80ms)) step-end',
       });
     });
   });
@@ -136,9 +137,9 @@ describe('transitionStyle', () => {
       });
       expect(result).toEqual({
         transition: [
-          'background-color var(--fill-transition, var(--transition)) ease-in',
-          'background-image var(--fill-transition, var(--transition)) ease-in',
-          '--tasty-second-fill-color var(--fill-transition, var(--transition)) ease-in',
+          'background-color var(--fill-transition, var(--transition, 80ms)) ease-in',
+          'background-image var(--fill-transition, var(--transition, 80ms)) ease-in',
+          '--tasty-second-fill-color var(--fill-transition, var(--transition, 80ms)) ease-in',
           'border-radius 0.3s ease-out',
         ].join(', '),
       });
@@ -184,7 +185,7 @@ describe('transitionStyle', () => {
       const result = transitionStyle({ transition: 'theme' });
       expect(result).toBeDefined();
       expect(result!.transition).toContain(
-        'var(--theme-transition, var(--transition))',
+        'var(--theme-transition, var(--transition, 80ms))',
       );
     });
   });
@@ -209,7 +210,7 @@ describe('transitionStyle', () => {
     it('handles custom property without timing (no double -- prefix)', () => {
       const result = transitionStyle({ transition: '--angle' });
       expect(result).toEqual({
-        transition: '--angle var(--angle-transition, var(--transition))',
+        transition: '--angle var(--angle-transition, var(--transition, 80ms))',
       });
     });
 
@@ -219,7 +220,7 @@ describe('transitionStyle', () => {
       });
       expect(result).toEqual({
         transition:
-          '--accent-color var(--accent-color-transition, var(--transition)) ease-in',
+          '--accent-color var(--accent-color-transition, var(--transition, 80ms)) ease-in',
       });
     });
 
@@ -229,7 +230,7 @@ describe('transitionStyle', () => {
       });
       expect(result).toEqual({
         transition:
-          '--angle var(--angle-transition, var(--transition)) ease-out 0.1s',
+          '--angle var(--angle-transition, var(--transition, 80ms)) ease-out 0.1s',
       });
     });
 
@@ -240,7 +241,7 @@ describe('transitionStyle', () => {
       expect(result).toEqual({
         transition: [
           '--angle 0.3s',
-          '--accent-color var(--accent-color-transition, var(--transition)) ease-in',
+          '--accent-color var(--accent-color-transition, var(--transition, 80ms)) ease-in',
         ].join(', '),
       });
     });
@@ -266,14 +267,14 @@ describe('transitionStyle', () => {
       ).toEqual({
         transition: [
           'opacity 120ms ease-in-out',
-          'color var(--theme-transition, var(--transition))',
-          'background-color var(--theme-transition, var(--transition))',
-          'background-image var(--theme-transition, var(--transition))',
-          'box-shadow var(--theme-transition, var(--transition))',
-          'border var(--theme-transition, var(--transition))',
-          'border-radius var(--theme-transition, var(--transition))',
-          'outline var(--theme-transition, var(--transition))',
-          '--tasty-second-fill-color var(--theme-transition, var(--transition))',
+          'color var(--theme-transition, var(--transition, 80ms))',
+          'background-color var(--theme-transition, var(--transition, 80ms))',
+          'background-image var(--theme-transition, var(--transition, 80ms))',
+          'box-shadow var(--theme-transition, var(--transition, 80ms))',
+          'border var(--theme-transition, var(--transition, 80ms))',
+          'border-radius var(--theme-transition, var(--transition, 80ms))',
+          'outline var(--theme-transition, var(--transition, 80ms))',
+          '--tasty-second-fill-color var(--theme-transition, var(--transition, 80ms))',
         ].join(', '),
       });
     });

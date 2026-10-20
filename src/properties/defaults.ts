@@ -1,5 +1,10 @@
 import type { PropertyDefinition } from '../injector/types';
 
+// Defaults the style handlers also inline as `var()` fallbacks, so their output
+// keeps its meaning where this set is not emitted (zero-runtime CSS).
+export const DEFAULT_TRANSITION = '80ms';
+export const DEFAULT_BOLD_FONT_WEIGHT = '700';
+
 /**
  * Default properties shipped with Tasty.
  *
@@ -36,10 +41,13 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'transparent',
   },
-  // Default border color
+  // Default border color: the text color, as in plain CSS. It matches the
+  // `border` handler's `var(--border-color, currentColor)` fallback, which
+  // zero-runtime CSS relies on, so a border with no color looks the same in
+  // every rendering mode.
   '#border': {
     inherits: true,
-    initialValue: 'rgb(0 0 0)',
+    initialValue: 'currentcolor',
   },
   // Default outline color: the text color, the same as the `outline` handler's
   // `var(--outline-color, currentColor)` fallback, which zero-runtime CSS
@@ -77,7 +85,7 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   $transition: {
     syntax: '<time>',
     inherits: true,
-    initialValue: '80ms',
+    initialValue: DEFAULT_TRANSITION,
   },
   // Used by radius.ts for `radius="leaf"` modifier
   '$sharp-radius': {
@@ -89,7 +97,7 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   '$bold-font-weight': {
     syntax: '<number>',
     inherits: true,
-    initialValue: '700',
+    initialValue: DEFAULT_BOLD_FONT_WEIGHT,
   },
   // Used by preset.ts as fallback font stacks
   '$font-sans-fallback': {

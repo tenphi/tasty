@@ -77,6 +77,7 @@ The last row goes the other way — longhands over the shorthand — because `fl
 
 - ❌ `#f5f5f5`, `rgb(0 0 0)`, `oklch(…)`, `okhsl(…)`, `okhst(…)`, `red` → ✅ `#surface` (add the token to the config if it doesn't exist).
 - ❌ `var(--gap)` → ✅ `$gap` · ❌ `$accent-color` → ✅ `#accent` · ❌ `transparent` → ✅ `#clear` · ❌ `currentColor` → ✅ `#current`.
+- `#clear` is a default replace token for `transparent`, so `#clear.5` and `#clear.$opacity` stay transparent. It does not read `--clear-color`; override it through `replaceTokens` if needed.
 - A `$name` must be declared as a `'$name': value` key in the same styles object, or in the config.
 - Names are case-sensitive and start lowercase — `$myVar` → `--myVar`; a leading capital folds (`$Foo` → `--foo`). Prefer kebab-case.
 - A `$name` reference is untyped: it fills the first free slot in a shorthand (`border: '1bw $my-style'` → the line style). Write colors as `#name`; `$name-color` is a fallback for pointing at a raw CSS custom property that holds a color.

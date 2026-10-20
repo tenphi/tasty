@@ -273,7 +273,7 @@ export interface TastyConfig {
    * Keys use tasty token syntax ($name for properties, #name for colors).
    *
    * Tasty ships with `DEFAULT_PROPERTIES` (e.g. `$gap`, `$radius`, `#white`,
-   * `#black`, `#clear`, `#border`, etc.) that are always included.
+   * `#black`, `#border`, etc.) that are always included.
    * Properties you specify here are merged on top, so you can override any
    * default by using the same key.
    *
@@ -460,6 +460,10 @@ export interface TastyConfig {
    * Use `$name` for custom properties and `#name` for color tokens.
    * Values are substituted inline before CSS generation, unlike `tokens` which
    * inject CSS custom properties on `:root`.
+   *
+   * Includes `'#clear': 'transparent'` by default. Aliases resolving to
+   * `transparent` ignore opacity suffixes, including custom-property opacity.
+   * Explicit replaceTokens entries can override the defaults.
    *
    * For color tokens (#name), boolean `true` is converted to `transparent`.
    *

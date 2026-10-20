@@ -72,7 +72,7 @@ describe('withTastyNext', () => {
 
     // Pin the full CSS byte stream: rule ordering and formatting feed the
     // content-addressed filename and must remain collector-compatible.
-    expect(href).toBe('/docs/assets/tasty/tasty.shared.4679fbe019c1.css');
+    expect(href).toBe('/docs/assets/tasty/tasty.shared.f113ac3bc1c7.css');
     expect(result.env?.EXISTING).toBe('yes');
     expect(result.webpack).toBe(existingWebpack);
     expect(await result.headers!()).toEqual([
@@ -95,6 +95,7 @@ describe('withTastyNext', () => {
     expect(files).toEqual([href!.split('/').at(-1)]);
     const css = await readFile(join(outputDir, files[0]), 'utf8');
     expect(css).toContain('@property --rotation');
+    expect(css).not.toContain('@property --clear-color');
     expect(css).toContain('--brand-gap: 12px');
     expect(css).toContain('@font-face');
     expect(css).toContain('font-family: "Brand"');

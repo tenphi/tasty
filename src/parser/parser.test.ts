@@ -1100,8 +1100,40 @@ describe('Predefined tokens', () => {
     expect(result.output).toBe('100');
   });
 
-  test('getGlobalPredefinedTokens returns null when not configured', () => {
-    expect(getGlobalPredefinedTokens()).toBeNull();
+  test('getGlobalPredefinedTokens includes defaults when not configured', () => {
+    expect(getGlobalPredefinedTokens()).toEqual({ '#clear': 'transparent' });
+  });
+
+  test.each(['#clear', '#clear.0', '#clear.5', '#clear.$opacity', '#CLEAR.5'])(
+    '%s is transparent without configuration',
+    (token) => {
+      const result = new StyleParser().process(token);
+      expect(result.output).toBe('transparent');
+      expect(result.groups[0].colors).toEqual(['transparent']);
+    },
+  );
+
+  test.each(['transparent', 'TRANSPARENT', '#clear'])(
+    'an alias for %s ignores opacity suffixes',
+    (value) => {
+      setGlobalPredefinedTokens({ '#invisible': value });
+
+      const result = new StyleParser().process('#invisible.5 #invisible.$fade');
+      expect(result.output).toBe('transparent transparent');
+      expect(result.groups[0].colors).toEqual(['transparent', 'transparent']);
+    },
+  );
+
+  test('reset restores the clear alias after an explicit override', async () => {
+    const { getGlobalParser } = await vi.importActual<any>('../utils/styles');
+    const globalParser = getGlobalParser();
+
+    expect(globalParser.process('#clear.5').output).toBe('transparent');
+    setGlobalPredefinedTokens({ '#clear': 'rgb(255 0 0)' });
+    expect(globalParser.process('#clear.5').output).toBe('rgb(255 0 0 / .5)');
+
+    resetGlobalPredefinedTokens();
+    expect(globalParser.process('#clear.5').output).toBe('transparent');
   });
 
   test('getGlobalPredefinedTokens returns configured tokens', () => {
@@ -1110,6 +1142,7 @@ describe('Predefined tokens', () => {
     });
 
     expect(getGlobalPredefinedTokens()).toEqual({
+      '#clear': 'transparent',
       $test: '10px',
     });
   });
@@ -1128,6 +1161,7 @@ describe('Predefined tokens', () => {
     });
 
     expect(getGlobalPredefinedTokens()).toEqual({
+      '#clear': 'transparent',
       $a: '10px', // Preserved from first call
       $b: '30px', // Overridden by second call
       $c: '40px', // Added by second call

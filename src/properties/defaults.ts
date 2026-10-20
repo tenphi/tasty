@@ -37,11 +37,6 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'rgb(0 0 0)',
   },
-  // Shorthand for transparent
-  '#clear': {
-    inherits: true,
-    initialValue: 'transparent',
-  },
   // Default border color: the text color, as in plain CSS, so a `border` with
   // no color is drawn until the app defines `#border`.
   '#border': {

@@ -343,8 +343,10 @@ const Checkbox = tasty({
 ```
 
 A custom property whose fallback is a single color is read as a color, so it
-also fills the color slot: `border: '1bw var(--accent, Highlight)'`. Keywords
-are case-insensitive; inside a style they are emitted lowercase.
+also fills the color slot: `border: '1bw var(--accent, Highlight)'`, as does
+`($accent, Highlight)`. Keywords are case-insensitive: a color token keeps the
+case it was written in, and a property value such as `border` or `fill` emits
+them lowercase.
 
 The deprecated system colors (`Menu`, `Window`, `ButtonHighlight`, …) are not
 recognized.

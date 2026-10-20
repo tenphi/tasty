@@ -404,7 +404,7 @@ describe('Tasty style tests', () => {
     });
   });
 
-  it.each(['mark', 'highlight / strong', 'navy'])(
+  it.each(['mark', 'highlight / strong', 'navy', 'highlight tight'])(
     'keeps a preset named like a color keyword: %s',
     (preset) => {
       const name = preset.split(' ')[0];

@@ -3,6 +3,7 @@ import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
 import {
   extractCSSWideKeyword,
+  isUnset,
   resolveDefaultValue,
   warnExtraGroupValues,
 } from './shared';
@@ -50,16 +51,6 @@ export interface DirectionalConfig {
    * and `scrollMargin` ignore the modifier and treat it as an unknown mod.
    */
   spanModifiers?: readonly string[];
-}
-
-/**
- * `false` sets nothing, exactly as `null` does: it is how a state map says a
- * state writes no declaration. Only `true` stands for the default value.
- */
-function isUnset(
-  value: string | number | boolean | undefined,
-): value is undefined | false {
-  return value == null || value === false;
 }
 
 function parseSingleValue(

@@ -168,12 +168,15 @@ export function presetStyle({
     const isModOnly =
       nameTokens.length > 0 && nameTokens.every((t) => PRESET_MODIFIERS.has(t));
 
-    // A preset may share its name with a color keyword (`mark`, `highlight`),
-    // which the parser files as a color rather than a modifier.
+    // The first modifier names the preset. A name may also be a color keyword
+    // (`mark`, `highlight`), which the parser files as a color instead, so the
+    // two are taken in source order.
+    const nameMods = namePart?.mods ?? [];
     const nameToken =
-      namePart?.mods[0] ??
+      nameTokens.find(
+        (token) => nameMods.includes(token) || isColorKeyword(token),
+      ) ??
       namePart?.values[0] ??
-      namePart?.colors.find(isColorKeyword) ??
       '';
     // A reference cannot name a preset; fall back to `inherit`, the same name an
     // absent preset resolves to, rather than emitting `var(--var(--x)-font-size)`.

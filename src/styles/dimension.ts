@@ -1,7 +1,7 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
-import { resolveDefaultValue } from './shared';
+import { isUnset, resolveDefaultValue } from './shared';
 
 /** `min` with no value; resolved through the parser so it follows the unit. */
 const DEFAULT_MIN_SIZE = '1x';
@@ -17,16 +17,6 @@ const STRETCH_FALLBACKS = [
   '-moz-available',
   'stretch',
 ];
-
-/**
- * `false` sets nothing, exactly as `null` does: it is how a state map says a
- * state writes no declaration. Only `true` stands for a value (the reset).
- */
-function isUnset(
-  value: string | number | boolean | undefined,
-): value is undefined | false {
-  return value == null || value === false;
-}
 
 /**
  * Parse a dimension value (string, number, or boolean) into a CSS value

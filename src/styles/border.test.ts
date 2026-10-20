@@ -38,6 +38,7 @@ describe('borderStyle', () => {
     ['1bw dashed CanvasText', '1px dashed canvastext'],
     ['1bw rebeccapurple', '1px solid rebeccapurple'],
     ['1bw var(--accent, Highlight)', '1px solid var(--accent, highlight)'],
+    ['1bw ($accent, Highlight)', '1px solid var(--accent, highlight)'],
   ])('takes a color keyword as the color: %s', (border, expected) => {
     expect(borderStyle({ border })).toEqual({ border: expected });
   });

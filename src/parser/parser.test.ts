@@ -460,12 +460,12 @@ describe('StyleProcessor', () => {
     const result4 = parser.process(
       'rgb($red, $green, $blue) ($color-fallback, #fff)',
     );
+    // A fallback that is one color makes the reference a color too.
     expect(result4.groups[0].colors).toEqual([
       'rgb(var(--red),var(--green),var(--blue))',
-    ]);
-    expect(result4.groups[0].values).toEqual([
       'var(--color-fallback, var(--fff-color, #fff))',
     ]);
+    expect(result4.groups[0].values).toEqual([]);
 
     // Test 5: Nested parentheses with custom properties
     const result5 = parser.process('(($outer, 10px) + ($inner, 5px))');
@@ -1636,6 +1636,8 @@ describe('Color keywords', () => {
 
   test.each([
     ['var(--accent, Highlight)', 'var(--accent, highlight)'],
+    ['($accent, Highlight)', 'var(--accent, highlight)'],
+    ['($accent, #purple)', 'var(--accent, var(--purple-color))'],
     ['var(--accent, #purple)', 'var(--accent, var(--purple-color))'],
     ['var(--accent, var(--other, red))', 'var(--accent, var(--other, red))'],
   ])('a reference with a color fallback is a color: %s', (input, color) => {
@@ -1656,6 +1658,21 @@ describe('Color keywords', () => {
     setGlobalPredefinedTokens({ '#forced': 'Highlight' });
 
     expect(parser.process('#forced').groups[0].colors).toEqual(['highlight']);
+  });
+
+  test('a `($name, …)` fallback that is not one color stays a value', () => {
+    expect(parser.process('($accent, 2x)').groups[0].values).toEqual([
+      'var(--accent, 16px)',
+    ]);
+    expect(parser.process('($accent, 2x)').groups[0].colors).toEqual([]);
+  });
+
+  test('an opacity suffix on a token aliasing currentColor composes', () => {
+    setGlobalPredefinedTokens({ '#ink': 'currentColor' });
+
+    expect(parser.process('#ink.5').output).toBe(
+      'color-mix(in oklab, currentcolor 50%, transparent)',
+    );
   });
 
   test('an opacity suffix fades a token aliasing a color keyword', () => {

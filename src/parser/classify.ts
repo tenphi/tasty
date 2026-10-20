@@ -16,7 +16,7 @@ import {
   canonicalFuncName,
 } from './const';
 import { StyleParser } from './parser';
-import type { ParserOptions, ProcessedStyle } from './types';
+import type { ParserOptions, ProcessedStyle, StyleDetails } from './types';
 import { Bucket } from './types';
 
 /**
@@ -74,22 +74,16 @@ function hasColorArgs(parsed: ProcessedStyle): boolean {
 }
 
 /**
- * Whether the arguments of a `var()` give it a color fallback: the name, then a
- * single color — `var(--accent, Highlight)`, `var(--accent, #purple)`.
+ * Whether a parsed group is a single color, which is what makes a reference's
+ * fallback a color fallback: `var(--accent, Highlight)`, `($accent, #purple)`.
  *
  * A reference can hold anything, so the parser cannot type it from its name, but
  * its fallback is a value of the type the reference is used as. A fallback made
  * of more than one token (`var(--x, 1px solid red)`) is a whole shorthand, not a
  * color, and leaves the reference untyped.
  */
-function hasColorFallback(parsed: ProcessedStyle): boolean {
-  const fallback = parsed.groups[1];
-
-  return (
-    parsed.groups.length === 2 &&
-    fallback.all.length === 1 &&
-    fallback.colors.length === 1
-  );
+function isSingleColor(group: StyleDetails | undefined): boolean {
+  return !!group && group.all.length === 1 && group.colors.length === 1;
 }
 
 /**
@@ -439,13 +433,18 @@ export function classify(
 
             // A color keyword (`red`, `Canvas`) has no channels to write into
             // either, so it is faded as a whole, the same way a token is.
-            if (isColorKeyword(resolvedValue.trim())) {
+            // `currentcolor` composes, as `#current.N` does.
+            const keyword = resolvedValue.trim().toLowerCase();
+            if (keyword === 'currentcolor') {
               return {
                 bucket: Bucket.Color,
-                processed: fadeColor(
-                  resolvedValue.trim().toLowerCase(),
-                  rawAlpha,
-                ),
+                processed: fadeCurrentColor(rawAlpha),
+              };
+            }
+            if (isColorKeyword(keyword)) {
+              return {
+                bucket: Bucket.Color,
+                processed: fadeColor(keyword, rawAlpha),
               };
             }
 
@@ -562,7 +561,9 @@ export function classify(
     return {
       // A reference with a color fallback is a color, as `(#name, fallback)` is.
       bucket:
-        fname === 'var' && hasColorFallback(parsedInner)
+        fname === 'var' &&
+        parsedInner.groups.length === 2 &&
+        isSingleColor(parsedInner.groups[1])
           ? Bucket.Color
           : Bucket.Value,
       processed: `${canonicalFuncName(fname)}(${parsedInner.output})`,
@@ -589,13 +590,17 @@ export function classify(
     const match = inner.match(/^\$([a-z_][a-zA-Z0-9-_]*)\s*,\s*(.*)$/);
     if (match) {
       const [, name, fallback] = match;
-      const processedFallback = recurse(fallback).output;
+      const parsedFallback = recurse(fallback);
+      // A color fallback makes it a color, as it does for `var(--name, …)`.
       const bucketType = name.endsWith('-color')
         ? Bucket.ColorValue
-        : Bucket.Value;
+        : parsedFallback.groups.length === 1 &&
+            isSingleColor(parsedFallback.groups[0])
+          ? Bucket.Color
+          : Bucket.Value;
       return {
         bucket: bucketType,
-        processed: `var(--${name}, ${processedFallback})`,
+        processed: `var(--${name}, ${parsedFallback.output})`,
       };
     }
   }

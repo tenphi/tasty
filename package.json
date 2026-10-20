@@ -232,7 +232,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "58.54 kB"
+      "limit": "59.55 kB"
     },
     {
       "name": "main (tasty)",

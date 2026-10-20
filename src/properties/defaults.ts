@@ -36,11 +36,6 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'rgb(0 0 0)',
   },
-  // Shorthand for transparent
-  '#clear': {
-    inherits: true,
-    initialValue: 'transparent',
-  },
   // Default border color: the text color, as in plain CSS. It matches the
   // `border` handler's `var(--border-color, currentColor)` fallback, which
   // zero-runtime CSS relies on, so a border with no color looks the same in

@@ -381,6 +381,7 @@ describe('ServerStyleCollector', () => {
     // Color properties are a single `<color>` rule, with no channel companion
     expect(css).toContain('@property --white-color');
     expect(css).not.toContain('@property --white-color-oklch');
+    expect(css).not.toContain('@property --clear-color');
 
     // `--current-color` carries the inherited colour for anything that reads it
     // as a colour, so its initial value has to be the keyword — `transparent`

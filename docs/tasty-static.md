@@ -608,7 +608,7 @@ If you add custom style properties, use module augmentation so `tastyStatic` rec
 2. **No runtime props** — Cannot use `styleProps` or dynamic `styles` prop
 3. **No mods at runtime** — Modifiers must be defined statically
 4. **Build-time transformation required** — Babel plugin must process files
-5. **No built-in token defaults** — The runtime registers fallbacks for `#white`, `#black`, `#clear`, `#border`, `$gap`, `$radius`, `$border-width`, `$outline-width`, and a few others as `@property` initial values. The Babel plugin does not emit them, so define every token your styles reference in `config.tokens`.
+5. **No built-in token defaults** — The runtime registers fallbacks for `#white`, `#black`, `#border`, `$gap`, `$radius`, `$border-width`, `$outline-width`, and a few others as `@property` initial values. The Babel plugin does not emit them, so define every token your styles reference in `config.tokens`.
 6. **`config.properties` is ignored** — It type-checks, but no `@property` rules are generated from it. Automatically inferred properties (`autoPropertyTypes`) are emitted.
 
 ### Workarounds

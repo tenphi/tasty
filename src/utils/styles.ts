@@ -275,11 +275,15 @@ export function getGlobalParseFunctions(): Record<
 // Global Predefined Tokens
 // ============================================================================
 
+const DEFAULT_PREDEFINED_TOKENS = { '#clear': 'transparent' };
+
 /**
  * Storage for predefined tokens that are replaced during style parsing.
  * Keys are token names (with $ or # prefix), values are pre-processed CSS values.
  */
-let __globalPredefinedTokens: Record<string, string> | null = null;
+let __globalPredefinedTokens: Record<string, string> = {
+  ...DEFAULT_PREDEFINED_TOKENS,
+};
 
 /**
  * Set global predefined tokens.
@@ -313,28 +317,28 @@ export function setGlobalPredefinedTokens(
     normalizedTokens[lowerKey] = value;
   }
   // Merge with existing tokens (consistent with how states, units, and parse functions are handled)
-  __globalPredefinedTokens = __globalPredefinedTokens
-    ? { ...__globalPredefinedTokens, ...normalizedTokens }
-    : normalizedTokens;
+  __globalPredefinedTokens = {
+    ...__globalPredefinedTokens,
+    ...normalizedTokens,
+  };
   // Clear parser cache since token values affect parsing
   getOrCreateParser().clearCache();
 }
 
 /**
- * Get the current global predefined tokens.
- * Returns null if no tokens are configured.
+ * Get the current global predefined tokens, including built-in defaults.
  */
-export function getGlobalPredefinedTokens(): Record<string, string> | null {
+export function getGlobalPredefinedTokens(): Record<string, string> {
   return __globalPredefinedTokens;
 }
 
 /**
- * Reset global predefined tokens.
- * Used for testing.
+ * Reset global predefined tokens to the built-in defaults.
+ * Used by runtime and build-time configuration resets, and by tests.
  * @internal
  */
 export function resetGlobalPredefinedTokens(): void {
-  __globalPredefinedTokens = null;
+  __globalPredefinedTokens = { ...DEFAULT_PREDEFINED_TOKENS };
   // Clear parser cache since token availability affects parsing
   getOrCreateParser().clearCache();
 }

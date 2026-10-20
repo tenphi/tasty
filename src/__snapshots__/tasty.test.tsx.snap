@@ -13,7 +13,7 @@ exports[`tasty() API > should allow multiple wrapping 1`] = `
 `;
 
 exports[`tasty() API > should allow nested modifiers 1`] = `
-".t1flirgv.t1flirgv:where(:first-child) { color: var(--clear-color); --current-color: var(--clear-color); }
+".t1flirgv.t1flirgv:where(:first-child) { color: transparent; --current-color: transparent; }
 .t1flirgv.t1flirgv:where(:not(:first-child)) { color: var(--black-color); --current-color: var(--black-color); }"
 `;
 
@@ -22,7 +22,7 @@ exports[`tasty() API > should apply extend-mode base styles on top of variant 1`
 .t1245eoh.t1245eoh:where(:not([data-hovered])) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
 .t1245eoh.t1245eoh:where([data-pressed]:not([data-disabled]):not([data-type="primary"])) { border: var(--border-width) solid var(--primary-text-color); }
 .t1245eoh.t1245eoh:where([data-hovered]) { background-color: var(--white-color); --tasty-second-fill-color: var(--primary-text-color); background-image: linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color)); }
-.t1245eoh.t1245eoh:where(:is([data-disabled], [data-type="primary"])) { border: var(--border-width) solid var(--clear-color); }
+.t1245eoh.t1245eoh:where(:is([data-disabled], [data-type="primary"])) { border: var(--border-width) solid transparent; }
 .t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
@@ -30,7 +30,7 @@ exports[`tasty() API > should apply extend-mode base styles on top of variant 2`
 ".tmipikk.tmipikk:where(:not([data-pressed]):not([data-type="primary"])) { border: var(--border-width) solid oklch(from var(--primary-color) l c h / .15); }
 .tmipikk.tmipikk { background-color: oklch(from var(--primary-color) l c h / .10); }
 .tmipikk.tmipikk:where([data-pressed]:not([data-type="primary"])) { border: var(--border-width) solid oklch(from var(--primary-color) l c h / .3); }
-.tmipikk.tmipikk:where([data-type="primary"]) { border: var(--border-width) solid var(--clear-color); }
+.tmipikk.tmipikk:where([data-type="primary"]) { border: var(--border-width) solid transparent; }
 .t12gf6kq.t12gf6kq { padding: 16px; }"
 `;
 
@@ -85,7 +85,7 @@ exports[`tasty() API > should optimize attribute selectors 3`] = `
 .t15auxy1.t15auxy1:where([data-selected][data-size="large"]) { padding: 24px 0px 0px; }"
 `;
 
-exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: oklch(from var(--clear-color) l c h / .1); --current-color: oklch(from var(--clear-color) l c h / .1); }"`;
+exports[`tasty() API > should pass styles from tasty 1`] = `".tal0tej.tal0tej { color: transparent; --current-color: transparent; }"`;
 
 exports[`tasty() API > should support camelCase modifiers 1`] = `
 ".t10vr46x.t10vr46x:where(:not([data-somehow-modified])) { color: var(--dark-color); --current-color: var(--dark-color); }

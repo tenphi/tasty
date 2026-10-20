@@ -23,7 +23,7 @@ export interface TastyPlugin {
    * definitions. See {@link FunctionsConfig}.
    */
   functions?: FunctionsConfig;
-  /** Custom units that transform numeric values (e.g., `2x` → `calc(2 * var(--gap))`) */
+  /** Custom units that scale numeric values (e.g., `x: '8px'` makes `2x` → `16px`) */
   units?: Record<string, string | UnitHandler>;
   /** Custom state aliases (e.g., `'@mobile': '@media(w < 768px)'`) */
   states?: Record<string, string>;

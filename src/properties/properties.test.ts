@@ -61,6 +61,7 @@ describe('properties', () => {
 
     it('should return null for non-object @property value', () => {
       const styles = {
+        // eslint-disable-next-line tasty/valid-styles-structure -- the invalid shape is the input under test
         '@property': 'invalid',
       } as unknown as Styles;
 

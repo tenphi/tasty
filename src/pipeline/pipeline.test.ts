@@ -73,6 +73,7 @@ import { clearPipelineCache, renderStyles } from './index';
 import { clearSimplifyCache } from './simplify';
 import { clearConditionCache } from './materialize';
 import { configure, resetConfig } from '../config';
+import { expandTastyUnits } from '../states';
 import type { StyleResult } from './index';
 
 describe('native animation shorthand', () => {
@@ -2099,6 +2100,89 @@ describe('Integration: Exclusive conditions for media queries', () => {
 
     // Third (default): !(w <= 920px) & !(w <= 1400px) → w > 1400px
     expect(exclusive[2].stateKey).toBe('');
+  });
+});
+
+describe('Tasty units in query conditions', () => {
+  // CSS has its own `x` unit for resolution (an alias of `dppx`), so a unit
+  // token only means a Tasty length in a feature that takes a length.
+  function atRulesFor(stateKey: string): string[] {
+    return renderStyles(
+      { color: { '': 'red', [stateKey]: 'blue' } },
+      '.t',
+    ).flatMap((rule) => rule.atRules ?? []);
+  }
+
+  it.each([
+    ['@media(min-resolution: 2x)', '(min-resolution: 2x)'],
+    ['@media(max-resolution: 1.5x)', '(max-resolution: 1.5x)'],
+    ['@media(resolution: 2x)', '(resolution: 2x)'],
+    ['@media(resolution >= 2x)', '(resolution >= 2x)'],
+    ['@media(2x <= resolution)', '(2x <= resolution)'],
+    ['@media(1x < resolution <= 3x)', '(1x < resolution <= 3x)'],
+  ])('keeps the resolution unit in %s', (stateKey, query) => {
+    expect(atRulesFor(stateKey)).toEqual([
+      `@media (not ${query})`,
+      `@media ${query}`,
+    ]);
+  });
+
+  it('parses a resolution feature as a media feature', () => {
+    expect(parseStateKey('@media(min-resolution: 2x)')).toMatchObject({
+      type: 'media',
+      subtype: 'feature',
+      feature: 'min-resolution',
+      featureValue: '2x',
+    });
+  });
+
+  it('passes range syntax over a non-dimension feature through as written', () => {
+    // Used to fall back to a pseudo-class, which emitted `@media(…)` as a
+    // selector.
+    expect(parseStateKey('@media(resolution >= 2x)')).toMatchObject({
+      type: 'media',
+      subtype: 'feature',
+      feature: 'resolution >= 2x',
+      featureValue: undefined,
+    });
+    expect(atRulesFor('@media(aspect-ratio > 16/9)')).toEqual([
+      '@media (not (aspect-ratio > 16/9))',
+      '@media (aspect-ratio > 16/9)',
+    ]);
+  });
+
+  it('expands units in the legacy min-width: form', () => {
+    expect(parseStateKey('@media(min-width: 40x)')).toMatchObject({
+      subtype: 'feature',
+      feature: 'min-width',
+      featureValue: expandTastyUnits('40x'),
+    });
+    expect(atRulesFor('@media(max-height: 12.5x)')).toContain(
+      `@media (max-height: ${expandTastyUnits('12.5x')})`,
+    );
+  });
+
+  it.each([
+    ['@media(w >= 40x)', '@media (width >= 40x)'],
+    ['@media(40x <= w < 80x)', '@media (40x <= width < 80x)'],
+    ['@media(is < 40x)', '@media (inline-size < 40x)'],
+    ['@(w < 40x)', '@container (width < 40x)'],
+    ['@(layout, bs > 40x)', '@container layout (block-size > 40x)'],
+  ])('expands units in the dimension query %s', (stateKey, expected) => {
+    expect(atRulesFor(stateKey)).toContain(expandTastyUnits(expected));
+  });
+
+  it('keeps the unit when a predefined state resolves to a resolution query', () => {
+    const rules = renderStyles(
+      {
+        '@hidpi': '@media(min-resolution: 2x)',
+        color: { '': 'red', '@hidpi': 'blue' },
+      },
+      '.t',
+    );
+    expect(rules.flatMap((rule) => rule.atRules ?? [])).toContain(
+      '@media (min-resolution: 2x)',
+    );
   });
 });
 

@@ -535,6 +535,10 @@ type       TastyIntegrationOptions
 value      tastyMiddleware
 type       TastyMiddlewareOptions
 
+## @tenphi/tasty/ssr/client
+
+value      hydrateTastyClasses
+
 ## @tenphi/tasty/ssr/astro-client
 
 _(no exports — side effects only)_

@@ -521,6 +521,8 @@ fill: {
 
 Custom units work inside media queries: `@media(w < 40x)` → `@media (width < calc(var(--gap) * 40))`.
 
+Units are only converted in features that take a length: `width`, `height`, `inline-size`, and `block-size`, with or without `min-`/`max-` (`@media(min-width: 40x)` converts too). Every other feature keeps its value as written, so `@media(min-resolution: 2x)` and `@media(resolution >= 2x)` reach the browser unchanged: there `x` is CSS's own resolution unit, an alias of `dppx`.
+
 In practice, define state aliases via `configure({ states })` and use `@mobile` instead of writing the full query in every component.
 
 ### `@(...)` — Container Queries

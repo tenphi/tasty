@@ -14,6 +14,7 @@
  * with the rest of the materialization pipeline.
  */
 
+import { getRangeUnit } from './conditions';
 import type {
   ParsedContainerCondition,
   ParsedMediaCondition,
@@ -117,11 +118,15 @@ export function hasMediaContradiction(
     // Negated dimensions are handled by the direct contradiction check.
     if (cond.subtype !== 'dimension' || cond.negated) continue;
 
-    const dim = cond.dimension || 'width';
-    let bounds = dimensionsByDim.get(dim);
+    // Only bounds in the same unit can contradict each other.
+    const unit = getRangeUnit(cond);
+    if (unit === null) continue;
+
+    const rangeKey = `${cond.dimension || 'width'}|${unit}`;
+    let bounds = dimensionsByDim.get(rangeKey);
     if (!bounds) {
       bounds = { lowerBound: null, upperBound: null };
-      dimensionsByDim.set(dim, bounds);
+      dimensionsByDim.set(rangeKey, bounds);
     }
 
     if (cond.lowerBound?.valueNumeric != null) {

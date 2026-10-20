@@ -46,6 +46,9 @@ const PROPERTY_TIMEOUT = 30_000;
 /** A width inside every `STATIC_ATOMS` media range that is meant to hold. */
 const VIEWPORT_WIDTH = 1000;
 
+/** The default font size, which a query `em` is relative to. */
+const EM = 16;
+
 const MOD_ATOMS = ['alpha', 'beta', 'gamma', 'd'];
 const ALL_ATOMS = [
   ...MOD_ATOMS,
@@ -82,19 +85,31 @@ function randomMaps(
 
 type Scope = 'element' | 'root' | 'parent';
 
-function inRange(node: {
-  lowerBound?: { valueNumeric: number | null; inclusive: boolean };
-  upperBound?: { valueNumeric: number | null; inclusive: boolean };
-}): boolean {
-  const { lowerBound: lower, upperBound: upper } = node;
+interface Bound {
+  value: string;
+  valueNumeric: number | null;
+  inclusive: boolean;
+}
+
+/** A bound's length in px, as the test environment resolves it. */
+function toPx(bound: Bound): number | null {
+  if (bound.valueNumeric === null) return null;
+  return bound.value.endsWith('em') && !bound.value.endsWith('rem')
+    ? bound.valueNumeric * EM
+    : bound.valueNumeric;
+}
+
+function inRange(node: { lowerBound?: Bound; upperBound?: Bound }): boolean {
+  const lower = node.lowerBound && toPx(node.lowerBound);
+  const upper = node.upperBound && toPx(node.upperBound);
   const w = VIEWPORT_WIDTH;
-  if (lower && lower.valueNumeric !== null) {
-    if (lower.inclusive ? w < lower.valueNumeric : w <= lower.valueNumeric) {
+  if (lower != null) {
+    if (node.lowerBound!.inclusive ? w < lower : w <= lower) {
       return false;
     }
   }
-  if (upper && upper.valueNumeric !== null) {
-    if (upper.inclusive ? w > upper.valueNumeric : w >= upper.valueNumeric) {
+  if (upper != null) {
+    if (node.upperBound!.inclusive ? w > upper : w >= upper) {
       return false;
     }
   }

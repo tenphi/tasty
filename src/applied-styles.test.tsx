@@ -497,6 +497,32 @@ describe('generated CSS applies in the browser', () => {
       expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
     });
 
+    it('leaves em and px bounds for the browser to compare', async () => {
+      const Box = tasty({
+        qa: 'Box',
+        styles: {
+          display: 'block',
+          padding: {
+            '': '4x',
+            '@media(w < 40em)': '2x',
+            '@media(w < 600px)': '1x',
+          },
+        },
+      });
+
+      const { getByTestId } = render(<Box />);
+
+      // 40em is 640px at the default font size, so 620px is only `w < 40em`.
+      await page.viewport(620, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('16px');
+
+      await page.viewport(500, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('8px');
+
+      await page.viewport(900, 600);
+      expect(computed(getByTestId('Box'), 'padding')).toBe('32px');
+    });
+
     // `x` here is CSS's resolution unit (an alias of `dppx`), not Tasty's
     // spacing unit. Rewriting it to a length makes the query invalid, so it
     // never matches.

@@ -23,9 +23,8 @@ configure({
 
   // Custom units (merged with built-in units)
   units: {
-    vh: 'vh',
-    vw: 'vw',
-    custom: (n) => `${n * 10}px`, // Function-based unit
+    gu: '4px', // `2gu` → `8px`
+    cols: (n) => `calc(${n} * var(--col-width))`, // function-based unit
   },
 
   // Custom functions — a single map for both flavors, discriminated by value type:
@@ -47,35 +46,35 @@ These docs use `data-schema="dark"` in examples. If your app already standardize
 
 ## Options
 
-| Option               | Type                                             | Default                               | Description                                                                                                                                                          |
-| -------------------- | ------------------------------------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nonce`              | `string`                                         | -                                     | CSP nonce for style elements                                                                                                                                         |
-| `maxRulesPerSheet`   | `number`                                         | `8192`                                | Maximum rules per injected stylesheet                                                                                                                                |
-| `forceTextInjection` | `boolean`                                        | auto (`true` in test envs)            | Force text-node CSS injection instead of constructable stylesheets                                                                                                   |
-| `devMode`            | `boolean`                                        | auto                                  | Enable development-mode features: performance metrics and debug info                                                                                                 |
-| `states`             | `Record<string, string>`                         | -                                     | Global state aliases for advanced state mapping                                                                                                                      |
-| `parserCacheSize`    | `number`                                         | `1000`                                | Parser LRU cache size                                                                                                                                                |
-| `units`              | `Record<string, string \| UnitHandler>`          | Built-in                              | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units)                                                                                     |
-| `functions`          | `Record<string, FunctionDefinition \| Function>` | -                                     | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions                                                      |
-| `handlers`           | `Record<string, StyleHandlerDefinition>`         | Built-in                              | Custom style handlers (replace built-in). See [Custom Style Handlers](#custom-style-handlers)                                                                        |
-| `propHandlers`       | `Record<string, PropHandlerDefinition>`          | -                                     | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware)                                                                |
-| `baseStyleProps`     | `readonly string[]`                              | -                                     | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props)                                                                       |
-| `tokens`             | `Record<string, value \| stateMap>`              | -                                     | Design tokens injected as `:root` CSS custom properties                                                                                                              |
-| `replaceTokens`      | `Record<string, string \| number \| boolean>`    | -                                     | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens                                                                        |
-| `keyframes`          | `Record<string, KeyframesSteps>`                 | -                                     | Global keyframes for animations                                                                                                                                      |
-| `properties`         | `Record<string, PropertyDefinition>`             | -                                     | Global CSS @property definitions                                                                                                                                     |
-| `fontFaces`          | `Record<string, FontFaceInput>`                  | -                                     | Global @font-face definitions                                                                                                                                        |
-| `counterStyles`      | `Record<string, CounterStyleDescriptors>`        | -                                     | Global @counter-style definitions                                                                                                                                    |
-| `polyfills`          | `{ functions?: boolean }`                        | `{}`                                  | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time                                             |
-| `autoPropertyTypes`  | `boolean`                                        | `true`                                | Auto-infer and register `@property` types from values                                                                                                                |
-| `recipes`            | `Record<string, RecipeStyles>`                   | -                                     | Predefined style recipes (named style bundles)                                                                                                                       |
-| `presets`            | `Record<string, TypographyPreset>`               | -                                     | Typography presets — shorthand for `generateTypographyTokens()`                                                                                                      |
-| `globalStyles`       | `Record<string, Styles>`                         | -                                     | Global Tasty styles keyed by CSS selector                                                                                                                            |
-| `plugins`            | `TastyPlugin[]`                                  | -                                     | Plugins that bundle any of the above (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md)                        |
-| `gc`                 | `GCConfig`                                       | -                                     | Garbage-collection tuning for unused styles (`{ touchInterval, capacity }`)                                                                                          |
-| `batchInjection`     | `boolean \| 'always'`                            | `false`                               | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection)                                                                     |
-| `colorSpace`         | `'rgb' \| 'hsl' \| 'oklch'`                      | -                                     | **Deprecated** — no longer has any effect. See [Color space](#color-space)                                                                                           |
-| `namePrefix`         | `string`                                         | `'t'` (`tasty`) / `'ts'` (build-time) | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix). |
+| Option               | Type                                             | Default                                                                              | Description                                                                                                                                                                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nonce`              | `string`                                         | -                                                                                    | CSP nonce for style elements                                                                                                                                                                                                                                                                                                            |
+| `maxRulesPerSheet`   | `number`                                         | `8192`                                                                               | Maximum rules per injected stylesheet                                                                                                                                                                                                                                                                                                   |
+| `forceTextInjection` | `boolean`                                        | `false` (`true` in test environments only while `configure()` has never been called) | Force text-node CSS injection instead of constructable stylesheets. Set it explicitly in test setup                                                                                                                                                                                                                                     |
+| `devMode`            | `boolean`                                        | auto                                                                                 | Enable development-mode features: performance metrics and debug info. Does not turn on dev warnings; those follow `NODE_ENV` (or `localStorage.TASTY_DEBUG = 'true'` in a browser)                                                                                                                                                      |
+| `states`             | `Record<string, string>`                         | -                                                                                    | Global state aliases for advanced state mapping                                                                                                                                                                                                                                                                                         |
+| `parserCacheSize`    | `number`                                         | `1000`                                                                               | Parser LRU cache size                                                                                                                                                                                                                                                                                                                   |
+| `units`              | `Record<string, string \| UnitHandler>`          | Built-in                                                                             | Custom units (merged with built-in). See [built-in units](dsl.md#built-in-units)                                                                                                                                                                                                                                                        |
+| `functions`          | `Record<string, FunctionDefinition \| Function>` | -                                                                                    | Custom functions (merged). Bare keys → parse functions; `$$name` keys → declarative CSS `@function` definitions                                                                                                                                                                                                                         |
+| `handlers`           | `Record<string, StyleHandlerDefinition>`         | Built-in                                                                             | Custom style handlers (replace built-in). See [Custom Style Handlers](#custom-style-handlers)                                                                                                                                                                                                                                           |
+| `propHandlers`       | `Record<string, PropHandlerDefinition>`          | -                                                                                    | Props middleware for every component — props in, props out. See [Props Middleware](#props-middleware)                                                                                                                                                                                                                                   |
+| `baseStyleProps`     | `readonly string[]`                              | -                                                                                    | Style names exposed as props on **every** component. See [Base Style Props](#base-style-props)                                                                                                                                                                                                                                          |
+| `tokens`             | `Record<string, value \| stateMap>`              | -                                                                                    | Design tokens injected as `:root` CSS custom properties                                                                                                                                                                                                                                                                                 |
+| `replaceTokens`      | `Record<string, string \| number \| boolean>`    | -                                                                                    | Parse-time token substitution (inline replacement). `boolean` is allowed for `#` color tokens                                                                                                                                                                                                                                           |
+| `keyframes`          | `Record<string, KeyframesSteps>`                 | -                                                                                    | Global keyframes for animations                                                                                                                                                                                                                                                                                                         |
+| `properties`         | `Record<string, PropertyDefinition>`             | -                                                                                    | Global CSS @property definitions                                                                                                                                                                                                                                                                                                        |
+| `fontFaces`          | `Record<string, FontFaceInput>`                  | -                                                                                    | Global @font-face definitions                                                                                                                                                                                                                                                                                                           |
+| `counterStyles`      | `Record<string, CounterStyleDescriptors>`        | -                                                                                    | Global @counter-style definitions                                                                                                                                                                                                                                                                                                       |
+| `polyfills`          | `{ functions?: boolean }`                        | `{}`                                                                                 | Opt-in polyfills for not-yet-baseline features. `functions: true` inlines `@function` calls into plain CSS at parse time                                                                                                                                                                                                                |
+| `autoPropertyTypes`  | `boolean`                                        | `true`                                                                               | Auto-infer and register `@property` types from values                                                                                                                                                                                                                                                                                   |
+| `recipes`            | `Record<string, RecipeStyles>`                   | -                                                                                    | Predefined style recipes (named style bundles)                                                                                                                                                                                                                                                                                          |
+| `presets`            | `Record<string, TypographyPreset>`               | -                                                                                    | Typography presets — shorthand for `generateTypographyTokens()`                                                                                                                                                                                                                                                                         |
+| `globalStyles`       | `Record<string, Styles>`                         | -                                                                                    | Global Tasty styles keyed by CSS selector                                                                                                                                                                                                                                                                                               |
+| `plugins`            | `TastyPlugin[]`                                  | -                                                                                    | Plugins that bundle `functions`, `units`, `states`, `handlers`, `propHandlers`, `baseStyleProps`, `tokens`, `replaceTokens`, `recipes`, `presets`, `globalStyles`, `properties`, `keyframes`, `fontFaces`, and `counterStyles` (processed in order; later override earlier, and direct config wins over all). See [Plugins](plugins.md) |
+| `gc`                 | `GCConfig`                                       | -                                                                                    | Turns on automatic collection of unused styles: `{ touchInterval?, capacity?, grace? }` (defaults `1000`, `1000`, `10000` ms). Without it nothing is collected automatically; call `gc()` yourself                                                                                                                                      |
+| `batchInjection`     | `boolean \| 'always'`                            | `false`                                                                              | Defer stylesheet writes and apply them in one batch. See [Batched injection](#batched-injection)                                                                                                                                                                                                                                        |
+| `colorSpace`         | `'rgb' \| 'hsl' \| 'oklch'`                      | -                                                                                    | **Deprecated** — no longer has any effect. See [Color space](#color-space)                                                                                                                                                                                                                                                              |
+| `namePrefix`         | `string`                                         | `'t'` (`tasty`) / `'ts'` (build-time)                                                | Prefix prepended to every generated identifier (class, keyframe, counter-style names). Must match `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$`. See [Name prefix](#name-prefix).                                                                                                                                                                    |
 
 ---
 
@@ -334,8 +333,7 @@ Tokens support state maps for responsive or theme-aware values:
 ```jsx
 configure({
   tokens: {
-    $gap: '4px',
-    $radius: '6px',
+    '$sidebar-width': '280px',
     '#primary': {
       '': '#purple',
       '@dark': '#light-purple',
@@ -350,9 +348,10 @@ configure({
 
 - `$name` keys become `--name` CSS custom properties
 - `#name` keys become `--name-color` custom properties
+- Tokens do not change units: `2x` stays `16px` whatever `$gap` is. To drive a unit from a token, point the unit at it: `units: { x: 'var(--gap)' }` makes `2x` compile to `calc(2 * var(--gap))`
 - Names keep their case, since CSS custom properties are case-sensitive: `$myVar` is `--myVar` and is referenced as `$myVar`. A leading capital is not supported and folds — `$Foo` and `#Purple` become `--foo` and `--purple-color` — so start names lowercase. Kebab-case (`$my-var`) remains the convention.
 
-Tokens are automatically emitted in all delivery modes: client rendering, server rendering, and build-time extraction with the Babel plugin.
+Tokens are emitted by the client injector, by the SSR collector (`TastyRegistry`, `tastyIntegration()`, `runWithCollector()`), by the `withTastyNext()` shared stylesheet, and by the Babel plugin. The inline React Server Component path without a collector does not emit them — see [Server-Side Rendering](ssr.md).
 
 ---
 
@@ -471,7 +470,7 @@ See [Functions (`@function`)](dsl.md#functions-function) for inline usage inside
 
 ### Custom color functions
 
-A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `#token.alpha` opacity injection, and `parseColor` — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
+A parse function whose output is an already-supported color (`rgb`, `hsl`, `#…`, `oklch`, …) is treated as a **color function**: it works everywhere a color is accepted — style values, `parseColor`, and the `#token.alpha` opacity suffix, which calls the function with a `/ alpha` part appended (read `groups[0].parts[1]`, as below) — with no extra registration. This is the same mechanism the built-in `okhsl`/`okhst` plugins use; they are ordinary plugins registered by default.
 
 ```ts
 import { configure, createColorFunc } from '@tenphi/tasty';
@@ -482,8 +481,12 @@ const myColorPlugin = () => ({
   functions: {
     // Hand-written parse function:
     mycolor: (groups) => {
-      const [r, g, b] = groups[0].all;
-      return `rgb(${r} ${g} ${b})`;
+      // `mycolor(255 0 0 / .5)` and `#brand.5` both arrive as two parts
+      const [main, alpha] = groups[0].parts;
+      const [r, g, b] = main.all;
+      return alpha?.all.length
+        ? `rgb(${r} ${g} ${b} / ${alpha.output})`
+        : `rgb(${r} ${g} ${b})`;
     },
   },
 });
@@ -690,10 +693,16 @@ Override or extend the built-in style property handlers. A handler definition ca
 | Single dep    | `['styleName', handler]`           | Triggered by the specified style property                       |
 | Multi dep     | `[['dep1', 'dep2', ...], handler]` | Triggered by any of the listed properties; receives all of them |
 
-The multi-dep form is useful when output depends on several style properties together (e.g., `gap` needs to know `display` and `flow` to decide the CSS strategy). Use `defineHandler` for it and the dependency types are inferred from the dependency list, so a typo in the destructure is a type error instead of a silent `undefined`.
+The multi-dep form is useful when output depends on several style properties together (e.g., `gap` needs to know `display` and `flow` to decide the CSS strategy). A handler whose dependencies include a built-in style takes over that style's whole group — see [Replacing a built-in handler](#replacing-a-built-in-handler). Use `defineHandler` for it and the dependency types are inferred from the dependency list, so a typo in the destructure is a type error instead of a silent `undefined`.
 
 ```jsx
-import { configure, defineHandler, styleHandlers } from '@tenphi/tasty';
+import {
+  configure,
+  defineHandler,
+  parseColor,
+  parseStyle,
+  styleHandlers,
+} from '@tenphi/tasty';
 
 configure({
   handlers: {
@@ -717,6 +726,10 @@ configure({
         'backgroundPosition',
         'backgroundSize',
         'backgroundRepeat',
+        'backgroundAttachment',
+        'backgroundOrigin',
+        'backgroundClip',
+        'background',
       ],
       (props) => {
         if (
@@ -729,12 +742,18 @@ configure({
       },
     ),
 
-    // Multi dep — handler reads multiple style properties
-    gap: defineHandler(['display', 'flow', 'gap'], ({ display, flow, gap }) => {
-      if (!gap) return;
-      const isGrid = String(display ?? '').includes('grid');
-      return { gap: isGrid ? gap : `/* custom logic for ${flow} */` };
-    }),
+    // Multi dep — triggered by either name, receives both
+    stripe: defineHandler(
+      ['stripe', 'stripeColor'],
+      ({ stripe, stripeColor }) => {
+        if (!stripe) return;
+        const width = parseStyle(String(stripe)).output;
+        const color = stripeColor
+          ? parseColor(String(stripeColor)).color
+          : 'currentcolor';
+        return { 'border-left': `${width} solid ${color}` };
+      },
+    ),
   },
 });
 ```
@@ -756,12 +775,17 @@ Built-in handlers are shared across several style names. Registering a handler f
 
 The shared groups worth knowing:
 
-| Registering a handler for      | Also takes over                                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `fill`                         | `backgroundColor`, `image`, `backgroundImage`, `backgroundPosition`, `backgroundSize`, `backgroundRepeat` |
-| `display`                      | `hide`, `overflow`, `whiteSpace`, `textOverflow`, `flow`, `gap`                                           |
-| `preset`                       | `font`, `fontSize`, `fontWeight`, `fontStyle`, `lineHeight`, `letterSpacing`, `textTransform`             |
-| `padding` / `margin` / `inset` | their `*Top`/`*Right`/`*Bottom`/`*Left`/`*Block`/`*Inline` longhands                                      |
+| Registering a handler for | Also takes over                                                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fill`                    | `backgroundColor`, `image`, `backgroundImage`, `backgroundPosition`, `backgroundSize`, `backgroundRepeat`, `backgroundAttachment`, `backgroundOrigin`, `backgroundClip`, `background` |
+| `display`                 | `hide`, `whiteSpace`, `textOverflow`, `flow`, `gap`                                                                                                                                   |
+| `flow`                    | `gap`                                                                                                                                                                                 |
+| `preset`                  | `font`, `fontFamily`, `fontSize`, `fontWeight`, `fontStyle`, `lineHeight`, `letterSpacing`, `textTransform`                                                                           |
+| `padding` / `margin`      | their `Top`/`Right`/`Bottom`/`Left` longhands (`paddingTop`, `marginLeft`, …)                                                                                                         |
+| `inset`                   | `top`, `right`, `bottom`, `left`                                                                                                                                                      |
+| `width` / `height`        | `minWidth`/`maxWidth`, `minHeight`/`maxHeight`                                                                                                                                        |
+
+A multi-dep handler takes over every group its dependencies touch: `defineHandler(['display', 'flow', 'gap'], …)` takes over `display`, `flow`, and `gap` together, so it must emit `display` and `flex-flow` itself.
 
 Either declare the whole group and delegate the rest to `styleHandlers.*`, or pick a name that isn't shared.
 
@@ -822,18 +846,98 @@ Each name costs one property check per render of every component, and the effect
 
 ---
 
-## Extending Style Types (TypeScript)
+## TypeScript
 
-Use module augmentation to extend the `StylesInterface`:
+Component props are typed from the `tasty()` definition with no setup. Module augmentation adds the names your design system defines and the extensions your plugins add.
 
-```tsx
-// tasty.d.ts
+### Component props
+
+| In `tasty({ … })`                                                     | Adds the props                                                                                                                                                        |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `styleProps: ['gap', 'padding'] as const`                             | `gap`, `padding`, each typed like the style: a value or a state map                                                                                                   |
+| `modProps: { isLoading: Boolean, size: ['sm', 'md', 'lg'] as const }` | `isLoading?: boolean`, `size?: 'sm' \| 'md' \| 'lg'` (`String` gives `string`, `Number` gives `number`)                                                               |
+| `modProps: ['isLoading'] as const`                                    | `isLoading?: ModValue`                                                                                                                                                |
+| `tokenProps: ['progress', 'accentColor'] as const`                    | `progress?: TokenValue`, `accentColor?: TokenValue`                                                                                                                   |
+| `variants: { default: {…}, danger: {…} }`                             | `variant?: 'default' \| 'danger'`                                                                                                                                     |
+| `elements: { Title: 'h3' }`                                           | `Card.Title`, with the `h3` props plus `qa`, `qaVal`, `mods`, `tokens`, `isDisabled`, `isHidden`, `isChecked`, and a `ref` typed as `HTMLHeadingElement`; no `styles` |
+| `as: SomeComponent`                                                   | `SomeComponent`'s own props, required ones still required                                                                                                             |
+
+Write the array forms with `as const`. Without it, `modProps: ['isLoading']` widens to `string[]` and every prop on the component is typed `ModValue`, so an `onClick` handler no longer type-checks. A `modProps` value list without `as const` widens to `string`.
+
+`tasty(Base, { … })` keeps `Base`'s prop types and adds none for the options above, which that form ignores — see [Extend an existing component](react-api.md#extend-an-existing-component).
+
+### Registering your names and extensions
+
+```ts
+// tasty.d.ts — keep the import: it makes this file a module, so the block
+// below extends '@tenphi/tasty' instead of replacing it.
+import '@tenphi/tasty';
+
 declare module '@tenphi/tasty' {
+  interface TastyNamedColors {
+    surface: true;
+    text: true;
+    primary: true;
+  }
+  interface TastyPresetNames {
+    h1: true;
+    t2: true;
+  }
+  interface TastyThemeNames {
+    danger: true;
+    success: true;
+  }
   interface StylesInterface {
-    elevation?: string;
-    gradient?: string;
+    stripe?: string;
+  }
+  interface TastyCustomProps {
+    glaze: 'soft' | 'strong' | { tone: string; intensity?: number };
+  }
+  interface TastyBaseStylePropNames {
+    radius: true;
+    stripe: true;
   }
 }
 ```
+
+| Interface                 | Register                                                             | What it types                                                            |
+| ------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `TastyNamedColors`        | Color token names from `tokens` and `replaceTokens`, without the `#` | Suggestions for `#name` and `#name.50` in `fill`, `color`, and `svgFill` |
+| `TastyPresetNames`        | `presets` names                                                      | The `preset` style and prop                                              |
+| `TastyThemeNames`         | Theme names                                                          | The `theme` prop (rendered as `data-theme`)                              |
+| `StylesInterface`         | Style properties added with `handlers`                               | Their value type in `styles`, `styleProps`, and base style props         |
+| `TastyCustomProps`        | Props added with `propHandlers`                                      | An optional prop on every `tasty()` component (not on sub-elements)      |
+| `TastyBaseStylePropNames` | Names passed to `baseStyleProps`                                     | A prop on every component, typed like the style it names                 |
+
+- The first three add autocomplete, not checking: any other string still type-checks (`preset: 'h9'` compiles). The ESLint plugin is what reports unknown names.
+- In `StylesInterface`, declare the plain value type (`stripe?: string`). Tasty adds state-map support itself, as it does for built-in styles.
+- A custom style name in `styles` type-checks without augmentation, but `styleProps` and `TastyBaseStylePropNames` accept only names in `StylesInterface`. A base style prop name missing from it adds no prop.
+- `TastyCustomProps` types the component prop, not the handler. A prop handler receives `Record<string, unknown>`, so cast inside it (`rest.styles as Styles`).
+- State keys, `$` value tokens, units, and recipe names have no TypeScript types. The ESLint plugin checks them against `tasty.config.ts`.
+
+### `tasty.config.ts`
+
+TypeScript augmentation does not reach the linter or the editor. [`@tenphi/eslint-plugin-tasty`](https://github.com/tenphi/eslint-plugin-tasty) and the Tasty VS Code extension read a `tasty.config.ts` (or `.js`, `.json`) at the project root instead. It only lists names: it is not passed to `configure()`, and it is unrelated to the Babel plugin's `configFile` (such as `tasty-zero.config.ts`).
+
+```ts
+// tasty.config.ts
+import type { TastyExtensionConfig } from '@tenphi/tasty';
+import type { TastyValidationConfig } from '@tenphi/eslint-plugin-tasty';
+
+export default {
+  tokens: ['#surface', '#text', '#primary', '$sidebar-width'],
+  units: ['cols'],
+  states: ['@mobile', '@dark'],
+  presets: ['h1', 't2'],
+  recipes: ['card', 'elevated'],
+  styles: ['stripe'],
+  importSources: ['@my-org/ui'],
+  presetDescriptions: { h1: 'Heading 1 (32px, bold)' },
+} satisfies TastyExtensionConfig & TastyValidationConfig;
+```
+
+`TastyExtensionConfig` from `@tenphi/tasty` types the fields the VS Code extension reads: `extends`, `tokens`, `units`, `functions`, `states`, `presets`, `styles`, `presetDescriptions`, and `stateDescriptions`. It has no `recipes`, `importSources`, `ownedSources`, or `styleFunctions`, so annotating the file with it alone rejects those ESLint fields; intersect it with the plugin's `TastyValidationConfig`, as above. An omitted list is not checked; `tokens: false`, `units: false`, or `functions: false` turns a check off even when an `extends` parent sets it.
+
+Keep it in step with `configure()`: token names with their `#` or `$`, custom units, parse-function names, state aliases, presets, recipes, and custom style names.
 
 See [Style DSL](dsl.md) for state maps, tokens, units, and extending semantics, and [React API](react-api.md) for `tasty()`, style functions, and component props.

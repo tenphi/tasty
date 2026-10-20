@@ -188,8 +188,8 @@ A key whose prefix doesn't match its value type is ignored with a development wa
 ## 7. Moved subpath
 
 ```diff
-- import { withTasty } from '@tenphi/tasty/next';
-+ import { withTasty } from '@tenphi/tasty/zero/next';
+- import { withTastyZero } from '@tenphi/tasty/next';
++ import { withTastyZero } from '@tenphi/tasty/zero/next';
 ```
 
 The build-time extraction Next.js wrapper already lived under the `zero` namespace internally; the top-level `/next` path collided confusingly with `@tenphi/tasty/ssr/next`, which is a different integration.

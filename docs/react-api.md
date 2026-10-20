@@ -2,7 +2,7 @@
 
 Use `tasty()` to turn state-aware style definitions into normal React components, extend existing Tasty components, and expose typed styling APIs to consumers.
 
-All Tasty style functions — `tasty()` components, `useStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — are hook-free and compatible with React Server Components. No `'use client'` directive is needed. For state maps, tokens, units, and extension semantics, see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
+Every Tasty style function except `useStyles()` — `tasty()` components, `computeStyles()`, `useGlobalStyles()`, `useRawCSS()`, `useKeyframes()`, `useProperty()`, `useFontFace()`, `useCounterStyle()`, and `useFunction()` — is hook-free and works in React Server Components with no `'use client'` directive. `useStyles()` reads the `TastyRegistry` collector from React context, so it is a real hook; in Server Components and outside React, call `computeStyles()` instead. For state maps, tokens, units, and extension semantics, see [Style DSL](dsl.md). For global configuration, see [Configuration](configuration.md). For the broader docs map, see the [Docs Hub](README.md).
 
 > **Note:** This file was previously named `runtime.md`. All functionality documented here works in both server and client contexts — "runtime" referred to style computation during React rendering, not to client-side JavaScript.
 
@@ -44,6 +44,8 @@ const PrimaryButton = tasty(Button, {
 
 Style maps merge intelligently — see [Style DSL — Extending vs. Replacing State Maps](dsl.md#extending-vs-replacing-state-maps) for extend mode, replace mode, `@inherit`, `null`, and `false` tombstones.
 
+The extension form forwards props; it does not re-run the factory. `styleProps`, `modProps`, `tokenProps`, `variants`, and `elements` passed to `tasty(Component, …)` are ignored even though they type-check, and the base's sub-components are not copied (`tasty(Card, …).Title` is `undefined`). Declare them on the base component, or create the component with `tasty({ … })` directly.
+
 `tasty(Component, ...)` always wraps `Component` and forwards every prop to it, so `Component` must be Tasty-aware (i.e. it accepts `styles`, `mods`, `qa`, etc. and renders them through its own Tasty pipeline). To apply styles to a third-party component or a string DOM tag via `className`, use the options-only form with `as`:
 
 ```jsx
@@ -68,7 +70,7 @@ const Span = tasty({
 </Link>;
 ```
 
-The wrapped component only needs to forward `className` (and ideally `style`/`ref`). Tasty-specific props (`qa`, `qaVal`, `mods`, `tokens`, `styleProps`, `modProps`, `tokenProps`) are consumed by Tasty and never leak to the DOM.
+The wrapped component only needs to forward `className` (and ideally `style`/`ref`). Tasty's own props (`styles`, `mods`, `tokens`, `qa`, `qaVal`, `theme`, `element`, the `is*` props) and the props you declared with `styleProps`, `modProps`, or `tokenProps` are consumed by Tasty; mods, `qa`, `qaVal`, `theme`, and `element` reach the DOM only as `data-*` attributes.
 
 Props forwarded to the `as` component keep their declared types and requiredness. For example, a component with `position: 'top-right' | 'bottom-left'` accepts those values through `tasty({ as: Component })`; CSS positioning can still be set through `styles.position`. A prop explicitly listed in `styleProps` is consumed as a style value instead. The always-available base style props below are also consumed by Tasty, so keep component-specific prop names separate from those reserved names.
 
@@ -112,12 +114,12 @@ A small set of style properties — `display`, `font`, `preset`, `hide`, `whiteS
 
 ## `Element`
 
-`Element` is the unstyled base component exported from the main entry — equivalent to `tasty({})` (a `div` with no default styles). It accepts all Tasty props (`styles`, `styleProps`, `mods`, `tokens`, `as`, `qa`, `theme`, the `is*` props, etc.) and is useful as a generic styled box or as a building block for layout primitives.
+`Element` is the unstyled base component exported from the main entry — equivalent to `tasty({})` (a `div` with no default styles). It accepts the props every Tasty component has (`as`, `styles`, `mods`, `tokens`, `qa`, `theme`, the `is*` props) plus the [always-available style props](#always-available-style-props), and is useful as a generic box or as a building block for layout primitives. Other style names, such as `padding`, are not props on it: create a component with `styleProps` for those, or pass them through `styles`.
 
 ```jsx
 import { Element } from '@tenphi/tasty';
 
-<Element as="section" padding="4x" fill="#surface">
+<Element as="section" display="grid" preset="t2" styles={{ padding: '4x' }}>
   Content
 </Element>;
 ```
@@ -144,6 +146,7 @@ List modifier key names. Types default to `ModValue` (`boolean | string | number
 
 ```jsx
 const Button = tasty({
+  as: 'button',
   modProps: ['isLoading', 'isSelected'] as const,
   styles: {
     fill: { '': '#surface', isLoading: '#surface.5' },
@@ -161,6 +164,7 @@ Map modifier names to type descriptors for precise TypeScript types:
 
 ```tsx
 const Button = tasty({
+  as: 'button',
   modProps: {
     isLoading: Boolean, // isLoading?: boolean
     isSelected: Boolean, // isSelected?: boolean
@@ -297,6 +301,8 @@ const Button = tasty({
 <Button variant="danger">Delete</Button>;
 ```
 
+With `variant` omitted, or set to a key `variants` does not define, the `default` variant applies; without a `default` key only the base `styles` apply. `variant` is typed from the variant keys.
+
 ### Extending Variants with Base State Maps
 
 When base `styles` contain an extend-mode state map (an object **without** a `''` key), it is applied **after** the variant merge. This lets you add or override states across all variants without repeating yourself:
@@ -401,19 +407,19 @@ const { className } = computeStyles({
 });
 ```
 
-On the client, CSS is injected synchronously into the DOM (idempotent via the injector cache). On the server, CSS is collected via the SSR collector if one is available. This is the same function that `tasty()` components use internally.
+On the client, CSS is injected synchronously into the DOM (idempotent via the injector cache). On the server with an SSR collector (from `runWithCollector()` or `TastyRegistry`), the CSS goes to the collector. With neither a collector nor a `document` — a React Server Component — nothing is injected: the CSS comes back as `css`, and you render it in a `style` tag yourself, as `tasty()` components do. This is the same function that `tasty()` components use internally.
 
 ---
 
 ## Style Functions
 
-All style functions below are plain functions (not React hooks) and can be used in any environment: client components, SSR with a `ServerStyleCollector`, and React Server Components. They retain their `use` prefix for backward compatibility, but do not use any React hooks internally.
+All style functions below except `useStyles()` are plain functions, not React hooks, and work in client components, SSR with a `ServerStyleCollector`, and React Server Components. They keep the `use` prefix for backward compatibility.
 
 In server-only contexts, components that use only Tasty style functions ship no Tasty styling runtime. Astro without `client:*` directives produces no client JavaScript; server-only Next.js RSC follows the same Tasty architecture, while final output depends on the application deployment. Tasty never forces the `'use client'` boundary — that decision belongs to your component when it needs React interactivity (state, effects, event handlers).
 
 ### useStyles
 
-Generate a className from a style object. Thin wrapper around `computeStyles()`:
+Generate a className from a style object. A thin wrapper around `computeStyles()` that also picks up the `TastyRegistry` collector through React context. That makes it a hook: call it inside a component, and not in a Server Component — use `computeStyles()` there.
 
 ```tsx
 import { useStyles } from '@tenphi/tasty';
@@ -481,6 +487,8 @@ function GlobalReset() {
 
 An `id` slot holds one injection per `root`. Without an `id` the CSS is deduped
 by content and permanent — there is nothing to replace it with later.
+
+It also accepts a factory and deps — `useRawCSS(() => css, [deps], { id })` — and skips the factory while the deps for that `id` are unchanged.
 
 ### useKeyframes
 
@@ -591,7 +599,11 @@ useFontFace('Brand Sans', [
 Signature:
 
 ```ts
-function useFontFace(family: string, input: FontFaceInput): void;
+function useFontFace(
+  family: string,
+  input: FontFaceInput,
+  options?: { root?: Document | ShadowRoot },
+): void;
 ```
 
 ### useCounterStyle
@@ -684,6 +696,7 @@ See the [Functions section of the DSL reference](dsl.md#functions-function) for 
 - **[Style DSL](dsl.md)** — State maps, tokens, units, extending semantics, keyframes, @property
 - **[Methodology](methodology.md)** — Recommended patterns: root + sub-elements, styleProps, tokens, wrapping
 - **[Configuration](configuration.md)** — Tokens, recipes, custom units, style handlers, TypeScript extensions
+- **[Configuration → TypeScript](configuration.md#typescript)** — How props are typed and how to register your names
 - **[Style Properties](styles.md)** — Complete reference for all enhanced style properties
 - **[Build-Time Extraction (`tastyStatic`)](tasty-static.md)** — Static styling with the Babel plugin
 - **[Server-Side Rendering](ssr.md)** — SSR setup for Next.js, Astro, and generic frameworks

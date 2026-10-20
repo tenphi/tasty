@@ -8,30 +8,33 @@ Choose `tastyStatic` specifically when styles must be generated during the build
 
 ## When to Use
 
-- **Static site generation (SSG)** — Pre-render all styles at build time
-- **No-JavaScript websites** — CSS works without any JS runtime
-- **Performance-critical pages** — CSS extracted before the application renders
-- **Landing pages** — Minimal bundle size with pre-generated CSS
+- **CSS that must exist before anything renders** — static sites, landing pages, and HTML served from a CDN get one stylesheet generated at build time
+- **No React at runtime** — `tastyStatic` returns class names, so plain DOM code or any templating that sets `class` can use them; the [Programmatic API](#programmatic-api) covers frameworks Babel does not process
+- **Class-name objects instead of components** — extend them with `tastyStatic(base, styles)` and pass them wherever a `className` goes
+- **Self-contained packages** — [inject mode](#inject-mode) embeds the CSS in the JavaScript, so consumers have no stylesheet to wire up
+
+If the styles depend on props, keep `tasty()`: rendered only on the server, it also ships no styling runtime (see [Server-Side Rendering](ssr.md)).
 
 ## Requirements
 
 Build-time extraction is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
 
-| Dependency                   | Version | Required for                                                               |
-| ---------------------------- | ------- | -------------------------------------------------------------------------- |
-| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)                                |
-| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                                               |
-| `@babel/types`               | >= 7.24 | Babel plugin                                                               |
-| `jiti`                       | >= 2.6  | Next.js wrapper (`@tenphi/tasty/zero/next`) when using `configFile` option |
+| Dependency                   | Version | Required for                                                                   |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)                                    |
+| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                                                   |
+| `@babel/types`               | >= 7.24 | Babel plugin                                                                   |
+| `jiti`                       | >= 2.6  | Babel plugin and Next.js wrapper (imported on load, even without `configFile`) |
+| `babel-loader`               | any     | Next.js wrapper (`@tenphi/tasty/zero/next`)                                    |
 
-All of these are declared as optional peer dependencies of `@tenphi/tasty`. Install only what your setup requires:
+The Babel packages and `jiti` are optional peer dependencies of `@tenphi/tasty`; `babel-loader` is resolved from your project. Install what your setup requires:
 
 ```bash
-# For any Babel-based setup (Vite, custom Babel config, etc.)
-pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types
-
-# For Next.js with TypeScript config file
+# Any Babel-based setup (Vite, custom Babel config, etc.)
 pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types jiti
+
+# Next.js
+pnpm add -D @babel/core @babel/helper-plugin-utils @babel/types jiti babel-loader
 ```
 
 ---
@@ -52,12 +55,14 @@ const button = tastyStatic({
   radius: '1r',
 });
 
-// Use in JSX - works via toString() coercion
-<button className={button}>Click me</button>
+// Use in JSX
+<button className={button.className}>Click me</button>;
 
-// Or access className explicitly
-<button className={button.className}>Click me</button>
+// toString() returns the class name, for template strings and plain JS
+element.className = `${button} is-active`;
 ```
+
+In TSX, pass `button.className`: React types `className` as `string`, so passing the `StaticStyle` object fails type-checking even though it works at runtime.
 
 ---
 
@@ -244,7 +249,7 @@ const card = tastyStatic({
   color: '#text',
 });
 
-<div className={card}>Styled card</div>;
+<div className={card.className}>Styled card</div>;
 ```
 
 ---
@@ -283,10 +288,10 @@ Starting with Next.js 16, Turbopack is the default bundler. `withTastyZero` supp
 
 The `configFile` option is key for Turbopack — it passes a file path (JSON-serializable) instead of a function, and the Babel plugin loads the config internally via jiti.
 
-**Requirements**: `babel-loader` must be installed in your project:
+**Requirements**: `babel-loader` must be installed in your project (see [Requirements](#requirements)):
 
 ```bash
-pnpm add babel-loader
+pnpm add -D babel-loader
 ```
 
 ### CSS Injection
@@ -330,35 +335,55 @@ The configuration is process-wide and shared with the Babel plugin and the runti
 
 `extractStylesForSelector()` output starts with the `@keyframes` its rules animate — local `@keyframes` and configured `keyframes` — under hashed names the `animation` declarations are rewritten to. `extractStylesWithChunks()` returns class rules only.
 
+To write the results to a file the way the Babel plugin does, use `createCSSWriter()`. It deduplicates blocks by key and prepends the generated-file header:
+
+```ts
+import { createCSSWriter, extractStylesWithChunks } from '@tenphi/tasty/zero';
+
+const writer = createCSSWriter('dist/tasty.css', { devMode: true });
+
+for (const chunk of extractStylesWithChunks({ display: 'flex', gap: '1u' })) {
+  writer.add(chunk.className, chunk.css, 'src/card.ts'); // source is a devMode comment
+}
+
+writer.write(); // also: has(key), getCSS(), clear(), getOutputPath()
+```
+
 ---
 
 ## Vite Integration
+
+`@vitejs/plugin-react` 6 no longer runs Babel; add it with `@rolldown/plugin-babel` (`pnpm add -D @rolldown/plugin-babel`):
 
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: [
-          [
-            '@tenphi/tasty/babel-plugin',
-            {
-              output: 'public/tasty.css',
-              config: {
-                states: { '@mobile': '@media(w < 768px)' },
-              },
+    react(),
+    babel({
+      plugins: [
+        [
+          '@tenphi/tasty/babel-plugin',
+          {
+            output: 'src/tasty.css',
+            config: {
+              states: { '@mobile': '@media(w < 768px)' },
             },
-          ],
+          },
         ],
-      },
+      ],
     }),
   ],
 });
 ```
+
+With `@vitejs/plugin-react` 5 or older, pass the same `plugins` array to `react({ babel: { plugins } })` instead.
+
+Keep `output` outside `public/`: the plugin replaces each `@tenphi/tasty/static` import with an import of the generated file, and Vite does not let JavaScript import files from `public/`. Vite then bundles the CSS like any other stylesheet.
 
 ---
 
@@ -377,43 +402,58 @@ const button = tastyStatic({
 
 tastyStatic('.heading', { preset: 'h1' });
 
-export const Button = () => <button className={button}>Click</button>;
+export const Button = () => <button className={button.className}>Click</button>;
 ```
 
 ### After (Production Build)
 
 ```tsx
+import './tasty.css';
+
 const button = {
-  className: 'ts3f2a1b ts8c4d2e',
+  className: 'ts3f783b ts070801',
   styles: { padding: '2x 4x', fill: '#purple', color: '#white' },
   toString() {
     return this.className;
   },
 };
 
-export const Button = () => <button className={button}>Click</button>;
+export const Button = () => <button className={button.className}>Click</button>;
 ```
+
+The `@tenphi/tasty/static` import becomes an import of the generated file (relative to the source file), and the selector-mode call is removed.
 
 ### Generated CSS (tasty.css)
 
 ```css
 /* Generated by @tenphi/tasty/zero - DO NOT EDIT */
 
-.ts3f2a1b.ts3f2a1b {
+@property --current-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+.ts3f783b.ts3f783b {
+  color: var(--white-color);
+  --current-color: var(--white-color);
+}
+
+.ts3f783b.ts3f783b {
+  background-color: var(--purple-color);
+}
+
+.ts070801.ts070801 {
   padding: 16px 32px;
 }
 
-.ts8c4d2e.ts8c4d2e {
-  background: #9370db;
-  color: #fff;
-}
-
-.heading.heading {
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1.2;
+.heading {
+  font-size: var(--h1-font-size, var(--default-font-size));
+  /* …line-height, letter-spacing, font-weight, and the rest of the h1 preset */
 }
 ```
+
+Styles are split into chunks (here appearance and spacing), each with its own class. Color tokens compile to custom properties: `#purple` becomes `var(--purple-color)`. Define it in `config.tokens` and the plugin writes it to `:root` at the top of the same file. Units are literal (`2x` is `16px`). Selector-mode rules use the selector as written, without the doubled specificity of class rules.
 
 ---
 
@@ -487,18 +527,18 @@ import { injectCSS as _$i } from '@tenphi/tasty/static/inject';
 
 const button =
   (_$i(
-    'ts3f2a1b ts8c4d2e',
-    '.ts3f2a1b.ts3f2a1b{padding:16px 32px}\n.ts8c4d2e.ts8c4d2e{background:#9370db}',
+    'tsa903d6 ts070801',
+    '.tsa903d6.tsa903d6 { background-color: var(--purple-color); }\n.ts070801.ts070801 { padding: 16px 32px; }',
   ),
   {
-    className: 'ts3f2a1b ts8c4d2e',
+    className: 'tsa903d6 ts070801',
     styles: { padding: '2x 4x', fill: '#purple' },
     toString() {
       return this.className;
     },
   });
 
-_$i('.heading', '.heading{font-size:2.5rem;font-weight:700;line-height:1.2}');
+_$i('.heading', '.heading { font-size: var(--h1-font-size, …); … }');
 ```
 
 ### Dev Mode / HMR
@@ -558,7 +598,7 @@ const card = tastyStatic({
 
 ## Extending Style Types (TypeScript)
 
-If you add custom style properties, use module augmentation so `tastyStatic` recognizes them too. See [Extending Style Types](configuration.md#extending-style-types-typescript) in the configuration docs.
+If you add custom style properties, use module augmentation so `tastyStatic` recognizes them too. See [TypeScript](configuration.md#typescript) in the configuration docs.
 
 ---
 
@@ -568,6 +608,8 @@ If you add custom style properties, use module augmentation so `tastyStatic` rec
 2. **No runtime props** — Cannot use `styleProps` or dynamic `styles` prop
 3. **No mods at runtime** — Modifiers must be defined statically
 4. **Build-time transformation required** — Babel plugin must process files
+5. **No built-in token defaults** — The runtime registers fallbacks for `#white`, `#black`, `#clear`, `#border`, `$gap`, `$radius`, `$border-width`, `$outline-width`, and a few others as `@property` initial values. The Babel plugin does not emit them, so define every token your styles reference in `config.tokens`.
+6. **`config.properties` is ignored** — It type-checks, but no `@property` rules are generated from it. Automatically inferred properties (`autoPropertyTypes`) are emitted.
 
 ### Workarounds
 
@@ -580,10 +622,12 @@ const card = tastyStatic({
 });
 
 <div
-  className={card}
-  style={{
-    '--card-bg': isActive ? 'var(--purple-color)' : 'var(--white-color)',
-  }}
+  className={card.className}
+  style={
+    {
+      '--card-bg': isActive ? 'var(--purple-color)' : 'var(--white-color)',
+    } as React.CSSProperties
+  }
 />;
 ```
 

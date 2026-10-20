@@ -1,6 +1,20 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import type { StyleDetails } from '../parser/types';
+import { parseStyle } from '../utils/styles';
 import { warnOnceDev } from '../utils/warnings';
+
+/**
+ * Resolve a handler's built-in default through the parser.
+ *
+ * Defaults are written in units (`1x`, `1r`, `1bw`) so a group that names no
+ * value matches the boolean form (`padding: 'top'` and `padding: true` both
+ * use `1x`) and follows `configure({ units })`. Resolving per call rather than
+ * once at module load keeps it current with the configured units; the parser's
+ * cache makes the repeat lookups cheap.
+ */
+export function resolveDefaultValue(value: string): string {
+  return parseStyle(value).groups[0]?.values[0] ?? value;
+}
 
 /**
  * If the group contains exactly one value that is a CSS-wide keyword

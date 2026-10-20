@@ -26,9 +26,10 @@ import { setExtractorNamePrefix } from './extractor';
  * only. Each call replaces the previous configuration.
  *
  * `tokens`, `globalStyles`, `fontFaces`, `counterStyles`, `properties` and
- * `$$` `@function` definitions are not emitted; render tokens and global
- * styles with `extractStylesForSelector(':root', tokens)` and
- * `extractStylesForSelector(selector, styles)`.
+ * `$$` `@function` definitions are not emitted with the rules; render tokens
+ * and global styles with `extractStylesForSelector(':root', tokens)` and
+ * `extractStylesForSelector(selector, styles)`, and the `@property` rules
+ * (Tasty's defaults plus `properties`) with `extractConfigProperties()`.
  *
  * The configuration is process-wide, shared with the Babel plugin and with
  * the runtime `configure()` from `@tenphi/tasty`. The extractors re-apply it

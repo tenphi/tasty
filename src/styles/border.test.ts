@@ -12,7 +12,7 @@ describe('borderStyle', () => {
     // 1bw is converted to 1px by tasty parser
     expect(result.border).toContain('1px');
     expect(result.border).toContain('solid');
-    expect(result.border).toContain('var(--border-color, currentColor)');
+    expect(result.border).toContain('var(--border-color)');
   });
 
   it('handles simple border value', () => {
@@ -135,20 +135,19 @@ describe('borderStyle', () => {
     it('fills the style slot with a reference past the width', () => {
       // Colors are authored as `#name`, so a plain reference is a line style.
       expect(borderStyle({ border: '1bw $my-style' })).toEqual({
-        border: '1px var(--my-style) var(--border-color, currentColor)',
+        border: '1px var(--my-style) var(--border-color)',
       });
     });
 
     it('fills width and style from two references', () => {
       expect(borderStyle({ border: '$my-width $my-style' })).toEqual({
-        border:
-          'var(--my-width) var(--my-style) var(--border-color, currentColor)',
+        border: 'var(--my-width) var(--my-style) var(--border-color)',
       });
     });
 
     it('takes a lone reference as the width', () => {
       expect(borderStyle({ border: '$my-width' })).toEqual({
-        border: 'var(--my-width) solid var(--border-color, currentColor)',
+        border: 'var(--my-width) solid var(--border-color)',
       });
     });
 
@@ -181,18 +180,14 @@ describe('borderStyle', () => {
       // Two lengths are not valid in the shorthand; promoting one would emit an
       // invalid declaration instead of dropping the extra value.
       expect(borderStyle({ border: '1bw 2px' })).toEqual({
-        border: '1px solid var(--border-color, currentColor)',
+        border: '1px solid var(--border-color)',
       });
     });
 
     it('applies per group in multi-group syntax', () => {
       const result = borderStyle({ border: '1bw $a, 2bw $b top' });
-      expect(result['border-top']).toBe(
-        '2px var(--b) var(--border-color, currentColor)',
-      );
-      expect(result['border-left']).toBe(
-        '1px var(--a) var(--border-color, currentColor)',
-      );
+      expect(result['border-top']).toBe('2px var(--b) var(--border-color)');
+      expect(result['border-left']).toBe('1px var(--a) var(--border-color)');
     });
   });
 

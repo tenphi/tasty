@@ -135,7 +135,7 @@ Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `row
 
 ### `transition`
 
-Use semantic names, not CSS property names: `fade` `fill` `color` `theme` `border` `radius` `shadow` `outline` `preset` `text` `gap` `opacity` `translate` `rotate` `scale` `filter` `image` `background` `width` `height` `inset`. For `z-index`, write the CSS name (`transition: 'z-index'`); `zIndex` currently compiles to an invalid `zindex`.
+Use semantic names, not CSS property names: `fade` `fill` `color` `theme` `border` `radius` `shadow` `outline` `preset` `text` `gap` `opacity` `translate` `rotate` `scale` `filter` `image` `background` `width` `height` `zIndex` `inset`.
 
 ❌ `transition: 'background-color 0.2s'` → ✅ `transition: 'fill'`
 

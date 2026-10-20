@@ -39,13 +39,13 @@ describe('dimensionStyle – width & height helpers', () => {
     expect(res['max-width']).toBe('max-content');
   });
 
+  // A fallback chain, emitted one declaration per entry with the standard
+  // keyword last (see the pipeline's array handling).
+  const STRETCH = ['-webkit-fill-available', '-moz-available', 'stretch'];
+
   test('stretch width keyword', () => {
     const res = widthStyle({ width: 'stretch' }) as any;
-    expect(res.width).toEqual([
-      'stretch',
-      '-webkit-fill-available',
-      '-moz-available',
-    ]);
+    expect(res.width).toEqual(STRETCH);
   });
 
   test('boolean true width (auto)', () => {
@@ -81,7 +81,7 @@ describe('dimensionStyle – width & height helpers', () => {
 
   test('stretch height keyword', () => {
     const res = heightStyle({ height: 'stretch' }) as any;
-    expect(res.height).toBe('auto');
+    expect(res.height).toEqual(STRETCH);
   });
 
   test('calc-size(auto) width', () => {

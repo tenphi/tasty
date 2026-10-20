@@ -1453,7 +1453,7 @@ describe('Token opacity suffix', () => {
 
   test('a hex token keeps its literal fallback under the fade', () => {
     expect(parser.process('#ff8040.5').output).toBe(
-      'oklch(from var(--ff8040-color) l c h / .5)',
+      'oklch(from var(--ff8040-color, #ff8040) l c h / .5)',
     );
   });
 

@@ -163,6 +163,34 @@ export function parsePropertyToken(token: string): ParsedPropertyToken {
   };
 }
 
+/** A declared property, found by the custom property it registers. */
+export interface DeclaredPropertyEntry {
+  /** The token the property was declared under (`#current`, `$gap`). */
+  token: string;
+  definition: PropertyDefinition;
+}
+
+/**
+ * Index property definitions by the custom property each one registers
+ * (`#current` → `--current-color`). Invalid tokens are left out.
+ *
+ * Auto-inference consults it so a property that is already declared keeps its
+ * own definition: otherwise a scan that meets `--current-color: …` registers it
+ * a second time as a `<color>` with a guessed `transparent` initial value.
+ */
+export function indexPropertiesByName(
+  properties: Record<string, PropertyDefinition>,
+): Map<string, DeclaredPropertyEntry> {
+  const index = new Map<string, DeclaredPropertyEntry>();
+
+  for (const [token, definition] of Object.entries(properties)) {
+    const parsed = parsePropertyToken(token);
+    if (parsed.isValid) index.set(parsed.cssName, { token, definition });
+  }
+
+  return index;
+}
+
 // ============================================================================
 // Normalization Functions
 // ============================================================================

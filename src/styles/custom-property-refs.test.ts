@@ -131,7 +131,7 @@ describe('custom property references in handler output', () => {
 
     expect(presetStyle({ font: '$my-font' })).toEqual({
       'font-family':
-        'var(--my-font), var(--font-sans, var(--font-sans-fallback, system-ui, sans-serif))',
+        'var(--my-font), var(--font-sans, var(--font-sans-fallback))',
     });
   });
 

@@ -554,7 +554,7 @@ fill: {
 | `@media(prefers-color-scheme: dark)` | `@media (prefers-color-scheme: dark)` |
 | `@media(prefers-reduced-motion)`     | `@media (prefers-reduced-motion)`     |
 
-Tasty units are not resolved inside query conditions: `@media(w < 40x)` currently emits `calc(var(--gap) * 40)`, which browsers reject in `@media` and `@container`, so neither branch applies. Write query lengths in `px`, `em`, or `rem`.
+Tasty units resolve to their literal length inside query conditions, built-in and configured units alike: `@media(w < 40x)` emits `@media (width < 320px)`. A query condition cannot read a custom property, so a unit configured as one (`units: { x: 'var(--gap)' }`) cannot be used there; write that length in `px`, `em`, or `rem`.
 
 Units are only converted in features that take a length: `width`, `height`, `inline-size`, and `block-size`, with or without `min-`/`max-` (`@media(min-width: 40x)` converts too). Every other feature keeps its value as written, so `@media(min-resolution: 2x)` and `@media(resolution >= 2x)` reach the browser unchanged: there `x` is CSS's own resolution unit, an alias of `dppx`.
 

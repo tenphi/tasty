@@ -1,9 +1,22 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
+import { resolveDefaultValue } from './shared';
 
-const DEFAULT_MIN_SIZE = 'var(--gap)';
+/** `min` with no value; resolved through the parser so it follows the unit. */
+const DEFAULT_MIN_SIZE = '1x';
 const DEFAULT_MAX_SIZE = '100%';
+
+/**
+ * `stretch` as a fallback chain, emitted as one declaration per entry: engines
+ * keep the last one they support, so the standard keyword goes last and the
+ * prefixed forms cover engines that predate it.
+ */
+const STRETCH_FALLBACKS = [
+  '-webkit-fill-available',
+  '-moz-available',
+  'stretch',
+];
 
 /**
  * Parse a dimension value (string, number, or boolean) into a CSS value
@@ -101,7 +114,8 @@ export function dimensionStyle(
       for (const mod of mods) {
         switch (mod) {
           case 'min':
-            styles[minStyle] = values[0] || DEFAULT_MIN_SIZE;
+            styles[minStyle] =
+              values[0] || resolveDefaultValue(DEFAULT_MIN_SIZE);
             flag = true;
             break;
           case 'max':
@@ -136,15 +150,7 @@ export function dimensionStyle(
       }
 
       if (styles[name] === 'stretch') {
-        if (name === 'width') {
-          styles[name] = [
-            'stretch',
-            '-webkit-fill-available',
-            '-moz-available',
-          ];
-        } else {
-          styles[name] = 'auto';
-        }
+        styles[name] = STRETCH_FALLBACKS;
       }
     }
 

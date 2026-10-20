@@ -2,7 +2,7 @@ import { processDirectionalStyle } from './directional';
 
 const PADDING_CONFIG = {
   property: 'padding',
-  defaultValue: 'var(--gap)',
+  defaultValue: '1x',
   trueValue: '1x',
   defaultInit: '0',
 } as const;

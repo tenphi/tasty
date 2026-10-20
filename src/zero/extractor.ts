@@ -471,9 +471,17 @@ export interface PropertyExtractionOptions {
  * The `@property` rules a configuration registers: Tasty's defaults (`#white`,
  * `#border`, `$gap`, `$radius`, …) overlaid with `config.properties`, the same
  * set the runtime registers.
+ *
+ * Style handlers read several of the defaults with no fallback of their own,
+ * so CSS from `extractStylesWithChunks()` and `extractStylesForSelector()`
+ * needs these rules alongside it, once per stylesheet.
+ *
+ * @param properties - Properties to overlay on the defaults. Without it, the
+ * ones set through `/zero` `configure()` (plugins included).
  */
 export function extractConfigProperties(
-  properties: Record<string, PropertyDefinition> = {},
+  properties: Record<string, PropertyDefinition> = getActiveZeroConfig()
+    ?.normalized.properties ?? {},
 ): ExtractedProperty[] {
   const results: ExtractedProperty[] = [];
 

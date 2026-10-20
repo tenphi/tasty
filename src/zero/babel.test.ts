@@ -692,7 +692,9 @@ tastyStatic('.card', { padding: { '': '2u', '@narrow': '1u' } });
       transformCode(code, { output: outputPath, configFile: configPath });
       const after = fs.readFileSync(outputPath, 'utf-8');
 
-      expect(after).not.toContain('8px');
+      // The `u` unit is gone, so `2u` no longer compiles to 8px. (`--gap`'s
+      // default `@property` is 8px too, so check the declaration itself.)
+      expect(after).not.toContain('padding: 8px;');
       expect(after).not.toContain('@media (width < 600px)');
     });
   });

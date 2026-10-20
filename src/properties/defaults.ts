@@ -1,15 +1,16 @@
 import type { PropertyDefinition } from '../injector/types';
 
-// Defaults the style handlers also inline as `var()` fallbacks, so their output
-// keeps its meaning where this set is not emitted (zero-runtime CSS).
-export const DEFAULT_TRANSITION = '80ms';
-export const DEFAULT_BOLD_FONT_WEIGHT = '700';
-
 /**
  * Default properties shipped with Tasty.
  *
  * Kept with the property formatter so runtime and build-time configuration
  * paths can share the same list without importing the browser runtime.
+ *
+ * This set is the single source of these defaults. Style handlers read
+ * `#border`, `#outline`, `$transition`, `$sharp-radius`, `$bold-font-weight`
+ * and the font fallbacks as bare `var()`s with no fallback of their own, so
+ * every rendering path emits it: the runtime injector, the SSR collector, the
+ * Babel plugin, and `extractConfigProperties()` for the programmatic zero API.
  */
 export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   // Used by dual-fill feature to enable CSS transitions on the second fill color
@@ -36,10 +37,8 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     inherits: true,
     initialValue: 'rgb(0 0 0)',
   },
-  // Default border color: the text color, as in plain CSS. It matches the
-  // `border` handler's `var(--border-color, currentColor)` fallback, which
-  // zero-runtime CSS relies on, so a border with no color looks the same in
-  // every rendering mode.
+  // Default border color: the text color, as in plain CSS, so a `border` with
+  // no color is drawn until the app defines `#border`.
   '#border': {
     inherits: true,
     initialValue: 'currentcolor',
@@ -53,14 +52,16 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue: 'currentcolor',
   },
 
-  // ---- Core design tokens used by style handlers ----
+  // ---- Core design tokens ----
   // These provide sensible defaults so Tasty works standalone without a design system.
   // Consuming projects (e.g. uikit) override these by defining tokens on :root.
+  // Each matches its built-in unit (`x`, `r`, `bw`, `ow`), so pointing the unit
+  // at the token (`units: { x: 'var(--gap)' }`) keeps the default scale.
 
   $gap: {
     syntax: '<length>',
     inherits: true,
-    initialValue: '4px',
+    initialValue: '8px',
   },
   $radius: {
     syntax: '<length>',
@@ -80,7 +81,7 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   $transition: {
     syntax: '<time>',
     inherits: true,
-    initialValue: DEFAULT_TRANSITION,
+    initialValue: '80ms',
   },
   // Used by radius.ts for `radius="leaf"` modifier
   '$sharp-radius': {
@@ -92,7 +93,7 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
   '$bold-font-weight': {
     syntax: '<number>',
     inherits: true,
-    initialValue: DEFAULT_BOLD_FONT_WEIGHT,
+    initialValue: '700',
   },
   // Used by preset.ts as fallback font stacks
   '$font-sans-fallback': {

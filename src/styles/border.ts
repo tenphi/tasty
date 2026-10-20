@@ -1,7 +1,11 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { DIRECTIONS, parseStyle } from '../utils/styles';
 import { BORDER_STYLES } from './const';
-import { assignLineSlots, extractCSSWideKeyword } from './shared';
+import {
+  assignLineSlots,
+  extractCSSWideKeyword,
+  resolveDefaultValue,
+} from './shared';
 
 type Direction = (typeof DIRECTIONS)[number];
 
@@ -45,9 +49,10 @@ function processGroup(group: GroupData): ProcessedBorderGroup {
 
   const slots = assignLineSlots(values, lineStyle, colors[0]);
 
-  const width = values[0] || 'var(--border-width)';
+  // The same `1bw` as `border: true`, so `'dotted left'` follows the unit.
+  const width = values[0] || resolveDefaultValue('1bw');
   const style = slots.style || 'solid';
-  const color = slots.color || 'var(--border-color, currentColor)';
+  const color = slots.color || 'var(--border-color)';
 
   return { modFlags, width, style, color };
 }
@@ -215,8 +220,7 @@ export function borderStyle({
   // Otherwise, output individual border-* properties
   const result: Record<string, string> = {};
   const fallbackStyle = allDirectionsValue?.style || 'solid';
-  const fallbackColor =
-    allDirectionsValue?.color || 'var(--border-color, currentColor)';
+  const fallbackColor = allDirectionsValue?.color || 'var(--border-color)';
 
   for (const dir of DIRECTIONS) {
     const value = directionMap[dir];

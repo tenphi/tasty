@@ -11,7 +11,11 @@ import {
   LOGICAL_SCROLL_MARGIN_STYLES,
   LOGICAL_SCROLL_PADDING_STYLES,
 } from './logical-list';
-import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
+import {
+  extractCSSWideKeyword,
+  resolveDefaultValue,
+  warnExtraGroupValues,
+} from './shared';
 
 type LogicalValue = string | number | boolean | undefined;
 
@@ -90,7 +94,7 @@ function logicalAxisStyle<const Name extends string>({
         ? [keyword]
         : group.values.length
           ? group.values
-          : [defaultValue];
+          : [resolveDefaultValue(defaultValue)];
       if (hasDirection && values.length > 1) {
         warnExtraGroupValues(styleName, group.input, 1, LOGICAL_DIRECTIONS);
       } else if (!hasDirection && values.length > 2) {
@@ -133,7 +137,7 @@ function zeroBorderValue(value: string): string {
   const firstSpace = value.indexOf(' ');
 
   return firstSpace === -1
-    ? '0 solid var(--border-color, currentColor)'
+    ? '0 solid var(--border-color)'
     : `0${value.slice(firstSpace)}`;
 }
 
@@ -156,7 +160,7 @@ function logicalBorderStyle<const Name extends string>(
       start: null,
       end: null,
     };
-    let fallback = '0 solid var(--border-color, currentColor)';
+    let fallback = '0 solid var(--border-color)';
     let useLonghand = false;
 
     for (const group of groups) {
@@ -229,20 +233,8 @@ function logicalBorderStyles<const Names extends readonly [string, string]>(
 
 /** One handler per logical axis/category; native CSS longhands stay ordinary. */
 export const logicalStyleHandlers = {
-  ...logicalAxisStyles(
-    LOGICAL_PADDING_STYLES,
-    'padding',
-    'var(--gap)',
-    '1x',
-    '0',
-  ),
-  ...logicalAxisStyles(
-    LOGICAL_MARGIN_STYLES,
-    'margin',
-    'var(--gap)',
-    '1x',
-    '0',
-  ),
+  ...logicalAxisStyles(LOGICAL_PADDING_STYLES, 'padding', '1x', '1x', '0'),
+  ...logicalAxisStyles(LOGICAL_MARGIN_STYLES, 'margin', '1x', '1x', '0'),
   ...logicalAxisStyles(LOGICAL_INSET_STYLES, 'inset', '0', '0', 'auto'),
   ...logicalAxisStyles(
     LOGICAL_SCROLL_MARGIN_STYLES,

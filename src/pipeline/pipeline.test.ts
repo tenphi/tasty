@@ -2143,10 +2143,6 @@ describe('query bounds in different units', () => {
       '@media(w > 600px) & @media(w > 40em)',
       '(width > 40em) and (width > 600px)',
     ],
-    [
-      '@media(w > 40x) & @media(w > 600px)',
-      '(width > 600px) and (width > calc(var(--gap) * 40))',
-    ],
   ])('keeps both bounds of %s', (stateKey, query) => {
     expect(rulesFor({ '': 'red', [stateKey]: 'blue' })).toContainEqual([
       'color: blue',
@@ -2161,6 +2157,10 @@ describe('query bounds in different units', () => {
     expect(
       rulesFor({ '': 'red', '@media(w >= 800px) & @media(w < 600px)': 'blue' }),
     ).toEqual([['color: red', []]]);
+    // A Tasty unit resolves to px (40x = 320px), so it compares with px bounds.
+    expect(
+      rulesFor({ '': 'red', '@media(w > 40x) & @media(w > 600px)': 'blue' }),
+    ).toContainEqual(['color: blue', ['@media (width > 600px)']]);
   });
 });
 

@@ -172,7 +172,7 @@ describe('logical style handlers', () => {
       'border-block-end': '2px dashed var(--blue-color)',
     });
     expect(logicalStyleHandlers.inlineBorder({ inlineBorder: true })).toEqual({
-      'border-inline': '1px solid var(--border-color, currentColor)',
+      'border-inline': '1px solid var(--border-color)',
     });
   });
 

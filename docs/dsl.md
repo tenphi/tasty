@@ -780,7 +780,7 @@ const Nav = tasty({
 
 `@own()` is only valid inside sub-element styles. Using it on root styles emits a warning and is treated as a regular modifier.
 
-When `$` ends in a pseudo-element, the condition attaches to the originating element, before the pseudo-element. CSS accepts no `:where()` after a pseudo-element:
+When `$` ends in a pseudo-element, the condition attaches to the originating element, before the pseudo-element. Browsers accept at most a few user-action pseudo-classes after a pseudo-element, so a condition placed there would never match:
 
 ```jsx
 Icon: {
@@ -790,7 +790,9 @@ Icon: {
 // → .t0.t0 a:where([rel="next"])::before { content: "→"; }
 ```
 
-This covers every pseudo-element form: `::before`, `::marker`, `::backdrop`, vendor-prefixed ones such as `::-webkit-details-marker`, functional ones such as `::part(label)`, and the legacy `:before`, `:after`, `:first-line`, `:first-letter`. In a `$` list, each item gets the condition before its own pseudo-element. A pseudo-class written after the pseudo-element in `$`, as in `'@::part(label):hover'`, qualifies the pseudo-element and stays after it.
+This covers every pseudo-element form: `::before`, `::marker`, `::backdrop`, vendor-prefixed ones such as `::-webkit-details-marker`, functional ones such as `::part(label)`, and the legacy `:before`, `:after`, `:first-line`, `:first-letter`. In a `$` list, each item gets the condition before its own pseudo-element.
+
+So `@own(:hover)` on `$: '@::part(label)'` or `'@::-webkit-scrollbar-thumb'` means the element is hovered, not the part or the thumb. To style a state of the pseudo-element itself, write the pseudo-class after it in the selector, either in `$` (`'@::part(label):hover'`) or as a nested `'&:hover'` key. It stays after the pseudo-element.
 
 ### `@starting` — Entry Animation
 

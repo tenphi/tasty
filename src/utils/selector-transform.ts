@@ -137,10 +137,11 @@ export function rootStateIndex(selector: string): number {
  * `::name` (or legacy `:before`, `:after`, `:first-line`, `:first-letter`) in
  * its last compound. Returns `selector.length` when that compound has none.
  *
- * A state for the element `selector` targets goes at this index. A
- * pseudo-element takes no `:where()` after it, so the state attaches to the
- * originating element instead: `a::before` takes `[rel]` as
- * `a:where([rel])::before`. Everything from the pseudo-element on stays after
+ * A state for the element `selector` targets goes at this index, on the
+ * originating element: `a::before` takes `[rel]` as `a:where([rel])::before`.
+ * After a pseudo-element, browsers accept at most a few user-action
+ * pseudo-classes. Chromium empties a `:where()` there, so the rule never
+ * matches, and it rejects `::slotted()` rules outright. Everything from the pseudo-element on stays after
  * the state, including pseudo-classes that qualify the pseudo-element itself
  * (`::part(x):hover`, `::-webkit-scrollbar-thumb:hover`) and a chained
  * pseudo-element (`::after::marker`).

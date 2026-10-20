@@ -1,8 +1,9 @@
 /**
  * States on a selector that ends in a pseudo-element, checked in Chromium
- * (tenphi/tasty#406). A state written after a pseudo-element makes the whole
- * rule an invalid selector, so the browser drops it and even the default
- * branch never applies. `pseudo-element-states.test.ts` pins the text.
+ * (tenphi/tasty#406). Written after a pseudo-element, a state never matched:
+ * Chromium keeps such a rule but empties its `:where()`, or rejects it outright
+ * for `::slotted()`, so even the default branch never applied.
+ * `pseudo-element-states.test.ts` pins the text.
  */
 import { cleanup, render } from '@testing-library/react';
 
@@ -32,7 +33,7 @@ const styles: Styles = {
   Summary: { $: 'summary::marker, summary::-webkit-details-marker', color },
   Host: { $: '@::part(label)', color },
   Dialog: { $: '@::backdrop', opacity: { '': '0.25', '@own([open])': '0.75' } },
-  // Not observable through computed styles; the rules must still be kept.
+  // Not observable through computed styles; the rules must keep their state.
   Thumb: { $: '@::-webkit-scrollbar-thumb:hover', color },
   Slot: { $: '@::slotted(span)', color },
   Found: { $: '@::highlight(found)', color },
@@ -181,7 +182,7 @@ describe('states on a sub-element that ends in a pseudo-element', () => {
 
   it('apply through a tasty() component', () => {
     const Card = tasty({ styles });
-    const { container } = render(<Card data-testid="card" />);
+    const { container } = render(<Card />);
     const root = container.firstElementChild as HTMLElement;
     fill(root);
     expectStatesApplied(root);

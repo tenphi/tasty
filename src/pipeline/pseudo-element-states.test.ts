@@ -1,12 +1,12 @@
 /**
  * States on a selector that ends in a pseudo-element (tenphi/tasty#406).
  *
- * No `:where()` may follow a pseudo-element, so a state for the element a
- * selector targets attaches to the originating element, before the
- * pseudo-element. Pseudo-classes written after the pseudo-element qualify the
- * pseudo-element and stay after it. The browser half of this suite,
- * `pseudo-element-states.test.tsx`, checks that Chromium keeps these rules
- * and applies them.
+ * A state for the element a selector targets attaches to the originating
+ * element, before the pseudo-element. Written after it, the state never
+ * matched: Chromium empties such a `:where()`. Pseudo-classes written after the
+ * pseudo-element in the selector qualify the pseudo-element and stay after it.
+ * The browser half of this suite, `pseudo-element-states.test.tsx`, checks
+ * that Chromium applies these rules.
  */
 import { computeStyles } from '../compute-styles';
 import { useGlobalStyles } from '../hooks/useGlobalStyles';
@@ -132,6 +132,25 @@ describe('@own() on a sub-element whose $ ends in a pseudo-element', () => {
       '.root:where(:not([open])):after',
       '.root:where([open])::before',
       '.root:where([open]):after',
+    ]);
+  });
+
+  it('targets the originating element even where a pseudo-class could follow', () => {
+    // `::part(x):where(:hover)` would be valid, but `@own()` means the element
+    // `$` selects for every pseudo-element. The part's own hover goes in the
+    // suffix: an `&:hover` key, or `:hover` written in `$`.
+    expect(
+      selectors({
+        Host: {
+          $: '@::part(label)',
+          color: { '': 'red', '@own(:hover)': 'blue' },
+          '&:hover': { outline: '1px solid' },
+        },
+      }),
+    ).toEqual([
+      '.root [data-element="Host"]::part(label):hover',
+      '.root [data-element="Host"]:where(:not(:hover))::part(label)',
+      '.root [data-element="Host"]:where(:hover)::part(label)',
     ]);
   });
 
@@ -261,8 +280,10 @@ describe('pseudo-element states through every rendering mode', () => {
     const css = collector.getCSS();
 
     for (const selector of expected) {
+      // Once from useGlobalStyles('.card'), once under the component class.
+      const fragment = selector.replace('.card', '');
+      expect(css.split(fragment).length - 1).toBe(2);
       expect(css).toContain(selector);
-      expect(css).toContain(selector.replace('.card', ''));
     }
     expect(css).toContain('.global:where(:hover)::before');
     expect(css).not.toMatch(/::[\w-]+:where\(/);

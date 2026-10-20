@@ -1226,8 +1226,11 @@ function buildSelectorFromVariant(
 
   if (ownSegment) {
     // When the suffix ends in a pseudo-element (`a::before`, `@::marker`),
-    // own states attach to its originating element: no `:where()` may follow
-    // a pseudo-element. See `pseudoElementIndex` for the exact split.
+    // own states attach to its originating element, always. Placed after the
+    // pseudo-element they would never match: browsers accept only a few
+    // user-action pseudo-classes there. A state of the pseudo-element itself
+    // is written in the suffix (`'@::part(x):hover'`, an `&:hover` key). See
+    // `pseudoElementIndex` for the exact split.
     const at = pseudoElementIndex(selectorSuffix);
     selector +=
       selectorSuffix.slice(0, at) +
@@ -1488,7 +1491,9 @@ export function renderStyles(
             // Root-element states before the base's pseudo-element, the
             // selector suffix after it.
             const at = rule.suffixStart?.[index] ?? part.length;
-            let sel = `${base}${part.slice(0, at)}${pseudoElement}${part.slice(at)}`;
+            let sel = pseudoElement
+              ? `${base}${part.slice(0, at)}${pseudoElement}${part.slice(at)}`
+              : `${base}${part}`;
 
             // Double class selector for increased specificity if requested
             // This is used when the caller explicitly wants higher specificity

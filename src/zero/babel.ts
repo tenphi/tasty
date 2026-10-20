@@ -22,13 +22,13 @@ import * as path from 'path';
 
 import { declare } from '@babel/helper-plugin-utils';
 import * as t from '@babel/types';
-import { createJiti } from 'jiti';
 
 import type { ConfigTokens, RecipeStyles, Styles } from '../styles/types';
 import { mergeStyles } from '../utils/merge-styles';
 import { DEFAULT_ZERO_NAME_PREFIX } from '../utils/name-prefix';
 import { resolveRecipesWith } from '../utils/resolve-recipes-core';
 
+import { loadConfigFile } from './config-file';
 import { CSSWriter } from './css-writer';
 import type { TastyZeroConfig } from './babel-types';
 export type { TastyZeroConfig } from './babel-types';
@@ -40,6 +40,7 @@ import {
 } from './config';
 import { writerCache, type StaticStyleRegistry } from './writer-cache';
 import {
+  extractConfigProperties,
   extractCounterStyleFromStyles,
   extractFontFaceFromStyles,
   extractFunctionsFromStyles,
@@ -58,6 +59,7 @@ import type {
   ExtractedFunction,
   ExtractedKeyframes,
   ExtractedProperty,
+  PropertyExtractionOptions,
 } from './extractor';
 
 import type { NodePath, PluginPass } from '@babel/core';
@@ -245,17 +247,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
       resolvedConfig =
         typeof configOption === 'function' ? configOption() : configOption;
     } else if (options.configFile) {
-      const jiti = createJiti(path.dirname(options.configFile), {
-        moduleCache: false,
-      });
-
-      const loaded = jiti(options.configFile) as
-        TastyZeroConfig | { default: TastyZeroConfig };
-      // jiti returns the ESM namespace, so unwrap `default` when present.
-      resolvedConfig =
-        loaded && typeof loaded === 'object' && 'default' in loaded
-          ? (loaded.default as TastyZeroConfig)
-          : (loaded as TastyZeroConfig);
+      resolvedConfig = loadConfigFile<TastyZeroConfig>(options.configFile);
     } else {
       resolvedConfig = {};
     }
@@ -278,9 +270,15 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     const newWriter = new CSSWriter(outputPath, { devMode });
 
-    // Emit configured tokens and global styles (file mode only;
-    // inject mode handles injection per-file in the post hook).
+    // Emit registered properties, configured tokens and global styles (file
+    // mode only; inject mode handles injection per-file in the post hook).
     if (mode !== 'inject') {
+      for (const prop of extractConfigProperties(
+        config.normalized.properties,
+      )) {
+        newWriter.add(`@property:${prop.name}`, prop.css);
+      }
+
       const tokenCSS = extractCSSFromStyles(':root', config.normalized.tokens);
       if (tokenCSS) newWriter.add(':root:tokens', tokenCSS);
 
@@ -319,10 +317,24 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
   // single configure() call across worker reuse.
   setExtractorNamePrefix(sourceConfig.namePrefix ?? DEFAULT_ZERO_NAME_PREFIX);
 
-  // Precompute token CSS and global styles CSS for inject mode
+  // Tasty's default properties (`#white`, `$gap`, …) and `config.properties`
+  // are registered once per output, as the runtime registers them, and
+  // inference leaves them alone so the explicit definitions apply.
+  const configProperties = extractConfigProperties(
+    config.normalized.properties,
+  );
+  const propertyOptions: PropertyExtractionOptions = {
+    autoPropertyTypes: sourceConfig.autoPropertyTypes,
+    defined: new Set(configProperties.map((prop) => prop.name)),
+  };
+
+  // Precompute property, token and global styles CSS for inject mode
+  let propertyCSS: string | undefined;
   let tokenCSS: string | undefined;
   let globalStylesCSS: Map<string, string> | undefined;
   if (mode === 'inject') {
+    propertyCSS =
+      configProperties.map((prop) => prop.css).join('\n') || undefined;
     tokenCSS = extractCSSFromStyles(':root', config.normalized.tokens);
     const gs = config.normalized.globalStyles;
     if (Object.keys(gs).length > 0) {
@@ -435,7 +447,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             mode,
             state.sourceFile,
             config.normalized.keyframes,
-            sourceConfig.autoPropertyTypes,
+            propertyOptions,
             config.normalized.fontFaces,
             config.normalized.counterStyles,
             functionsForExtraction(config),
@@ -451,7 +463,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             globalRegistry,
             mode,
             config.normalized.keyframes,
-            sourceConfig.autoPropertyTypes,
+            propertyOptions,
             config.normalized.fontFaces,
             config.normalized.counterStyles,
             functionsForExtraction(config),
@@ -467,7 +479,7 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             globalRegistry,
             mode,
             config.normalized.keyframes,
-            sourceConfig.autoPropertyTypes,
+            propertyOptions,
             config.normalized.fontFaces,
             config.normalized.counterStyles,
             functionsForExtraction(config),
@@ -509,9 +521,12 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
 
     post(this: PluginState) {
       if (mode === 'inject') {
-        // In inject mode, inject token/global CSS as top-level statements
-        // when this file had tastyStatic calls and config CSS exists.
-        if (this._fileAddedCSS && (tokenCSS || globalStylesCSS)) {
+        // In inject mode, inject property/token/global CSS as top-level
+        // statements when this file had tastyStatic calls and config CSS exists.
+        if (
+          this._fileAddedCSS &&
+          (propertyCSS || tokenCSS || globalStylesCSS)
+        ) {
           const program = this.file.ast.program;
 
           // Find the position after the inject import
@@ -520,6 +535,16 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
             if (t.isImportDeclaration(program.body[i])) {
               insertIndex = i + 1;
             }
+          }
+
+          if (propertyCSS) {
+            const injectCall = createInjectCallAST('@property', propertyCSS);
+            program.body.splice(
+              insertIndex,
+              0,
+              t.expressionStatement(injectCall),
+            );
+            insertIndex++;
           }
 
           if (tokenCSS) {
@@ -620,7 +645,7 @@ function handleStylesMode(
   globalRegistry: StaticStyleRegistry,
   mode: 'file' | 'inject',
   globalKeyframes?: Record<string, KeyframesSteps>,
-  autoPropertyTypes?: boolean,
+  propertyOptions?: PropertyExtractionOptions,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
@@ -647,7 +672,7 @@ function handleStylesMode(
   );
 
   // Extract and add auto-inferred @property rules
-  const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
+  const properties = extractPropertiesFromStyles(styles, propertyOptions);
 
   // Extract @font-face rules
   const fontFaces = extractFontFaceFromStyles(styles, globalFontFace);
@@ -710,7 +735,7 @@ function handleExtensionMode(
   globalRegistry: StaticStyleRegistry,
   mode: 'file' | 'inject',
   globalKeyframes?: Record<string, KeyframesSteps>,
-  autoPropertyTypes?: boolean,
+  propertyOptions?: PropertyExtractionOptions,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
@@ -766,9 +791,7 @@ function handleExtensionMode(
   );
 
   // Extract auto-inferred @property rules
-  const properties = extractPropertiesFromStyles(mergedStyles, {
-    autoPropertyTypes,
-  });
+  const properties = extractPropertiesFromStyles(mergedStyles, propertyOptions);
 
   // Extract @font-face rules
   const fontFaces = extractFontFaceFromStyles(mergedStyles, globalFontFace);
@@ -836,7 +859,7 @@ function handleSelectorMode(
   mode: 'file' | 'inject',
   sourceFile?: string,
   globalKeyframes?: Record<string, KeyframesSteps>,
-  autoPropertyTypes?: boolean,
+  propertyOptions?: PropertyExtractionOptions,
   globalFontFace?: Record<string, FontFaceInput>,
   globalCounterStyle?: Record<string, CounterStyleDescriptors>,
   globalFunction?: Record<string, FunctionDefinition>,
@@ -876,7 +899,7 @@ function handleSelectorMode(
   );
 
   // Extract auto-inferred @property rules
-  const properties = extractPropertiesFromStyles(styles, { autoPropertyTypes });
+  const properties = extractPropertiesFromStyles(styles, propertyOptions);
 
   // Extract @font-face rules
   const fontFaces = extractFontFaceFromStyles(styles, globalFontFace);

@@ -1004,7 +1004,7 @@ export class SheetManager {
   }
 
   /**
-   * Get CSS text from all sheets (for SSR)
+   * Get the CSS text of every sheet in `registry`.
    */
   getCSSText(registry: RootRegistry): string {
     const cssChunks: string[] = [];

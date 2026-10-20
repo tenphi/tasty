@@ -9,10 +9,13 @@
  *
  * The context is created lazily to avoid calling createContext() at
  * module evaluation time, which would break Server Components that
- * import from `@tenphi/tasty` without using any React hooks.
+ * import from `@tenphi/tasty` without using any React hooks. React's
+ * `react-server` build has no `createContext` export at all, so it is read
+ * off the default export: a named import would fail to link there.
  */
 
-import { createContext, type Context } from 'react';
+import React from 'react';
+import type { Context } from 'react';
 
 import type { ServerStyleCollector } from './collector';
 
@@ -20,7 +23,7 @@ let _ctx: Context<ServerStyleCollector | null> | undefined;
 
 export function getTastySSRContext(): Context<ServerStyleCollector | null> {
   if (!_ctx) {
-    _ctx = createContext<ServerStyleCollector | null>(null);
+    _ctx = React.createContext<ServerStyleCollector | null>(null);
   }
   return _ctx;
 }

@@ -33,8 +33,10 @@ import { isSelector } from './utils/is-selector';
 import { mergeStyles } from './utils/merge-styles';
 import { modAttrs } from './utils/mod-attrs';
 import { processTokens } from './utils/process-tokens';
-import { getConfig } from './config';
+import { getConfig, getGlobalInjector } from './config';
 import { touch } from './injector';
+import type { StyleInjector } from './injector/injector';
+import { checkRequestScope } from './rsc-cache';
 
 import type { StyleValue, StyleValueStateMap } from './utils/styles';
 
@@ -148,6 +150,174 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
   return SubElement as ForwardRefExoticComponent<
     PropsWithoutRef<SubElementProps<Tag>> & RefAttributes<unknown>
   >;
+}
+
+type AnySubElement = ReturnType<typeof createSubElement>;
+
+/** Create the sub-element components an `elements` definition declares. */
+function createSubElements(
+  elements: ElementsDefinition,
+): Record<string, AnySubElement> {
+  const subElements: Record<string, AnySubElement> = {};
+  for (const [name, definition] of Object.entries(elements)) {
+    subElements[name] = createSubElement(
+      name,
+      definition as SubElementDefinition<keyof JSX.IntrinsicElements>,
+    );
+  }
+  return subElements;
+}
+
+/** Statics React itself reads; never copied from a base onto its extension. */
+const REACT_STATICS = new Set([
+  '$$typeof',
+  'render',
+  'type',
+  'compare',
+  'displayName',
+  'defaultProps',
+  'propTypes',
+  'contextType',
+  'contextTypes',
+  'childContextTypes',
+  'getDerivedStateFromProps',
+  'getDerivedStateFromError',
+]);
+
+/**
+ * Copy the component statics of `source` onto `target`, so an extension keeps
+ * its base's sub-elements (`tasty(Card, …).Title`).
+ */
+function hoistComponentStatics(target: object, source: object): void {
+  for (const key of Object.keys(source)) {
+    if (REACT_STATICS.has(key) || key in target) continue;
+
+    const value = (source as Record<string, unknown>)[key];
+    if (typeof value !== 'string' && isValidElementType(value)) {
+      (target as Record<string, unknown>)[key] = value;
+    }
+  }
+}
+
+/**
+ * Merge each variant over the base styles, once, at factory time.
+ *
+ * Extend-mode state maps in the base styles (no `''` key, not a selector) are
+ * pulled out and applied AFTER the variant merge, so they survive replace-mode
+ * maps in variants. Without a `default` variant, `default` is the base styles.
+ */
+function buildVariantStylesMap(
+  defaultStyles: Styles | undefined,
+  variants: VariantMap,
+): Record<string, Styles | undefined> {
+  let baseStyles = defaultStyles;
+  let extensionStyles: Styles | undefined;
+
+  if (defaultStyles) {
+    for (const key of Object.keys(defaultStyles)) {
+      if (isSelector(key)) continue;
+
+      const value = (defaultStyles as Record<string, unknown>)[key];
+
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        !('' in value)
+      ) {
+        if (!extensionStyles) {
+          baseStyles = { ...defaultStyles } as Styles;
+          extensionStyles = {} as Styles;
+        }
+        (extensionStyles as Record<string, unknown>)[key] = value;
+        delete (baseStyles as Record<string, unknown>)[key];
+      }
+    }
+  }
+
+  const variantStylesMap: Record<string, Styles | undefined> = {};
+  for (const [variant, variantStyles] of Object.entries(variants)) {
+    variantStylesMap[variant] = extensionStyles
+      ? mergeStyles(baseStyles, variantStyles, extensionStyles)
+      : mergeStyles(baseStyles, variantStyles);
+  }
+  // Ensure 'default' variant always exists
+  if (!variantStylesMap['default']) {
+    variantStylesMap['default'] = defaultStyles;
+  }
+
+  return variantStylesMap;
+}
+
+interface MergedStylesEntry {
+  /** The styles the passed-in object was merged over. */
+  base: Styles | undefined;
+  styles: Styles;
+  /** What `computeStyles()` returned for `styles` (client only). */
+  className?: string;
+}
+
+/**
+ * Merges keyed by the passed-in styles object, held weakly so a per-render
+ * object is not kept alive.
+ */
+type MergedStylesCache = WeakMap<object, MergedStylesEntry>;
+
+/**
+ * `mergeStyles(base, extra)`, reusing the previous result while `extra` and
+ * `base` are the same objects — a wrapper's defaults, a module-level constant
+ * or a memoized object. The merged object then stays the same too, which lets
+ * the class names computed for it be cached. Styles are treated as immutable,
+ * as React treats props.
+ */
+function getMergedStyles(
+  cache: MergedStylesCache,
+  base: Styles | undefined,
+  extra: Styles,
+): MergedStylesEntry {
+  let entry = cache.get(extra);
+  if (!entry || entry.base !== base) {
+    entry = { base, styles: mergeStyles(base, extra) };
+    cache.set(extra, entry);
+  }
+  return entry;
+}
+
+/** Move the listed props out of `props`, into a new object. */
+function takeProps(
+  props: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> | undefined {
+  let taken: Record<string, unknown> | undefined;
+  for (const key of keys) {
+    if (key in props) {
+      if (!taken) taken = {};
+      taken[key] = props[key];
+      delete props[key];
+    }
+  }
+  return taken;
+}
+
+/** Move the `tokenProps` props out of `props`, keyed by their tokens. */
+function takeTokenProps(
+  props: Record<string, unknown>,
+  mapping: readonly [propName: string, tokenKey: string][],
+): Tokens | undefined {
+  let tokens: Record<string, TokenValue> | undefined;
+  for (const [propName, tokenKey] of mapping) {
+    if (propName in props) {
+      if (!tokens) tokens = {};
+      tokens[tokenKey] = props[propName] as TokenValue;
+      delete props[propName];
+    }
+  }
+  return tokens as Tokens | undefined;
+}
+
+/** The keys a `modProps` definition declares. */
+function getModPropsKeys(def: ModPropsInput): string[] {
+  return (Array.isArray(def) ? def : Object.keys(def)) as string[];
 }
 
 type StyleList = readonly (keyof {
@@ -492,6 +662,82 @@ export type TastyElementProps<
     | TokenPropsKeys<TP>
   >;
 
+/** Statics React itself reads, as a type (see `REACT_STATICS`). */
+type ReactStaticKey =
+  | '$$typeof'
+  | 'render'
+  | 'type'
+  | 'compare'
+  | 'displayName'
+  | 'defaultProps'
+  | 'propTypes'
+  | 'contextType'
+  | 'contextTypes'
+  | 'childContextTypes'
+  | 'getDerivedStateFromProps'
+  | 'getDerivedStateFromError';
+
+/**
+ * The statics of a component that are components themselves — a `tasty()`
+ * base's sub-elements (`Card.Title`) — which its extension keeps.
+ */
+export type ComponentStatics<C> = {
+  [
+    Key in keyof C as Key extends ReactStaticKey
+      ? never
+      : C[Key] extends string
+        ? never
+        : C[Key] extends ElementType
+          ? Key
+          : never
+  ]: C[Key];
+};
+
+/** Prop names the extension form's own options claim from the base's props. */
+type ExtensionClaimedKeys<
+  K extends StyleList,
+  V extends VariantMap,
+  M extends ModPropsInput,
+  TP extends TokenPropsInput,
+> =
+  | K[number]
+  | ModPropsKeys<M>
+  | TokenPropsKeys<TP>
+  | (string extends keyof V ? never : 'variant');
+
+/**
+ * Props of a `tasty(Component, options)` extension: the base's props, plus
+ * whatever its own `styleProps`, `modProps`, `tokenProps` and `variants` add.
+ * Its variants extend the base's: `variant` accepts either set.
+ */
+export type TastyExtensionProps<
+  Props extends PropsWithStyles,
+  DefaultProps extends Partial<Props>,
+  K extends StyleList = readonly never[],
+  V extends VariantMap = VariantMap,
+  M extends ModPropsInput = readonly never[],
+  TP extends TokenPropsInput = readonly never[],
+> = [ExtensionClaimedKeys<K, V, M, TP>] extends [never]
+  ? TastyComponentPropsWithDefaults<Props, DefaultProps>
+  : Omit<
+      TastyComponentPropsWithDefaults<Props, DefaultProps>,
+      ExtensionClaimedKeys<K, V, M, TP>
+    > & {
+      [key in K[number]]?:
+        | StyleValue<StylesInterface[key]>
+        | StyleValueStateMap<StylesInterface[key]>;
+    } & ResolveModProps<M> &
+      ResolveTokenProps<TP> &
+      (string extends keyof V
+        ? unknown
+        : {
+            variant?:
+              | keyof V
+              | ('variant' extends keyof Props
+                  ? NonNullable<Props['variant']>
+                  : never);
+          });
+
 export type TastyComponentPropsWithDefaults<
   Props extends PropsWithStyles,
   DefaultProps extends Partial<Props>,
@@ -545,13 +791,17 @@ export function tasty<
   DefaultProps extends Partial<Props> = Partial<Props>,
   K extends StyleList = readonly never[],
   V extends VariantMap = VariantMap,
-  E extends ElementsDefinition = Record<string, never>,
+  // `const`: the base's props in the options type would widen tag names.
+  const E extends ElementsDefinition = Record<string, never>,
   M extends ModPropsInput = readonly never[],
   TP extends TokenPropsInput = readonly never[],
+  C extends ComponentType<Props> = ComponentType<Props>,
 >(
-  Component: ComponentType<Props>,
+  Component: C & ComponentType<Props>,
   options?: TastyProps<K, V, E, Props, M, TP>,
-): ComponentType<TastyComponentPropsWithDefaults<Props, DefaultProps>>;
+): ComponentType<TastyExtensionProps<Props, DefaultProps, K, V, M, TP>> &
+  ComponentStatics<C> &
+  (string extends keyof E ? unknown : SubElementComponents<E>);
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Implementation
@@ -579,55 +829,121 @@ function tastyWrap<
   Component: ComponentType<P>,
   options?: TastyProps<K, V, E, P, M, TP>,
 ): ComponentType<TastyComponentPropsWithDefaults<P, DefaultProps>> {
-  // The wrap path forwards default props + merges `styles`/`*Styles` props.
-  // Factory-only options (`styleProps`, `modProps`, `tokenProps`, `variants`,
-  // `elements`) are stripped here, not forwarded to the wrapped component.
+  // The wrap path forwards props to `Component`; it does not re-run the base
+  // factory. Its own `styleProps`, `modProps`, `tokenProps` and `variants`
+  // resolve here into the `styles`, `mods` and `tokens` it forwards, and the
+  // `variant` it forwards still selects the base's own variants. Other options
+  // are default props, with `styles` and `*Styles` merged under instance ones.
   const {
     as: extendTag,
     element: extendElement,
-    styleProps: _styleProps,
-    modProps: _modProps,
-    tokenProps: _tokenProps,
-    variants: _variants,
-    elements: _elements,
+    styleProps,
+    modProps: modPropsDef,
+    tokenProps: tokenPropsDef,
+    variants,
+    variant: defaultVariant,
+    elements,
     ...defaultProps
   } = (options ?? {}) as TastyProps<K, V, E, P, M, TP>;
+
+  const defaultStyles = (defaultProps as { styles?: Styles }).styles;
+  const variantStylesMap = variants
+    ? buildVariantStylesMap(defaultStyles, variants)
+    : undefined;
+  const fallbackVariant = (defaultVariant as string | undefined) ?? 'default';
+  const stylePropNames = styleProps as readonly string[] | undefined;
+  const modPropsKeys = modPropsDef ? getModPropsKeys(modPropsDef) : undefined;
+  const tokenPropsMapping = tokenPropsDef
+    ? buildTokenPropsMapping(tokenPropsDef)
+    : undefined;
 
   const propsWithStyles = ['styles'];
   for (const prop of Object.keys(defaultProps)) {
     if (prop.endsWith('Styles')) propsWithStyles.push(prop);
   }
 
+  const mergedCache: MergedStylesCache = new WeakMap();
+
   const _WrappedComponent = forwardRef<any, any>((props, ref) => {
     const { as, element, ...restProps } = props as Record<string, unknown>;
 
+    const propStyles = stylePropNames
+      ? takeProps(restProps, stylePropNames)
+      : undefined;
+    const propMods = modPropsKeys
+      ? takeProps(restProps, modPropsKeys)
+      : undefined;
+    const propTokens = tokenPropsMapping
+      ? takeTokenProps(restProps, tokenPropsMapping)
+      : undefined;
+
+    const variant = (restProps.variant as string | undefined) ?? defaultVariant;
+    const baseStyles = variantStylesMap
+      ? (variantStylesMap[(variant as string) || fallbackVariant] ??
+        variantStylesMap[fallbackVariant] ??
+        variantStylesMap['default'])
+      : defaultStyles;
+
+    // Unchanged instance styles keep the merged object stable across renders,
+    // so the base can answer from its class name cache.
     const mergedStylesMap: Record<string, unknown> = {};
     for (const prop of propsWithStyles) {
-      const restValue = (restProps as any)[prop];
-      const defaultValue = (defaultProps as any)[prop];
+      const restValue = restProps[prop] as Styles | undefined;
+      const defaultValue =
+        prop === 'styles'
+          ? baseStyles
+          : ((defaultProps as Record<string, unknown>)[prop] as
+              Styles | undefined);
 
       mergedStylesMap[prop] =
         restValue != null && defaultValue != null
-          ? mergeStyles(defaultValue, restValue)
+          ? getMergedStyles(mergedCache, defaultValue, restValue).styles
           : (restValue ?? defaultValue);
+    }
+
+    if (propStyles) {
+      mergedStylesMap.styles = mergeStyles(
+        mergedStylesMap.styles as Styles | undefined,
+        propStyles as Styles,
+      );
     }
 
     const elementProps = {
       ...(defaultProps as unknown as Record<string, unknown>),
-      ...(restProps as unknown as Record<string, unknown>),
+      ...restProps,
       ...mergedStylesMap,
       as: (as as string | undefined) ?? extendTag,
       element: (element as string | undefined) || extendElement,
       ref,
-    } as unknown as P;
+    } as Record<string, unknown>;
 
-    return createElement(Component as ComponentType<P>, elementProps);
+    if (variant !== undefined) elementProps.variant = variant;
+    if (propMods) {
+      elementProps.mods = { ...(elementProps.mods as Mods), ...propMods };
+    }
+    if (propTokens) {
+      elementProps.tokens = {
+        ...(elementProps.tokens as Tokens),
+        ...propTokens,
+      };
+    }
+
+    return createElement(
+      Component as ComponentType<P>,
+      elementProps as unknown as P,
+    );
   });
 
   _WrappedComponent.displayName = `TastyWrappedComponent(${getDisplayName(
     Component,
     (defaultProps as any).qa ?? (extendTag as any) ?? 'Anonymous',
   )})`;
+
+  // Keep the base's sub-elements, then add (or replace with) this one's own.
+  hoistComponentStatics(_WrappedComponent, Component);
+  if (elements) {
+    Object.assign(_WrappedComponent, createSubElements(elements));
+  }
 
   return _WrappedComponent as unknown as ComponentType<
     TastyComponentPropsWithDefaults<P, DefaultProps>
@@ -647,6 +963,7 @@ function tastyElement<
     modProps: modPropsDef,
     tokenProps: tokenPropsDef,
     variants,
+    variant: defaultVariant,
     tokens: defaultTokens,
     elements,
     ...defaultProps
@@ -654,50 +971,15 @@ function tastyElement<
 
   // Pre-compute merged styles for each variant (if variants are defined)
   // This avoids creating separate component instances per variant
-  let variantStylesMap: Record<string, Styles | undefined> | undefined;
-  if (variants) {
-    // Split defaultStyles: extend-mode state maps (no '' key, non-selector)
-    // are pulled out and applied AFTER variant merge so they survive
-    // replace-mode maps in variants.
-    let baseStyles = defaultStyles;
-    let extensionStyles: Styles | undefined;
-
-    if (defaultStyles) {
-      for (const key of Object.keys(defaultStyles)) {
-        if (isSelector(key)) continue;
-
-        const value = (defaultStyles as Record<string, unknown>)[key];
-
-        if (
-          typeof value === 'object' &&
-          value !== null &&
-          !Array.isArray(value) &&
-          !('' in value)
-        ) {
-          if (!extensionStyles) {
-            baseStyles = { ...defaultStyles } as Styles;
-            extensionStyles = {} as Styles;
-          }
-          (extensionStyles as Record<string, unknown>)[key] = value;
-          delete (baseStyles as Record<string, unknown>)[key];
-        }
-      }
-    }
-
-    variantStylesMap = {};
-    for (const [variant, variantStyles] of Object.entries(variants) as [
-      string,
-      Styles,
-    ][]) {
-      variantStylesMap[variant] = extensionStyles
-        ? mergeStyles(baseStyles, variantStyles, extensionStyles)
-        : mergeStyles(baseStyles, variantStyles);
-    }
-    // Ensure 'default' variant always exists
-    if (!variantStylesMap['default']) {
-      variantStylesMap['default'] = defaultStyles;
-    }
-  }
+  const variantStylesMap = variants
+    ? buildVariantStylesMap(defaultStyles, variants)
+    : undefined;
+  // The variant applied when the prop is omitted or names no variant: the
+  // `variant` option, else `default`.
+  const fallbackVariant = (defaultVariant as string | undefined) ?? 'default';
+  const fallbackStyles = variantStylesMap
+    ? (variantStylesMap[fallbackVariant] ?? variantStylesMap['default'])
+    : defaultStyles;
 
   const {
     qa: defaultQa,
@@ -718,18 +1000,25 @@ function tastyElement<
   let propsToCheckVersion = -1;
 
   const modPropsKeys: string[] | undefined = modPropsDef
-    ? ((Array.isArray(modPropsDef)
-        ? modPropsDef
-        : Object.keys(modPropsDef)) as string[])
+    ? getModPropsKeys(modPropsDef as ModPropsInput)
     : undefined;
 
   const tokenPropsMapping: [string, string][] | undefined = tokenPropsDef
     ? buildTokenPropsMapping(tokenPropsDef as TokenPropsInput)
     : undefined;
 
-  // Factory-level cache: maps stable style references to computed classNames.
-  // For the common case (no instance overrides), this avoids recomputation.
-  const classNameCache = new Map<Styles | undefined, string>();
+  // Factory-level caches from styles to the class names computeStyles() gave
+  // them, so a re-render skips the pipeline (client only):
+  // - classNameCache: the factory's own styles, per variant.
+  // - mergedCache: instance styles that stay the same object between renders —
+  //   an extension's defaults, a module-level constant, a memoized object —
+  //   merged over the variant's styles.
+  // Both are dropped when the injector deletes rules (`gc()`, `cleanup()`,
+  // `destroy()`) or is replaced, since a cached name may have lost its CSS.
+  let classNameCache = new Map<Styles | undefined, string>();
+  let mergedCache: MergedStylesCache = new WeakMap();
+  let cacheInjector: StyleInjector | undefined;
+  let cacheEvictions = 0;
 
   // Passed when the styles object handed to computeStyles() is the factory's
   // own AND computeStyles() will see it again — which is only true where
@@ -801,55 +1090,62 @@ function tastyElement<
       }
     }
 
-    let propMods: Record<string, ModValue> | undefined;
-    if (modPropsKeys) {
-      for (const key of modPropsKeys) {
-        if (key in otherProps) {
-          if (!propMods) propMods = {};
-          propMods[key] = (otherProps as Record<string, unknown>)[
-            key
-          ] as ModValue;
-          delete (otherProps as Record<string, unknown>)[key];
-        }
-      }
-    }
+    const propMods = modPropsKeys
+      ? (takeProps(otherProps as Record<string, unknown>, modPropsKeys) as
+          Record<string, ModValue> | undefined)
+      : undefined;
 
-    let propTokens: Tokens | undefined;
-    if (tokenPropsMapping) {
-      for (const [propName, tokenKey] of tokenPropsMapping) {
-        if (propName in otherProps) {
-          if (!propTokens) propTokens = {} as Tokens;
-          (propTokens as Record<string, TokenValue>)[tokenKey] = (
-            otherProps as Record<string, unknown>
-          )[propName] as TokenValue;
-          delete (otherProps as Record<string, unknown>)[propName];
-        }
-      }
-    }
+    const propTokens = tokenPropsMapping
+      ? takeTokenProps(otherProps as Record<string, unknown>, tokenPropsMapping)
+      : undefined;
 
     const baseStyles = variantStylesMap
-      ? (variantStylesMap[(variant as string) || 'default'] ??
-        variantStylesMap['default'])
+      ? (variant && variantStylesMap[variant as string]) || fallbackStyles
       : defaultStyles;
 
     const hasInstanceStyles =
-      styles && hasKeys(styles as Record<string, unknown>);
-    const hasPropStyles = !!propStyles;
+      !!styles && hasKeys(styles as Record<string, unknown>);
 
-    const allStyles =
-      hasInstanceStyles || hasPropStyles
-        ? mergeStyles(baseStyles, styles as Styles, propStyles as Styles)
-        : baseStyles;
-
-    // Use factory-level cache for stable style references (client only).
-    // On the server the cache must be skipped: both the SSR collector and
-    // the RSC inline-style paths are per-request, so every request must
-    // call computeStyles() to ensure CSS is actually collected/emitted.
+    // Use factory-level caches for stable style references (client only).
+    // On the server they must be skipped: both the SSR collector and the RSC
+    // inline-style paths are per-request, so every request must call
+    // computeStyles() to ensure CSS is actually collected/emitted.
     const useFactoryCache = typeof document !== 'undefined';
-    let generatedClassName =
-      useFactoryCache && allStyles === baseStyles
-        ? classNameCache.get(allStyles)
-        : undefined;
+
+    if (useFactoryCache) {
+      const injector = getGlobalInjector();
+      if (injector !== cacheInjector || injector.evictions !== cacheEvictions) {
+        classNameCache = new Map();
+        mergedCache = new WeakMap();
+        cacheInjector = injector;
+        cacheEvictions = injector.evictions;
+      }
+    }
+
+    let allStyles: Styles | undefined;
+    let generatedClassName: string | undefined;
+    let mergedEntry: MergedStylesEntry | undefined;
+
+    if (propStyles) {
+      // Style props are fresh values every render; nothing to reuse.
+      allStyles = mergeStyles(baseStyles, styles as Styles, propStyles);
+    } else if (hasInstanceStyles) {
+      if (useFactoryCache) {
+        mergedEntry = getMergedStyles(
+          mergedCache,
+          baseStyles,
+          styles as Styles,
+        );
+        allStyles = mergedEntry.styles;
+        generatedClassName = mergedEntry.className;
+      } else {
+        allStyles = mergeStyles(baseStyles, styles as Styles);
+      }
+    } else {
+      allStyles = baseStyles;
+      if (useFactoryCache) generatedClassName = classNameCache.get(baseStyles);
+    }
+
     let rscCSS: string | undefined;
 
     if (generatedClassName !== undefined) {
@@ -863,7 +1159,9 @@ function tastyElement<
       );
       generatedClassName = result.className;
       rscCSS = result.css;
-      if (useFactoryCache && allStyles === baseStyles) {
+      if (mergedEntry) {
+        mergedEntry.className = generatedClassName;
+      } else if (useFactoryCache && allStyles === baseStyles) {
         classNameCache.set(allStyles, generatedClassName);
       }
     }
@@ -947,6 +1245,7 @@ function tastyElement<
     // Class names are extracted from these tags on the client via
     // the doubled-specificity pattern (.tXXX.tXXX), so no <script> is needed.
     if (rscCSS) {
+      checkRequestScope();
       const nonce = getConfig().nonce;
 
       return createElement(
@@ -970,15 +1269,7 @@ function tastyElement<
 
   // Attach sub-element components if elements are defined
   if (elements) {
-    const subElements: Record<string, ForwardRefExoticComponent<any>> = {};
-    for (const [name, definition] of Object.entries(elements)) {
-      subElements[name] = createSubElement(
-        name,
-        definition as SubElementDefinition<keyof JSX.IntrinsicElements>,
-      );
-    }
-
-    return Object.assign(_TastyComponent, subElements);
+    return Object.assign(_TastyComponent, createSubElements(elements));
   }
 
   return _TastyComponent;

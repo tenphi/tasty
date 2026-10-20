@@ -458,7 +458,7 @@ exports[`Advanced State Mapping - CSS Output > edge cases > should handle advanc
   :where(:root[data-theme="dark"]) .t134qtxa.t134qtxa { border: 1px solid var(--dark-05-color); }
 }
 @media (width < 600px) {
-  .t134qtxa.t134qtxa { border: 1px none var(--border-color, currentColor); }
+  .t134qtxa.t134qtxa { border: 1px none var(--border-color); }
 }"
 `;
 

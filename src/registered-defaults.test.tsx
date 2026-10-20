@@ -174,13 +174,10 @@ describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
  * A style that sets `#outline` makes auto-inference meet `--outline-color`.
  * Inferred, it would be a `<color>` starting at `transparent`, which every
  * element without the token then reads. Tasty declares it by default
- * (`initial-value: currentcolor`), and the runtime injector and the Babel
- * plugin both leave a declared property to its own definition.
- *
- * Not through SSR: the collector's inference does not skip declared
- * properties yet, so it emits a second, `transparent` rule after Tasty's.
+ * (`initial-value: currentcolor`), and every path leaves a declared property
+ * to its own definition.
  */
-describe.each<RenderPath>(['runtime', 'zero'])(
+describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
   '`#outline` set by one style through %s',
   (path) => {
     afterEach(cleanup);

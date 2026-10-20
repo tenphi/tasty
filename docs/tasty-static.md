@@ -329,7 +329,9 @@ extractStylesWithChunks({ display: 'flex', gap: '1u' });
 // → [{ className: 'ts…', css: '.ts….ts… { … }' }]
 ```
 
-`configure()` takes the same options as the Babel plugin's `config` (see [Plugin Options](#plugin-options)) and replaces the previous configuration on each call; `resetConfig()` returns to the defaults. Options that shape the extracted rules apply — `states`, `units`, parse `functions`, `handlers`, `replaceTokens`, `recipes`, `plugins`, `namePrefix`. Definitions that become at-rules or global CSS of their own are not emitted: `tokens`, `globalStyles`, `fontFaces`, `counterStyles`, `properties` and `$$` `@function` definitions. Render tokens and global styles with `extractStylesForSelector(':root', tokens)` and `extractStylesForSelector(selector, styles)`.
+`configure()` takes the same options as the Babel plugin's `config` (see [Plugin Options](#plugin-options)) and replaces the previous configuration on each call; `resetConfig()` returns to the defaults. Options that shape the extracted rules apply — `states`, `units`, parse `functions`, `handlers`, `replaceTokens`, `recipes`, `plugins`, `namePrefix`. Definitions that become at-rules or global CSS of their own are not emitted with the rules: `tokens`, `globalStyles`, `fontFaces`, `counterStyles`, `properties` and `$$` `@function` definitions. Render tokens and global styles with `extractStylesForSelector(':root', tokens)` and `extractStylesForSelector(selector, styles)`.
+
+`extractConfigProperties()` returns the `@property` rules the Babel plugin writes at the top of its output: Tasty's default set (`#border`, `#outline`, `$gap`, `$radius`, `$transition`, …) overlaid with the configured `properties`. Emit them once per stylesheet. Style handlers read several of these tokens with no fallback of their own (`border: true` reads `#border`, `transition` reads `$transition`), so without them those declarations resolve to nothing.
 
 The configuration is process-wide and shared with the Babel plugin and the runtime `configure()` from `@tenphi/tasty`. The extractors re-apply their own configuration when the Babel plugin replaced it, but not after a runtime `configure()` — don't mix the runtime and build-time configuration in one process.
 
@@ -338,9 +340,17 @@ The configuration is process-wide and shared with the Babel plugin and the runti
 To write the results to a file the way the Babel plugin does, use `createCSSWriter()`. It deduplicates blocks by key and prepends the generated-file header:
 
 ```ts
-import { createCSSWriter, extractStylesWithChunks } from '@tenphi/tasty/zero';
+import {
+  createCSSWriter,
+  extractConfigProperties,
+  extractStylesWithChunks,
+} from '@tenphi/tasty/zero';
 
 const writer = createCSSWriter('dist/tasty.css', { devMode: true });
+
+for (const prop of extractConfigProperties()) {
+  writer.add(`@property:${prop.name}`, prop.css);
+}
 
 for (const chunk of extractStylesWithChunks({ display: 'flex', gap: '1u' })) {
   writer.add(chunk.className, chunk.css, 'src/card.ts'); // source is a devMode comment
@@ -610,8 +620,6 @@ If you add custom style properties, use module augmentation so `tastyStatic` rec
 2. **No runtime props** — Cannot use `styleProps` or dynamic `styles` prop
 3. **No mods at runtime** — Modifiers must be defined statically
 4. **Build-time transformation required** — Babel plugin must process files
-5. **No built-in token defaults** — The runtime registers fallbacks for `#white`, `#black`, `#clear`, `#border`, `$gap`, `$radius`, `$border-width`, `$outline-width`, and a few others as `@property` initial values. The Babel plugin does not emit them, so define every token your styles reference in `config.tokens`.
-6. **`config.properties` is ignored** — It type-checks, but no `@property` rules are generated from it. Automatically inferred properties (`autoPropertyTypes`) are emitted.
 
 ### Workarounds
 

@@ -41,7 +41,7 @@ exports[`tasty() API > should create element styles 1`] = `
 .tt6i54n.tt6i54n:where([data-modified]) [data-element="Element"] { color: var(--purple-color); --current-color: var(--purple-color); }"
 `;
 
-exports[`tasty() API > should define style props 1`] = `".tms9l71.tms9l71 { border: 1px solid var(--border-color, currentColor); }"`;
+exports[`tasty() API > should define style props 1`] = `".tms9l71.tms9l71 { border: 1px solid var(--border-color); }"`;
 
 exports[`tasty() API > should fallback to default variant 1`] = `".t1qyzno6.t1qyzno6 { color: var(--white-color); --current-color: var(--white-color); }"`;
 

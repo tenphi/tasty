@@ -281,7 +281,9 @@ value      configure
 value      createCSSWriter
 value+type CSSWriter
 type       CSSWriterOptions
+value      extractConfigProperties
 type       ExtractedChunk
+type       ExtractedProperty
 type       ExtractedSelector
 value      extractStylesForSelector
 value      extractStylesWithChunks

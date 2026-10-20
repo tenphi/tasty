@@ -1,16 +1,15 @@
 /**
  * Handler output that reads one of Tasty's default tokens.
  *
- * Runtime and SSR register the default @property set, so `--transition`,
- * `--bold-font-weight`, `--font-sans-fallback` and `--border-color` have a
- * value there even when the app never defines them. Zero-runtime CSS ships
- * without that set. A `var()` with neither a value nor a fallback makes its
- * whole declaration invalid at computed-value time, which reads as no
- * transition, a normal weight, or the inherited font rather than as an error.
- * Only `getComputedStyle` can tell, so every case is asserted on computed
- * values through the runtime injector, the SSR collector, and the zero-runtime
- * extractor. The paths agree on every value except the default font stack,
- * which zero-runtime CSS shortens to the same family.
+ * `transition`, `preset: '… / strong'`, `font` and a `border` with no color
+ * read `$transition`, `$bold-font-weight`, `$font-sans-fallback` /
+ * `$font-mono-fallback` and `#border` as bare `var()`s. They have a value only
+ * because every rendering path ships Tasty's default @property set: the
+ * runtime injector, the SSR collector, and the Babel plugin's output. Without
+ * it the whole declaration is invalid at computed-value time, which reads as
+ * no transition, a normal weight, the inherited font, or no border rather than
+ * as an error. Only `getComputedStyle` can tell, so every case is asserted on
+ * computed values through all three paths, which agree on every value.
  */
 import { render } from '@testing-library/react';
 
@@ -22,7 +21,11 @@ import { createServerStyleCollector } from './ssr/collector';
 import type { Styles } from './styles/types';
 import { tasty } from './tasty';
 import { hashString } from './utils/hash';
-import { extractChunks, extractPropertiesFromStyles } from './zero/extractor';
+import {
+  extractChunks,
+  extractConfigProperties,
+  extractPropertiesFromStyles,
+} from './zero/extractor';
 
 // The extractor names classes with Node's `crypto`, which the browser lacks.
 // Any stable content hash serves; the CSS it writes is what is under test.
@@ -64,14 +67,18 @@ function mount(styles: Styles, path: RenderPath): HTMLElement {
       }).className;
       style.textContent = collector.getCSS();
     } else {
-      // What the Babel plugin writes: the chunk rules and the @property rules
-      // inferred from them, and nothing from Tasty's default set.
+      // What the Babel plugin writes: Tasty's default @property set, the
+      // @property rules inferred from the styles except those already
+      // declared, and the chunk rules.
+      const declared = extractConfigProperties();
+      const inferred = extractPropertiesFromStyles(styles, {
+        defined: new Set(declared.map((prop) => prop.name)),
+      });
       const chunks = extractChunks(styles);
       element.className = chunks.map((chunk) => chunk.className).join(' ');
-      style.textContent = [
-        ...extractPropertiesFromStyles(styles).map((prop) => prop.css),
-        ...chunks.map((chunk) => chunk.css),
-      ].join('\n');
+      style.textContent = [...declared, ...inferred, ...chunks]
+        .map((rule) => rule.css)
+        .join('\n');
     }
 
     style.dataset.defaultTokenProbe = '';
@@ -107,6 +114,15 @@ function withRootToken(name: string, value: string, run: () => void): void {
   }
 }
 
+function cleanup() {
+  document.querySelectorAll('[data-default-token-probe]').forEach((el) => {
+    el.remove();
+  });
+  document.body.replaceChildren();
+  destroy();
+  resetConfig();
+}
+
 /** A registered default font stack, as `fontFamily()` reads it back. */
 function defaultStack(token: string): string {
   return String(DEFAULT_PROPERTIES[token].initialValue).toLowerCase();
@@ -115,25 +131,15 @@ function defaultStack(token: string): string {
 describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
   'default tokens in handler output through %s',
   (path) => {
-    afterEach(() => {
-      document.querySelectorAll('[data-default-token-probe]').forEach((el) => {
-        el.remove();
-      });
-      document.body.replaceChildren();
-      destroy();
-      resetConfig();
-    });
+    afterEach(cleanup);
 
-    if (path === 'zero') {
-      it('renders without the default @property set', () => {
-        mount({ transition: 'opacity' }, path);
-        // Each is registered with an initial value wherever the set is emitted.
-        expect(computed(document.body, '--transition')).toBe('');
-        expect(computed(document.body, '--bold-font-weight')).toBe('');
-        expect(computed(document.body, '--font-sans-fallback')).toBe('');
-        expect(computed(document.body, '--border-color')).toBe('');
-      });
-    }
+    it('registers the default set from its own CSS', () => {
+      // Nothing is left over from an earlier path, so the cases below pass on
+      // what this path emits.
+      expect(computed(document.body, '--bold-font-weight')).toBe('');
+      mount({ transition: 'opacity' }, path);
+      expect(computed(document.body, '--bold-font-weight')).toBe('700');
+    });
 
     describe('transition', () => {
       it.each<[string, string, string]>([
@@ -195,17 +201,10 @@ describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
     });
 
     describe('font family', () => {
-      // Runtime and SSR read the full stacks registered as
-      // `$font-sans-fallback` / `$font-mono-fallback`. Zero-runtime CSS falls
-      // through to the handler's own short stacks, which keep the family.
-      const sans =
-        path === 'zero'
-          ? 'system-ui, sans-serif'
-          : defaultStack('$font-sans-fallback');
-      const mono =
-        path === 'zero'
-          ? 'ui-monospace, monospace'
-          : defaultStack('$font-mono-fallback');
+      // The full stacks registered as `$font-sans-fallback` /
+      // `$font-mono-fallback`.
+      const sans = defaultStack('$font-sans-fallback');
+      const mono = defaultStack('$font-mono-fallback');
 
       it.each<[string, Styles, string]>([
         ['font: true', { font: true }, sans],
@@ -272,25 +271,24 @@ describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
 );
 
 /**
- * A style that sets `#border` makes auto-inference register `--border-color`.
+ * A style that sets `#border` makes auto-inference meet `--border-color`.
  * Inferred, it would be a `<color>` starting at `transparent`, which every
- * element without the token then reads instead of the `currentColor`
- * fallback. Tasty declares it itself (`initial-value: currentcolor`), and the
- * runtime injector does not infer a property that is already registered.
+ * element without the token then reads. Tasty declares it by default
+ * (`initial-value: currentcolor`), and every path leaves a declared property
+ * to its own definition.
  */
-describe('`#border` set by one style', () => {
-  afterEach(() => {
-    document.body.replaceChildren();
-    destroy();
-    resetConfig();
-  });
+describe.each<RenderPath>(['runtime', 'ssr', 'zero'])(
+  '`#border` set by one style through %s',
+  (path) => {
+    afterEach(cleanup);
 
-  it('leaves a border without it in the text color', () => {
-    const tinted = mount({ '#border': GREEN, border: true }, 'runtime');
-    const plain = mount({ border: '2px dashed' }, 'runtime');
+    it('leaves a border without it in the text color', () => {
+      const tinted = mount({ '#border': GREEN, border: true }, path);
+      const plain = mount({ border: '2px dashed' }, path);
 
-    expect(computed(tinted, 'border-top-color')).toBe(GREEN);
-    expect(computed(plain, 'border-top-style')).toBe('dashed');
-    expect(computed(plain, 'border-top-color')).toBe(RED);
-  });
-});
+      expect(computed(tinted, 'border-top-color')).toBe(GREEN);
+      expect(computed(plain, 'border-top-style')).toBe('dashed');
+      expect(computed(plain, 'border-top-color')).toBe(RED);
+    });
+  },
+);

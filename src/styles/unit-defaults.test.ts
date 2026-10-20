@@ -64,8 +64,8 @@ describe('value-less groups resolve through the units', () => {
     [
       'border side',
       () => borderStyle({ border: 'dotted left' })?.['border-left'],
-      '1px dotted var(--border-color, currentColor)',
-      '2px dotted var(--border-color, currentColor)',
+      '1px dotted var(--border-color)',
+      '2px dotted var(--border-color)',
     ],
     [
       'outline',

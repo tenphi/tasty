@@ -1,5 +1,4 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
-import { DEFAULT_TRANSITION } from '../properties/defaults';
 import { parseStyle } from '../utils/styles';
 import { isTokenNameReference } from './shared';
 
@@ -99,9 +98,9 @@ function getTiming(name: string): string {
   const varName = name.startsWith('--')
     ? `${name}-transition`
     : `--${name}-transition`;
-  // The fallback keeps the declaration valid where `$transition` is not
-  // defined, as in zero-runtime CSS that ships without the default properties.
-  return `var(${varName}, var(--transition, ${DEFAULT_TRANSITION}))`;
+  // `$transition` is one of Tasty's default properties, so it always has a
+  // value: no fallback of its own is needed.
+  return `var(${varName}, var(--transition))`;
 }
 
 export function transitionStyle({ transition }: { transition?: string }) {

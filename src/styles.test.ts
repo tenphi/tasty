@@ -15,8 +15,7 @@ import { radiusStyle } from './styles/radius';
 import { shadowStyle } from './styles/shadow';
 import { resetStyleWarnings } from './utils/warnings';
 
-const SANS_FONT =
-  'var(--font-sans, var(--font-sans-fallback, system-ui, sans-serif))';
+const SANS_FONT = 'var(--font-sans, var(--font-sans-fallback))';
 
 describe('Tasty style tests', () => {
   beforeEach(() => {
@@ -412,7 +411,7 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-size': 'var(--t3-font-size, var(--default-font-size))',
       }),
     );
@@ -425,7 +424,7 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-size': 'var(--t3-font-size, var(--default-font-size))',
       }),
     );
@@ -435,7 +434,7 @@ describe('Tasty style tests', () => {
     const result = presetStyle({ preset: 'bold' });
     expect(result).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-size': 'inherit',
       }),
     );
@@ -502,7 +501,7 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-style': 'italic',
         'font-size': 'var(--t3-font-size, var(--default-font-size))',
       }),
@@ -516,7 +515,7 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'line-height': '1em',
         'font-size': 'var(--t3-font-size, var(--default-font-size))',
       }),
@@ -541,7 +540,7 @@ describe('Tasty style tests', () => {
     const result = presetStyle({ preset: 'bold italic' });
     expect(result).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-style': 'italic',
         'font-size': 'inherit',
       }),
@@ -580,7 +579,7 @@ describe('Tasty style tests', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        'font-weight': 'var(--bold-font-weight, 700)',
+        'font-weight': 'var(--bold-font-weight)',
         'font-style': 'italic',
         'font-size': 'var(--icon-size)',
         'line-height': 'normal',
@@ -596,8 +595,7 @@ describe('Tasty style tests', () => {
       'font-family': `Inter, ${SANS_FONT}`,
     });
     expect(presetStyle({ font: 'monospace' })).toEqual({
-      'font-family':
-        'var(--font-mono, var(--font-mono-fallback, ui-monospace, monospace))',
+      'font-family': 'var(--font-mono, var(--font-mono-fallback))',
     });
   });
 

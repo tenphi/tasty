@@ -137,7 +137,7 @@ function zeroBorderValue(value: string): string {
   const firstSpace = value.indexOf(' ');
 
   return firstSpace === -1
-    ? '0 solid var(--border-color, currentColor)'
+    ? '0 solid var(--border-color)'
     : `0${value.slice(firstSpace)}`;
 }
 
@@ -160,7 +160,7 @@ function logicalBorderStyle<const Name extends string>(
       start: null,
       end: null,
     };
-    let fallback = '0 solid var(--border-color, currentColor)';
+    let fallback = '0 solid var(--border-color)';
     let useLonghand = false;
 
     for (const group of groups) {

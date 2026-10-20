@@ -1,4 +1,7 @@
 import type { Styles } from '../styles/types';
+import { CUSTOM_UNITS } from '../utils/styles';
+
+import { DEFAULT_PROPERTIES } from './defaults';
 
 import {
   extractLocalProperties,
@@ -385,5 +388,19 @@ describe('properties', () => {
       expect(inferSyntaxFromValue('')).toBeNull();
       expect(inferSyntaxFromValue('var(--x) + 1')).toBeNull();
     });
+  });
+});
+
+describe('default token properties', () => {
+  // A unit pointed at its token (`units: { x: 'var(--gap)' }`) must keep the
+  // built-in scale until the token is defined. `$gap` used to start at 4px,
+  // which silently halved every `x` value.
+  it.each([
+    ['$gap', 'x'],
+    ['$radius', 'r'],
+    ['$border-width', 'bw'],
+    ['$outline-width', 'ow'],
+  ] as const)('%s starts at the `%s` unit', (token, unit) => {
+    expect(DEFAULT_PROPERTIES[token].initialValue).toBe(CUSTOM_UNITS[unit]);
   });
 });

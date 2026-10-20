@@ -15,6 +15,8 @@ import type {
   KeyframesSteps,
   PropertyDefinition,
 } from './injector/types';
+import type { DeclaredPropertyEntry } from './properties';
+import { indexPropertiesByName } from './properties';
 import { DEFAULT_PROPERTIES } from './properties/defaults';
 import type { ConfigTokens, Styles } from './styles/types';
 
@@ -63,6 +65,34 @@ export function getEffectiveProperties(): Record<string, PropertyDefinition> {
   return properties
     ? { ...DEFAULT_PROPERTIES, ...properties }
     : DEFAULT_PROPERTIES;
+}
+
+let effectivePropertyIndex: {
+  source: Record<string, PropertyDefinition> | null | undefined;
+  index: ReadonlyMap<string, DeclaredPropertyEntry>;
+} | null = null;
+
+/**
+ * The effective properties (Tasty's defaults and `configure({ properties })`)
+ * keyed by the custom property each one registers — see
+ * `indexPropertiesByName()`. Rebuilt only when `configure({ properties })`
+ * replaces the set.
+ */
+export function getEffectivePropertiesByName(): ReadonlyMap<
+  string,
+  DeclaredPropertyEntry
+> {
+  const source =
+    globalProperties ??
+    getFromGlobalThis<Record<string, PropertyDefinition>>(GTKEY_PROPERTIES);
+
+  if (effectivePropertyIndex && effectivePropertyIndex.source === source) {
+    return effectivePropertyIndex.index;
+  }
+
+  const index = indexPropertiesByName(getEffectiveProperties());
+  effectivePropertyIndex = { source, index };
+  return index;
 }
 
 export function getGlobalFontFaces(): Record<string, FontFaceInput> | null {

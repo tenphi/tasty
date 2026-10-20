@@ -1,7 +1,11 @@
 import type { StyleDetails } from '../parser/types';
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
-import { extractCSSWideKeyword, warnExtraGroupValues } from './shared';
+import {
+  extractCSSWideKeyword,
+  resolveDefaultValue,
+  warnExtraGroupValues,
+} from './shared';
 
 type Direction = 'top' | 'right' | 'bottom' | 'left';
 
@@ -16,7 +20,10 @@ const DIRECTION_SPAN = 32;
 export interface DirectionalConfig {
   /** CSS property name (e.g. 'padding', 'margin', 'inset', 'scroll-margin') */
   property: string;
-  /** Default value when parsing yields empty (e.g. 'var(--gap)', '0') */
+  /**
+   * Value for a group that names no value (e.g. `'1x'`, `'0'`). Written in Tasty
+   * syntax and resolved through the parser, so units follow `configure({ units })`.
+   */
   defaultValue: string;
   /** Value used when the prop is `true` (e.g. '1x', '0') */
   trueValue: string;
@@ -60,7 +67,7 @@ function parseSingleValue(
 
   const { values } = parseStyle(strVal).groups[0] ?? { values: [] };
 
-  return values[0] || defaultValue;
+  return values[0] || resolveDefaultValue(defaultValue);
 }
 
 function directionModFlags(
@@ -96,7 +103,9 @@ function applyGroup(
   property: string,
   defaultValue: string,
 ): void {
-  const values = group.values.length ? group.values : [defaultValue];
+  const values = group.values.length
+    ? group.values
+    : [resolveDefaultValue(defaultValue)];
   const directions = modFlags & DIRECTION_MASK;
   const span = modFlags & DIRECTION_SPAN;
 

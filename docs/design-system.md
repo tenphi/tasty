@@ -59,7 +59,7 @@ configure({
 });
 ```
 
-Leave out the `units` block to keep the built-in fixed scale (`x` = `8px`, `r` = `6px`, `bw` = `1px`, `ow` = `3px`), or set fixed values there instead (`units: { x: '8px', r: '4px' }`). Always define the token a unit points at: `--gap` is registered with an initial value of `4px`, which would silently halve the default step. Boolean shorthands follow the same scale: `radius: true` is `1r`, `border: true` is `1bw`, and `outline: true` is `1ow`. See [Built-in Units](dsl.md#built-in-units).
+Leave out the `units` block to keep the built-in fixed scale (`x` = `8px`, `r` = `6px`, `bw` = `1px`, `ow` = `3px`), or set fixed values there instead (`units: { x: '8px', r: '4px' }`). Define the token a unit points at; until you do, `--gap`, `--radius`, `--border-width`, and `--outline-width` start at the built-in unit values. Boolean shorthands follow the same scale: `radius: true` is `1r`, `border: true` is `1bw`, and `outline: true` is `1ow`. See [Built-in Units](dsl.md#built-in-units).
 
 Tokens are injected as CSS custom properties on `:root` when the first style is rendered. They support state maps for theme-aware values:
 

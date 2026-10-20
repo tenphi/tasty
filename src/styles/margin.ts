@@ -2,7 +2,7 @@ import { processDirectionalStyle } from './directional';
 
 const MARGIN_CONFIG = {
   property: 'margin',
-  defaultValue: 'var(--gap)',
+  defaultValue: '1x',
   trueValue: '1x',
   defaultInit: '0',
 } as const;

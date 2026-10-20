@@ -69,7 +69,7 @@ describe('outlineStyle', () => {
     it('handles outline: "none" style', () => {
       const result = outlineStyle({ outline: 'none' });
       expect(result).toEqual({
-        outline: 'var(--outline-width) none var(--outline-color)',
+        outline: '3px none var(--outline-color)',
       });
     });
   });

@@ -146,7 +146,7 @@ A group that names *no* direction keeps plain CSS shorthand order, which is unam
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
-A group with directions but no value (`padding: 'top'`) uses `var(--gap)` rather than the `x` unit, so it ignores `configure({ units })`; with no `$gap` token it resolves to `4px`, not `1x` (`8px`). Write the value: `padding: '1x top'`.
+A group with directions but no value (`padding: 'top'`) uses `1x`, the same as `padding: true`, so it follows `configure({ units })`.
 
 Individual physical props `paddingTop`, `paddingRight`, `paddingBottom`, and `paddingLeft` are supported, but `padding` with modifiers is recommended. Use `blockPadding` or `inlinePadding` for an enhanced logical-axis shorthand; native declarations such as `paddingInlineStart` remain ordinary CSS properties. See [Logical properties](#logical-properties).
 
@@ -198,10 +198,11 @@ Element width with min/max control. One, two, or three values set `min-width`, `
 | `"max 100%"` | initial | auto | `100%` |
 | `"fixed 200px"` | `200px` | `200px` | `200px` |
 
-**Keywords:** `max-content`, `min-content`, `fit-content`
+**Keywords:** `stretch`, `max-content`, `min-content`, `fit-content`
 
 | Value | Effect |
 |-------|--------|
+| `"stretch"` | Fill the available space, margins included. Emitted with `-webkit-fill-available` and `-moz-available` fallbacks for engines without the standard keyword |
 | `true` | Reset to `auto` / `initial` / `initial` |
 | Number | Converted to `px` |
 
@@ -209,9 +210,7 @@ Separate `minWidth` and `maxWidth` props are supported and override values from 
 
 ### `height`
 
-Element height. Same syntax, modifiers, and positional patterns as `width`.
-
-Avoid `stretch` for now on `width` and `height`: `width: 'stretch'` emits a comma-joined fallback list that browsers drop, and `height: 'stretch'` becomes `auto`.
+Element height. Same syntax, modifiers, keywords, and positional patterns as `width`, including `stretch`.
 
 Separate `minHeight` and `maxHeight` props are supported and override values from the `height` syntax.
 
@@ -311,7 +310,7 @@ Background color with design token support. Preferred over `backgroundColor` and
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 
-When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. Avoid combining a two-color `fill` with `image` or `backgroundImage` on the same element: both set `background-image` from separate rules, so which one shows depends on rule order.
+When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. With `image` or `backgroundImage` on the same element, the image is layered over the overlay color in one `background-image`.
 
 **Related deprecated props:** `backgroundColor` (use `fill`), `background` (overrides all background props when set — avoid).
 
@@ -392,7 +391,7 @@ Border shorthand with directional and multi-group support. Use **comma-separated
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
-A directional group without a width (`'dotted left'`) uses `var(--border-width)` rather than the `bw` unit, so it ignores `configure({ units })`; `border: true` uses the unit. Both default to `1px`.
+A directional group without a width (`'dotted left'`) uses `1bw`, the same as `border: true`, so it follows `configure({ units })`.
 
 ### `radius`
 
@@ -433,7 +432,7 @@ Use these when an edge modifier would round one corner too many. Edge and corner
 | `"4px top-left"` | Top-left corner `4px`, every other corner `0` |
 | `"top bottom-right"` | Both top corners and bottom-right `1r`, bottom-left `0` |
 
-A value-less corner group (`'top-right'`, `'top bottom-right'`) uses `var(--radius)` rather than the `r` unit, so it ignores `configure({ units })`; `radius: true` uses the unit. Both default to `6px`. Write the value (`'1r top-right'`) when you change the `r` unit.
+A value-less corner group (`'top-right'`, `'top bottom-right'`) uses `1r`, the same as `radius: true`, so it follows `configure({ units })`.
 
 ### `outline`
 
@@ -590,9 +589,10 @@ When easing is provided without a duration, the default timing variable is used 
 | `width` | `width`, `min-width`, `max-width` |
 | `height` | `height`, `min-height`, `max-height` |
 | `gap` | `gap`, `margin` |
+| `zIndex` | `z-index` (same as writing `z-index`) |
 | `inset` | `inset`, `top`, `right`, `bottom`, `left` |
 
-Any other name passes through as a CSS property. Write `z-index` in its CSS form: `transition: 'z-index'` works, while `zIndex` is currently lowercased to the invalid `zindex`.
+Any other name passes through as a CSS property.
 
 When two entries cover the same property, an entry that names that one property wins over a group such as `theme`, in either order: `opacity 120ms ease-in-out, theme` keeps the opacity timing. Otherwise the later entry wins, as in CSS.
 
@@ -684,7 +684,7 @@ plain CSS shorthand order, like `padding`. See the [`padding` rule](#padding).
 
 | Value | Effect |
 |-------|--------|
-| `"top"` | Fade top edge, default width `calc(2 * var(--gap))` (`8px` unless `$gap` is set), all other edges unfaded |
+| `"top"` | Fade top edge, default width `2x`, all other edges unfaded |
 | `"2x left right"` | Fade left and right edges with `2x` width, top/bottom unfaded |
 | `"3x 1x"` | All edges faded — top/bottom `3x`, left/right `1x` (CSS shorthand order) |
 | `"3x top, 1x bottom"` | Fade top with `3x` width, bottom with `1x` width |

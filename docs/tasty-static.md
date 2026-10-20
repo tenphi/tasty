@@ -431,8 +431,10 @@ The `@tenphi/tasty/static` import becomes an import of the generated file (relat
 @property --current-color {
   syntax: '<color>';
   inherits: true;
-  initial-value: transparent;
+  initial-value: currentcolor;
 }
+
+/* …the rest of Tasty's default @property rules (--gap, --radius, --white-color, …) */
 
 .ts3f783b.ts3f783b {
   color: var(--white-color);

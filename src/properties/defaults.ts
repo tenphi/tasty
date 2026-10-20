@@ -50,14 +50,16 @@ export const DEFAULT_PROPERTIES: Record<string, PropertyDefinition> = {
     initialValue: 'currentcolor',
   },
 
-  // ---- Core design tokens used by style handlers ----
+  // ---- Core design tokens ----
   // These provide sensible defaults so Tasty works standalone without a design system.
   // Consuming projects (e.g. uikit) override these by defining tokens on :root.
+  // Each matches its built-in unit (`x`, `r`, `bw`, `ow`), so pointing the unit
+  // at the token (`units: { x: 'var(--gap)' }`) keeps the default scale.
 
   $gap: {
     syntax: '<length>',
     inherits: true,
-    initialValue: '4px',
+    initialValue: '8px',
   },
   $radius: {
     syntax: '<length>',

@@ -104,7 +104,8 @@ export interface RenderResult {
 
 interface ComputedRule {
   condition: ConditionNode;
-  declarations: Record<string, string>;
+  /** A list value is a fallback chain: one declaration per entry, in order. */
+  declarations: Record<string, string | string[]>;
   selectorSuffix: string;
   /**
    * Cascade order hint (source priority of the highest-priority style entry
@@ -427,7 +428,7 @@ function invokeHandler(
       if (!r || typeof r !== 'object') continue;
 
       const { $, ...styleProps } = r;
-      const declarations: Record<string, string> = {};
+      const declarations: Record<string, string | string[]> = {};
 
       for (const [prop, val] of Object.entries(styleProps)) {
         // Regex first so the common case is one cheap test; isDevEnv() is called
@@ -445,7 +446,18 @@ function invokeHandler(
           );
         }
 
-        if (val != null && val !== '') {
+        if (Array.isArray(val)) {
+          // A fallback chain (`['-webkit-fill-available', 'stretch']`): each
+          // entry is emitted as its own declaration, in order, so the browser
+          // keeps the last one it supports. Stringifying the array would emit
+          // one comma-joined value that no browser accepts.
+          const chain = val
+            .filter((v) => v != null && v !== '')
+            .map((v) => String(v));
+          if (chain.length) {
+            declarations[prop] = chain.length === 1 ? chain[0] : chain;
+          }
+        } else if (val != null && val !== '') {
           declarations[prop] = String(val);
         }
       }
@@ -1110,9 +1122,14 @@ function cartesianProduct<T>(arrays: T[][]): T[][] {
   return result;
 }
 
-const declStringCache = new WeakMap<Record<string, string>, string>();
+const declStringCache = new WeakMap<
+  Record<string, string | string[]>,
+  string
+>();
 
-function stringifyDeclarations(decl: Record<string, string>): string {
+function stringifyDeclarations(
+  decl: Record<string, string | string[]>,
+): string {
   let cached = declStringCache.get(decl);
   if (cached === undefined) {
     cached = JSON.stringify(decl);
@@ -1221,7 +1238,11 @@ function materializeComputedRule(rule: ComputedRule): CSSRule[] {
   }
 
   const declarations = Object.entries(rule.declarations)
-    .map(([prop, value]) => `${prop}: ${value};`)
+    .map(([prop, value]) =>
+      Array.isArray(value)
+        ? value.map((v) => `${prop}: ${v};`).join(' ')
+        : `${prop}: ${value};`,
+    )
     .join(' ');
 
   // Group variants by their at-rules + startingStyle (variants with same context can be combined with commas)

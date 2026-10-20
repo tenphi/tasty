@@ -45,12 +45,28 @@ export type ChunkName = (typeof CHUNK_NAMES)[keyof typeof CHUNK_NAMES];
 // ============================================================================
 
 /**
- * Appearance chunk - visual styling with independent handlers
+ * Appearance chunk - visual styling
+ *
+ * Handler dependencies (all styles in each handler MUST stay in this chunk):
+ * ⚠️ fillStyle: fill, backgroundColor, image, backgroundImage,
+ *    backgroundPosition/Size/Repeat/Attachment/Origin/Clip, background
  *
  * @public
  */
 export const APPEARANCE_CHUNK_STYLES = [
-  'fill', // fillStyle (independent)
+  // fillStyle handler - MUST stay together: a two-color `fill` layers its
+  // overlay under `image` in one `background-image`
+  'fill',
+  'backgroundColor',
+  'image',
+  'backgroundImage',
+  'backgroundPosition',
+  'backgroundSize',
+  'backgroundRepeat',
+  'backgroundAttachment',
+  'backgroundOrigin',
+  'backgroundClip',
+  'background',
   'color', // colorStyle (independent)
   'opacity', // independent
   'border', // borderStyle (independent)

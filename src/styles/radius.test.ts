@@ -37,10 +37,10 @@ describe('radiusStyle', () => {
 
     it('expands default value (no explicit value) to 4 corner longhands', () => {
       expect(radiusStyle({ radius: 'longhand' })).toEqual({
-        'border-top-left-radius': 'var(--radius)',
-        'border-top-right-radius': 'var(--radius)',
-        'border-bottom-right-radius': 'var(--radius)',
-        'border-bottom-left-radius': 'var(--radius)',
+        'border-top-left-radius': '6px',
+        'border-top-right-radius': '6px',
+        'border-bottom-right-radius': '6px',
+        'border-bottom-left-radius': '6px',
       });
     });
 
@@ -65,17 +65,17 @@ describe('radiusStyle', () => {
     it('expands leaf modifier with longhand', () => {
       expect(radiusStyle({ radius: 'leaf longhand' })).toEqual({
         'border-top-left-radius': 'var(--sharp-radius)',
-        'border-top-right-radius': 'var(--radius)',
+        'border-top-right-radius': '6px',
         'border-bottom-right-radius': 'var(--sharp-radius)',
-        'border-bottom-left-radius': 'var(--radius)',
+        'border-bottom-left-radius': '6px',
       });
     });
 
     it('expands backleaf modifier with longhand', () => {
       expect(radiusStyle({ radius: 'backleaf longhand' })).toEqual({
-        'border-top-left-radius': 'var(--radius)',
+        'border-top-left-radius': '6px',
         'border-top-right-radius': 'var(--sharp-radius)',
-        'border-bottom-right-radius': 'var(--radius)',
+        'border-bottom-right-radius': '6px',
         'border-bottom-left-radius': 'var(--sharp-radius)',
       });
     });
@@ -113,12 +113,12 @@ describe('radiusStyle', () => {
     });
   });
   describe('single-corner modifiers', () => {
-    it('rounds only the named corner, defaulting to var(--radius)', () => {
+    it('rounds only the named corner, defaulting to 1r', () => {
       expect(radiusStyle({ radius: 'top-right' })).toEqual({
-        'border-radius': '0 var(--radius) 0 0',
+        'border-radius': '0 6px 0 0',
       });
       expect(radiusStyle({ radius: 'bottom-left' })).toEqual({
-        'border-radius': '0 0 0 var(--radius)',
+        'border-radius': '0 0 0 6px',
       });
     });
 
@@ -133,13 +133,13 @@ describe('radiusStyle', () => {
 
     it('keeps edge modifiers addressing the corner pair', () => {
       expect(radiusStyle({ radius: 'top' })).toEqual({
-        'border-radius': 'var(--radius) var(--radius) 0 0',
+        'border-radius': '6px 6px 0 0',
       });
     });
 
     it('combines an edge modifier with a single corner', () => {
       expect(radiusStyle({ radius: 'top bottom-right' })).toEqual({
-        'border-radius': 'var(--radius) var(--radius) var(--radius) 0',
+        'border-radius': '6px 6px 6px 0',
       });
     });
 

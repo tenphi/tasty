@@ -121,7 +121,8 @@ configure `forceTextInjection: true` and read it back with `getCSSText()`.
 
 Choose the newest **compatible, stable, non-deprecated** release that has been
 published for at least **14 full days**. This applies to npm packages, the pinned
-pnpm version, and GitHub Actions. Verify npm's `time` metadata (for example,
+pnpm version, and GitHub Actions, except first-party `@tenphi/*` packages (see
+below). Verify npm's `time` metadata (for example,
 `pnpm view <package> time --json`) or the action's GitHub release publication date;
 do not infer age from a dependency PR's creation date or use an unreviewed
 `@latest` update.
@@ -142,7 +143,10 @@ against older supported React types as well as checking runtime compatibility.
 `pnpm-workspace.yaml` enforces 14 days (`minimumReleaseAge: 20160`) for direct and
 transitive npm dependencies, fails when no eligible version exists, and requires
 publication timestamps. Keep these checks enabled when refreshing the lockfile.
-Dependabot uses the same 14-day cooldown for version updates and groups coupled
+First-party `@tenphi/*` packages (such as `@tenphi/eslint-plugin-tasty`) come from
+the same maintainer, so they are excluded through `minimumReleaseAgeExclude` and
+Dependabot's `cooldown.exclude`, and a fix in one of them can be adopted the day
+it ships. Dependabot uses the same 14-day cooldown for version updates and groups coupled
 packages and other minor/patch updates to reduce PR noise. Dependabot security
 updates bypass its cooldown; an urgent fix requiring a younger npm release needs
 a documented, version-specific `minimumReleaseAgeExclude` exception reviewed in

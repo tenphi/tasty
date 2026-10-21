@@ -2,19 +2,47 @@ import { resolve } from 'node:path';
 
 import ts from 'typescript';
 
+/** Compiles in-memory fixtures, keyed by their path under `src/`. */
+function compileFixtures(sources: Record<string, string>) {
+  const root = resolve(__dirname, '..');
+  const configFile = ts.readConfigFile(
+    resolve(root, 'tsconfig.json'),
+    ts.sys.readFile,
+  );
+  const config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root);
+  const files = new Map(
+    Object.entries(sources).map(([name, text]) => [
+      resolve(root, 'src', name),
+      text,
+    ]),
+  );
+  // These fixtures need Node globals, but not Vitest's full declaration graph.
+  const options = { ...config.options, types: ['node'] };
+  const host = ts.createCompilerHost(options);
+  const { fileExists, readFile, getSourceFile } = host;
+  host.fileExists = (fileName) => files.has(fileName) || fileExists(fileName);
+  host.readFile = (fileName) => files.get(fileName) ?? readFile(fileName);
+  host.getSourceFile = (fileName, languageVersion, ...rest) => {
+    const text = files.get(fileName);
+
+    return text === undefined
+      ? getSourceFile(fileName, languageVersion, ...rest)
+      : ts.createSourceFile(fileName, text, languageVersion, true);
+  };
+  const program = ts.createProgram([...files.keys()], options, host);
+  const describeDiagnostics = (diagnostics: readonly ts.Diagnostic[]) =>
+    diagnostics.map((diagnostic) => {
+      const { line } = diagnostic.file!.getLineAndCharacterOfPosition(
+        diagnostic.start ?? 0,
+      );
+      return `Line ${line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
+    });
+
+  return { program, files: [...files.keys()], describeDiagnostics };
+}
+
 describe('tasty component and filtered prop types', () => {
   it('preserves component props and types only retained filtered props', () => {
-    const root = resolve(__dirname, '..');
-    const configFile = ts.readConfigFile(
-      resolve(root, 'tsconfig.json'),
-      ts.sys.readFile,
-    );
-    const config = ts.parseJsonConfigFileContent(
-      configFile.config,
-      ts.sys,
-      root,
-    );
-    const fixture = resolve(root, 'src/tasty-props-type-fixture.tsx');
     const source = `
       import type { ComponentType, ComponentProps } from 'react';
       import { createElement, createRef, forwardRef, memo } from 'react';
@@ -119,6 +147,12 @@ describe('tasty component and filtered prop types', () => {
         const wrapped = <Wrapped position="top-right" color="brand" width={12} />;
         // @ts-expect-error The component-extension form retains the wrapped prop domain.
         const invalidWrapped = <Wrapped position="absolute" color="brand" width={12} />;
+        // It keeps each member of a base's union props, not only their shared keys.
+        const Choice = (_props: { kind: 'a'; label: string } | { kind: 'b'; count: number }) => null;
+        const WrappedChoice = factory(Choice);
+        const choice = <WrappedChoice kind="a" label="One" />;
+        // @ts-expect-error Each member keeps its own prop types.
+        const invalidChoice = <WrappedChoice kind="b" count="one" />;
 
         // The extension form's own options add props, and it keeps the base's sub-elements.
         const Card = factory({
@@ -262,28 +296,50 @@ describe('tasty component and filtered prop types', () => {
         return <PlainBox {...filterBaseProps(input)} />;
       }
     `;
-    // These fixtures need Node globals, but not Vitest's full declaration graph.
-    const options = { ...config.options, types: ['node'] };
-    const host = ts.createCompilerHost(options);
-    const original = host.getSourceFile.bind(host);
-    host.getSourceFile = (fileName, languageVersion, ...rest) =>
-      fileName === fixture
-        ? ts.createSourceFile(fileName, source, languageVersion, true)
-        : original(fileName, languageVersion, ...rest);
-    const program = ts.createProgram([fixture], options, host);
-    const file = program.getSourceFile(fixture)!;
-    const diagnostics = [
-      ...program.getSyntacticDiagnostics(file),
-      ...program.getSemanticDiagnostics(file),
-    ];
+    const { program, files, describeDiagnostics } = compileFixtures({
+      'tasty-props-type-fixture.tsx': source,
+    });
+    const file = program.getSourceFile(files[0])!;
 
     expect(
-      diagnostics.map((diagnostic) => {
-        const { line } = file.getLineAndCharacterOfPosition(
-          diagnostic.start ?? 0,
-        );
-        return `Line ${line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
-      }),
+      describeDiagnostics([
+        ...program.getSyntacticDiagnostics(file),
+        ...program.getSemanticDiagnostics(file),
+      ]),
     ).toEqual([]);
+  }, 60_000);
+
+  it('names the base props in the declaration of an extension', () => {
+    // A library that exports `tasty(Base, …)` emits its inferred type, so
+    // every type that type spells out has to be importable from there.
+    const { program, files, describeDiagnostics } = compileFixtures({
+      'tasty-kit-fixture.tsx': `
+        import type { ComponentType } from 'react';
+
+        interface Tone { name: 'light' | 'dark' }
+        export interface KitProps { label: string; tone?: Tone }
+        export declare const Kit: ComponentType<KitProps>;
+      `,
+      'tasty-extension-fixture.tsx': `
+        import { tasty } from './index';
+        import { Kit } from './tasty-kit-fixture';
+
+        export const Extended = tasty(Kit, { styles: { padding: '2x' } });
+      `,
+    });
+    let declaration = '';
+    const { diagnostics } = program.emit(
+      program.getSourceFile(files[1]),
+      (_fileName, text) => {
+        declaration = text;
+      },
+      undefined,
+      true,
+    );
+
+    expect(describeDiagnostics(diagnostics)).toEqual([]);
+    expect(declaration).toContain(
+      'ComponentType<Partial<import("./tasty-kit-fixture").KitProps>>',
+    );
   }, 60_000);
 });

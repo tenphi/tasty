@@ -39,6 +39,8 @@ export type {
   TastyElementProps,
   TastyPolymorphicComponent,
   TastyComponentPropsWithDefaults,
+  TastyExtensionProps,
+  ComponentStatics,
   ResolveAsProps,
   AllBasePropsWithMods,
   SubElementDefinition,

@@ -153,7 +153,8 @@ a documented, version-specific `minimumReleaseAgeExclude` exception reviewed in
 the PR. Remove that exception after the release matures.
 
 Run the full submit workflow, both test projects, and the CI checks (including
-the built-entrypoint, packed React compatibility, and test-only-code checks).
+the built-entrypoint, packed React and Babel compatibility, and test-only-code
+checks).
 Runtime/type dependency or generated-build changes need a changeset; tooling-only
 updates do not.
 

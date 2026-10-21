@@ -208,7 +208,7 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 ## CI/CD
 
-- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), built-entry check (`check:build`), React compatibility check (`check:react-compat`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
+- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), built-entry check (`check:build`), React and Babel compatibility checks (`check:react-compat`, `check:babel-compat`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
 - **Release**: Changesets — on push to `main`, either creates a version PR or publishes to npm
 - **Snapshots**: every PR push publishes `0.0.0-snapshot.<sha>` under the `pr_<number>` dist-tag and comments the install command on the PR
 - **npm trusted publishing**: OIDC provenance via the `release` GitHub environment

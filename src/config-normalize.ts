@@ -85,8 +85,8 @@ export function applyStyleConfig(
       'colorSpace-deprecated',
       '[Tasty] configure({ colorSpace }) no longer has any effect and will be ' +
         'removed in the next major. Colors are emitted as authored, and opacity ' +
-        "is applied with relative color syntax, which reads a color's channels " +
-        'in the browser. To address channels yourself, write ' +
+        'is applied with color-mix(), which the browser resolves against any ' +
+        'color. To address channels yourself, write ' +
         '`oklch(from var(--name-color) l c h)` against the token.',
     );
   }

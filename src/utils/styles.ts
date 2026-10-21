@@ -4,7 +4,7 @@ import { registerDefaultFunctions } from '../plugins/defaults';
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
 import { isColorKeyword } from './color-math';
-import { parseAlphaOverride } from './color-space';
+import { parseAlphaMix } from './color-space';
 
 export {
   getNamedColorHex,
@@ -432,9 +432,9 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
     firstColor = extractedColor;
   }
 
-  // `#name.alpha` fades the color with relative color syntax, so the name and the
+  // `#name.alpha` fades the color with `color-mix()`, so the name and the
   // opacity are read off the parts rather than the whole.
-  const faded = parseAlphaOverride(firstColor);
+  const faded = parseAlphaMix(firstColor);
   const baseColor = faded ? faded.color : firstColor;
 
   // Extract color name (if present) from variable pattern using precompiled regex
@@ -442,10 +442,9 @@ export function parseColor(val: string, ignoreError = false): ParsedColor {
 
   let opacity: number | undefined;
   if (faded) {
-    // A `var()` alpha has no number to report.
-    const { alpha } = faded;
-    const v = parseFloat(alpha);
-    if (!isNaN(v)) opacity = alpha.endsWith('%') ? v : v * 100;
+    // A `$prop` alpha (`calc(var(--prop) * 100%)`) has no number to report.
+    const v = parseFloat(faded.percentage);
+    if (!isNaN(v)) opacity = v;
   } else if (
     baseColor.startsWith('rgb') ||
     baseColor.startsWith('hsl') ||

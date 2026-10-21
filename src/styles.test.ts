@@ -734,7 +734,8 @@ describe('Tasty style tests', () => {
         transparent: 'transparent',
         currentcolor: 'currentcolor',
         '(#purple, #red)': 'var(--purple-color, var(--red-color))',
-        '#purple.5': 'oklch(from var(--purple-color) l c h / .5)',
+        '#purple.5':
+          'color-mix(in oklab, var(--purple-color) 50%, transparent)',
         'color-mix(in oklab, #purple 50%, #red)':
           'color-mix(in oklab,var(--purple-color) 50%,var(--red-color))',
       });
@@ -890,8 +891,9 @@ describe('Tasty style tests', () => {
 
     it('keeps a faded token faded in `--current-color`', () => {
       expect(colorStyle({ color: '#purple.5' })).toEqual({
-        color: 'oklch(from var(--purple-color) l c h / .5)',
-        '--current-color': 'oklch(from var(--purple-color) l c h / .5)',
+        color: 'color-mix(in oklab, var(--purple-color) 50%, transparent)',
+        '--current-color':
+          'color-mix(in oklab, var(--purple-color) 50%, transparent)',
       });
     });
 
@@ -899,7 +901,8 @@ describe('Tasty style tests', () => {
       const handler = createStyle('#brand');
 
       expect(handler({ '#brand': '#purple.5' })).toEqual({
-        '--brand-color': 'oklch(from var(--purple-color) l c h / .5)',
+        '--brand-color':
+          'color-mix(in oklab, var(--purple-color) 50%, transparent)',
       });
     });
 

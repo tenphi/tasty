@@ -71,8 +71,8 @@ export function createStyle(
         // chain becomes its `var()` chain, a color function keeps its expanded
         // tokens, a literal or keyword passes through as authored. Nothing needs
         // rewriting into a particular color space — opacity is applied with
-        // relative color syntax, which reads the channels off whatever the
-        // browser resolves the value to.
+        // `color-mix()`, which the browser resolves against whatever the value
+        // turns out to be.
         return {
           [finalCssStyle]: parseColor(styleValue as string).color ?? '',
         };

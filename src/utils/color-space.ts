@@ -2,10 +2,9 @@
  * Color handling that survives into the emitted CSS.
  *
  * Tasty does not rewrite a color into a particular color space: opacity is
- * applied with CSS relative color syntax, which reads the channels off whatever
- * the browser resolves a value to, so a color is emitted exactly as authored.
- * What is left here is how an alpha gets applied, and the one distinction that
- * matters — replacing a token's alpha versus composing onto an inherited one.
+ * applied with `color-mix()`, which the browser resolves against whatever a
+ * value turns out to be, so a color is emitted exactly as authored. What is left
+ * here is how an alpha gets applied.
  */
 
 /**
@@ -13,73 +12,70 @@
  *
  * @deprecated Kept for the `colorSpace` config option, which no longer has any
  * effect. Colors are emitted as authored and opacity is always applied in
- * `oklch` through relative color syntax.
+ * `oklab` through `color-mix()`.
  */
 export type ColorSpace = 'rgb' | 'hsl' | 'oklch';
 
 /**
- * Set the alpha of a whole color, replacing any it already carries.
+ * Fade a whole color: `color-mix(in oklab, <color> <percentage>, transparent)`.
  *
- * CSS relative color syntax is how opacity is applied to every color Tasty
- * emits. `oklch(from <color> l c h / <alpha>)` copies the channels over and
- * writes the alpha slot, which needs nothing from the color except that it *is*
- * a color: a `color-mix()`, a `light-dark()`, a `currentcolor`, a
- * `--name-color` written by hand-authored CSS that Tasty never defined — all of
- * them work, where writing into a channel slot directly would require channels
- * the engine has no way to compute.
+ * This is how opacity is applied to every color Tasty emits — a `#token.N`, a
+ * `#current.N`, a faded replace token. Mixing against `transparent` needs
+ * nothing from the color except that it *is* one: a `color-mix()`, a
+ * `light-dark()`, a `currentcolor`, a `--name-color` written by hand-authored
+ * CSS that Tasty never defined — all of them work, where writing into a channel
+ * slot directly would require channels the engine has no way to compute.
  *
- * Alpha is *replaced*, not composed. A token holding `rgb(255 0 0 / .8)` faded
- * to `.5` is alpha `.5`. `color-mix()` against `transparent` cannot do this —
- * it would multiply the two to `.4`.
+ * `color-mix()` is Baseline widely available (Chrome 111, Firefox 113, Safari
+ * 16.2). Relative color syntax, `oklch(from <color> l c h / <alpha>)`, would set
+ * the alpha the same way but is not.
  *
- * The alpha slot takes a `<number>` or a `<percentage>`, so an opacity custom
- * property passes straight through in whichever form the author declared it.
+ * The mix is premultiplied, so the channels come through untouched and the
+ * alphas multiply: a color that is already translucent is faded further. That
+ * composes — `#current.4` means "40% of the color that reaches me", and a nested
+ * `#current.18` under it lands at `.072` — and a token holding `rgb(255 0 0 /
+ * .8)` faded to `.5` is alpha `.4`.
  *
- * The space is always `oklch`, regardless of the configured {@link ColorSpace}:
- * it is unbounded, so a wide-gamut color survives the round trip that a
- * gamut-limited space would clamp, and it is the space the computed value used
- * to be reported in. Channels are copied rather than interpolated, so the polar
- * form costs nothing even for an achromatic color, whose hue is carried through
- * untouched.
- */
-export function overrideColorAlpha(color: string, alpha: string): string {
-  return `oklch(from ${color} l c h / ${alpha})`;
-}
-
-/**
- * Compose an alpha onto a color, multiplying with any it already carries.
+ * The space is `oklab`. It is unbounded, so a wide-gamut color is not clamped,
+ * and rectangular, so there is no hue to interpolate against `transparent`.
  *
- * This is the counterpart to {@link overrideColorAlpha}, and the difference is
- * the point. A design token names a color, so fading it *sets* its alpha. But
- * `currentcolor` is the color an element **inherits**, which an ancestor may
- * already have faded — `#current.4` there means "40% of what reaches me", and a
- * nested `#current.18` under it composes to `.072`. Design systems build ramps
- * out of exactly that, so `#current` composes and a token replaces.
- *
- * `color-mix()` against `transparent` is what composes: mixing premultiplied
- * leaves the channels alone and multiplies the alphas. Its percentage slot takes
- * no `<number>`, so a `$prop` alpha has to be scaled — which is why an opacity
- * property used as `#current.$prop` has to hold a unitless number, where a token
- * accepts either form.
+ * The percentage slot takes no `<number>`, so an opacity custom property used as
+ * an alpha (`#name.$prop`) is scaled by `100%` and has to hold a unitless number.
  */
 export function mixColorAlpha(color: string, percentage: string): string {
   return `color-mix(in oklab, ${color} ${percentage}, transparent)`;
 }
 
 /**
- * Matches what {@link overrideColorAlpha} builds. The first group is greedy so a
- * nested override splits on its outermost layer.
+ * Matches what {@link mixColorAlpha} builds, also after the parser has dropped
+ * the spaces following its commas. The first group is greedy so a nested fade
+ * splits on its outermost layer.
  */
-const RE_ALPHA_OVERRIDE = /^oklch\(from (.+) l c h \/ (.+)\)$/;
+const RE_ALPHA_MIX =
+  /^color-mix\(in oklab,\s*(.+) (\S+%|calc\(.+ \* 100%\)),\s*transparent\)$/;
 
 /**
- * Split what {@link overrideColorAlpha} builds back into the color it faded and
- * the alpha, or `null` when the value is not one of those.
+ * Split what {@link mixColorAlpha} builds back into the color it faded and the
+ * percentage, or `null` when the value is not one of those.
  */
-export function parseAlphaOverride(
+export function parseAlphaMix(
   value: string,
-): { color: string; alpha: string } | null {
-  const match = value.match(RE_ALPHA_OVERRIDE);
+): { color: string; percentage: string } | null {
+  const match = value.match(RE_ALPHA_MIX);
 
-  return match ? { color: match[1], alpha: match[2] } : null;
+  return match ? { color: match[1], percentage: match[2] } : null;
+}
+
+/**
+ * Convert an alpha to the percentage {@link mixColorAlpha} takes, without the
+ * float artifact of a bare multiplication (`.07 * 100` is `7.000000000000001`).
+ *
+ * The alpha is clamped to `[0, 1]`: a mix percentage outside `0%`–`100%` is a
+ * parse error that drops the declaration, where an alpha slot would clamp it. A
+ * `NaN` is treated as fully opaque.
+ */
+export function alphaToPercentage(alpha: number): string {
+  const clamped = Number.isNaN(alpha) ? 1 : Math.min(1, Math.max(0, alpha));
+
+  return `${Number((clamped * 100).toFixed(6))}%`;
 }

@@ -144,7 +144,7 @@ Keep conditions such as `:last-child` out of `$` and write them as `@own(:last-c
 Named color prefixed with `#` that maps to CSS custom properties. Supports opacity with `.N` suffix:
 
 ```jsx
-fill: '#purple.5'; // → oklch(from var(--purple-color) l c h / .5)
+fill: '#purple.5'; // → color-mix(in oklab, var(--purple-color) 50%, transparent)
 ```
 
 ### Modifier
@@ -173,18 +173,17 @@ color: '(#primary, #secondary)',  // Fallback syntax
 
 `#white`, `#black`, `#border`, and `#outline` are registered by default (see [Default properties](#default-properties)), and `#clear` is a built-in alias for `transparent` (see [below](#clear-is-transparent)), so they work before you define any tokens.
 
-A name that is also a hex color is read as a token with the literal as its fallback, in every color style: `color: '#ddd'` emits `var(--ddd-color, #ddd)`, and `#ddd.5` emits `oklch(from var(--ddd-color, #ddd) l c h / .5)`. A `#ddd` token, if you define one, wins over the literal.
+A name that is also a hex color is read as a token with the literal as its fallback, in every color style: `color: '#ddd'` emits `var(--ddd-color, #ddd)`, and `#ddd.5` emits `color-mix(in oklab, var(--ddd-color, #ddd) 50%, transparent)`. A `#ddd` token, if you define one, wins over the literal.
 
-The suffix sets the alpha on the token's color with CSS relative color syntax:
+The suffix fades the token's color by mixing it with `transparent`:
 
 ```jsx
 fill: '#purple.5';
-// → oklch(from var(--purple-color) l c h / .5)
+// → color-mix(in oklab, var(--purple-color) 50%, transparent)
 ```
 
-The channels are copied over and the alpha slot is written, which asks nothing of
-the color beyond _being_ a color. That means the suffix works on every one of
-these:
+The mix asks nothing of the color beyond _being_ a color. That means the suffix
+works on every one of these:
 
 - a token holding a `color-mix()`, a `light-dark()`, or a `color()` in a space
   Tasty cannot convert — none of which have channels to decompose
@@ -192,13 +191,18 @@ these:
 - a `--name-color` variable declared in your own CSS, with no Tasty token
   definition behind it
 
-Two properties follow from writing the alpha slot rather than compositing:
+`color-mix()` is Baseline widely available (Chrome 111, Firefox 113, Safari
+16.2). Two properties follow from mixing rather than writing an alpha channel:
 
-- **Alpha is replaced, not multiplied.** A token holding `rgb(255 0 0 / .8)`
-  faded to `.5` is alpha `.5`, not `.4`.
-- **The alpha may be a number or a percentage.** `#purple.$fade` emits
-  `/ var(--fade)` unchanged, so it works whether `$fade` holds `.5` or `50%` —
-  which is what `--*-opacity` properties are registered to accept.
+- **Alpha composes.** The mix is premultiplied, so a color that is already
+  translucent is faded further: a token holding `rgb(255 0 0 / .8)` faded to
+  `.5` is alpha `.4`. An opaque token — the usual case — ends at exactly the
+  suffix. System colors are whatever the platform draws, and some are
+  translucent: Chrome and Safari on macOS give `Highlight` an alpha of `.6`, so
+  a token holding it faded to `.5` ends at `.3` there.
+- **A `$prop` alpha must be a number.** `#purple.$fade` emits
+  `calc(var(--fade) * 100%)`, because a mix percentage cannot be a `<number>`,
+  so `$fade` has to hold `.5`, not `50%`.
 
 ### `#clear` is transparent
 
@@ -232,42 +236,23 @@ A color that already reads the color it inherits — `#current`, a `#current` fa
 — is not published into it: resolving such a value a second time at a descendant
 would fade it twice.
 
-One case needs the wider floor to be considered. A token _defined_ as `#current`
-and then faded gives relative color syntax a `currentcolor` origin, which Safari
-supports only from 18:
+### `#current` fades compose
 
-```jsx
-{ '#ink': '#current', fill: '#ink.5' }
-// --ink-color: currentcolor
-// fill: oklch(from currentcolor l c h / .5)  → Chrome, Firefox, Safari 18+
-```
-
-Put the fade in the token instead — `{ '#ink': '#current.5' }` — and it goes
-through `color-mix()`, which works from Safari 16.2 and composes like every other
-`#current` fade.
-
-### `#current` composes instead
-
-`#current` composes alpha, and the difference is deliberate. A token _names_
-a color, so fading it sets its alpha. `currentcolor` is the color an element
-**inherits**, which an ancestor may already have faded — `#current.4` means "40%
-of what reaches me":
+`currentcolor` is the color an element **inherits**, which an ancestor may
+already have faded, so `#current.4` means "40% of what reaches me":
 
 ```jsx
 fill: '#current.4';
 // → color-mix(in oklab, currentcolor 40%, transparent)
 ```
 
-So a `#current` fade nested inside another one composes: a label at `#current.4`
+A `#current` fade nested inside another one composes: a label at `#current.4`
 with a fill of `#current.18` under it lands at `.072`. Color ramps built on
-`#current` depend on that — replacing would double the opacity of every nested
-step. Because a `color-mix()` percentage cannot be a `<number>`, an opacity
-custom property used as `#current.$fade` must hold a unitless number; a token
-accepts either form.
+`#current` depend on that.
 
-Token fades always use `oklch(from …)`: it is unbounded, so a wide-gamut color
-survives a round trip that a gamut-limited space would clamp. `#current` fades
-mix `in oklab`. Nothing configures either — see
+Fades always mix `in oklab`: it is unbounded, so a wide-gamut color is not
+clamped, and rectangular, so there is no hue to interpolate against
+`transparent`. Nothing configures it — see
 [Color space](configuration.md#color-space).
 
 ---
@@ -319,7 +304,7 @@ configure({
 });
 
 fill: '#solid.5'; // → hsl(220 90% 50% / .5)
-fill: '#adaptive.5'; // → oklch(from light-dark(…) l c h / .5)
+fill: '#adaptive.5'; // → color-mix(in oklab, light-dark(…) 50%, transparent)
 ```
 
 ### Color keywords

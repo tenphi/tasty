@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { getGlobalParser } from '../utils/styles';
 
@@ -48,132 +48,98 @@ function warmParserCache(): void {
   transitionStyle({ transition: TRANSITION });
 }
 
-describe('style handlers with cached parsing', () => {
-  bench(
-    'physical shorthand',
-    () => {
+test('style handlers with cached parsing', async ({ bench }) => {
+  await bench.compare(
+    bench('physical shorthand', { beforeAll: warmParserCache }, () => {
       paddingStyle({ padding: PHYSICAL_SHORTHAND });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'physical direction groups',
-    () => {
+    bench('physical direction groups', { beforeAll: warmParserCache }, () => {
       paddingStyle({ padding: PHYSICAL_DIRECTIONS });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'physical individual overrides',
-    () => {
-      paddingStyle({
-        padding: PHYSICAL_SHORTHAND,
-        paddingTop: '5x',
-        paddingLeft: '6x',
-      });
-    },
-    { setup: warmParserCache },
-  );
+    bench(
+      'physical individual overrides',
+      { beforeAll: warmParserCache },
+      () => {
+        paddingStyle({
+          padding: PHYSICAL_SHORTHAND,
+          paddingTop: '5x',
+          paddingLeft: '6x',
+        });
+      },
+    ),
 
-  bench(
-    'logical shorthand',
-    () => {
+    bench('logical shorthand', { beforeAll: warmParserCache }, () => {
       logicalStyleHandlers.blockPadding({
         blockPadding: LOGICAL_SHORTHAND,
       });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'logical direction groups',
-    () => {
+    bench('logical direction groups', { beforeAll: warmParserCache }, () => {
       logicalStyleHandlers.inlinePadding({
         inlinePadding: LOGICAL_DIRECTIONS,
       });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'logical border groups',
-    () => {
+    bench('logical border groups', { beforeAll: warmParserCache }, () => {
       logicalStyleHandlers.blockBorder({ blockBorder: LOGICAL_BORDER });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'physical border shorthand',
-    () => {
+    bench('physical border shorthand', { beforeAll: warmParserCache }, () => {
       borderStyle({ border: PHYSICAL_BORDER });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'physical border directions',
-    () => {
+    bench('physical border directions', { beforeAll: warmParserCache }, () => {
       borderStyle({ border: PHYSICAL_BORDER_DIRECTIONS });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'physical border groups',
-    () => {
+    bench('physical border groups', { beforeAll: warmParserCache }, () => {
       borderStyle({ border: PHYSICAL_BORDER_GROUPS });
-    },
-    { setup: warmParserCache },
-  );
+    }),
 
-  bench(
-    'fade direction groups',
-    () => {
-      fadeStyle({ fade: FADE });
-    },
-    {
-      setup: warmParserCache,
-    },
-  );
+    bench(
+      'fade direction groups',
+      {
+        beforeAll: warmParserCache,
+      },
+      () => {
+        fadeStyle({ fade: FADE });
+      },
+    ),
 
-  bench(
-    'outline with offset',
-    () => {
-      outlineStyle({ outline: OUTLINE });
-    },
-    {
-      setup: warmParserCache,
-    },
-  );
+    bench(
+      'outline with offset',
+      {
+        beforeAll: warmParserCache,
+      },
+      () => {
+        outlineStyle({ outline: OUTLINE });
+      },
+    ),
 
-  bench(
-    'docked inset',
-    () => {
-      insetStyle({ inset: DOCKED_INSET });
-    },
-    {
-      setup: warmParserCache,
-    },
-  );
+    bench(
+      'docked inset',
+      {
+        beforeAll: warmParserCache,
+      },
+      () => {
+        insetStyle({ inset: DOCKED_INSET });
+      },
+    ),
 
-  bench(
-    'multiline text overflow',
-    () => {
-      displayStyle({ textOverflow: MULTILINE_TEXT_OVERFLOW });
-    },
-    {
-      setup: warmParserCache,
-    },
-  );
+    bench(
+      'multiline text overflow',
+      {
+        beforeAll: warmParserCache,
+      },
+      () => {
+        displayStyle({ textOverflow: MULTILINE_TEXT_OVERFLOW });
+      },
+    ),
 
-  bench(
-    'mapped transition',
-    () => {
+    bench('mapped transition', { beforeAll: warmParserCache }, () => {
       transitionStyle({ transition: TRANSITION });
-    },
-    { setup: warmParserCache },
+    }),
   );
 });

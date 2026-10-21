@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { modAttrs } from './mod-attrs';
 
@@ -17,16 +17,18 @@ let index = 0;
 
 modAttrs(stableMods);
 
-describe('modAttrs', () => {
-  bench('stable modifier map', () => {
-    modAttrs(stableMods);
-  });
+test('modAttrs', async ({ bench }) => {
+  await bench.compare(
+    bench('stable modifier map', () => {
+      modAttrs(stableMods);
+    }),
 
-  bench('equivalent modifier maps', () => {
-    modAttrs(equivalentMods[index++ % equivalentMods.length]);
-  });
+    bench('equivalent modifier maps', () => {
+      modAttrs(equivalentMods[index++ % equivalentMods.length]);
+    }),
 
-  bench('varied modifier maps', () => {
-    modAttrs(variedMods[index++ % variedMods.length]);
-  });
+    bench('varied modifier maps', () => {
+      modAttrs(variedMods[index++ % variedMods.length]);
+    }),
+  );
 });

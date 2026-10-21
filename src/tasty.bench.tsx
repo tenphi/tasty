@@ -1,6 +1,6 @@
 import { cleanup, render } from '@testing-library/react';
 import { createElement } from 'react';
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { clearPipelineCache } from './pipeline';
 import { clearConditionCache } from './pipeline/materialize';
@@ -28,99 +28,101 @@ function clearAllCaches() {
 // Factory benchmarks — measuring tasty() component creation
 // ============================================================================
 
-describe('tasty() factory', () => {
-  bench('simple element', () => {
-    tasty({
-      as: 'div',
-      styles: {
-        display: 'flex',
-        padding: '2x',
-        gap: '1x',
-        fill: '#surface',
-      },
-    });
-  });
-
-  bench('element with state maps', () => {
-    tasty({
-      as: 'button',
-      styles: {
-        padding: '2x 4x',
-        fill: {
-          '': '#primary',
-          ':hover': '#primary-text',
-          disabled: '#muted',
-        },
-        color: {
-          '': '#white',
-          disabled: '#muted-text',
-        },
-        border: {
-          '': '1bw solid #border',
-          '@media (width < 768px)': 'none',
-        },
-        radius: '1r',
-      },
-    });
-  });
-
-  bench('element with variants', () => {
-    tasty({
-      as: 'button',
-      styles: {
-        padding: '2x 4x',
-        border: '1bw solid #border',
-        radius: '1r',
-      },
-      variants: {
-        primary: {
-          fill: '#primary',
-          color: '#white',
-        },
-        secondary: {
-          fill: '#surface',
-          color: '#text',
-        },
-        danger: {
-          fill: '#danger',
-          color: '#white',
-        },
-      },
-    });
-  });
-
-  bench('element with sub-elements', () => {
-    tasty({
-      as: 'div',
-      styles: {
-        display: 'flex',
-        gap: '2x',
-        Icon: { color: '#primary', width: '20px' },
-        Label: { fontWeight: 'bold' },
-        Description: { color: '#text-soft', fontSize: '12px' },
-      },
-      elements: {
-        Icon: 'span',
-        Label: 'span',
-        Description: 'p',
-      },
-    });
-  });
-
+test('tasty() factory', async ({ bench }) => {
   const BaseComponent = tasty({
     as: 'div',
     styles: { display: 'block' },
   });
 
-  bench('wrapping existing component', () => {
-    tasty(BaseComponent, {
-      styles: {
-        padding: '2x',
-        fill: '#surface',
-        border: '1bw solid #border',
-      },
-    });
-  });
+  await bench.compare(
+    bench('simple element', () => {
+      tasty({
+        as: 'div',
+        styles: {
+          display: 'flex',
+          padding: '2x',
+          gap: '1x',
+          fill: '#surface',
+        },
+      });
+    }),
+
+    bench('element with state maps', () => {
+      tasty({
+        as: 'button',
+        styles: {
+          padding: '2x 4x',
+          fill: {
+            '': '#primary',
+            ':hover': '#primary-text',
+            disabled: '#muted',
+          },
+          color: {
+            '': '#white',
+            disabled: '#muted-text',
+          },
+          border: {
+            '': '1bw solid #border',
+            '@media (width < 768px)': 'none',
+          },
+          radius: '1r',
+        },
+      });
+    }),
+
+    bench('element with variants', () => {
+      tasty({
+        as: 'button',
+        styles: {
+          padding: '2x 4x',
+          border: '1bw solid #border',
+          radius: '1r',
+        },
+        variants: {
+          primary: {
+            fill: '#primary',
+            color: '#white',
+          },
+          secondary: {
+            fill: '#surface',
+            color: '#text',
+          },
+          danger: {
+            fill: '#danger',
+            color: '#white',
+          },
+        },
+      });
+    }),
+
+    bench('element with sub-elements', () => {
+      tasty({
+        as: 'div',
+        styles: {
+          display: 'flex',
+          gap: '2x',
+          Icon: { color: '#primary', width: '20px' },
+          Label: { fontWeight: 'bold' },
+          Description: { color: '#text-soft', fontSize: '12px' },
+        },
+        elements: {
+          Icon: 'span',
+          Label: 'span',
+          Description: 'p',
+        },
+      });
+    }),
+
+    bench('wrapping existing component', () => {
+      tasty(BaseComponent, {
+        styles: {
+          padding: '2x',
+          fill: '#surface',
+          border: '1bw solid #border',
+        },
+      });
+    }),
+  );
 });
 
 // ============================================================================
@@ -206,83 +208,85 @@ function makeStyleOverridePool(n: number): Styles[] {
 
 const styleOverridePool = makeStyleOverridePool(POOL_SIZE);
 
-describe('tasty component render', () => {
-  bench('simple element (cached)', () => {
-    const { unmount } = render(createElement(SimpleDiv));
-    unmount();
-    cleanup();
-  });
+test('tasty component render', async ({ bench }) => {
+  await bench.compare(
+    bench('simple element (cached)', () => {
+      const { unmount } = render(createElement(SimpleDiv));
+      unmount();
+      cleanup();
+    }),
 
-  bench('element with state maps (cached)', () => {
-    const { unmount } = render(createElement(ButtonWithStates));
-    unmount();
-    cleanup();
-  });
+    bench('element with state maps (cached)', () => {
+      const { unmount } = render(createElement(ButtonWithStates));
+      unmount();
+      cleanup();
+    }),
 
-  bench('element with mods', () => {
-    const { unmount } = render(
-      createElement(SimpleDiv, { mods: { active: true, size: 'large' } }),
-    );
-    unmount();
-    cleanup();
-  });
+    bench('element with mods', () => {
+      const { unmount } = render(
+        createElement(SimpleDiv, { mods: { active: true, size: 'large' } }),
+      );
+      unmount();
+      cleanup();
+    }),
 
-  bench('element with tokens', () => {
-    const { unmount } = render(
-      createElement(SimpleDiv, {
-        tokens: { $spacing: '2x', '#accent': '#purple' },
-      }),
-    );
-    unmount();
-    cleanup();
-  });
-
-  bench(
-    'element with style overrides (cold)',
-    () => {
+    bench('element with tokens', () => {
       const { unmount } = render(
         createElement(SimpleDiv, {
-          styles: styleOverridePool[idx++ % POOL_SIZE],
+          tokens: { $spacing: '2x', '#accent': '#purple' },
         }),
       );
       unmount();
       cleanup();
-    },
-    {
-      setup() {
-        clearAllCaches();
-        idx = 0;
+    }),
+
+    bench(
+      'element with style overrides (cold)',
+      {
+        beforeAll() {
+          clearAllCaches();
+          idx = 0;
+        },
       },
-    },
+      () => {
+        const { unmount } = render(
+          createElement(SimpleDiv, {
+            styles: styleOverridePool[idx++ % POOL_SIZE],
+          }),
+        );
+        unmount();
+        cleanup();
+      },
+    ),
+
+    bench('element with variant', () => {
+      const { unmount } = render(
+        createElement(CardWithVariants, { variant: 'primary' }),
+      );
+      unmount();
+      cleanup();
+    }),
+
+    bench('element with styleProps', () => {
+      const { unmount } = render(
+        createElement(WithStyleProps, {
+          padding: '4x',
+          fill: '#white',
+          radius: '2r',
+        }),
+      );
+      unmount();
+      cleanup();
+    }),
+
+    bench('element with modProps', () => {
+      const { unmount } = render(
+        createElement(WithModProps, { isActive: true, size: 'large' }),
+      );
+      unmount();
+      cleanup();
+    }),
   );
-
-  bench('element with variant', () => {
-    const { unmount } = render(
-      createElement(CardWithVariants, { variant: 'primary' }),
-    );
-    unmount();
-    cleanup();
-  });
-
-  bench('element with styleProps', () => {
-    const { unmount } = render(
-      createElement(WithStyleProps, {
-        padding: '4x',
-        fill: '#white',
-        radius: '2r',
-      }),
-    );
-    unmount();
-    cleanup();
-  });
-
-  bench('element with modProps', () => {
-    const { unmount } = render(
-      createElement(WithModProps, { isActive: true, size: 'large' }),
-    );
-    unmount();
-    cleanup();
-  });
 });
 
 // ============================================================================
@@ -313,92 +317,99 @@ function glazeStyles(value: string): Styles {
   return styles;
 }
 
-describe('propHandlers', () => {
-  bench('no handlers registered (fast path)', () => {
-    resetPropHandlers();
-    const { unmount } = render(createElement(PlainBox));
-    unmount();
-    cleanup();
-  });
+test('propHandlers', async ({ bench }) => {
+  await bench.compare(
+    bench('no handlers registered (fast path)', () => {
+      resetPropHandlers();
+      const { unmount } = render(createElement(PlainBox));
+      unmount();
+      cleanup();
+    }),
 
-  bench('one handler, trigger prop absent', () => {
-    resetPropHandlers();
-    registerPropHandler('glaze', (props) => props);
-    const { unmount } = render(createElement(PlainBox));
-    unmount();
-    cleanup();
-  });
+    bench('one handler, trigger prop absent', () => {
+      resetPropHandlers();
+      registerPropHandler('glaze', (props) => props);
+      const { unmount } = render(createElement(PlainBox));
+      unmount();
+      cleanup();
+    }),
 
-  bench('one handler, trigger present — memoized styles', () => {
-    resetPropHandlers();
-    registerPropHandler('glaze', (props) => {
-      const { glaze, ...rest } = props;
-      if (!glaze) return rest;
-      return {
-        ...rest,
-        styles: mergeStyles(glazeStyles(String(glaze)), rest.styles as Styles),
-      };
-    });
-    const { unmount } = render(
-      createElement(PlainBox, { glaze: 'purple' } as never),
-    );
-    unmount();
-    cleanup();
-  });
+    bench('one handler, trigger present — memoized styles', () => {
+      resetPropHandlers();
+      registerPropHandler('glaze', (props) => {
+        const { glaze, ...rest } = props;
+        if (!glaze) return rest;
+        return {
+          ...rest,
+          styles: mergeStyles(
+            glazeStyles(String(glaze)),
+            rest.styles as Styles,
+          ),
+        };
+      });
+      const { unmount } = render(
+        createElement(PlainBox, { glaze: 'purple' } as never),
+      );
+      unmount();
+      cleanup();
+    }),
 
-  bench('one handler, trigger present — fresh styles each render', () => {
-    resetPropHandlers();
-    registerPropHandler('glaze', (props) => {
-      const { glaze, ...rest } = props;
-      if (!glaze) return rest;
-      return {
-        ...rest,
-        styles: mergeStyles(
-          { '#glaze-bg': `#${String(glaze)}.10`, fill: '#glaze-bg' },
-          rest.styles as Styles,
-        ),
-      };
-    });
-    const { unmount } = render(
-      createElement(PlainBox, { glaze: 'purple' } as never),
-    );
-    unmount();
-    cleanup();
-  });
+    bench('one handler, trigger present — fresh styles each render', () => {
+      resetPropHandlers();
+      registerPropHandler('glaze', (props) => {
+        const { glaze, ...rest } = props;
+        if (!glaze) return rest;
+        return {
+          ...rest,
+          styles: mergeStyles(
+            { '#glaze-bg': `#${String(glaze)}.10`, fill: '#glaze-bg' },
+            rest.styles as Styles,
+          ),
+        };
+      });
+      const { unmount } = render(
+        createElement(PlainBox, { glaze: 'purple' } as never),
+      );
+      unmount();
+      cleanup();
+    }),
 
-  bench('three chained handlers, all trigger', () => {
-    resetPropHandlers();
-    for (const key of ['a', 'b', 'c']) {
-      registerPropHandler(key, ['*', (props) => props]);
-    }
-    const { unmount } = render(createElement(PlainBox));
-    unmount();
-    cleanup();
-  });
+    bench('three chained handlers, all trigger', () => {
+      resetPropHandlers();
+      for (const key of ['a', 'b', 'c']) {
+        registerPropHandler(key, ['*', (props) => props]);
+      }
+      const { unmount } = render(createElement(PlainBox));
+      unmount();
+      cleanup();
+    }),
+  );
 });
 
-describe('baseStyleProps', () => {
-  bench('none registered', () => {
-    resetBaseStyleProps();
-    const { unmount } = render(createElement(PlainBox));
-    unmount();
-    cleanup();
-  });
+test('baseStyleProps', async ({ bench }) => {
+  await bench.compare(
+    bench('none registered', () => {
+      resetBaseStyleProps();
+      const { unmount } = render(createElement(PlainBox));
+      unmount();
+      cleanup();
+    }),
 
-  bench('eight promoted, none passed', () => {
-    resetBaseStyleProps();
-    registerBaseStyleProps([
-      'radius',
-      'shadow',
-      'border',
-      'outline',
-      'fill',
-      'color',
-      'width',
-      'height',
-    ]);
-    const { unmount } = render(createElement(PlainBox));
-    unmount();
-    cleanup();
-  });
+    bench('eight promoted, none passed', () => {
+      resetBaseStyleProps();
+      registerBaseStyleProps([
+        'radius',
+        'shadow',
+        'border',
+        'outline',
+        'fill',
+        'color',
+        'width',
+        'height',
+      ]);
+      const { unmount } = render(createElement(PlainBox));
+      unmount();
+      cleanup();
+    }),
+  );
 });

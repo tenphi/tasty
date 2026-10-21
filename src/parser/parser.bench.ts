@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { getGlobalParser, parseStyle } from '../utils/styles';
 
@@ -51,73 +51,75 @@ const groupedPool = makeGroupedPool(POOL_SIZE);
 
 parseStyle('2x 4x');
 
-describe('parseStyle', () => {
-  bench(
-    'spacing values (cold)',
-    () => {
-      parseStyle(valuePool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        getGlobalParser().clearCache();
-        idx = 0;
+test('parseStyle', async ({ bench }) => {
+  await bench.compare(
+    bench(
+      'spacing values (cold)',
+      {
+        beforeAll() {
+          getGlobalParser().clearCache();
+          idx = 0;
+        },
       },
-    },
-  );
-
-  bench('spacing values (cached)', () => {
-    parseStyle('2x 4x');
-  });
-
-  bench(
-    'color tokens (cold)',
-    () => {
-      parseStyle(colorPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        getGlobalParser().clearCache();
-        idx = 0;
+      () => {
+        parseStyle(valuePool[idx++ % POOL_SIZE]);
       },
-    },
-  );
+    ),
 
-  bench(
-    'mixed values (cold)',
-    () => {
-      parseStyle(mixedPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        getGlobalParser().clearCache();
-        idx = 0;
-      },
-    },
-  );
+    bench('spacing values (cached)', () => {
+      parseStyle('2x 4x');
+    }),
 
-  bench(
-    'layered functions (cold)',
-    () => {
-      parseStyle(layeredPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        getGlobalParser().clearCache();
-        idx = 0;
+    bench(
+      'color tokens (cold)',
+      {
+        beforeAll() {
+          getGlobalParser().clearCache();
+          idx = 0;
+        },
       },
-    },
-  );
+      () => {
+        parseStyle(colorPool[idx++ % POOL_SIZE]);
+      },
+    ),
 
-  bench(
-    'comma and slash groups (cold)',
-    () => {
-      parseStyle(groupedPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        getGlobalParser().clearCache();
-        idx = 0;
+    bench(
+      'mixed values (cold)',
+      {
+        beforeAll() {
+          getGlobalParser().clearCache();
+          idx = 0;
+        },
       },
-    },
+      () => {
+        parseStyle(mixedPool[idx++ % POOL_SIZE]);
+      },
+    ),
+
+    bench(
+      'layered functions (cold)',
+      {
+        beforeAll() {
+          getGlobalParser().clearCache();
+          idx = 0;
+        },
+      },
+      () => {
+        parseStyle(layeredPool[idx++ % POOL_SIZE]);
+      },
+    ),
+
+    bench(
+      'comma and slash groups (cold)',
+      {
+        beforeAll() {
+          getGlobalParser().clearCache();
+          idx = 0;
+        },
+      },
+      () => {
+        parseStyle(groupedPool[idx++ % POOL_SIZE]);
+      },
+    ),
   );
 });

@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { TastyBatchProvider } from './batch-provider';
 import { configure, resetConfig } from './config';
@@ -266,30 +266,31 @@ function createHarness(mode: TreeMode): TreeHarness {
   };
 }
 
-describe(`representative React update (${ITEM_COUNT.toLocaleString()} elements, ${STYLE_COUNT} shared styles)`, () => {
+test(`representative React update (${ITEM_COUNT.toLocaleString()} elements, ${STYLE_COUNT} shared styles)`, async ({
+  bench,
+}) => {
   const staticCSS = createHarness('static');
-
-  bench('CSS already present', staticCSS.run, {
-    ...BENCH_OPTIONS,
-    setup: staticCSS.setup,
-    teardown: staticCSS.teardown,
-  });
-
   const warmTasty = createHarness('warm');
-
-  bench('Tasty: shared styles already cached', warmTasty.run, {
-    ...BENCH_OPTIONS,
-    setup: warmTasty.setup,
-    teardown: warmTasty.teardown,
-  });
-
   const coldTasty = createHarness('cold');
 
-  bench('Tasty: 20 new shared styles', coldTasty.run, {
-    ...BENCH_OPTIONS,
-    setup: coldTasty.setup,
-    teardown: coldTasty.teardown,
-  });
+  await bench.compare(
+    bench(
+      'CSS already present',
+      { beforeAll: staticCSS.setup, afterAll: staticCSS.teardown },
+      staticCSS.run,
+    ),
+    bench(
+      'Tasty: shared styles already cached',
+      { beforeAll: warmTasty.setup, afterAll: warmTasty.teardown },
+      warmTasty.run,
+    ),
+    bench(
+      'Tasty: 20 new shared styles',
+      { beforeAll: coldTasty.setup, afterAll: coldTasty.teardown },
+      coldTasty.run,
+    ),
+    BENCH_OPTIONS,
+  );
 });
 
 // Keep computed-style reads observable to the optimizer.

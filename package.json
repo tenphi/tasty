@@ -126,8 +126,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "size": "size-limit",
-    "bench": "vitest bench --project node",
-    "bench:browser": "vitest bench --project browser",
+    "bench": "vitest bench --project \"node (bench)\"",
+    "bench:browser": "vitest bench --project \"browser (chromium) (bench)\"",
     "bench:overhead": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-overhead.bench.tsx",
     "bench:injection": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-injection.bench.ts",
     "bench:interaction": "vitest bench --config vitest.production-browser-bench.config.ts src/tasty-interaction.bench.tsx",
@@ -214,7 +214,7 @@
     "@types/node": "^24.19.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitest/browser-playwright": "^4.1.11",
+    "@vitest/browser-playwright": "^5.0.3",
     "astro": "^7.3.6",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
@@ -230,7 +230,7 @@
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   },
   "packageManager": "pnpm@11.27.1",
   "size-limit": [

@@ -1,4 +1,5 @@
-import { bench, describe } from 'vitest';
+import type { Bench } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { computeStyles } from './compute-styles';
 import { configure, resetConfig } from './config';
@@ -83,7 +84,7 @@ interface PreparedSample {
 
 interface BenchmarkHarness {
   run(): void;
-  setup(mode: 'warmup' | 'run'): void;
+  setup(mode?: 'warmup' | 'run'): void;
   teardown(): void;
 }
 
@@ -243,9 +244,9 @@ function createHarness(
       cursor = 0;
       clearAllCaches();
 
-      // Tinybench invokes the task once outside the sample timer to detect an
-      // async return value, so the pool needs one additional prepared sample.
-      const count = (mode === 'warmup' ? WARMUP_ITERATIONS : ITERATIONS) + 1;
+      // The tasks are declared synchronous, so Tinybench calls them exactly
+      // once per sample and never once more to detect an async return value.
+      const count = mode === 'warmup' ? WARMUP_ITERATIONS : ITERATIONS;
       samples = Array.from({ length: count }, (_, sample) =>
         prepareSample(workload, sample, withExistingCSS),
       );
@@ -282,26 +283,36 @@ function validateBenchmarkContract() {
   }
 }
 
+function benchmarkHarness(
+  bench: Bench,
+  name: string,
+  harness: BenchmarkHarness,
+) {
+  return bench(
+    name,
+    {
+      async: false,
+      beforeAll: harness.setup,
+      afterAll: harness.teardown,
+    },
+    harness.run,
+  );
+}
+
 function registerWorkload(workload: Workload) {
-  describe(workload.name, () => {
-    const existingCSS = createHarness(workload, true);
-
-    bench('CSS already present: commit + style resolution', existingCSS.run, {
-      ...BENCH_OPTIONS,
-      setup: (_task, mode) => existingCSS.setup(mode),
-      teardown: () => existingCSS.teardown(),
-    });
-
-    const runtimeTasty = createHarness(workload, false);
-
-    bench(
-      'Tasty: generate + inject + same commit + style resolution',
-      runtimeTasty.run,
-      {
-        ...BENCH_OPTIONS,
-        setup: (_task, mode) => runtimeTasty.setup(mode),
-        teardown: () => runtimeTasty.teardown(),
-      },
+  test(workload.name, async ({ bench }) => {
+    await bench.compare(
+      benchmarkHarness(
+        bench,
+        'CSS already present: commit + style resolution',
+        createHarness(workload, true),
+      ),
+      benchmarkHarness(
+        bench,
+        'Tasty: generate + inject + same commit + style resolution',
+        createHarness(workload, false),
+      ),
+      BENCH_OPTIONS,
     );
   });
 }

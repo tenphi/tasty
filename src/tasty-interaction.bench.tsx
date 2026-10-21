@@ -3,7 +3,8 @@ import { createElement, memo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
-import { bench, describe } from 'vitest';
+import type { Bench } from 'vitest';
+import { test } from 'vitest';
 
 import { TastyBatchProvider } from './batch-provider';
 import { configure, resetConfig } from './config';
@@ -258,13 +259,36 @@ validateBenchmarkContract();
 let checksum = 0;
 
 /** One element flips, inside a tree that does not: a hover, a press, a focus. */
-function benchmarkSingleToggle(name: string, kind: 'raw' | 'tasty') {
+function benchmarkSingleToggle(
+  bench: Bench,
+  name: string,
+  kind: 'raw' | 'tasty',
+) {
   let mounted: Mounted | undefined;
   let hovered = false;
   let style: HTMLStyleElement | undefined;
 
-  bench(
+  return bench(
     name,
+    {
+      beforeAll() {
+        if (kind === 'raw') {
+          style = document.createElement('style');
+          style.textContent = RAW_CSS;
+          document.head.append(style);
+        }
+        mounted = mount(kind, TREE_SIZE);
+        hovered = false;
+      },
+      afterAll() {
+        if (mounted) unmount(mounted);
+        mounted = undefined;
+        style?.remove();
+        style = undefined;
+        destroy();
+        resetStyleBatch();
+      },
+    },
     () => {
       if (!mounted) throw new Error('Benchmark tree was not initialized');
 
@@ -284,45 +308,21 @@ function benchmarkSingleToggle(name: string, kind: 'raw' | 'tasty') {
       // boundaries are measured.
       checksum += getComputedStyle(mounted.rows[0]!).color.length;
     },
-    {
-      ...BENCH_OPTIONS,
-      setup() {
-        if (kind === 'raw') {
-          style = document.createElement('style');
-          style.textContent = RAW_CSS;
-          document.head.append(style);
-        }
-        mounted = mount(kind, TREE_SIZE);
-        hovered = false;
-      },
-      teardown() {
-        if (mounted) unmount(mounted);
-        mounted = undefined;
-        style?.remove();
-        style = undefined;
-        destroy();
-        resetStyleBatch();
-      },
-    },
   );
 }
 
 /** A styled subtree opening and closing, the way a menu or dialog does. */
-function benchmarkSubtreeChurn(name: string, kind: 'raw' | 'tasty') {
+function benchmarkSubtreeChurn(
+  bench: Bench,
+  name: string,
+  kind: 'raw' | 'tasty',
+) {
   let style: HTMLStyleElement | undefined;
 
-  bench(
+  return bench(
     name,
-    () => {
-      for (let cycle = 0; cycle < CHURN_CYCLES; cycle++) {
-        const mounted = mount(kind, SUBTREE_SIZE);
-        checksum += getComputedStyle(mounted.rows[0]!).color.length;
-        unmount(mounted);
-      }
-    },
     {
-      ...BENCH_OPTIONS,
-      setup() {
+      beforeAll() {
         if (kind === 'raw') {
           style = document.createElement('style');
           style.textContent = RAW_CSS;
@@ -333,24 +333,41 @@ function benchmarkSubtreeChurn(name: string, kind: 'raw' | 'tasty') {
         // pay that cost here rather than inside the first sample.
         unmount(mount(kind, 2));
       },
-      teardown() {
+      afterAll() {
         style?.remove();
         style = undefined;
         destroy();
         resetStyleBatch();
       },
     },
+    () => {
+      for (let cycle = 0; cycle < CHURN_CYCLES; cycle++) {
+        const mounted = mount(kind, SUBTREE_SIZE);
+        checksum += getComputedStyle(mounted.rows[0]!).color.length;
+        unmount(mounted);
+      }
+    },
   );
 }
 
-describe(`${TOGGLES_PER_SAMPLE} single-element mod toggles (inside ${TREE_SIZE.toLocaleString()} elements)`, () => {
-  benchmarkSingleToggle('raw className toggle', 'raw');
-  benchmarkSingleToggle('tasty mods toggle', 'tasty');
+test(`${TOGGLES_PER_SAMPLE} single-element mod toggles (inside ${TREE_SIZE.toLocaleString()} elements)`, async ({
+  bench,
+}) => {
+  await bench.compare(
+    benchmarkSingleToggle(bench, 'raw className toggle', 'raw'),
+    benchmarkSingleToggle(bench, 'tasty mods toggle', 'tasty'),
+    BENCH_OPTIONS,
+  );
 });
 
-describe(`${CHURN_CYCLES} styled subtree mount + unmount cycles (${SUBTREE_SIZE} elements, CSS cached)`, () => {
-  benchmarkSubtreeChurn('raw className', 'raw');
-  benchmarkSubtreeChurn('tasty mods', 'tasty');
+test(`${CHURN_CYCLES} styled subtree mount + unmount cycles (${SUBTREE_SIZE} elements, CSS cached)`, async ({
+  bench,
+}) => {
+  await bench.compare(
+    benchmarkSubtreeChurn(bench, 'raw className', 'raw'),
+    benchmarkSubtreeChurn(bench, 'tasty mods', 'tasty'),
+    BENCH_OPTIONS,
+  );
 });
 
 // Keep the computed-style reads observable to the optimizer.

@@ -62,7 +62,7 @@ Any necessary consumer support change must be called out and reviewed explicitly
 
 - **Language**: TypeScript (strict mode, `consistent-type-imports` enforced)
 - **Build**: tsdown — ESM, code-split into shared chunks (`dist/chunks/`), `platform: 'browser'` with Node built-ins external, sourcemaps; a second pass emits `.d.ts` only
-- **Test**: Vitest 4, globals enabled, split into two projects (see [Test environments](#test-environments))
+- **Test**: Vitest 5, globals enabled, split into two projects (see [Test environments](#test-environments))
 - **Lint**: ESLint 10 + typescript-eslint + prettier + `@tenphi/eslint-plugin-tasty` (dogfooded on the repo's own style objects; see `eslint.config.js` for the rules disabled because this repo tests the parser)
 - **Format**: Prettier — single quotes, semicolons, trailing commas, 80 cols
 - **Versioning**: Changesets

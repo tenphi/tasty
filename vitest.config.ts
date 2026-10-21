@@ -52,8 +52,11 @@ const BROWSER_TESTS = [
  * Benchmarks are split along the same line, but run them one project at a time
  * — `pnpm bench` and `pnpm bench:browser`. A bare `vitest bench` runs both
  * concurrently, and the browser competing for CPU depresses the Node pipeline
- * numbers. The focused production-browser benchmarks use a separate config so
- * they can load production React without changing the browser test environment.
+ * numbers. Vitest runs each project's benchmarks in a derived project named
+ * `<name> (bench)` — `node (bench)` and `browser (chromium) (bench)`, after
+ * the browser instance — which is what those scripts select. The focused
+ * production-browser benchmarks use a separate config so they can load
+ * production React without changing the browser test environment.
  */
 export default defineConfig({
   test: {
@@ -74,6 +77,11 @@ export default defineConfig({
               'src/**/*.bench.tsx',
               'src/tasty-injection.bench.ts',
             ],
+            // Vite's module runner reads every imported binding through an
+            // export getter, as it did when the published numbers were taken.
+            // The tracker behind this warning counts each of those reads, which
+            // adds its own cost to every iteration, so keep it off.
+            suppressExportGetterWarnings: true,
           },
         },
       },

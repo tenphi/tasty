@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { Lru } from './lru';
 
@@ -20,31 +20,33 @@ mruCache.get(keys[SIZE - 1]);
 let writeCache = new Lru<string, number>(512);
 let idx = 0;
 
-describe('Lru read path', () => {
-  // The steady-state shape: reads land on non-MRU entries and have to rewire
-  // the list. This is what tasty's caches do on every render.
-  bench('get (scattered hits, rewires the list)', () => {
-    readCache.get(keys[idx++ % SIZE]);
-  });
+test('Lru read path', async ({ bench }) => {
+  await bench.compare(
+    // The steady-state shape: reads land on non-MRU entries and have to rewire
+    // the list. This is what tasty's caches do on every render.
+    bench('get (scattered hits, rewires the list)', () => {
+      readCache.get(keys[idx++ % SIZE]);
+    }),
 
-  bench('get (repeat hit on MRU entry)', () => {
-    mruCache.get(keys[SIZE - 1]);
-  });
+    bench('get (repeat hit on MRU entry)', () => {
+      mruCache.get(keys[SIZE - 1]);
+    }),
 
-  bench('get (miss)', () => {
-    readCache.get('absent');
-  });
+    bench('get (miss)', () => {
+      readCache.get('absent');
+    }),
 
-  bench(
-    'set (fresh keys, with eviction)',
-    () => {
-      writeCache.set(`w-${idx++}`, idx);
-    },
-    {
-      setup() {
-        writeCache = new Lru<string, number>(512);
-        idx = 0;
+    bench(
+      'set (fresh keys, with eviction)',
+      {
+        beforeAll() {
+          writeCache = new Lru<string, number>(512);
+          idx = 0;
+        },
       },
-    },
+      () => {
+        writeCache.set(`w-${idx++}`, idx);
+      },
+    ),
   );
 });

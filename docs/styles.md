@@ -394,6 +394,7 @@ Border shorthand with directional and multi-group support. Use **comma-separated
 | `"1bw longhand"` | All sides: 1bw solid `#border`, output as 4 individual `border-*` properties |
 | `"1bw #red, 2bw #blue top"` | All sides: 1bw solid `#red`, top overridden to 2bw solid `#blue` |
 | `"1bw, dashed top bottom, #purple left right"` | Base: 1bw solid `#border`, top/bottom: 1bw dashed `#border`, left/right: 1bw solid `#purple` |
+| `"1bw CanvasText"` | All sides: 1bw solid in the system color `CanvasText` (see [Color keywords](dsl.md#color-keywords)) |
 
 Later comma-separated groups override earlier groups for conflicting directions.
 
@@ -611,7 +612,10 @@ transition="fade $transition ease-in"
 transition="fill ease-in"           // easing without duration (uses default timing)
 transition="radius ease-in-out"     // easing keyword only
 transition="$$custom-prop"          // custom property transition
+transition="none"                   // no transition at all, e.g. under @media(prefers-reduced-motion: reduce)
 ```
+
+`none` and the CSS-wide keywords (`inherit`, `initial`, `unset`, `revert`, `revert-layer`) are the whole value, not a name to transition.
 
 **Recognized easing keywords:** `ease`, `ease-in`, `ease-out`, `ease-in-out`, `linear`, `step-start`, `step-end`. CSS easing functions (`cubic-bezier(...)`, `steps(...)`, `linear(...)`) are also recognized.
 

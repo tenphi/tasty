@@ -1,7 +1,7 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { makeEmptyDetails } from '../parser/types';
 import { parseStyle } from '../utils/styles';
-import { resolveDefaultValue } from './shared';
+import { isUnset, resolveDefaultValue } from './shared';
 
 /** `min` with no value; resolved through the parser so it follows the unit. */
 const DEFAULT_MIN_SIZE = '1x';
@@ -24,7 +24,7 @@ const STRETCH_FALLBACKS = [
 function parseDimensionValue(
   val: string | number | boolean | undefined,
 ): string | null {
-  if (val == null) return null;
+  if (isUnset(val)) return null;
   if (typeof val === 'number') return `${val}px`;
   if (val === true) return 'initial';
 
@@ -54,13 +54,9 @@ export function dimensionStyle(
   const maxStyle = `max-${name}`;
 
   return ({ value, min, max }: DimensionProps) => {
-    if (value == null && min == null && max == null) return null;
+    if (isUnset(value) && isUnset(min) && isUnset(max)) return null;
 
-    if (
-      value != null &&
-      typeof value === 'string' &&
-      CSS_WIDE_KEYWORDS.has(value)
-    ) {
+    if (typeof value === 'string' && CSS_WIDE_KEYWORDS.has(value)) {
       const styles: Record<string, string> = {
         [name]: value,
         [minStyle]: value,
@@ -98,7 +94,7 @@ export function dimensionStyle(
     };
 
     // Process main dimension value
-    if (value != null) {
+    if (!isUnset(value)) {
       let val = value;
       if (typeof val === 'number') {
         val = `${val}px`;

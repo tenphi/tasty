@@ -3,7 +3,7 @@ import { registerDefaultFunctions } from '../plugins/defaults';
 
 import type { ProcessedStyle, StyleDetails } from '../parser/types';
 
-import { getNamedColorHex } from './color-math';
+import { isColorKeyword } from './color-math';
 import { parseAlphaOverride } from './color-space';
 
 export {
@@ -141,9 +141,9 @@ function isSimpleColorFast(val: string): boolean {
   const c0 = val.charCodeAt(0);
 
   // Cheap first-character dispatch for the shapes that have one. A miss must
-  // fall through rather than answer `false`: the CSS named colors start with
+  // fall through rather than answer `false`: the color keywords start with
   // every letter these cases claim — `red`, `hotpink`, `lime`, `orange`,
-  // `violet`, `coral`, `teal` — and each one is a color too.
+  // `violet`, `coral`, `teal`, `Highlight` — and each one is a color too.
   switch (c0) {
     case 35: // '#'
       return RE_HEX_COLOR.test(val);
@@ -170,7 +170,8 @@ function isSimpleColorFast(val: string): boolean {
       break;
   }
 
-  return getNamedColorHex().has(val.toLowerCase());
+  // A named or system color passes through as authored, case included.
+  return isColorKeyword(val);
 }
 
 // Rate limiting for dev warnings to avoid spam

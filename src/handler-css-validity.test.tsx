@@ -262,5 +262,71 @@ describe.each<RenderPath>(['runtime', 'ssr'])(
         expect(computed(element, 'background-color')).toBe('rgb(255, 0, 0)');
       });
     });
+
+    describe('color keywords', () => {
+      /** What the engine resolves a color keyword to, set directly. */
+      function resolved(keyword: string): string {
+        const reference = document.body.appendChild(div(`color: ${keyword}`));
+
+        return computed(reference, 'color');
+      }
+
+      it.each<[string, Styles, string, string]>([
+        [
+          'border',
+          { border: '1bw Highlight' },
+          'border-top-color',
+          'Highlight',
+        ],
+        [
+          'outline',
+          { outline: '2px ButtonText' },
+          'outline-color',
+          'ButtonText',
+        ],
+        [
+          'border',
+          { border: '1bw rebeccapurple' },
+          'border-top-color',
+          'rebeccapurple',
+        ],
+        [
+          'a reference fallback',
+          { border: '1bw var(--unset-accent, LinkText)' },
+          'border-top-color',
+          'LinkText',
+        ],
+        [
+          'a color token',
+          { '#sys-canvas': 'CanvasText', fill: '#sys-canvas' },
+          'background-color',
+          'CanvasText',
+        ],
+      ])('applies a keyword in %s', (_, styles, property, keyword) => {
+        const element = mount(styles, path);
+
+        expect(computed(element, property)).toBe(resolved(keyword));
+      });
+    });
+
+    describe('false and none under a state', () => {
+      it('writes no padding for false', () => {
+        const element = mount(
+          { display: 'block', padding: { '': false, hovered: '2x' } },
+          path,
+        );
+
+        expect(computed(element, 'padding-top')).toBe('0px');
+      });
+
+      it('turns transitions off with `none`', () => {
+        const element = mount(
+          { transition: { '': 'opacity 80ms', ':not(:hover)': 'none' } },
+          path,
+        );
+
+        expect(computed(element, 'transition-property')).toBe('none');
+      });
+    });
   },
 );

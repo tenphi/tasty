@@ -592,6 +592,32 @@ export function getNamedColorHex(): Map<string, string> {
   return (_namedColorHex = colors);
 }
 
+/**
+ * The CSS system colors (CSS Color 4 §6.2), lowercased. They resolve to the
+ * user's or the platform's palette rather than to a fixed value, and are what
+ * `forced-colors` styles are written in.
+ *
+ * The deprecated system colors (`Menu`, `Window`, `Background`, …) are left
+ * out: they name nothing a current style should reach for, and as keywords they
+ * would collide with names authors pick for presets and handlers.
+ */
+const SYSTEM_COLORS = new Set(
+  'accentcolor accentcolortext activetext buttonborder buttonface buttontext canvas canvastext field fieldtext graytext highlight highlighttext linktext mark marktext selecteditem selecteditemtext visitedtext'.split(
+    ' ',
+  ),
+);
+
+/**
+ * Whether an identifier is a color keyword the parser has no token syntax for:
+ * a CSS named color (`rebeccapurple`) or a system color (`Canvas`). Matched
+ * case-insensitively, as CSS matches them.
+ */
+export function isColorKeyword(name: string): boolean {
+  const lower = name.toLowerCase();
+
+  return getNamedColorHex().has(lower) || SYSTEM_COLORS.has(lower);
+}
+
 // ============================================================================
 // String Converters
 // ============================================================================

@@ -238,7 +238,7 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "59.65 kB"
+      "limit": "60.79 kB"
     },
     {
       "name": "main (tasty)",
@@ -250,13 +250,13 @@
       "name": "main (StyleParser)",
       "path": "dist/index.js",
       "import": "{ StyleParser }",
-      "limit": "6.94 kB"
+      "limit": "8 kB"
     },
     {
       "name": "main (parseColor)",
       "path": "dist/index.js",
       "import": "{ parseColor }",
-      "limit": "7.59 kB"
+      "limit": "8.67 kB"
     },
     {
       "name": "main (useRawCSS)",

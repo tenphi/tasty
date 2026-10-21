@@ -3,6 +3,7 @@ import { CSS_WIDE_KEYWORDS } from '../parser/const';
 import { parseStyle } from '../utils/styles';
 import {
   extractCSSWideKeyword,
+  isUnset,
   resolveDefaultValue,
   warnExtraGroupValues,
 } from './shared';
@@ -184,11 +185,11 @@ export function processDirectionalStyle(
   const { main, top, right, bottom, left } = props;
 
   if (
-    main == null &&
-    top == null &&
-    right == null &&
-    bottom == null &&
-    left == null
+    isUnset(main) &&
+    isUnset(top) &&
+    isUnset(right) &&
+    isUnset(bottom) &&
+    isUnset(left)
   ) {
     return null;
   }
@@ -206,7 +207,7 @@ export function processDirectionalStyle(
     directionProperty ?? ((dir: Direction) => `${property}-${dir}`);
 
   if (individualOnly) {
-    const onlyIndividualProps = main == null;
+    const onlyIndividualProps = isUnset(main);
 
     if (onlyIndividualProps) {
       const result: Record<string, string> = {};
@@ -241,7 +242,7 @@ export function processDirectionalStyle(
 
   let useLonghand = false;
 
-  if (main != null) {
+  if (!isUnset(main)) {
     if (typeof main === 'number') {
       const v = `${main}px`;
       dirs.top = dirs.right = dirs.bottom = dirs.left = v;

@@ -404,6 +404,19 @@ describe('Tasty style tests', () => {
     });
   });
 
+  it.each(['mark', 'highlight / strong', 'navy', 'highlight tight'])(
+    'keeps a preset named like a color keyword: %s',
+    (preset) => {
+      const name = preset.split(' ')[0];
+
+      expect(presetStyle({ preset })).toEqual(
+        expect.objectContaining({
+          'font-size': `var(--${name}-font-size, var(--default-font-size))`,
+        }),
+      );
+    },
+  );
+
   it('should support slash-separated modifier: t3 / strong', () => {
     expect(
       presetStyle({

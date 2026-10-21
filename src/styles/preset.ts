@@ -1,4 +1,5 @@
 import { CSS_WIDE_KEYWORDS } from '../parser/const';
+import { isColorKeyword } from '../utils/color-math';
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import { isTokenNameReference } from './shared';
 import type { CSSMap } from '../utils/styles';
@@ -167,7 +168,16 @@ export function presetStyle({
     const isModOnly =
       nameTokens.length > 0 && nameTokens.every((t) => PRESET_MODIFIERS.has(t));
 
-    const nameToken = namePart?.mods[0] ?? namePart?.values[0] ?? '';
+    // The first modifier names the preset. A name may also be a color keyword
+    // (`mark`, `highlight`), which the parser files as a color instead, so the
+    // two are taken in source order.
+    const nameMods = namePart?.mods ?? [];
+    const nameToken =
+      nameTokens.find(
+        (token) => nameMods.includes(token) || isColorKeyword(token),
+      ) ??
+      namePart?.values[0] ??
+      '';
     // A reference cannot name a preset; fall back to `inherit`, the same name an
     // absent preset resolves to, rather than emitting `var(--var(--x)-font-size)`.
     const name =

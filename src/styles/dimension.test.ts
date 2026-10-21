@@ -160,6 +160,20 @@ describe('dimensionStyle – width & height helpers', () => {
     expect(res['max-width']).toBe('initial');
   });
 
+  test('false writes nothing, as every style does', () => {
+    expect(widthStyle({ width: false })).toBeNull();
+    expect(widthStyle({ minWidth: false, maxWidth: false })).toBeNull();
+    expect(heightStyle({ height: false })).toBeNull();
+  });
+
+  test('a false main value leaves a set min in place', () => {
+    expect(widthStyle({ width: false, minWidth: '10x' })).toEqual({
+      width: 'auto',
+      'min-width': '80px',
+      'max-width': 'initial',
+    });
+  });
+
   describe('CSS-wide keywords', () => {
     test('width inherit sets width, min-width, and max-width', () => {
       const res = widthStyle({ width: 'inherit' }) as any;

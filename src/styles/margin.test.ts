@@ -6,6 +6,11 @@ describe('marginStyle', () => {
       expect(marginStyle({})).toBeNull();
     });
 
+    it('writes nothing for false, as every style does', () => {
+      expect(marginStyle({ margin: false })).toBeNull();
+      expect(marginStyle({ marginLeft: false })).toBeNull();
+    });
+
     it('handles boolean true value', () => {
       const result = marginStyle({ margin: true });
       expect(result).toEqual({

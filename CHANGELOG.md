@@ -1,5 +1,39 @@
 # @tenphi/tasty
 
+## 3.12.0
+
+### Minor Changes
+
+- [#424](https://github.com/tenphi/tasty/pull/424) [`098a1d3`](https://github.com/tenphi/tasty/commit/098a1d30a2a4c52f16a0fc4a79b453f398c3176b) Thanks [@tenphi](https://github.com/tenphi)! - `@tenphi/tasty/babel-plugin` now supports Babel 8. The optional peers `@babel/core`, `@babel/helper-plugin-utils` and `@babel/types` accept `^7.24.0 || ^8.0.0`, and Babel 7 keeps working as before. Under Babel 8, negative numbers in `tastyStatic()` styles, such as `zIndex: -1`, no longer fail the build. The plugin's published type no longer imports Babel's types, so it type-checks against Babel 7's `@types/babel__core` and Babel 8's own types alike.
+
+- [#417](https://github.com/tenphi/tasty/pull/417) [`0ea0167`](https://github.com/tenphi/tasty/commit/0ea0167bb0e5fa5bca138cf415fa313ef89663c9) Thanks [@tenphi](https://github.com/tenphi)! - An opacity suffix now compiles to `color-mix()` instead of relative color syntax. `#purple.5` emits `color-mix(in oklab, var(--purple-color) 50%, transparent)` where it used to emit `oklch(from var(--purple-color) l c h / .5)`. `color-mix()` is Baseline widely available (Chrome 111, Firefox 113, Safari 16.2). Relative color syntax is Baseline 2024 (Chrome 125, Firefox 128, Safari 18) and isn't widely available yet, so a project targeting widely available features can now use the suffix. The same goes for a faded replace token holding `color-mix()` or `light-dark()`, and for the `color()` helper. `#current.N` already compiled this way, and a token defined as `#current` and then faded no longer needs Safari 18.
+
+  An opaque token fades to the same color as before. Two things change:
+
+  - **Alpha composes.** The mix is premultiplied, so a token that is already translucent is faded further. A token holding `rgb(255 0 0 / .8)` faded to `.5` is now alpha `.4`; before, it was `.5`. A replace token holding a literal channel color (`replaceTokens: { '#overlay': 'rgba(0, 0, 0, .8)' }`) is still faded in place, so its alpha is still replaced.
+  - **A `$prop` alpha must hold a number.** `#purple.$fade` emits `calc(var(--fade) * 100%)`, because a mix percentage can't be a `<number>`. `$fade: '.5'` works; `$fade: '50%'` no longer does. This is the rule `#current.$fade` already had.
+
+  `parseColor()` reads the token name and the opacity back from the new form.
+
+- [#416](https://github.com/tenphi/tasty/pull/416) [`75a2fc5`](https://github.com/tenphi/tasty/commit/75a2fc58f4497b34a4257c539ecfb507c95f7ced) Thanks [@tenphi](https://github.com/tenphi)! - `mergeStyles()` and the `Styles` type are now exported from `@tenphi/tasty/zero`. Node build code can merge per-component overrides into source styles, with the same rules as `tasty(Base, { styles })`, without loading React.
+
+### Patch Changes
+
+- [#416](https://github.com/tenphi/tasty/pull/416) [`75a2fc5`](https://github.com/tenphi/tasty/commit/75a2fc58f4497b34a4257c539ecfb507c95f7ced) Thanks [@tenphi](https://github.com/tenphi)! - A custom property name written out as CSS keeps its case: `padding: 'var(--myGap)'` emits `var(--myGap)` instead of `var(--mygap)`, which named a different property. `$myGap` already kept its case.
+
+- [#416](https://github.com/tenphi/tasty/pull/416) [`75a2fc5`](https://github.com/tenphi/tasty/commit/75a2fc58f4497b34a4257c539ecfb507c95f7ced) Thanks [@tenphi](https://github.com/tenphi)! - `false` now writes nothing in `padding`, `margin`, `inset`, `scrollMargin` and `scrollPadding` (and their per-side styles), in `width`, `height`, `blockSize` and `inlineSize` (and their `min`/`max` styles), and in `outlineOffset`, as it already did in every other style. This holds whether `false` is set directly or under a state. Before, `padding: { '': false, hovered: '2x' }` wrote the default gap outside `hovered`, `width: false` wrote `width: auto; min-width: initial; max-width: initial`, and `outlineOffset: false` wrote `outline-offset: false`. `true` still means the default value. `outlineOffset: true`, which names no offset, is now ignored too. `fontStyle: false` still means `normal`.
+
+- [#416](https://github.com/tenphi/tasty/pull/416) [`75a2fc5`](https://github.com/tenphi/tasty/commit/75a2fc58f4497b34a4257c539ecfb507c95f7ced) Thanks [@tenphi](https://github.com/tenphi)! - CSS system colors (`Canvas`, `CanvasText`, `Highlight`, `ButtonText`, `GrayText`, `LinkText`, …) and named colors are now colors wherever a style takes one.
+
+  - A color token can hold one. `'#sys-canvas': 'Canvas'` emits `--sys-canvas-color: Canvas` in styles, `globalStyles` and `configure({ tokens })` alike. Before, it warned `unable to parse color` and emitted nothing.
+  - `border` and `outline` keep a keyword color instead of replacing it with `var(--border-color)` / `var(--outline-color)`: `border: '1bw Highlight'` emits `1px solid highlight`. The same goes for named colors (`border: '1bw red'`), for `shadow` next to `inset` (`'inset 0 0 1x red'` dropped the color), and for `scrollbar` and `fade`.
+  - A reference whose fallback is a single color is a color, in either spelling: `'#accent': 'var(--brand, GrayText)'`, `border: '1bw ($brand, Highlight)'`.
+  - A replace token can alias a keyword color: with `replaceTokens: { '#forced': 'Highlight' }`, `fill: '#forced'` emits `highlight` instead of `#forced`, and `#forced.5` fades it. A replace token aliasing `currentColor` takes an opacity suffix too, composing as `#current.N` does.
+
+  Keyword colors are emitted lowercase inside a style, so `fill: 'Canvas'` now emits `canvas`; CSS matches them case-insensitively. The deprecated system colors (`Menu`, `Window`, `ButtonHighlight`, …) are not recognized.
+
+- [#416](https://github.com/tenphi/tasty/pull/416) [`75a2fc5`](https://github.com/tenphi/tasty/commit/75a2fc58f4497b34a4257c539ecfb507c95f7ced) Thanks [@tenphi](https://github.com/tenphi)! - `transition: 'none'` turns transitions off, alone or under a state. `transition: { '': 'opacity 80ms', '@reduced-motion': 'none' }` now emits `transition: none` under `@reduced-motion`. Before, `none` was read as a property name and emitted `none var(--none-transition, var(--transition))`, which the browser dropped, so the default transition kept running.
+
 ## 3.11.2
 
 ### Patch Changes

@@ -81,13 +81,16 @@ export default tseslint.config(
     },
   },
   {
-    // Tests pass `styles`, `style`, and `className` to Tasty components to
-    // assert how instance overrides, inline styles, and class merging behave.
     files: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
+      // Tests pass `styles`, `style`, and `className` to Tasty components to
+      // assert how instance overrides, inline styles, and class merging behave.
       'tasty/no-styles-prop': 'off',
       'tasty/no-style-prop': 'off',
       'tasty/no-classname-prop': 'off',
+      // Pseudo-element tests write states a pseudo-element cannot have, to
+      // assert that Tasty drops them with a warning and keeps the default.
+      'tasty/no-ignored-pseudo-element-state': 'off',
     },
   },
   {

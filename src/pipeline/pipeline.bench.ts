@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { clearConditionCache } from './materialize';
 import { clearParseCache } from './parseStateKey';
@@ -84,47 +84,49 @@ const cachedComplexStyles: Styles = {
 
 renderStyles(cachedComplexStyles);
 
-describe('renderStyles', () => {
-  bench(
-    'simple styles (5 properties, cold)',
-    () => {
-      renderStyles(simplePool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearAllCaches();
-        idx = 0;
+test('renderStyles', async ({ bench }) => {
+  await bench.compare(
+    bench(
+      'simple styles (5 properties, cold)',
+      {
+        beforeAll() {
+          clearAllCaches();
+          idx = 0;
+        },
       },
-    },
-  );
-
-  bench(
-    'complex state map (cold)',
-    () => {
-      renderStyles(complexPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearAllCaches();
-        idx = 0;
+      () => {
+        renderStyles(simplePool[idx++ % POOL_SIZE]);
       },
-    },
-  );
+    ),
 
-  bench(
-    'mixed OR state map (cold)',
-    () => {
-      renderStyles(mixedOrPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearAllCaches();
-        idx = 0;
+    bench(
+      'complex state map (cold)',
+      {
+        beforeAll() {
+          clearAllCaches();
+          idx = 0;
+        },
       },
-    },
-  );
+      () => {
+        renderStyles(complexPool[idx++ % POOL_SIZE]);
+      },
+    ),
 
-  bench('complex state map (cached)', () => {
-    renderStyles(cachedComplexStyles);
-  });
+    bench(
+      'mixed OR state map (cold)',
+      {
+        beforeAll() {
+          clearAllCaches();
+          idx = 0;
+        },
+      },
+      () => {
+        renderStyles(mixedOrPool[idx++ % POOL_SIZE]);
+      },
+    ),
+
+    bench('complex state map (cached)', () => {
+      renderStyles(cachedComplexStyles);
+    }),
+  );
 });

@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import type { Styles } from '../styles/types';
 import {
@@ -29,18 +29,20 @@ const styles = Array.from(
     }) as Styles,
 );
 
-describe('advanced state helpers', () => {
-  bench('expand dimension shorthands', () => {
-    expandDimensionShorthands(dimensionQueries[index++ % POOL_SIZE]);
-  });
+test('advanced state helpers', async ({ bench }) => {
+  await bench.compare(
+    bench('expand dimension shorthands', () => {
+      expandDimensionShorthands(dimensionQueries[index++ % POOL_SIZE]);
+    }),
 
-  bench('extract predefined state references', () => {
-    extractPredefinedStateRefs(stateExpressions[index++ % POOL_SIZE]);
-  });
+    bench('extract predefined state references', () => {
+      extractPredefinedStateRefs(stateExpressions[index++ % POOL_SIZE]);
+    }),
 
-  bench('extract local predefined states (cold)', () => {
-    extractLocalPredefinedStates({
-      ...(styles[index++ % POOL_SIZE] as Record<string, unknown>),
-    } as Styles);
-  });
+    bench('extract local predefined states (cold)', () => {
+      extractLocalPredefinedStates({
+        ...(styles[index++ % POOL_SIZE] as Record<string, unknown>),
+      } as Styles);
+    }),
+  );
 });

@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { computeStyles } from '../compute-styles';
 import type { Styles } from '../styles/types';
@@ -35,8 +35,8 @@ registerSSRCollectorGetter(() => collector);
 // it is a repeat, which is what a page full of one component looks like.
 computeStyles(factoryStyles, { stableStyles: true });
 
-describe('SSR repeat render of one factory', () => {
-  bench('computeStyles (stable factory styles)', () => {
+test('SSR repeat render of one factory', async ({ bench }) => {
+  await bench('computeStyles (stable factory styles)', () => {
     computeStyles(factoryStyles, { stableStyles: true });
-  });
+  }).run();
 });

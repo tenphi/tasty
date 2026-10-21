@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { filterBaseProps } from './filter-base-props';
 
@@ -27,12 +27,14 @@ const props = {
 
 const customProps = new Set(['name', 'value', 'type']);
 
-describe('filterBaseProps', () => {
-  bench('common component props', () => {
-    filterBaseProps(props);
-  });
+test('filterBaseProps', async ({ bench }) => {
+  await bench.compare(
+    bench('common component props', () => {
+      filterBaseProps(props);
+    }),
 
-  bench('events and custom props', () => {
-    filterBaseProps(props, { eventProps: true, propNames: customProps });
-  });
+    bench('events and custom props', () => {
+      filterBaseProps(props, { eventProps: true, propNames: customProps });
+    }),
+  );
 });

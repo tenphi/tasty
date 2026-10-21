@@ -7,8 +7,10 @@ import { getCSSTextForNode } from '../injector';
 configure({ testIdAttribute: 'data-qa' });
 
 declare module 'vitest' {
-  interface Assertion {
-    toMatchTastySnapshot(): void;
+  // Merging requires Vitest's exact type parameter list, including `T`.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface Matchers<R, T> {
+    toMatchTastySnapshot(): R;
   }
 }
 

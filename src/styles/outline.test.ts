@@ -145,9 +145,24 @@ describe('outlineStyle', () => {
       const result = outlineStyle({ outline: '2px solid' });
       expect(result!.outline).toBe('2px solid var(--outline-color)');
     });
+
+    it.each([
+      ['2px Highlight', '2px solid highlight'],
+      ['2px dotted ButtonText', '2px dotted buttontext'],
+      ['2px red', '2px solid red'],
+    ])('takes a color keyword as the color: %s', (outline, expected) => {
+      expect(outlineStyle({ outline })!.outline).toBe(expected);
+    });
   });
 
   describe('outlineOffset prop', () => {
+    it('writes nothing for outlineOffset: false', () => {
+      expect(outlineStyle({ outlineOffset: false })).toBeNull();
+      expect(outlineStyle({ outline: '2px', outlineOffset: false })).toEqual({
+        outline: '2px solid var(--outline-color)',
+      });
+    });
+
     it('handles outlineOffset as string', () => {
       const result = outlineStyle({ outlineOffset: '4px' });
       expect(result).toEqual({

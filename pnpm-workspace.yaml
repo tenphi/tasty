@@ -1,6 +1,9 @@
 minimumReleaseAge: 20160 # 14 days, in minutes
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
+# First-party packages, published by the same maintainer, install immediately.
+minimumReleaseAgeExclude:
+  - '@tenphi/*'
 
 allowBuilds:
   esbuild: false

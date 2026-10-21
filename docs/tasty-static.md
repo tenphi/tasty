@@ -341,6 +341,18 @@ The configuration is process-wide and shared with the Babel plugin and the runti
 
 `extractStylesForSelector()` output starts with the `@keyframes` its rules animate — local `@keyframes` and configured `keyframes` — under hashed names the `animation` declarations are rewritten to. `extractStylesWithChunks()` returns class rules only.
 
+`mergeStyles()` merges style objects with the rules `tasty(Base, { styles })` extends by — state maps with and without a `''` key, `null`, `false`, `'@inherit'` and sub-elements (see [Extending vs. Replacing State Maps](dsl.md#extending-vs-replacing-state-maps)) — so a build script can layer overrides onto source styles before extracting them, without React:
+
+```ts
+import { extractStylesForSelector, mergeStyles } from '@tenphi/tasty/zero';
+
+const styles = mergeStyles(checkboxStyles, {
+  Indicator: { radius: '0.5r' },
+});
+
+extractStylesForSelector('.checkbox', styles).css;
+```
+
 To write the results to a file the way the Babel plugin does, use `createCSSWriter()`. It deduplicates blocks by key and prepends the generated-file header:
 
 ```ts

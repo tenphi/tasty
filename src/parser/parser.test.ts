@@ -460,12 +460,12 @@ describe('StyleProcessor', () => {
     const result4 = parser.process(
       'rgb($red, $green, $blue) ($color-fallback, #fff)',
     );
+    // A fallback that is one color makes the reference a color too.
     expect(result4.groups[0].colors).toEqual([
       'rgb(var(--red),var(--green),var(--blue))',
-    ]);
-    expect(result4.groups[0].values).toEqual([
       'var(--color-fallback, var(--fff-color, #fff))',
     ]);
+    expect(result4.groups[0].values).toEqual([]);
 
     // Test 5: Nested parentheses with custom properties
     const result5 = parser.process('(($outer, 10px) + ($inner, 5px))');
@@ -1614,6 +1614,85 @@ describe('Modern color functions', () => {
 
     expect(parser.process('#wide-gamut.5').output).toBe(
       'color(display-p3 1 .5 0 / .5)',
+    );
+  });
+});
+
+describe('Color keywords', () => {
+  let setGlobalPredefinedTokens: (tokens: Record<string, string>) => void;
+  let resetGlobalPredefinedTokens: () => void;
+
+  beforeAll(async () => {
+    const styles = await vi.importActual<any>('../utils/styles');
+    setGlobalPredefinedTokens = styles.setGlobalPredefinedTokens;
+    resetGlobalPredefinedTokens = styles.resetGlobalPredefinedTokens;
+  });
+
+  afterEach(() => {
+    resetGlobalPredefinedTokens();
+  });
+
+  test.each(['red', 'rebeccapurple', 'Canvas', 'CanvasText', 'Highlight'])(
+    '%s is a color',
+    (keyword) => {
+      const [group] = parser.process(`1bw ${keyword}`).groups;
+
+      expect(group.colors).toEqual([keyword.toLowerCase()]);
+      expect(group.mods).toEqual([]);
+    },
+  );
+
+  test('a deprecated system color is not a color keyword', () => {
+    // `Menu`, `Window`, `Background`, … would collide with names authors pick.
+    expect(parser.process('menu').groups[0].mods).toEqual(['menu']);
+  });
+
+  test.each([
+    ['var(--accent, Highlight)', 'var(--accent, highlight)'],
+    ['($accent, Highlight)', 'var(--accent, highlight)'],
+    ['($accent, #purple)', 'var(--accent, var(--purple-color))'],
+    ['var(--accent, #purple)', 'var(--accent, var(--purple-color))'],
+    ['var(--accent, var(--other, red))', 'var(--accent, var(--other, red))'],
+  ])('a reference with a color fallback is a color: %s', (input, color) => {
+    expect(parser.process(input).groups[0].colors).toEqual([color]);
+  });
+
+  test.each(['var(--accent)', 'var(--accent, 2x)', 'var(--x, 1px solid red)'])(
+    'a reference without a single color fallback stays a value: %s',
+    (input) => {
+      const [group] = parser.process(input).groups;
+
+      expect(group.colors).toEqual([]);
+      expect(group.values).toHaveLength(1);
+    },
+  );
+
+  test('a token aliasing a color keyword resolves to the keyword', () => {
+    setGlobalPredefinedTokens({ '#forced': 'Highlight' });
+
+    expect(parser.process('#forced').groups[0].colors).toEqual(['highlight']);
+  });
+
+  test('a `($name, …)` fallback that is not one color stays a value', () => {
+    expect(parser.process('($accent, 2x)').groups[0].values).toEqual([
+      'var(--accent, 16px)',
+    ]);
+    expect(parser.process('($accent, 2x)').groups[0].colors).toEqual([]);
+  });
+
+  test('an opacity suffix on a token aliasing currentColor composes', () => {
+    setGlobalPredefinedTokens({ '#ink': 'currentColor' });
+
+    expect(parser.process('#ink.5').output).toBe(
+      'color-mix(in oklab, currentcolor 50%, transparent)',
+    );
+  });
+
+  test('an opacity suffix fades a token aliasing a color keyword', () => {
+    setGlobalPredefinedTokens({ '#forced': 'Highlight' });
+
+    expect(parser.process('#forced.5').output).toBe(
+      'color-mix(in oklab, highlight 50%, transparent)',
     );
   });
 });

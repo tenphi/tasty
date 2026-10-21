@@ -5,7 +5,7 @@ import { assignLineSlots, resolveDefaultValue } from './shared';
 
 interface OutlineStyleProps {
   outline?: string | boolean | number;
-  outlineOffset?: string | number;
+  outlineOffset?: string | number | boolean;
 }
 
 /**
@@ -70,8 +70,14 @@ export function outlineStyle({ outline, outlineOffset }: OutlineStyleProps) {
     }
   }
 
-  // Handle outlineOffset prop (only if not already set by slash syntax)
-  if (outlineOffset != null && result['outline-offset'] === undefined) {
+  // Handle outlineOffset prop (only if not already set by slash syntax).
+  // A boolean names no offset: `false` sets nothing, as it does for `outline`,
+  // and there is no default offset for `true` to stand for.
+  if (
+    outlineOffset != null &&
+    typeof outlineOffset !== 'boolean' &&
+    result['outline-offset'] === undefined
+  ) {
     const offsetValue =
       typeof outlineOffset === 'number' ? `${outlineOffset}px` : outlineOffset;
     const processed = parseStyle(offsetValue);

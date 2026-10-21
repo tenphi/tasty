@@ -6,6 +6,18 @@ describe('paddingStyle', () => {
       expect(paddingStyle({})).toBeNull();
     });
 
+    it('writes nothing for false, as every style does', () => {
+      // `true` is the default gap; `false` is "not set".
+      expect(paddingStyle({ padding: false })).toBeNull();
+      expect(paddingStyle({ padding: false, paddingTop: false })).toBeNull();
+    });
+
+    it('ignores a false shorthand next to a set side', () => {
+      expect(paddingStyle({ padding: false, paddingTop: '2x' })).toEqual({
+        padding: '16px 0 0 0',
+      });
+    });
+
     it('handles boolean true value', () => {
       const result = paddingStyle({ padding: true });
       expect(result).toEqual({

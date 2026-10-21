@@ -106,8 +106,11 @@ function getTiming(name: string): string {
 export function transitionStyle({ transition }: { transition?: string }) {
   if (!transition) return null;
 
-  if (CSS_WIDE_KEYWORDS.has(transition)) {
-    return { transition };
+  // `none` turns every transition off. It is the whole value, not a property
+  // name to transition with a timing token of its own.
+  const keyword = String(transition).trim().toLowerCase();
+  if (keyword === 'none' || CSS_WIDE_KEYWORDS.has(keyword)) {
+    return { transition: keyword };
   }
 
   const processed = parseStyle(transition);

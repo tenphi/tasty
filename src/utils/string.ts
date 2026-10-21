@@ -25,8 +25,11 @@ export function normalizeDslName(name: string): string {
   return lower === first ? name : lower + name.slice(1);
 }
 
-/** A DSL identifier: `$name`, `$$name`, `#name` or `##name`. */
-const RE_DSL_IDENTIFIER = /(\$\$?|##?)([a-zA-Z_][a-zA-Z0-9_-]*)/g;
+/**
+ * A DSL identifier — `$name`, `$$name`, `#name` or `##name` — or a custom
+ * property name written out as CSS (`--name`, as in `var(--name)`).
+ */
+const RE_DSL_IDENTIFIER = /(\$\$?|##?|--)([a-zA-Z_][a-zA-Z0-9_-]*)/g;
 
 /**
  * Case-fold a DSL string for parsing, preserving the case of custom-property
@@ -41,7 +44,8 @@ const RE_DSL_IDENTIFIER = /(\$\$?|##?)([a-zA-Z_][a-zA-Z0-9_-]*)/g;
  * Identifier bodies now keep their case (their first character still folds, see
  * {@link normalizeDslName}); everything else is lowercased exactly as before.
  * Hex literals are excluded — `#FF0000` is a color, not a name, and must fold to
- * match {@link RE_HEX}.
+ * match {@link RE_HEX}. A name written out as CSS (`var(--myVar)`) is kept
+ * exactly as written, the way the browser matches it.
  */
 export function foldDslCase(src: string): string {
   const folded = src.toLowerCase();
@@ -50,7 +54,10 @@ export function foldDslCase(src: string): string {
   // has no case to protect, and one without a sigil has no identifier to protect.
   // Both reduce to the single fold this replaced, so only mixed-case values that
   // actually name a custom property reach the scan below.
-  if (folded === src || (!src.includes('$') && !src.includes('#'))) {
+  if (
+    folded === src ||
+    (!src.includes('$') && !src.includes('#') && !src.includes('--'))
+  ) {
     return folded;
   }
 
@@ -66,9 +73,11 @@ export function foldDslCase(src: string): string {
     out += src.slice(last, match.index).toLowerCase();
     out +=
       prefix +
-      (prefix[0] === '#' && RE_HEX.test(body.toLowerCase())
-        ? body.toLowerCase()
-        : normalizeDslName(body));
+      (prefix === '--'
+        ? body
+        : prefix[0] === '#' && RE_HEX.test(body.toLowerCase())
+          ? body.toLowerCase()
+          : normalizeDslName(body));
     last = match.index + whole.length;
   }
 

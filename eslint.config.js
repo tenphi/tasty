@@ -81,6 +81,16 @@ export default tseslint.config(
     },
   },
   {
+    // Tests pass `styles`, `style`, and `className` to Tasty components to
+    // assert how instance overrides, inline styles, and class merging behave.
+    files: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'tasty/no-styles-prop': 'off',
+      'tasty/no-style-prop': 'off',
+      'tasty/no-classname-prop': 'off',
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**'],
   },
 );

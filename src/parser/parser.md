@@ -117,7 +117,7 @@ Each `StyleParser` instance maintains its own LRU cache.
 | token             | A contiguous chunk of input that is meaningful outside parentheses, URLs, and comments. |
 | group             | A sequence of tokens delimited by a top-level comma (depth 0).          |
 | value             | Magnitude/keyword/function that is not a color.                         |
-| color             | A hash color token or a recognized color function call.                 |
+| color             | A hash color token, a recognized color function call, a color keyword (a CSS named or system color, `transparent`, `currentcolor`), or a `var()` whose fallback is a single color. |
 | modifier          | Anything else (e.g., thin, right).                                      |
 | auto-calc group   | Parentheses not immediately preceded by an identifier or `url(`; rewritten to `calc( … )`. |
 
@@ -148,12 +148,13 @@ Each `StyleParser` instance maintains its own LRU cache.
 | 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. An ident ending in `-color` is filed under both buckets (see note below). | value / color+value |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |
 | 4     | Color function – name in list §12.2 followed by `(` (balanced). `light-dark()` is a color only when its arguments hold one, otherwise a value. | color / value |
-| 5     | User / other function – `ident(` not in color list; parse args recursively, hand off to `funcs[name]` if provided; else rebuild with processed args. | value    |
+| 5     | User / other function – `ident(` not in color list; parse args recursively, hand off to `funcs[name]` if provided; else rebuild with processed args. A `var()` whose fallback is a single color (`var(--accent, Highlight)`) is a color. | value / color |
 | 6     | Color fallback – `(#name, fallback)` → `var(--name-color, <processed fallback>)`. Supports unlimited nesting. Fallback can be another color token, nested color fallback, hex literal, or CSS color function. | color    |
 | 7     | Custom property fallback – `($ident, fallback)` → `var(--ident, <processed fallback>)`. If the ident ends with `-color` it is filed under **both** buckets (see §5 note), otherwise value. | color+value/value |
 | 8     | Auto-calc group – parentheses not preceded by identifier. See §6.                          | value    |
 | 9     | Numeric + custom unit – regex `^[+-]?(\d*.\d+ \d+)([a-z][a-z0-9]*)$` and unit key exists.  |          |
 | 10    | Literal value keyword – exactly `auto`, `max-content`, `min-content`, `fit-content`, `stretch`. | value    |
+| 10b   | Color keyword – `transparent`, `currentcolor`, a CSS named color (`rebeccapurple`), or a non-deprecated system color (`canvas`, `highlight`, …). | color    |
 | 11    | Fallback                                                                                   | modifier |
 
 Each processed string is inserted into its bucket and into `all` in source order.

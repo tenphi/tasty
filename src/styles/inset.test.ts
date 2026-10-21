@@ -6,6 +6,11 @@ describe('insetStyle', () => {
       expect(insetStyle({})).toBeNull();
     });
 
+    it('writes nothing for false, as every style does', () => {
+      expect(insetStyle({ inset: false })).toBeNull();
+      expect(insetStyle({ inset: false, top: '1x' })).toEqual({ top: '8px' });
+    });
+
     it('handles boolean true for inset', () => {
       expect(insetStyle({ inset: true })).toEqual({ inset: '0' });
     });

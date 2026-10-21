@@ -28,6 +28,16 @@ export function extractCSSWideKeyword(group: StyleDetails): string | null {
   return CSS_WIDE_KEYWORDS.has(group.values[0]) ? group.values[0] : null;
 }
 
+/**
+ * `false` sets nothing, exactly as `null` does: it is how a state map says a
+ * state writes no declaration. Only `true` stands for a value.
+ */
+export function isUnset(
+  value: string | number | boolean | undefined,
+): value is undefined | false {
+  return value == null || value === false;
+}
+
 /** A resolved custom-property reference, i.e. `var(--name)` or `var(--name, …)`. */
 const RE_VAR_REFERENCE = /^var\(/;
 

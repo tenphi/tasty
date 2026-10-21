@@ -287,7 +287,9 @@ type       ExtractedProperty
 type       ExtractedSelector
 value      extractStylesForSelector
 value      extractStylesWithChunks
+value      mergeStyles
 value      resetConfig
+type       Styles
 type       TastyZeroConfig
 
 ## @tenphi/tasty/zero/next

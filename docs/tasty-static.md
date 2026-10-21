@@ -19,13 +19,15 @@ If the styles depend on props, keep `tasty()`: rendered only on the server, it a
 
 Build-time extraction is part of the main `@tenphi/tasty` package but requires additional peer dependencies depending on your setup:
 
-| Dependency                   | Version | Required for                                         |
-| ---------------------------- | ------- | ---------------------------------------------------- |
-| `@babel/core`                | >= 7.24 | Babel plugin (`@tenphi/tasty/babel-plugin`)          |
-| `@babel/helper-plugin-utils` | >= 7.24 | Babel plugin                                         |
-| `@babel/types`               | >= 7.24 | Babel plugin                                         |
-| `jiti`                       | >= 2.6  | `configFile` only (Babel plugin and Next.js wrapper) |
-| `babel-loader`               | any     | Next.js wrapper (`@tenphi/tasty/zero/next`)          |
+| Dependency                   | Version                | Required for                                         |
+| ---------------------------- | ---------------------- | ---------------------------------------------------- |
+| `@babel/core`                | 7.24+ or 8             | Babel plugin (`@tenphi/tasty/babel-plugin`)          |
+| `@babel/helper-plugin-utils` | 7.24+ or 8             | Babel plugin                                         |
+| `@babel/types`               | 7.24+ or 8             | Babel plugin                                         |
+| `jiti`                       | >= 2.6                 | `configFile` only (Babel plugin and Next.js wrapper) |
+| `babel-loader`               | any (10+ with Babel 8) | Next.js wrapper (`@tenphi/tasty/zero/next`)          |
+
+Install the three Babel packages from the same major. Babel 8 itself needs Node 22.18+ or 24.11+, and `babel-loader` accepts it from version 10.
 
 The Babel packages and `jiti` are optional peer dependencies of `@tenphi/tasty`; `babel-loader` is resolved from your project. `jiti` is loaded only to read a `configFile`, so a setup that passes `config` directly does not need it; without it, `configFile` fails with an error that says to install it. Install what your setup requires:
 

@@ -100,6 +100,25 @@ const button = tastyStatic({
       expect(fs.existsSync(outputPath)).toBe(false);
     });
 
+    it('should keep negative numbers in the emitted styles object', () => {
+      const code = `
+import { tastyStatic } from '@tenphi/tasty/static';
+
+const layer = tastyStatic({
+  zIndex: -1,
+  order: -2,
+});
+`;
+
+      const result = transformCode(code, {
+        output: path.join(tempDir, 'output.css'),
+        mode: 'inject',
+      });
+
+      expect(result).toContain('zIndex: -1');
+      expect(result).toContain('order: -2');
+    });
+
     it('should handle selector mode with inject call', () => {
       const outputPath = path.join(tempDir, 'output.css');
 

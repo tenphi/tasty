@@ -139,6 +139,18 @@ interface PluginState extends PluginPass {
   _fileAddedCSS?: boolean;
 }
 
+/**
+ * The plugin's call signature, written out rather than inferred from
+ * `declare()` so the published declaration names no Babel types: Babel 7's
+ * come from `@types/babel__core`, Babel 8 ships its own, and the two name the
+ * plugin object differently.
+ */
+type TastyZeroBabelPlugin = (
+  api: object,
+  options: TastyZeroBabelOptions | null | undefined,
+  dirname: string,
+) => object;
+
 function mtime(filePath: string): number | null {
   try {
     return fs.statSync(filePath).mtimeMs;
@@ -173,9 +185,9 @@ function clearRequireCacheTree(filePath: string): void {
   delete require.cache[resolved];
 }
 
-// @ts-expect-error PluginState vs PluginPass type mismatch in @babel/helper-plugin-utils
-export default declare<TastyZeroBabelOptions>((api, options) => {
-  api.assertVersion(7);
+const plugin = declare<PluginState, TastyZeroBabelOptions>((api, options) => {
+  // `^7.0.0-0` is what `assertVersion(7)` checks; Babel 8 rejects that number.
+  api.assertVersion('^7.0.0-0 || ^8.0.0-0');
 
   const mode = options.mode ?? 'file';
   const outputPath = options.output || 'tasty.css';
@@ -582,6 +594,8 @@ export default declare<TastyZeroBabelOptions>((api, options) => {
     },
   };
 });
+
+export default plugin as TastyZeroBabelPlugin;
 
 /**
  * Check if an object expression looks like a StaticStyle object
@@ -1138,7 +1152,8 @@ function valueToAST(value: unknown): t.Expression {
     return t.stringLiteral(value);
   }
   if (typeof value === 'number') {
-    return t.numericLiteral(value);
+    // Babel 8's `numericLiteral` rejects negative and non-finite numbers.
+    return t.valueToNode(value);
   }
   if (typeof value === 'boolean') {
     return t.booleanLiteral(value);

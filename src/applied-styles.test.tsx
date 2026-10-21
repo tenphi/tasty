@@ -214,16 +214,32 @@ describe('generated CSS applies in the browser', () => {
       ])('%s at %s', (color, suffix, alpha) => {
         const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
         const el = render(
-          <Box styles={{ '#probe': color, fill: `#probe${suffix}` }} />,
+          <Box styles={{ '#probe': color, fill: `#probe${suffix}` }}>
+            <div
+              data-qa="Relative"
+              style={{
+                backgroundColor: `oklch(from var(--probe-color) l c h / ${alpha})`,
+              }}
+            />
+          </Box>,
         ).getByTestId('Box');
 
+        // Both forms read the same token. `--probe-color` is registered as a
+        // `<color>`, which stores a legacy color such as `hsl()` as 8-bit
+        // `rgb()`, so comparing against the authored literal instead would
+        // measure that rounding rather than the fade.
         const mixed = oklab(computed(el, 'background-color'));
-        const relative = oklab(`oklch(from ${color} l c h / ${alpha})`);
+        const relative = oklab(
+          computed(
+            el.querySelector('[data-qa="Relative"]')!,
+            'background-color',
+          ),
+        );
 
-        // Within .005: the relative form round-trips through oklch, which the
-        // engine rounds, and a visible difference in oklab is around .02.
+        // Within .00005: what is left is float noise from serializing oklch,
+        // where a visible difference in oklab is around .02.
         mixed.forEach((channel, i) => {
-          expect(channel).toBeCloseTo(relative[i], 2);
+          expect(channel).toBeCloseTo(relative[i], 4);
         });
       });
     });

@@ -197,7 +197,9 @@ works on every one of these:
 - **Alpha composes.** The mix is premultiplied, so a color that is already
   translucent is faded further: a token holding `rgb(255 0 0 / .8)` faded to
   `.5` is alpha `.4`. An opaque token — the usual case — ends at exactly the
-  suffix.
+  suffix. System colors are whatever the platform draws, and some are
+  translucent: Chrome and Safari on macOS give `Highlight` an alpha of `.6`, so
+  a token holding it faded to `.5` ends at `.3` there.
 - **A `$prop` alpha must be a number.** `#purple.$fade` emits
   `calc(var(--fade) * 100%)`, because a mix percentage cannot be a `<number>`,
   so `$fade` has to hold `.5`, not `50%`.

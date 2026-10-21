@@ -71,6 +71,9 @@ jobs:
       - name: Packed React compatibility check
         run: pnpm check:react-compat
 
+      - name: Packed Babel compatibility check
+        run: pnpm check:babel-compat
+
       - name: Test
         run: pnpm test
 

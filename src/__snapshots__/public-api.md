@@ -36,6 +36,7 @@ value      color
 value      COLOR_STYLES
 type       ColorSpace
 type       ColorStyleProps
+type       ComponentStatics
 value      computeStyles
 type       ComputeStylesOptions
 type       ComputeStylesResult
@@ -226,6 +227,7 @@ value      tastyDebug
 type       TastyElementOptions
 type       TastyElementProps
 type       TastyExtensionConfig
+type       TastyExtensionProps
 type       TastyNamedColors
 type       TastyPlugin
 type       TastyPluginFactory

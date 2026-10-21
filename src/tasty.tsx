@@ -769,11 +769,16 @@ export type TastyComponentPropsWithDefaults<
   DefaultProps extends Partial<Props>,
 > = keyof DefaultProps extends never
   ? Props
-  : {
-      [key in Extract<keyof Props, keyof DefaultProps>]?: Props[key];
-    } & {
-      [key in keyof Omit<Props, keyof DefaultProps>]: Props[key];
-    };
+  : // Defaults for every prop (the extension form's own default) make them all
+    // optional. `Partial` keeps the base's props named in declarations, where
+    // the mapped type below expands each one and needs every type it uses.
+    keyof Props extends keyof DefaultProps
+    ? Partial<Props>
+    : {
+        [key in Extract<keyof Props, keyof DefaultProps>]?: Props[key];
+      } & {
+        [key in keyof Omit<Props, keyof DefaultProps>]: Props[key];
+      };
 
 /**
  * The component type returned by the `tasty(options)` element-factory overload.

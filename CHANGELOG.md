@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.13.0
+
+### Minor Changes
+
+- [#426](https://github.com/tenphi/tasty/pull/426) [`b1435ce`](https://github.com/tenphi/tasty/commit/b1435ce297b44147f531c8e6f9a00c52ca898e23) Thanks [@tenphi](https://github.com/tenphi)! - Export `TastyExtensionProps` and `ComponentStatics`, and type a `tasty(Component, …)` extension's props as `Partial` of its base's props. A library's declaration for an exported extension now names those props instead of listing each one, so it no longer needs every type they use to be exported. An extension of a base whose props are a union now accepts each member's props, not only the keys they share.
+
 ## 3.12.0
 
 ### Minor Changes

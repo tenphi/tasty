@@ -69,6 +69,10 @@ For a deeper map of the codebase, see [`AGENTS.md`](AGENTS.md).
 | `pnpm size` | Run size-limit checks against the built bundles |
 | `pnpm bench` | Run pipeline benchmarks (Node project) |
 | `pnpm bench:browser` | Run component-render benchmarks (headless Chromium) |
+| `pnpm bench:overhead` / `bench:injection` / `bench:interaction` / `bench:tree` | Production-React browser benchmarks (see [Runtime Benchmarks](docs/runtime-benchmarks.md)) |
+| `pnpm bench:cold-start` | Page-load cold-start benchmark (run `pnpm build` first) |
+| `pnpm knip` | Dead-code check |
+| `pnpm check:build` / `check:react-compat` / `check:babel-compat` / `check:test-only` | Built-entry, packed React/Babel compatibility, and test-only-code checks (run after `pnpm build`) |
 
 Run `pnpm hygiene` before pushing — CI runs the same checks.
 
@@ -175,7 +179,7 @@ Internal-only changes (refactors, CI tweaks, doc-only updates) don't need a chan
 ## Coding Guidelines
 
 - **TypeScript first.** Keep the public API fully typed; prefer narrow, descriptive types over `any`.
-- **No hooks in the core.** `tasty()`, style functions, and SSR helpers are intentionally hook-free so they work in React Server Components. Don't introduce React-only runtime dependencies in `src/` outside the React entry points.
+- **No hooks in the core.** `tasty()`, the style functions, and SSR helpers are intentionally hook-free so they work in React Server Components; `useStyles` is the one exception, and it only reads context when React provides it. Don't introduce React-only runtime dependencies in `src/` outside the React entry points.
 - **Determinism.** The selector model relies on mutually exclusive conditions. When touching the pipeline, add tests that exercise selector exclusivity, not just snapshot output.
 - **Performance.** The pipeline has multi-level caches (parser, state-key, simplify, condition). When changing hot paths, run `pnpm bench` before and after and include the numbers in the PR.
 - **Bundle size.** `pnpm size` enforces per-entry-point limits. If a change increases bundle size, justify it in the PR.
@@ -200,7 +204,7 @@ Reviewers look for:
 - A clear description of motivation and scope
 - Tests that fail without the change and pass with it
 - Updated docs and a changeset (when user-visible)
-- Green CI: lint, typecheck, tests, build, size-limit
+- Green CI: build, lint, format check, typecheck, `knip`, built-entry, React and Babel compatibility, and test-only-code checks, tests, size-limit
 - No unrelated changes (formatting drift, dependency churn, etc.)
 
 PRs that touch the pipeline or SSR collectors will usually take an extra round of review — that's expected.
@@ -217,7 +221,6 @@ Maintainers are responsible for merging the Version Packages PR — contributors
 
 ## Getting Help
 
-- Open a [GitHub Discussion](https://github.com/tenphi/tasty/discussions) for design questions or general help.
-- Open an [issue](https://github.com/tenphi/tasty/issues) for bugs or concrete proposals.
+- Open an [issue](https://github.com/tenphi/tasty/issues) for bugs, concrete proposals, design questions, or general help.
 
 Thanks again — every contribution helps make Tasty better.

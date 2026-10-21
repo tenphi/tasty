@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { clearParseCache, parseStateKey } from './parseStateKey';
 
@@ -30,53 +30,55 @@ parseStateKey(
   '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
 );
 
-describe('parseStateKey', () => {
-  bench(
-    'simple key (cold)',
-    () => {
-      parseStateKey(simplePool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearParseCache();
-        idx = 0;
+test('parseStateKey', async ({ bench }) => {
+  await bench.compare(
+    bench(
+      'simple key (cold)',
+      {
+        beforeAll() {
+          clearParseCache();
+          idx = 0;
+        },
       },
-    },
-  );
-
-  bench('simple key (cached)', () => {
-    parseStateKey(':hover');
-  });
-
-  bench(
-    'value modifier (cold)',
-    () => {
-      parseStateKey(valuePool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearParseCache();
-        idx = 0;
+      () => {
+        parseStateKey(simplePool[idx++ % POOL_SIZE]);
       },
-    },
-  );
+    ),
 
-  bench(
-    'complex key (cold)',
-    () => {
-      parseStateKey(complexPool[idx++ % POOL_SIZE]);
-    },
-    {
-      setup() {
-        clearParseCache();
-        idx = 0;
+    bench('simple key (cached)', () => {
+      parseStateKey(':hover');
+    }),
+
+    bench(
+      'value modifier (cold)',
+      {
+        beforeAll() {
+          clearParseCache();
+          idx = 0;
+        },
       },
-    },
-  );
+      () => {
+        parseStateKey(valuePool[idx++ % POOL_SIZE]);
+      },
+    ),
 
-  bench('complex key (cached)', () => {
-    parseStateKey(
-      '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
-    );
-  });
+    bench(
+      'complex key (cold)',
+      {
+        beforeAll() {
+          clearParseCache();
+          idx = 0;
+        },
+      },
+      () => {
+        parseStateKey(complexPool[idx++ % POOL_SIZE]);
+      },
+    ),
+
+    bench('complex key (cached)', () => {
+      parseStateKey(
+        '@root(schema=dark) | (!@root(schema) & @media(prefers-color-scheme: dark))',
+      );
+    }),
+  );
 });

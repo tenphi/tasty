@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import type { Styles } from '../styles/types';
 import { categorizeStyleKeys } from './definitions';
@@ -93,53 +93,60 @@ function freshCopy(): Entry {
   };
 }
 
-describe('categorizeStyleKeys', () => {
-  bench('typical component styles', () => {
-    categorizeStyleKeys(
-      pool[idx++ % POOL_SIZE].styles as Record<string, unknown>,
-    );
-  });
+test('categorizeStyleKeys', async ({ bench }) => {
+  await bench.compare(
+    bench('typical component styles', () => {
+      categorizeStyleKeys(
+        pool[idx++ % POOL_SIZE].styles as Record<string, unknown>,
+      );
+    }),
 
-  bench('component styles with local states', () => {
-    categorizeStyleKeys(
-      localStatePool[idx++ % POOL_SIZE] as Record<string, unknown>,
-    );
-  });
+    bench('component styles with local states', () => {
+      categorizeStyleKeys(
+        localStatePool[idx++ % POOL_SIZE] as Record<string, unknown>,
+      );
+    }),
+  );
 });
 
-describe('generateChunkCacheKey', () => {
-  bench('all chunks (fresh styles object every call)', () => {
-    keyAllChunks(freshCopy());
-  });
+test('generateChunkCacheKey', async ({ bench }) => {
+  await bench.compare(
+    bench('all chunks (fresh styles object every call)', () => {
+      keyAllChunks(freshCopy());
+    }),
 
-  // The shape a write-only opt-in has: an object keyed once, stored, and never
-  // looked up again — what the client would pay if `tasty()` opted in on the
-  // single render that reaches computeStyles before classNameCache takes over.
-  // The gap to the row above is exactly what that mistake costs.
-  bench(
-    'all chunks (fresh styles object every call, stored but never read)',
-    () => {
-      keyAllChunks(freshCopy(), true);
-    },
+    // The shape a write-only opt-in has: an object keyed once, stored, and never
+    // looked up again — what the client would pay if `tasty()` opted in on the
+    // single render that reaches computeStyles before classNameCache takes over.
+    // The gap to the row above is exactly what that mistake costs.
+    bench(
+      'all chunks (fresh styles object every call, stored but never read)',
+      () => {
+        keyAllChunks(freshCopy(), true);
+      },
+    ),
+
+    // A styles object that survives across renders — what SSR sees on every
+    // render of a `tasty({ styles })` definition, since the client-side
+    // `classNameCache` in tasty.tsx is disabled on the server. Only these
+    // callers opt into the memo.
+    bench('all chunks (stable styles object)', () => {
+      keyAllChunks(warm);
+    }),
+
+    bench('all chunks (stable styles object, memoized)', () => {
+      keyAllChunks(warmMemo, true);
+    }),
+
+    bench('all chunks (stable styles object with local states)', () => {
+      keyAllChunks(warmWithStates);
+    }),
+
+    bench(
+      'all chunks (stable styles object with local states, memoized)',
+      () => {
+        keyAllChunks(warmStatesMemo, true);
+      },
+    ),
   );
-
-  // A styles object that survives across renders — what SSR sees on every
-  // render of a `tasty({ styles })` definition, since the client-side
-  // `classNameCache` in tasty.tsx is disabled on the server. Only these
-  // callers opt into the memo.
-  bench('all chunks (stable styles object)', () => {
-    keyAllChunks(warm);
-  });
-
-  bench('all chunks (stable styles object, memoized)', () => {
-    keyAllChunks(warmMemo, true);
-  });
-
-  bench('all chunks (stable styles object with local states)', () => {
-    keyAllChunks(warmWithStates);
-  });
-
-  bench('all chunks (stable styles object with local states, memoized)', () => {
-    keyAllChunks(warmStatesMemo, true);
-  });
 });

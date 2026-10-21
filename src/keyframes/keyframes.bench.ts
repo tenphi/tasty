@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import type { Styles } from '../styles/types';
 
@@ -37,12 +37,14 @@ const names = new Map([
   ['unused', 'unused-e5'],
 ]);
 
-describe('local keyframes', () => {
-  bench('discover animation names', () => {
-    extractAnimationNamesFromStyles(styles);
-  });
+test('local keyframes', async ({ bench }) => {
+  await bench.compare(
+    bench('discover animation names', () => {
+      extractAnimationNamesFromStyles(styles);
+    }),
 
-  bench('rewrite and collect animation names', () => {
-    replaceAnimationNames(declarations, names, new Set());
-  });
+    bench('rewrite and collect animation names', () => {
+      replaceAnimationNames(declarations, names, new Set());
+    }),
+  );
 });

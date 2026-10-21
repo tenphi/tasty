@@ -3,7 +3,8 @@ import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
-import { bench, describe } from 'vitest';
+import type { Bench } from 'vitest';
+import { test } from 'vitest';
 
 import { tasty } from './tasty';
 
@@ -97,6 +98,7 @@ function validateBenchmarkContract() {
 validateBenchmarkContract();
 
 function benchmarkUpdate(
+  bench: Bench,
   name: string,
   Element: ElementType,
   changeHostProp: boolean,
@@ -104,19 +106,10 @@ function benchmarkUpdate(
   let root: Root | undefined;
   let version = 0;
 
-  bench(
+  return bench(
     name,
-    () => {
-      if (!root) throw new Error('Benchmark root was not initialized');
-
-      if (changeHostProp) version = version === 0 ? 1 : 0;
-      const nextVersion = changeHostProp ? version : undefined;
-
-      flushSync(() => root!.render(createTree(Element, nextVersion)));
-    },
     {
-      ...BENCH_OPTIONS,
-      setup() {
+      beforeAll() {
         root = createRoot(document.createElement('div'));
         version = 0;
         flushSync(() =>
@@ -125,42 +118,56 @@ function benchmarkUpdate(
           ),
         );
       },
-      teardown() {
+      afterAll() {
         if (root) flushSync(() => root!.unmount());
         root = undefined;
       },
     },
+    () => {
+      if (!root) throw new Error('Benchmark root was not initialized');
+
+      if (changeHostProp) version = version === 0 ? 1 : 0;
+      const nextVersion = changeHostProp ? version : undefined;
+
+      flushSync(() => root!.render(createTree(Element, nextVersion)));
+    },
   );
 }
 
-describe(`empty wrapper lifecycle (${ITEM_COUNT.toLocaleString()} siblings)`, () => {
-  bench(
-    'raw <div className> mount + remove',
-    () => {
+test(`empty wrapper lifecycle (${ITEM_COUNT.toLocaleString()} siblings)`, async ({
+  bench,
+}) => {
+  await bench.compare(
+    bench('raw <div className> mount + remove', () => {
       const root = createRoot(document.createElement('div'));
       flushSync(() => root.render(createTree('div')));
       flushSync(() => root.unmount());
-    },
-    BENCH_OPTIONS,
-  );
-
-  bench(
-    'tasty({}) mount + remove',
-    () => {
+    }),
+    bench('tasty({}) mount + remove', () => {
       const root = createRoot(document.createElement('div'));
       flushSync(() => root.render(createTree(EmptyTastyDiv)));
       flushSync(() => root.unmount());
-    },
+    }),
     BENCH_OPTIONS,
   );
 });
 
-describe(`empty wrapper same-props update (${ITEM_COUNT.toLocaleString()} siblings)`, () => {
-  benchmarkUpdate('raw <div className>', 'div', false);
-  benchmarkUpdate('tasty({})', EmptyTastyDiv, false);
+test(`empty wrapper same-props update (${ITEM_COUNT.toLocaleString()} siblings)`, async ({
+  bench,
+}) => {
+  await bench.compare(
+    benchmarkUpdate(bench, 'raw <div className>', 'div', false),
+    benchmarkUpdate(bench, 'tasty({})', EmptyTastyDiv, false),
+    BENCH_OPTIONS,
+  );
 });
 
-describe(`empty wrapper host-prop update (${ITEM_COUNT.toLocaleString()} siblings)`, () => {
-  benchmarkUpdate('raw <div className>', 'div', true);
-  benchmarkUpdate('tasty({})', EmptyTastyDiv, true);
+test(`empty wrapper host-prop update (${ITEM_COUNT.toLocaleString()} siblings)`, async ({
+  bench,
+}) => {
+  await bench.compare(
+    benchmarkUpdate(bench, 'raw <div className>', 'div', true),
+    benchmarkUpdate(bench, 'tasty({})', EmptyTastyDiv, true),
+    BENCH_OPTIONS,
+  );
 });

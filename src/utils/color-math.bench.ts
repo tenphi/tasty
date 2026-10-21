@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test } from 'vitest';
 
 import { okhslToSrgb } from './color-math';
 
@@ -10,9 +10,9 @@ const COLORS = Array.from(
 
 let index = 0;
 
-describe('color math', () => {
-  bench('OKHSL to sRGB', () => {
+test('color math', async ({ bench }) => {
+  await bench('OKHSL to sRGB', () => {
     const [h, s, l] = COLORS[index++ & (COLORS.length - 1)];
     okhslToSrgb(h, s, l);
-  });
+  }).run();
 });

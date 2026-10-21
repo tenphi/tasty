@@ -593,14 +593,14 @@ Measured with [size-limit](https://github.com/ai/size-limit): minified and brotl
 
 | Entry point                                       | Size     |
 | ------------------------------------------------- | -------- |
-| `@tenphi/tasty`, importing `tasty`                | 52.26 kB |
-| `@tenphi/tasty`, everything                       | 58.9 kB  |
-| `@tenphi/tasty/core`, everything (no SSR)         | 55.2 kB  |
+| `@tenphi/tasty`, importing `tasty`                | 53.11 kB |
+| `@tenphi/tasty`, everything                       | 59.85 kB |
+| `@tenphi/tasty/core`, everything (no SSR)         | 55.99 kB |
 | `@tenphi/tasty/static` (build-time authoring API) | 920 B    |
 | `@tenphi/tasty/ssr/client`                        | 277 B    |
 | `@tenphi/tasty/ssr/astro-client`                  | 283 B    |
-| `@tenphi/tasty/zero` (Node, build time)           | 38.87 kB |
-| `@tenphi/tasty/babel-plugin` (Node, build time)   | 43.05 kB |
+| `@tenphi/tasty/zero` (Node, build time)           | 39.68 kB |
+| `@tenphi/tasty/babel-plugin` (Node, build time)   | 44.1 kB  |
 
 Run `pnpm size` to reproduce; numbers shift slightly between releases.
 
@@ -695,7 +695,7 @@ The [Docs Hub](docs/README.md) routes you by role, rendering mode, and task.
 **Internals**
 
 - [Style rendering pipeline](docs/pipeline.md) — How state maps become mutually exclusive CSS rules
-- [Style Injector](docs/injector.md) — Deduplication, reference counting, cleanup, SSR, and Shadow DOM
+- [Style Injector](docs/injector.md) — Content-hash classes, pinning, DOM-driven cleanup, SSR, and Shadow DOM
 - [Debug Utilities](docs/debug.md) — Inspecting CSS, elements, caches, and chunks at runtime
 - [Runtime Benchmarks](docs/runtime-benchmarks.md) — Methodology and results
 

@@ -47,7 +47,7 @@ It also applies when an individual is officially representing the community in p
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project maintainer at **tenphi@gmail.com**, or by reporting via [GitHub Issues](https://github.com/tenphi/tasty/issues) (mark as confidential). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project maintainer at **tenphi@gmail.com**. Please do not report conduct issues in public GitHub issues. All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

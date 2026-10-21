@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest published version of `@tenphi/tasty` receives security updates. The project is pre-1.0; there are no long-term support branches.
+Only the latest published version of `@tenphi/tasty` receives security updates. Fixes ship as a new release on the current major line (3.x); earlier major versions are not maintained and there are no long-term support branches.
 
 | Version | Supported          |
 | ------- | ------------------ |

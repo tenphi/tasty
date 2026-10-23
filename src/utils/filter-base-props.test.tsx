@@ -2,6 +2,7 @@ import { cleanup, render } from '@testing-library/react';
 import type { ComponentProps, HTMLAttributes } from 'react';
 
 import { tasty } from '../tasty';
+import type { AllBaseProps } from '../types';
 
 import { filterBaseProps } from './filter-base-props';
 
@@ -9,6 +10,10 @@ const StyledElement = tasty({ as: 'div' });
 const _ColoredElement = tasty({ styleProps: ['color', 'width'] as const });
 
 function FilteredElement(props: HTMLAttributes<HTMLDivElement>) {
+  return <StyledElement {...filterBaseProps(props)} />;
+}
+
+function FilteredBaseElement(props: AllBaseProps) {
   return <StyledElement {...filterBaseProps(props)} />;
 }
 
@@ -34,6 +39,31 @@ describe('filtered DOM props', () => {
     expect(element.hasAttribute('title')).toBe(false);
     expect(element.inert).toBe(false);
     expect(element.hasAttribute('inert')).toBe(false);
+  });
+
+  it('forwards tokens, theme, and isChecked through a filtered Tasty component', () => {
+    const { container, rerender } = render(
+      <FilteredBaseElement
+        tokens={{ $progress: '50%', '#accent': 'red' }}
+        style={{ color: 'red' }}
+        theme="dark"
+        isChecked
+      />,
+    );
+    const element = container.firstElementChild as HTMLDivElement;
+
+    expect(element.style.getPropertyValue('--progress')).toBe('50%');
+    expect(element.style.getPropertyValue('--accent-color')).toBe('red');
+    expect(element.style.color).toBe('red');
+    expect(element.getAttribute('data-theme')).toBe('dark');
+    expect(element.hasAttribute('data-checked')).toBe(true);
+
+    rerender(<FilteredBaseElement />);
+
+    expect(element.style.getPropertyValue('--progress')).toBe('');
+    expect(element.style.getPropertyValue('--accent-color')).toBe('');
+    expect(element.hasAttribute('data-theme')).toBe(false);
+    expect(element.hasAttribute('data-checked')).toBe(false);
   });
 
   it('forwards base props while removing style state maps', () => {

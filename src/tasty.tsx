@@ -92,6 +92,7 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
       isDisabled,
       isHidden,
       isChecked,
+      theme,
       className,
       style,
       ...htmlProps
@@ -124,6 +125,7 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
       'data-element': elementName,
       'data-qa': qa ?? defaultQa,
       'data-qaval': qaVal ?? defaultQaVal,
+      'data-theme': theme,
       ...(modDataAttrs || {}),
       ...htmlProps,
       className,
@@ -141,6 +143,8 @@ function createSubElement<Tag extends keyof JSX.IntrinsicElements>(
     if (elementProps['data-qa'] === undefined) delete elementProps['data-qa'];
     if (elementProps['data-qaval'] === undefined)
       delete elementProps['data-qaval'];
+    if (elementProps['data-theme'] === undefined)
+      delete elementProps['data-theme'];
 
     return createElement(tag, elementProps);
   });
@@ -464,7 +468,7 @@ type ResolveElementTag<T extends SubElementDefinition<any>> = T extends string
 
 /**
  * Props for sub-element components.
- * Combines HTML attributes with tasty-specific props (qa, qaVal, mods, tokens, isDisabled, etc.)
+ * Combines HTML attributes with tasty-specific props (qa, qaVal, mods, tokens, theme, isDisabled, etc.)
  */
 export type SubElementProps<Tag extends keyof JSX.IntrinsicElements = 'div'> =
   Omit<
@@ -475,6 +479,8 @@ export type SubElementProps<Tag extends keyof JSX.IntrinsicElements = 'div'> =
     qaVal?: string | number;
     mods?: Mods;
     tokens?: Tokens;
+    /** User-defined theme for the element. Mapped to `data-theme` attribute. */
+    theme?: BaseProps['theme'];
     isDisabled?: boolean;
     isHidden?: boolean;
     isChecked?: boolean;

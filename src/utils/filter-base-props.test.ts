@@ -17,12 +17,15 @@ describe('filterBaseProps', () => {
       isHidden: false,
       disabled: false,
       isDisabled: false,
+      isChecked: false,
       children: 'Open',
       style: { color: 'red' },
       className: 'trigger',
       href: '#content',
       target: '_blank',
       tabIndex: 0,
+      tokens: { $progress: '50%' },
+      theme: 'dark',
       unknown: 'discarded',
     };
 
@@ -41,12 +44,15 @@ describe('filterBaseProps', () => {
       isHidden: false,
       disabled: false,
       isDisabled: false,
+      isChecked: false,
       children: 'Open',
       style: { color: 'red' },
       className: 'trigger',
       href: '#content',
       target: '_blank',
       tabIndex: 0,
+      tokens: { $progress: '50%' },
+      theme: 'dark',
     });
     expect(props.unknown).toBe('discarded');
   });

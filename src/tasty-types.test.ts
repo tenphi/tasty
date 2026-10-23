@@ -50,7 +50,7 @@ describe('tasty component and filtered prop types', () => {
       import { filterBaseProps as coreFilter } from './core';
       import { filterBaseProps as directFilter } from './utils/filter-base-props';
       import { tasty as directTasty } from './tasty';
-      import type { BaseStyleProps } from './types';
+      import type { BasePropsWithoutChildren, BaseStyleProps } from './types';
 
       declare module './types' {
         interface TastyBaseStylePropNames { margin: true; }
@@ -196,10 +196,12 @@ describe('tasty component and filtered prop types', () => {
       const ColoredBox = tasty({ styleProps: ['color', 'width'] as const });
       const PlainBox = tasty({ as: 'div' });
       declare const boxProps: ComponentProps<typeof ColoredBox>;
+      declare const baseProps: BasePropsWithoutChildren;
       const props = {
         id: 'trigger' as const,
         title: 'Details',
         inert: true,
+        tokens: { $progress: '50%' },
         'aria-label': 'Open',
         'aria-': 'bare prefix',
         'data-state': 'open',
@@ -219,12 +221,16 @@ describe('tasty component and filtered prop types', () => {
         onPressStart: () => true,
         onPressEnd: () => true,
       };
-      type BaseKeys = 'id' | 'title' | 'inert' | 'aria-label' | 'aria-' |
-        'data-state' | 'data-';
+      type BaseKeys = 'id' | 'title' | 'inert' | 'tokens' | 'aria-label' |
+        'aria-' | 'data-state' | 'data-';
       type EventKeys = 'onClick' | 'onCustom' | 'onA1';
 
       for (const filter of [filterBaseProps, coreFilter, directFilter]) {
         const filtered = filter(props);
+        // Every declared base prop is forwarded, except the \`styles\` a wrapper owns.
+        const allBase = filter(baseProps);
+        type AllBase = Assert<Equal<keyof typeof allBase,
+          Exclude<keyof BasePropsWithoutChildren, 'styles'>>>;
         type Base = Assert<Equal<typeof filtered, Partial<Pick<typeof props, BaseKeys>>>>;
         // @ts-expect-error Style props are absent after default filtering.
         filtered.color;

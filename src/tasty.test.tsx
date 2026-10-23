@@ -541,6 +541,48 @@ describe('tasty() API', () => {
     expect(style).toContain('padding: 10px');
   });
 
+  it('should map theme prop to data-theme attribute in sub-elements', () => {
+    const Element = tasty({
+      elements: {
+        Title: 'h3',
+      },
+    });
+
+    const { container, rerender } = render(
+      <Element.Title qa="title" theme="dark">
+        Title
+      </Element.Title>,
+    );
+
+    const title = getByTestId(container, 'title');
+
+    expect(title).toHaveAttribute('data-theme', 'dark');
+    expect(title).not.toHaveAttribute('theme');
+
+    rerender(<Element.Title qa="title">Title</Element.Title>);
+
+    expect(title).not.toHaveAttribute('data-theme');
+  });
+
+  it('should let an explicit data-theme override theme in sub-elements', () => {
+    const Element = tasty({
+      elements: {
+        Title: 'h3',
+      },
+    });
+
+    const { container } = render(
+      <Element.Title qa="title" theme="dark" data-theme="light">
+        Title
+      </Element.Title>,
+    );
+
+    expect(getByTestId(container, 'title')).toHaveAttribute(
+      'data-theme',
+      'light',
+    );
+  });
+
   it('should map theme prop to data-theme attribute', () => {
     const Element = tasty({ as: 'div' });
 

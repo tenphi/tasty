@@ -169,6 +169,9 @@ describe('tasty component and filtered prop types', () => {
         const extended = <Extended padding="2x" isActive progress={0.5} variant="danger" />;
         const baseVariant = <Extended variant="primary" />;
         const title = <Extended.Title>Title</Extended.Title>;
+        const themedTitle = <Extended.Title theme="dark">Title</Extended.Title>;
+        // @ts-expect-error Sub-element themes are strings.
+        const invalidTheme = <Extended.Title theme={1}>Title</Extended.Title>;
         const icon = <Extended.Icon />;
         // @ts-expect-error Variants are those of the base and the extension.
         const unknownExtendedVariant = <Extended variant="unknown" />;

@@ -406,7 +406,7 @@ elements: {
 }
 ```
 
-The sub-components produced by `elements` support `mods`, `tokens`, `isDisabled`, `isHidden`, and `isChecked` props — the same modifier interface as the root component.
+The sub-components produced by `elements` support `mods`, `tokens`, `theme`, `isDisabled`, `isHidden`, and `isChecked` props — the same modifier interface as the root component. As on the root, `theme` renders as `data-theme`, and an explicit `data-theme` wins over it.
 
 If you don't need sub-components (e.g., the inner elements are already rendered by a third-party library), you can still style them by key alone — just omit `elements` and apply `data-element` manually:
 

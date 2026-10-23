@@ -1,5 +1,15 @@
 # @tenphi/tasty
 
+## 3.14.0
+
+### Minor Changes
+
+- [#434](https://github.com/tenphi/tasty/pull/434) [`a958f51`](https://github.com/tenphi/tasty/commit/a958f512da63f00994098bcb0a42772c7eb6a085) Thanks [@tenphi](https://github.com/tenphi)! - Support `theme` on sub-elements created by `elements`. As on the root component, it renders as `data-theme`, and an explicit `data-theme` wins over it. Before, a sub-element passed `theme` through as a raw DOM attribute, which states such as `@own(theme=dark)` don't match.
+
+### Patch Changes
+
+- [#433](https://github.com/tenphi/tasty/pull/433) [`293a5f8`](https://github.com/tenphi/tasty/commit/293a5f83503beb2f9909ab9fd5e27a714518610e) Thanks [@tenphi](https://github.com/tenphi)! - Preserve `tokens`, `theme`, and `isChecked` in `filterBaseProps`, so it keeps every `BaseProps` prop except `styles`. A component that wraps a Tasty element with the helper no longer drops a consumer's `tokens` silently; `theme` now reaches the element as `data-theme`, and `isChecked` as `checked` and `data-checked`. A wrapper that sets one of these before spreading the filtered props now has it replaced by the consumer's value, as `style` already is; set it after the spread, or merge the `tokens` objects, to keep it.
+
 ## 3.13.0
 
 ### Minor Changes

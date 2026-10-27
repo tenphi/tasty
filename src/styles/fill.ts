@@ -1,6 +1,10 @@
 import type { StyleDetails } from '../parser/types';
-import { parseAlphaMix } from '../utils/color-space';
-import { parseStyle, resolveCustomProperties } from '../utils/styles';
+import { isTransparent, parseAlphaMix } from '../utils/color-space';
+import {
+  isDroppedValue,
+  parseStyle,
+  resolveCustomProperties,
+} from '../utils/styles';
 import { warnOnceDev } from '../utils/warnings';
 
 /**
@@ -117,27 +121,40 @@ export function fillStyle({
       // parser classified as a plain value (`$name` is a color only when the
       // name ends with `-color`), so substitute before falling back to the raw
       // input.
-      result['background-color'] =
-        firstColor || resolveCustomProperties(colorValue);
+      if (firstColor || !isDroppedValue(colorValue)) {
+        result['background-color'] =
+          firstColor || resolveCustomProperties(colorValue);
+      }
 
       if (secondColor) {
-        // A faded overlay joins its base in a compound color that paints the
-        // same thing. An overlay without an opacity covered its base anyway,
-        // and a transparent one painted nothing.
+        // The fix depends on what the overlay resolves to: a faded overlay
+        // joins its base in a compound color that paints the same thing, a
+        // transparent one painted nothing, and an opaque one covered its base.
         const tokens = colorValue.trim().split(/\s+/);
         const [base, overlay] = tokens;
-        const fix =
-          tokens.length === 2 && base[0] === '#' && overlay[0] === '#'
-            ? secondColor === 'transparent'
-              ? `"${overlay}" paints nothing, so use the first color alone: ` +
-                `"${base}".`
-              : overlay.includes('.')
-                ? `Join them with a plus instead: "${base}+${overlay}" paints ` +
-                  `the second color over the first as one background color.`
-                : `"${overlay}" has no opacity and covers the first color, so ` +
-                  `use it alone: "${overlay}".`
-            : `Join them with a plus instead: "#surface+#dark.04" paints the ` +
-              `second color over the first as one background color.`;
+        const join = (compound: string) =>
+          `Join them with a plus instead: "${compound}" paints the second ` +
+          `color over the first as one background color.`;
+        const makeOpaque = `make it opaque and give it an opacity: "${base}+${overlay}.04".`;
+
+        let fix: string;
+        if (tokens.length !== 2 || base[0] !== '#' || overlay[0] !== '#') {
+          fix = join('#surface+#dark.04');
+        } else if (isTransparent(secondColor)) {
+          fix =
+            `"${overlay}" paints nothing, so use the first color alone: ` +
+            `"${base}".`;
+        } else if (overlay.includes('.')) {
+          fix = join(`${base}+${overlay}`);
+        } else if (parseAlphaMix(secondColor) || secondColor.includes('/')) {
+          fix =
+            `"${overlay}" is translucent, which would leave a compound ` +
+            `see-through, so ${makeOpaque}`;
+        } else {
+          fix =
+            `If "${overlay}" is opaque, it covers the first color, so use it ` +
+            `alone: "${overlay}". If it is translucent, ${makeOpaque}`;
+        }
 
         warnOnceDev(
           `fill-two-colors:${colorProperty}:${colorValue}`,
@@ -212,6 +229,7 @@ export function svgFillStyle({ svgFill }: { svgFill?: string }) {
   if (!svgFill) return null;
 
   const processed = parseStyle(svgFill);
+  if (!processed.groups[0]?.colors[0] && isDroppedValue(svgFill)) return null;
   svgFill = processed.groups[0]?.colors[0] || resolveCustomProperties(svgFill);
 
   return { fill: svgFill };

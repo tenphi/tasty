@@ -1,7 +1,12 @@
 import { renderStyles } from '../pipeline';
+import {
+  resetGlobalPredefinedTokens,
+  setGlobalPredefinedTokens,
+} from '../utils/styles';
 import { resetStyleWarnings } from '../utils/warnings';
 
-import { fillStyle } from './fill';
+import { colorStyle } from './color';
+import { fillStyle, svgFillStyle } from './fill';
 
 const LAYER =
   'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))';
@@ -90,6 +95,14 @@ describe('a compound color', () => {
   });
 });
 
+describe('a malformed compound', () => {
+  it('leaves no declaration rather than the raw input', () => {
+    expect(fillStyle({ fill: '#surface+1x' })).toBe(null);
+    expect(colorStyle({ color: '#surface+1x' })).toBe(null);
+    expect(svgFillStyle({ svgFill: '#surface+1x' })).toBe(null);
+  });
+});
+
 describe('fill diagnostics', () => {
   let warn: ReturnType<typeof vi.spyOn>;
 
@@ -151,6 +164,30 @@ describe('fill diagnostics', () => {
 
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('so use the first color alone: "#surface"'),
+      );
+    });
+
+    it('suggests the base alone for an overlay faded to nothing', () => {
+      fillStyle({ fill: '#surface #dark.0' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('so use the first color alone: "#surface"'),
+      );
+    });
+
+    it('tells a translucent overlay token to become opaque', () => {
+      setGlobalPredefinedTokens({ '#overlay': '#dark.04' });
+
+      try {
+        fillStyle({ fill: '#surface #overlay' });
+      } finally {
+        resetGlobalPredefinedTokens();
+      }
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"#overlay" is translucent, which would leave a compound see-through',
+        ),
       );
     });
 

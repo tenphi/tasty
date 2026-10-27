@@ -1839,8 +1839,16 @@ describe('Compound colors', () => {
     setGlobalPredefinedTokens({
       '#ghost': 'rgb(0 0 0 / 0)',
       '#gone': '#dark.0',
+      '#legacy': 'rgba(0, 0, 0, 0)',
+      '#none': 'rgb(0 0 0 / none)',
     });
     const fresh = new StyleParser();
+
+    for (const layer of ['#legacy', '#none']) {
+      expect(fresh.process(`#surface+${layer}.5`).output).toBe(
+        'var(--surface-color)',
+      );
+    }
 
     expect(fresh.process('#surface+#ghost.5').output).toBe(
       'var(--surface-color)',
@@ -1848,6 +1856,12 @@ describe('Compound colors', () => {
     expect(fresh.process('#surface+#gone.5').output).toBe(
       'var(--surface-color)',
     );
+  });
+
+  test('a replace token holding a malformed compound is dropped when faded', () => {
+    setGlobalPredefinedTokens({ '#bad': '#a+1x' });
+
+    expect(new StyleParser().process('solid #bad.5').output).toBe('solid');
   });
 
   test('a token holding a color function is layered as that color', () => {
@@ -1900,15 +1914,39 @@ describe('Compound colors', () => {
       );
     });
 
-    test('a `+` with spaces around it warns with the joined form', () => {
+    test.each(['#a + #b.1', '#a +#b.1', '#a+ #b.1'])(
+      '`%s` warns with the joined form',
+      (value) => {
+        vi.stubEnv('NODE_ENV', 'development');
+
+        new StyleParser().process(`1bw ${value}`);
+
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('Write "1bw #a+#b.1"'),
+        );
+      },
+    );
+
+    test('the joined form leaves other `+` signs alone', () => {
       vi.stubEnv('NODE_ENV', 'development');
 
-      new StyleParser().process('1bw #border + #dark.1');
+      new StyleParser().process('0 0 calc(1x + 2px) #surface + #dark.1');
 
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('Write "1bw #border+#dark.1"'),
+        expect.stringContaining('Write "0 0 calc(1x + 2px) #surface+#dark.1"'),
       );
     });
+
+    test.each(['calc(1x + 2px) #dark', 'url(a.svg#x) + 1x'])(
+      '`%s` joins no colors and is silent',
+      (value) => {
+        vi.stubEnv('NODE_ENV', 'development');
+
+        new StyleParser().process(value);
+
+        expect(warn).not.toHaveBeenCalled();
+      },
+    );
 
     test('a layer with opacity is silent', () => {
       vi.stubEnv('NODE_ENV', 'development');

@@ -1,5 +1,5 @@
 import { isColorKeyword } from '../utils/color-math';
-import { mixColorAlpha, parseAlphaMix } from '../utils/color-space';
+import { isTransparent, mixColorAlpha } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 import { warnOnceDev } from '../utils/warnings';
@@ -55,18 +55,6 @@ const RE_COLOR_LAYER = new RegExp(
   `^(#[a-z0-9-]+)(?:\\.${ALPHA_SUFFIX})?$`,
   'i',
 );
-
-/**
- * Whether a processed color is fully transparent: the keyword, a fade to `0%`,
- * or a color function with a zero alpha (`rgb(0 0 0 / 0)`).
- */
-function isTransparent(color: string): boolean {
-  return (
-    color === 'transparent' ||
-    parseAlphaMix(color)?.percentage === '0%' ||
-    /\/\s*(?:0+\.?0*|\.0+)%?\s*\)$/.test(color)
-  );
-}
 
 /**
  * Compile a compound color, `#base+#layer.N+…`, to one color: each layer is
@@ -354,13 +342,21 @@ export function classify(
             }
 
             // A value with no alpha channel to write into is faded as a whole.
-            const fadeWhole = () => ({
-              bucket: Bucket.Color,
-              processed: fadeColor(
-                classify(foldDslCase(resolvedValue), opts, recurse).processed,
-                rawAlpha,
-              ),
-            });
+            const fadeWhole = () => {
+              const { bucket, processed } = classify(
+                foldDslCase(resolvedValue),
+                opts,
+                recurse,
+              );
+              // Nothing to fade when the value is not a color, such as a
+              // malformed compound the parser dropped.
+              return bucket === Bucket.Color || bucket === Bucket.ColorValue
+                ? {
+                    bucket: Bucket.Color,
+                    processed: fadeColor(processed, rawAlpha),
+                  }
+                : { bucket: Bucket.Mod, processed: '' };
+            };
 
             // A compound color has no single token to suffix.
             if (resolvedValue.startsWith('#') && resolvedValue.includes('+')) {

@@ -1,4 +1,5 @@
 import {
+  isDroppedValue,
   parseColor,
   parseStyle,
   resolveCustomProperties,
@@ -33,6 +34,8 @@ export function colorStyle({ color }: { color?: string | boolean }) {
   const resolved = RE_HEX_LITERAL.test(color)
     ? parseStyle(color).groups[0]?.colors[0]
     : parseColor(color, true).color;
+
+  if (!resolved && isDroppedValue(color)) return null;
 
   color = resolved || resolveCustomProperties(color);
 

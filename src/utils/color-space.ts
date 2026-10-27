@@ -66,6 +66,33 @@ export function parseAlphaMix(
   return match ? { color: match[1], percentage: match[2] } : null;
 }
 
+/** A zero alpha: `0`, `0.0`, `.0`, `0%`, or `none`. */
+const ZERO_ALPHA = String.raw`(?:0+\.?0*|\.0+)%?|none`;
+/** A color function whose alpha, after a slash, is zero: `rgb(0 0 0 / 0)`. */
+const RE_SLASH_ZERO_ALPHA = new RegExp(
+  String.raw`\/\s*(?:${ZERO_ALPHA})\s*\)$`,
+  'i',
+);
+/** A legacy `rgba()`/`hsla()` whose fourth argument is zero: `rgba(0,0,0,0)`. */
+const RE_LEGACY_ZERO_ALPHA = new RegExp(
+  String.raw`^(?:rgba|hsla)\([^(),]*,[^(),]*,[^(),]*,\s*(?:${ZERO_ALPHA})\s*\)$`,
+  'i',
+);
+
+/**
+ * Whether a processed color is fully transparent where the parser can see it:
+ * the keyword, a fade to `0%`, or a color function with a zero alpha. A token
+ * whose value turns transparent at runtime is not.
+ */
+export function isTransparent(color: string): boolean {
+  return (
+    color === 'transparent' ||
+    parseAlphaMix(color)?.percentage === '0%' ||
+    RE_SLASH_ZERO_ALPHA.test(color) ||
+    RE_LEGACY_ZERO_ALPHA.test(color)
+  );
+}
+
 /**
  * Convert an alpha to the percentage {@link mixColorAlpha} takes, without the
  * float artifact of a bare multiplication (`.07 * 100` is `7.000000000000001`).

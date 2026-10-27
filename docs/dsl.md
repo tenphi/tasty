@@ -299,7 +299,8 @@ result see-through: with `'#overlay': { '': '#clear', hovered: '#dark' }`,
 - Over a transparent base, a layer is just its fade: `#clear+#dark.04` compiles
   to `#dark.04`.
 - A `+` joining anything but color tokens (`#surface+1x`) is not a compound: the
-  value is dropped, with a development warning.
+  token is dropped, with a development warning, and the style renders as if
+  that color were not there.
 
 A `+` joins tokens only. To fade a whole compound, give it a token
 (`'#hover-surface': '#surface+#dark.04'`) and fade that (`#hover-surface.5`). For

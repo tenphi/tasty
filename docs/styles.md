@@ -303,17 +303,51 @@ Avoid setting physical and logical declarations that resolve to the same edge in
 
 Background color with design token support. Preferred over `backgroundColor` and `background`.
 
-**Syntax:** `[color]` or `[base-color] [overlay-color]`
+**Syntax:** `[color]`, or two colors mixed with a comma: `[color] [weight%], [color]`
 
 | Value | Effect |
 |-------|--------|
 | `"#purple"` | Token-based background color |
 | `"#purple.10"` | Token color at 10% opacity |
-| `"#surface #primary.10"` | Background `#surface` with `#primary.10` overlay (two colors enable smooth transitions between both) |
+| `"#dark 4%, #surface"` | `#dark` mixed into `#surface` at 4% — the color `#dark` at 4% opacity over `#surface` would show |
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 
-When two colors are provided, the first sets the background color and the second is applied as an overlay gradient layer. This enables independent CSS transitions on each color. With `image` or `backgroundImage` on the same element, the image is layered over the overlay color in one `background-image`.
+#### Mixing two colors
+
+A comma between two colors mixes them into one:
+
+```jsx
+fill: '#dark 4%, #surface'
+// → background-color: color-mix(in srgb, var(--dark-color) 4%, var(--surface-color));
+```
+
+The comma-separated parts are the arguments of `color-mix()`, as written, mixed in sRGB: the space browsers composite layers in. When the weighted color is opaque, the mix is exactly what drawing it at that opacity over the other color shows. And because it is one `background-color`:
+
+- contrast checkers such as axe-core and Lighthouse can read it;
+- it transitions and animates between states like any other color;
+- an `image` on the same element stays the only `background-image` layer.
+
+The weight can come from a token or an expression: `'#dark $hover-weight, #surface'`, `'#dark ($hover * 100%), #surface'`.
+
+Give the weight as a percentage, not as an opacity. A color without a percentage takes half the weight, and its own alpha weighs it down again, so the mix comes out see-through: `'#dark.04, #surface'` is 52% opaque, not `#dark` at 4% over `#surface`. In development Tasty warns about a `#name.N` or `#clear` part without a percentage. It can't see into a token, though, so a token holding a translucent color mixes the same way with no warning: keep the token opaque and put its weight in the percentage.
+
+A mix takes two colors. Any more are ignored, with a development warning.
+
+#### Two colors separated by a space (deprecated)
+
+`fill: '#surface #dark.04'` paints the first color as `background-color` and the second as a `linear-gradient()` layer over it, through the `--tasty-second-fill-color` custom property. It still works, with a development warning, and is going away in the next major version: contrast checkers can't see through a `background-image`, so axe-core reports every text node over the layer as *incomplete*.
+
+| Before | After |
+|--------|-------|
+| `'#surface #dark.04'` | `'#dark 4%, #surface'` |
+| `'#surface #clear'` | `'#surface'` |
+| `'#surface #accent'` (an opaque overlay) | `'#accent'` |
+| `'#base #overlay'` (a token holding a translucent color) | `'#overlay $overlay-weight, #base'`, with `#overlay` opaque and `$overlay-weight` a percentage |
+
+The rewrites are exact when the overlay token is opaque. A state map no longer needs the same two-color shape in every state to transition smoothly: every state is now a plain background color.
+
+If an overlay has to stay a translucent token, draw the layer yourself with `fill: '#base', image: 'linear-gradient(#overlay, #overlay)'`. Contrast checkers can't read that either.
 
 There is no default fill color, so `fill: true` is ignored with a development warning. Use `false` for no fill.
 

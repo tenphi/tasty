@@ -1,5 +1,55 @@
+import type { StyleDetails } from '../parser/types';
+import { parseAlphaMix } from '../utils/color-space';
 import { parseStyle, resolveCustomProperties } from '../utils/styles';
 import { warnOnceDev } from '../utils/warnings';
+
+/**
+ * Mix the comma-separated colors of a fill into one: `'#dark 4%, #surface'` is
+ * `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`.
+ *
+ * Mixed in sRGB, an opaque color at weight `a` shows exactly what drawing it at
+ * alpha `a` over the other color would, as one `background-color` that contrast
+ * checkers can read. The weight has to come from the percentage: a color that
+ * is itself translucent is weighted by its alpha as well.
+ */
+function mixFillColors(
+  property: string,
+  value: string,
+  groups: StyleDetails[],
+): string {
+  if (groups.length > 2) {
+    warnOnceDev(
+      `fill-mix-extra:${property}:${value}`,
+      `${property}="${value}": a mix takes two colors. The extra ones are ` +
+        `ignored.`,
+    );
+  }
+
+  const [first, second] = groups;
+
+  for (const group of [first, second]) {
+    // A translucent color without a weight is weighed down twice, by its share
+    // of the mix and by its own alpha, which also leaves the mix see-through:
+    // `#dark.04, #surface` is 52% opaque, not `#dark` at 4% over `#surface`.
+    if (group.all.length !== 1) continue;
+
+    const color = group.colors[0];
+    const fade = color && parseAlphaMix(color);
+
+    if (color === 'transparent' || (fade && fade.percentage !== '100%')) {
+      warnOnceDev(
+        `fill-mix-alpha:${property}:${value}`,
+        `${property}="${value}": "${group.input}" is translucent and has no ` +
+          `percentage, so its alpha weighs it down on top of its share of the ` +
+          `mix and the background comes out see-through. Give the color a ` +
+          `weight instead: "#dark 4%, #surface", not "#dark.04, #surface". ` +
+          `A transparent color mixes in nothing; leave it out.`,
+      );
+    }
+  }
+
+  return `color-mix(in srgb, ${first.output}, ${second.output})`;
+}
 
 export function fillStyle({
   fill,
@@ -46,21 +96,40 @@ export function fillStyle({
   }
 
   // Priority: backgroundColor > fill
+  const colorProperty = backgroundColor != null ? 'backgroundColor' : 'fill';
   const colorValue =
     backgroundColor ?? (typeof fill === 'string' ? fill : undefined);
   if (colorValue) {
-    const parsed = parseStyle(colorValue);
-    const firstColor = parsed.groups[0]?.colors[0];
-    const secondColor = parsed.groups[0]?.colors[1];
+    const { groups } = parseStyle(colorValue);
 
-    // No color found: the value may still be a custom-property reference the
-    // parser classified as a plain value (`$name` is a color only when the name
-    // ends with `-color`), so substitute before falling back to the raw input.
-    result['background-color'] =
-      firstColor || resolveCustomProperties(colorValue);
+    if (groups.length > 1) {
+      result['background-color'] = mixFillColors(
+        colorProperty,
+        colorValue,
+        groups,
+      );
+    } else {
+      const firstColor = groups[0]?.colors[0];
+      const secondColor = groups[0]?.colors[1];
 
-    if (secondColor) {
-      result['--tasty-second-fill-color'] = secondColor;
+      // No color found: the value may still be a custom-property reference the
+      // parser classified as a plain value (`$name` is a color only when the
+      // name ends with `-color`), so substitute before falling back to the raw
+      // input.
+      result['background-color'] =
+        firstColor || resolveCustomProperties(colorValue);
+
+      if (secondColor) {
+        warnOnceDev(
+          `fill-two-colors:${colorProperty}:${colorValue}`,
+          `${colorProperty}="${colorValue}": two colors separated by a space ` +
+            `are deprecated. The second one is painted as a background-image ` +
+            `layer, which contrast checkers such as axe cannot read. Mix the ` +
+            `colors with a comma instead: "#dark 4%, #surface" paints #dark ` +
+            `at 4% over #surface as one background color.`,
+        );
+        result['--tasty-second-fill-color'] = secondColor;
+      }
     }
   }
 

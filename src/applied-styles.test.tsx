@@ -297,6 +297,65 @@ describe('generated CSS applies in the browser', () => {
     });
   });
 
+  describe('a comma-mixed fill', () => {
+    // The two colors as tokens of the element itself, so nothing else can
+    // change what they resolve to.
+    const TOKENS = {
+      '#dark': 'rgb(20 30 40)',
+      '#surface': 'rgb(250 250 250)',
+    };
+
+    /** Channels of a computed `color(srgb r g b)`, scaled to 0–255. */
+    function srgb(value: string): number[] {
+      const match = value.match(/^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/);
+      if (!match) throw new Error(`not an opaque sRGB color: ${value}`);
+      return match.slice(1).map((channel) => Number(channel) * 255);
+    }
+
+    /** `color` drawn at `alpha` over the opaque `base`: what a layer paints. */
+    function over(color: number[], alpha: number, base: number[]): number[] {
+      return color.map((channel, i) => alpha * channel + (1 - alpha) * base[i]);
+    }
+
+    function expectColor(actual: number[], expected: number[]) {
+      actual.forEach((channel, i) =>
+        expect(channel).toBeCloseTo(expected[i], 3),
+      );
+    }
+
+    it('paints what the overlay layer painted, as one background color', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ ...TOKENS, fill: '#dark 4%, #surface' }} />,
+      ).getByTestId('Box');
+
+      // `'#surface #dark.04'` drew `#dark` at 4% over `#surface`.
+      expectColor(
+        srgb(computed(el, 'background-color')),
+        over([20, 30, 40], 0.04, [250, 250, 250]),
+      );
+      expect(computed(el, 'background-image')).toBe('none');
+    });
+
+    it('takes the weight from a token', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            ...TOKENS,
+            '$overlay-weight': '12%',
+            fill: '#dark $overlay-weight, #surface',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      expectColor(
+        srgb(computed(el, 'background-color')),
+        over([20, 30, 40], 0.12, [250, 250, 250]),
+      );
+    });
+  });
+
   describe('cascade', () => {
     it('wins against an equally specific rule that comes later', () => {
       const Box = tasty({ qa: 'Box', styles: { display: 'block' } });

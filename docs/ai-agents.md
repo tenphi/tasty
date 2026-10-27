@@ -134,7 +134,7 @@ Directional modifiers beat placeholder zeros:
 - ❌ `padding: '2x 4x top right'` — a directional group takes one value, so `4x` is dropped → ✅ `padding: '2x top, 4x right'`
 - ❌ `fade: '3x 1x top bottom'` → ✅ `fade: '3x top, 1x bottom'`
 
-Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill`, `color`, `caretColor`, and `accentColor` take a color only (use `#clear` for transparent).
+Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill`, `color`, `caretColor`, and `accentColor` take a color only (use `#clear` for transparent). `fill` also mixes two colors with a comma, the weight as a percentage: ❌ `fill: '#surface #dark.04'` (deprecated overlay layer) · ❌ `fill: '#dark.04, #surface'` (half-transparent mix) → ✅ `fill: '#dark 4%, #surface'`.
 
 ### `transition`
 

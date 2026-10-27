@@ -356,7 +356,7 @@ const Badge = tasty({
   variants: {
     primary: {
       border: { '': '#white.2', pressed: '#primary-text', disabled: '#clear' },
-      fill: { '': '#white #primary', hovered: '#white #primary-text' },
+      fill: { '': '#primary', hovered: '#primary-text' },
     },
     secondary: {
       border: { '': '#primary.15', pressed: '#primary.3' },

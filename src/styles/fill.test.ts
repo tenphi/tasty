@@ -134,14 +134,23 @@ describe('fill diagnostics', () => {
       );
     });
 
-    it('suggests no join for an overlay without opacity', () => {
+    it('suggests the overlay alone when it has no opacity', () => {
       // `#surface+#accent` would only warn again; the overlay alone is the fix.
       fillStyle({ fill: '#surface #accent' });
 
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Join them with a plus instead: "#surface+#dark.04"',
-        ),
+        expect.stringContaining('so use it alone: "#accent"'),
+      );
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Join them with a plus'),
+      );
+    });
+
+    it('suggests the base alone when the overlay is transparent', () => {
+      fillStyle({ fill: '#surface #clear' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('so use the first color alone: "#surface"'),
       );
     });
 

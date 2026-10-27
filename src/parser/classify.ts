@@ -1,5 +1,5 @@
 import { isColorKeyword } from '../utils/color-math';
-import { mixColorAlpha } from '../utils/color-space';
+import { mixColorAlpha, parseAlphaMix } from '../utils/color-space';
 import { getGlobalPredefinedTokens } from '../utils/styles';
 import { foldDslCase } from '../utils/string';
 import { warnOnceDev } from '../utils/warnings';
@@ -44,8 +44,29 @@ function fadeColor(color: string, rawAlpha: string): string {
   return mixColorAlpha(color, alphaSuffixToPercentage(rawAlpha));
 }
 
+/** An opacity suffix after the dot: digits, or a `$prop` reference. */
+const ALPHA_SUFFIX = String.raw`(\$[a-z_][a-z0-9-_]*|[0-9]+)`;
+/** `#current` with an opacity suffix. */
+const RE_CURRENT_ALPHA = new RegExp(`^#current\\.${ALPHA_SUFFIX}$`, 'i');
+/** A `#name` with an opacity suffix. */
+const RE_TOKEN_ALPHA = new RegExp(`^(#[a-z0-9-]+)\\.${ALPHA_SUFFIX}$`, 'i');
 /** One operand of a compound color: a `#name`, optionally with an opacity suffix. */
-const RE_COLOR_LAYER = /^(#[a-z0-9-]+)(?:\.(\$[a-z_][a-z0-9-_]*|[0-9]+))?$/i;
+const RE_COLOR_LAYER = new RegExp(
+  `^(#[a-z0-9-]+)(?:\\.${ALPHA_SUFFIX})?$`,
+  'i',
+);
+
+/**
+ * Whether a processed color is fully transparent: the keyword, a fade to `0%`,
+ * or a color function with a zero alpha (`rgb(0 0 0 / 0)`).
+ */
+function isTransparent(color: string): boolean {
+  return (
+    color === 'transparent' ||
+    parseAlphaMix(color)?.percentage === '0%' ||
+    /\/\s*(?:0+\.?0*|\.0+)%?\s*\)$/.test(color)
+  );
+}
 
 /**
  * Compile a compound color, `#base+#layer.N+…`, to one color: each layer is
@@ -54,11 +75,10 @@ const RE_COLOR_LAYER = /^(#[a-z0-9-]+)(?:\.(\$[a-z_][a-z0-9-_]*|[0-9]+))?$/i;
  * `color-mix(in srgb, L a, B)` is exactly an opaque `L` drawn at alpha `a` over
  * `B`, and the mix is premultiplied, so this holds for a translucent `B` too.
  * That is why the layers mix in sRGB, the space browsers composite in. A layer
- * whose token is itself translucent cannot have that alpha folded in, so the
- * suffix stands for the layer's whole opacity.
+ * has to be opaque: the premultiplied mix counts its own alpha as well, and
+ * lowers the alpha of the result, which no opacity suffix can undo.
  *
- * Returns `null` when an operand is not a color, leaving the token to the
- * rules that follow.
+ * Returns `null` when an operand is not a color.
  */
 function layerColors(
   token: string,
@@ -84,7 +104,7 @@ function layerColors(
     if (color === null) return null;
 
     // A transparent layer paints nothing.
-    if (color === 'transparent') continue;
+    if (isTransparent(color)) continue;
 
     if (rawAlpha === undefined) {
       warnOnceDev(
@@ -97,15 +117,14 @@ function layerColors(
       continue;
     }
 
-    const weight = alphaSuffixToPercentage(rawAlpha);
-    if (weight === '0%') continue;
+    const opacity = alphaSuffixToPercentage(rawAlpha);
+    if (opacity === '0%') continue;
 
     // Over a transparent base, a layer is just its fade: `#clear+#dark.04` is
     // `#dark.04`, and compiles to the same thing.
-    result =
-      result === 'transparent'
-        ? mixColorAlpha(color, weight)
-        : `color-mix(in srgb, ${color} ${weight}, ${result})`;
+    result = isTransparent(result)
+      ? mixColorAlpha(color, opacity)
+      : `color-mix(in srgb, ${color} ${opacity}, ${result})`;
   }
 
   return result;
@@ -263,10 +282,19 @@ export function classify(
   }
 
   // 0a. Compound color: `#surface+#dark.04` paints `#dark` at 4% over
-  // `#surface`. A `+` cannot appear in a token name, so it only joins layers.
+  // `#surface`. A `+` cannot appear in a token name, so it only joins layers,
+  // and a token it joins to anything else is dropped.
   if (token[0] === '#' && token.includes('+')) {
     const layered = layerColors(token, opts, recurse);
     if (layered !== null) return { bucket: Bucket.Color, processed: layered };
+
+    warnOnceDev(
+      `compound-color-invalid:${token}`,
+      `"${token}" is not a compound color and is ignored: every part joined ` +
+        `by "+" must be a color token with an optional opacity, such as ` +
+        `"#surface+#dark.04".`,
+    );
+    return { bucket: Bucket.Mod, processed: '' };
   }
 
   // 0b. Special handling for #current (reserved keyword, cannot be overridden by
@@ -289,9 +317,7 @@ export function classify(
   // which an ancestor may already have faded, and the mix composes with that:
   // `#current.4` means "40% of what reaches me", and `#current.4` with
   // `#current.18` under it lands at `.072`.
-  const currentAlphaMatch = token.match(
-    /^#current\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
-  );
+  const currentAlphaMatch = token.match(RE_CURRENT_ALPHA);
   if (currentAlphaMatch) {
     return {
       bucket: Bucket.Color,
@@ -314,9 +340,7 @@ export function classify(
       }
       // Check for color token with alpha suffix: #token.alpha or #token.$prop
       if (token[0] === '#') {
-        const alphaMatch = token.match(
-          /^(#[a-z0-9-]+)\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
-        );
+        const alphaMatch = token.match(RE_TOKEN_ALPHA);
         if (alphaMatch) {
           const [, baseToken, rawAlpha] = alphaMatch;
           const baseKey = baseToken.toLowerCase();
@@ -329,19 +353,18 @@ export function classify(
               return { bucket: Bucket.Color, processed: 'transparent' };
             }
 
-            // A compound color has no single token to suffix, so it is faded as
-            // a whole, the way a derived color function is.
-            if (resolvedValue.startsWith('#') && resolvedValue.includes('+')) {
-              const resolved = classify(
-                foldDslCase(resolvedValue),
-                opts,
-                recurse,
-              );
+            // A value with no alpha channel to write into is faded as a whole.
+            const fadeWhole = () => ({
+              bucket: Bucket.Color,
+              processed: fadeColor(
+                classify(foldDslCase(resolvedValue), opts, recurse).processed,
+                rawAlpha,
+              ),
+            });
 
-              return {
-                bucket: Bucket.Color,
-                processed: fadeColor(resolved.processed, rawAlpha),
-              };
+            // A compound color has no single token to suffix.
+            if (resolvedValue.startsWith('#') && resolvedValue.includes('+')) {
+              return fadeWhole();
             }
 
             // If resolved value starts with # (color token), use standard alpha syntax
@@ -366,18 +389,7 @@ export function classify(
               // A derived color function (color-mix, light-dark, …) has no alpha
               // channel to write into, so opacity is applied to the whole call
               // the same way `#current.5` is.
-              if (DERIVED_COLOR_FUNCS.has(lowerFunc)) {
-                const resolved = classify(
-                  foldDslCase(resolvedValue),
-                  opts,
-                  recurse,
-                );
-
-                return {
-                  bucket: Bucket.Color,
-                  processed: fadeColor(resolved.processed, rawAlpha),
-                };
-              }
+              if (DERIVED_COLOR_FUNCS.has(lowerFunc)) return fadeWhole();
               const isCustomFunc = !!(
                 opts.functions &&
                 lowerFunc in opts.functions &&
@@ -544,11 +556,10 @@ export function classify(
   // 3. Hash colors (with optional alpha suffix e.g., #purple.5 or #purple.$disabled)
   if (token[0] === '#' && token.length > 1) {
     // alpha form: #name.alpha or #name.$prop
-    const alphaMatch = token.match(
-      /^#([a-z0-9-]+)\.(\$[a-z_][a-z0-9-_]*|[0-9]+)$/i,
-    );
+    const alphaMatch = token.match(RE_TOKEN_ALPHA);
     if (alphaMatch) {
-      const [, base, rawAlpha] = alphaMatch;
+      const [, baseToken, rawAlpha] = alphaMatch;
+      const base = baseToken.slice(1);
 
       // Opacity applies to the color variable as a whole. The token may hold
       // anything a `<color>` can be — including a `color-mix()` or a

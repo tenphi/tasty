@@ -1789,7 +1789,6 @@ describe('Compound colors', () => {
 
   test('replace tokens resolve before they are layered', () => {
     setGlobalPredefinedTokens({
-      '#clear': 'transparent',
       '#base': '#surface',
       '#solid': 'hsl(220 90% 50%)',
       '#invisible': 'transparent',
@@ -1797,7 +1796,7 @@ describe('Compound colors', () => {
     const fresh = new StyleParser();
 
     // The layer is the token's color with no alpha written into it; the
-    // suffix is the mix weight.
+    // suffix is its opacity.
     expect(fresh.process('#base+#solid.1').output).toBe(
       'color-mix(in srgb, hsl(220 90% 50%) 10%, var(--surface-color))',
     );
@@ -1808,7 +1807,6 @@ describe('Compound colors', () => {
 
   test('a replace token holding a compound is faded as a whole', () => {
     setGlobalPredefinedTokens({
-      '#clear': 'transparent',
       '#hover': '#surface+#dark.04',
     });
     const fresh = new StyleParser();
@@ -1821,8 +1819,45 @@ describe('Compound colors', () => {
     );
   });
 
-  test('a `+` between anything but color tokens is left alone', () => {
-    expect(parser.process('#a+1x').output).toBe('var(--a+1x-color)');
+  test('token names fold case as they do alone', () => {
+    expect(parser.process('#Surface+#Dark.04').output).toBe(
+      parser.process('#surface+#dark.04').output,
+    );
+  });
+
+  test.each(['#a+1x', '#a++#b.1', '#a+', '#surface+#dark.4x'])(
+    '%s is not a compound and is dropped',
+    (value) => {
+      const [group] = new StyleParser().process(`solid ${value}`).groups;
+
+      expect(group.output).toBe('solid');
+      expect(group.colors).toEqual([]);
+    },
+  );
+
+  test('a layer whose token is fully transparent paints nothing', () => {
+    setGlobalPredefinedTokens({
+      '#ghost': 'rgb(0 0 0 / 0)',
+      '#gone': '#dark.0',
+    });
+    const fresh = new StyleParser();
+
+    expect(fresh.process('#surface+#ghost.5').output).toBe(
+      'var(--surface-color)',
+    );
+    expect(fresh.process('#surface+#gone.5').output).toBe(
+      'var(--surface-color)',
+    );
+  });
+
+  test('a token holding a color function is layered as that color', () => {
+    setGlobalPredefinedTokens({
+      '#red': 'rgb(255 0 0)',
+    });
+
+    expect(new StyleParser().process('#surface+#red.5').output).toBe(
+      'color-mix(in srgb, rgb(255 0 0) 50%, var(--surface-color))',
+    );
   });
 
   describe('diagnostics', () => {
@@ -1852,6 +1887,26 @@ describe('Compound colors', () => {
         expect.stringContaining(
           '"#surface+#dark": "#dark" has no opacity, so it covers everything before it',
         ),
+      );
+    });
+
+    test('a `+` that joins no colors warns', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+
+      new StyleParser().process('#surface+#dark.4x');
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('"#surface+#dark.4x" is not a compound color'),
+      );
+    });
+
+    test('a `+` with spaces around it warns with the joined form', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+
+      new StyleParser().process('1bw #border + #dark.1');
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Write "1bw #border+#dark.1"'),
       );
     });
 

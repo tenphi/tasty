@@ -115,7 +115,7 @@ export interface StylesInterface extends Omit<
   /**
    * Set the background color of the element. Shortcut for `background-color` with enhanced support for Tasty color tokens and syntaxes.
    *
-   * Supports double-color syntax: the second color is applied as a foreground overlay via a CSS custom property.
+   * To paint one color over another, use a compound color: `#surface+#dark.04` is `#dark` at 4% opacity over `#surface`, as one background color.
    *
    * Examples:
    * - `fill="#purple.10"` // purple background with 10% opacity

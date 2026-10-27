@@ -309,19 +309,23 @@ Background color with design token support. Preferred over `backgroundColor` and
 |-------|--------|
 | `"#purple"` | Token-based background color |
 | `"#purple.10"` | Token color at 10% opacity |
-| `"#surface+#dark.04"` | `#dark` at 4% opacity over `#surface`, as one color — see [Layering colors](dsl.md#layering-colors) |
+| `"#surface+#dark.04"` | `#dark` at 4% opacity over `#surface`, as one color — see [Compound colors](dsl.md#compound-colors) |
 | `"#dark 4%, #surface"` | `#dark` mixed into `#surface` at 4% — the same color, written as `color-mix()` arguments |
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 
 #### Overlays
 
-An overlay over a base color is a [compound color](dsl.md#layering-colors):
+An overlay over a base color is a [compound color](dsl.md#compound-colors):
 
 ```jsx
 fill: { '': '#surface', hovered: '#surface+#dark.04', pressed: '#surface+#dark.08' }
 // hovered → background-color: color-mix(in srgb, var(--dark-color) 4%, var(--surface-color));
 ```
+
+The overlay token has to be opaque, with its opacity in the suffix: a translucent
+token, or one that turns `#clear` in some state, leaves the background
+see-through.
 
 #### Mixing two colors
 

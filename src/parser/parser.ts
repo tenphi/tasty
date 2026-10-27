@@ -1,4 +1,5 @@
 import { foldDslCase } from '../utils/string';
+import { warnOnceDev } from '../utils/warnings';
 
 import { classify } from './classify';
 import { Lru } from './lru';
@@ -107,6 +108,15 @@ export class StyleParser {
 
     scan(stripped, (tok, isComma, isSlash) => {
       if (tok) {
+        // A `+` joins colors only within one token; `#a + #b.1` is three.
+        if (tok === '+' && stripped.includes('#')) {
+          warnOnceDev(
+            `compound-color-spaced:${src}`,
+            `"${src}": a "+" joins colors only without spaces around it. ` +
+              `Write "${src.replace(/\s*\+\s*/g, '+')}".`,
+          );
+        }
+
         // Accumulate raw token into currentGroup.input
         if (currentGroup.input) {
           currentGroup.input += ` ${tok}`;

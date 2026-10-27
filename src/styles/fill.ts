@@ -41,9 +41,10 @@ function mixFillColors(
         `fill-mix-alpha:${property}:${value}`,
         `${property}="${value}": "${group.input}" is translucent and has no ` +
           `percentage, so its alpha weighs it down on top of its share of the ` +
-          `mix and the background comes out see-through. Give the color a ` +
-          `weight instead: "#dark 4%, #surface", not "#dark.04, #surface". ` +
-          `A transparent color mixes in nothing; leave it out.`,
+          `mix and the background comes out see-through. To paint it over the ` +
+          `other color, layer it: "#surface+#dark.04", not "#dark.04, ` +
+          `#surface". Or give it a percentage: "#dark 4%, #surface". A ` +
+          `transparent color mixes in nothing; leave it out.`,
       );
     }
   }
@@ -120,23 +121,29 @@ export function fillStyle({
         firstColor || resolveCustomProperties(colorValue);
 
       if (secondColor) {
-        // A token and a faded token join into a compound color that paints the
-        // same thing.
+        // A faded overlay joins its base in a compound color that paints the
+        // same thing. An overlay without an opacity covered its base anyway,
+        // and a transparent one painted nothing.
         const tokens = colorValue.trim().split(/\s+/);
-        const compound =
-          tokens.length === 2 &&
-          tokens[0][0] === '#' &&
-          /^#[^.]+\.\S+$/.test(tokens[1])
-            ? tokens.join('+')
-            : '#surface+#dark.04';
+        const [base, overlay] = tokens;
+        const fix =
+          tokens.length === 2 && base[0] === '#' && overlay[0] === '#'
+            ? secondColor === 'transparent'
+              ? `"${overlay}" paints nothing, so use the first color alone: ` +
+                `"${base}".`
+              : overlay.includes('.')
+                ? `Join them with a plus instead: "${base}+${overlay}" paints ` +
+                  `the second color over the first as one background color.`
+                : `"${overlay}" has no opacity and covers the first color, so ` +
+                  `use it alone: "${overlay}".`
+            : `Join them with a plus instead: "#surface+#dark.04" paints the ` +
+              `second color over the first as one background color.`;
 
         warnOnceDev(
           `fill-two-colors:${colorProperty}:${colorValue}`,
           `${colorProperty}="${colorValue}": two colors separated by a space ` +
             `are deprecated. The second one is painted as a background-image ` +
-            `layer, which contrast checkers such as axe cannot read. Join them ` +
-            `with a plus instead: "${compound}" paints the second color over ` +
-            `the first as one background color.`,
+            `layer, which contrast checkers such as axe cannot read. ${fix}`,
         );
         result['--tasty-second-fill-color'] = secondColor;
       }

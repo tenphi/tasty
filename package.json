@@ -243,7 +243,7 @@
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "53.84 kB"
+      "limit": "54.99 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -261,7 +261,7 @@
       "name": "main (useRawCSS)",
       "path": "dist/index.js",
       "import": "{ useRawCSS }",
-      "limit": "32.48 kB"
+      "limit": "33.63 kB"
     },
     {
       "name": "core (import *)",
@@ -297,7 +297,7 @@
         "node:module",
         "node:path"
       ],
-      "limit": "44.79 kB"
+      "limit": "45.95 kB"
     },
     {
       "name": "astro client",

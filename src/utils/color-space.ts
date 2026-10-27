@@ -67,7 +67,7 @@ export function parseAlphaMix(
 }
 
 /** A zero alpha: `0`, `0.0`, `.0`, `0%`, or `none`. */
-const ZERO_ALPHA = String.raw`(?:0+\.?0*|\.0+)%?|none`;
+const ZERO_ALPHA = String.raw`(?:0+(?:\.0*)?|\.0+)%?|none`;
 /** A color function whose alpha, after a slash, is zero: `rgb(0 0 0 / 0)`. */
 const RE_SLASH_ZERO_ALPHA = new RegExp(
   String.raw`\/\s*(?:${ZERO_ALPHA})\s*\)$`,

@@ -30,7 +30,7 @@ function warnSpacedCompound(src: string, tokens: string[]): void {
       warnOnceDev(
         `compound-color-spaced:${src}`,
         `"${src}": a "+" joins colors only without spaces around it. Write ` +
-          `"${src.replace(/(#[^\s,()+]+)\s*\+\s*(?=#)/g, '$1+')}".`,
+          `"${src.replace(/(#[^\s,()+#]+)\s*\+\s*(?=#)/g, '$1+')}".`,
       );
       return;
     }

@@ -309,9 +309,23 @@ Background color with design token support. Preferred over `backgroundColor` and
 |-------|--------|
 | `"#purple"` | Token-based background color |
 | `"#purple.10"` | Token color at 10% opacity |
-| `"#dark 4%, #surface"` | `#dark` mixed into `#surface` at 4% — the color `#dark` at 4% opacity over `#surface` would show |
+| `"#surface+#dark.04"` | `#dark` at 4% opacity over `#surface`, as one color — see [Compound colors](dsl.md#compound-colors) |
+| `"#dark 4%, #surface"` | `#dark` mixed into `#surface` at 4% — the same color, written as `color-mix()` arguments |
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
+
+#### Overlays
+
+An overlay over a base color is a [compound color](dsl.md#compound-colors):
+
+```jsx
+fill: { '': '#surface', hovered: '#surface+#dark.04', pressed: '#surface+#dark.08' }
+// hovered → background-color: color-mix(in srgb, var(--dark-color) 4%, var(--surface-color));
+```
+
+The overlay token has to be opaque, with its opacity in the suffix: a translucent
+token, or one that turns `#clear` in some state, leaves the background
+see-through.
 
 #### Mixing two colors
 
@@ -338,12 +352,14 @@ A mix takes two colors. Any more are ignored, with a development warning.
 
 `fill: '#surface #dark.04'` paints the first color as `background-color` and the second as a `linear-gradient()` layer over it, through the `--tasty-second-fill-color` custom property. It still works, with a development warning, and is going away in the next major version: contrast checkers can't see through a `background-image`, so axe-core reports every text node over the layer as *incomplete*.
 
+Put a `+` where the space is:
+
 | Before | After |
 |--------|-------|
-| `'#surface #dark.04'` | `'#dark 4%, #surface'` |
+| `'#surface #dark.04'` | `'#surface+#dark.04'` |
 | `'#surface #clear'` | `'#surface'` |
 | `'#surface #accent'` (an opaque overlay) | `'#accent'` |
-| `'#base #overlay'` (a token holding a translucent color) | `'#overlay $overlay-weight, #base'`, with `#overlay` opaque and `$overlay-weight` a percentage |
+| `'#base #overlay'` (a token holding a translucent color) | `'#base+#overlay.$overlay-alpha'`, with `#overlay` opaque and `$overlay-alpha` its opacity as a number |
 
 The rewrites are exact when the overlay token is opaque. A state map no longer needs the same two-color shape in every state to transition smoothly: every state is now a plain background color.
 

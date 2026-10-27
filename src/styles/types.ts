@@ -115,7 +115,7 @@ export interface StylesInterface extends Omit<
   /**
    * Set the background color of the element. Shortcut for `background-color` with enhanced support for Tasty color tokens and syntaxes.
    *
-   * Supports double-color syntax: the second color is applied as a foreground overlay via a CSS custom property.
+   * To paint one color over another, use a compound color: `#surface+#dark.04` is `#dark` at 4% opacity over `#surface`, as one background color.
    *
    * Examples:
    * - `fill="#purple.10"` // purple background with 10% opacity
@@ -125,7 +125,8 @@ export interface StylesInterface extends Omit<
    * - `fill="hsl(200 100% 50%)"` // HSL color
    * - `fill="okhsl(200 100% 50%)"` // perceptually uniform OKHSL color
    * - `fill="oklch(0.7 0.15 200)"` // OKLCH color
-   * - `fill="#dark 4%, #surface"` // two colors mixed: `#dark` at 4% over `#surface`
+   * - `fill="#surface+#dark.04"` // `#dark` at 4% opacity over `#surface`, as one color
+   * - `fill="#dark 4%, #surface"` // two colors mixed: the same color as `color-mix()` arguments
    * - `fill="#surface #dark.04"` // deprecated: the second color as an overlay layer
    *
    * `fill={false}` sets no fill. `fill={true}` names no color and is ignored.

@@ -391,6 +391,15 @@ export function resolveCustomProperties(value: string): string {
 }
 
 /**
+ * Whether the parser dropped every token of a value, as it does a malformed
+ * compound color (`#surface+1x`). Such a value leaves nothing to emit, so a
+ * handler skips its declaration instead of falling back to the raw input.
+ */
+export function isDroppedValue(value: string): boolean {
+  return parseStyle(value).groups.every((group) => group.all.length === 0);
+}
+
+/**
  * Parse color. Find it value, name and opacity.
  * Optimized to avoid heavy parseStyle calls for simple color patterns.
  */

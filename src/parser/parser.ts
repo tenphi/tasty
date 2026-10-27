@@ -1,4 +1,5 @@
 import { foldDslCase } from '../utils/string';
+import { warnOnceDev } from '../utils/warnings';
 
 import { classify } from './classify';
 import { Lru } from './lru';
@@ -10,6 +11,31 @@ import type {
   StyleDetailsPart,
 } from './types';
 import { Bucket, makeEmptyDetails, makeEmptyPart } from './types';
+
+/**
+ * A `+` joins colors only within one token: `#a + #b.1`, `#a +#b.1` and
+ * `#a+ #b.1` are not compound colors. Warn with the joined form.
+ */
+function warnSpacedCompound(src: string, tokens: string[]): void {
+  for (let i = 1; i < tokens.length; i++) {
+    const prev = tokens[i - 1];
+    const tok = tokens[i];
+    const spaced =
+      prev[0] === '#' &&
+      (tok.startsWith('+#') ||
+        (tok === '+' && tokens[i + 1]?.[0] === '#') ||
+        (prev.endsWith('+') && tok[0] === '#'));
+
+    if (spaced) {
+      warnOnceDev(
+        `compound-color-spaced:${src}`,
+        `"${src}": a "+" joins colors only without spaces around it. Write ` +
+          `"${src.replace(/(#[^\s,()+#]+)\s*\+\s*(?=#)/g, '$1+')}".`,
+      );
+      return;
+    }
+  }
+}
 
 export class StyleParser {
   private cache: Lru<string, ProcessedStyle>;
@@ -105,8 +131,12 @@ export class StyleParser {
       }
     };
 
+    const tokens: string[] = [];
+
     scan(stripped, (tok, isComma, isSlash) => {
       if (tok) {
+        tokens.push(tok);
+
         // Accumulate raw token into currentGroup.input
         if (currentGroup.input) {
           currentGroup.input += ` ${tok}`;
@@ -126,6 +156,8 @@ export class StyleParser {
     // push final group if not already
     if (currentPart.all.length || parts.length || !groups.length)
       endGroup(false);
+
+    warnSpacedCompound(src, tokens);
 
     const output =
       groups.length === 1

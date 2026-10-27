@@ -237,13 +237,13 @@
       "name": "main (import *)",
       "path": "dist/index.js",
       "import": "*",
-      "limit": "60.79 kB"
+      "limit": "62.08 kB"
     },
     {
       "name": "main (tasty)",
       "path": "dist/index.js",
       "import": "{ tasty }",
-      "limit": "53.84 kB"
+      "limit": "54.99 kB"
     },
     {
       "name": "main (StyleParser)",
@@ -261,7 +261,7 @@
       "name": "main (useRawCSS)",
       "path": "dist/index.js",
       "import": "{ useRawCSS }",
-      "limit": "32.48 kB"
+      "limit": "33.63 kB"
     },
     {
       "name": "core (import *)",
@@ -284,7 +284,7 @@
         "path",
         "crypto"
       ],
-      "limit": "40.16 kB"
+      "limit": "41.3 kB"
     },
     {
       "name": "babel-plugin",
@@ -297,7 +297,7 @@
         "node:module",
         "node:path"
       ],
-      "limit": "44.79 kB"
+      "limit": "45.95 kB"
     },
     {
       "name": "astro client",

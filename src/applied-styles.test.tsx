@@ -297,42 +297,56 @@ describe('generated CSS applies in the browser', () => {
     });
   });
 
+  // The colors as tokens of the element itself, so nothing else can change
+  // what they resolve to.
+  const MIX_TOKENS = {
+    '#dark': 'rgb(20 30 40)',
+    '#surface': 'rgb(250 250 250)',
+    '#accent': 'rgb(80 60 200)',
+  };
+  const DARK = [20, 30, 40];
+  const SURFACE = [250, 250, 250];
+  const ACCENT = [80, 60, 200];
+
+  /** Channels of a computed `color(srgb r g b)`, scaled to 0–255. */
+  function srgb(value: string): number[] {
+    const match = value.match(/^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/);
+    if (!match) throw new Error(`not an opaque sRGB color: ${value}`);
+    return match.slice(1).map((channel) => Number(channel) * 255);
+  }
+
+  /** `color` drawn at `alpha` over the opaque `base`: what a layer paints. */
+  function over(color: number[], alpha: number, base: number[]): number[] {
+    return color.map((channel, i) => alpha * channel + (1 - alpha) * base[i]);
+  }
+
+  /** Channels and alpha of a computed `color(srgb r g b / a)`. */
+  function srgba(value: string): number[] {
+    const match = value.match(
+      /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/,
+    );
+    if (!match) throw new Error(`not an sRGB color: ${value}`);
+    return [
+      ...match.slice(1, 4).map((channel) => Number(channel) * 255),
+      Number(match[4] ?? 1),
+    ];
+  }
+
+  function expectColor(actual: number[], expected: number[]) {
+    actual.forEach((channel, i) => expect(channel).toBeCloseTo(expected[i], 3));
+  }
+
   describe('a comma-mixed fill', () => {
-    // The two colors as tokens of the element itself, so nothing else can
-    // change what they resolve to.
-    const TOKENS = {
-      '#dark': 'rgb(20 30 40)',
-      '#surface': 'rgb(250 250 250)',
-    };
-
-    /** Channels of a computed `color(srgb r g b)`, scaled to 0–255. */
-    function srgb(value: string): number[] {
-      const match = value.match(/^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/);
-      if (!match) throw new Error(`not an opaque sRGB color: ${value}`);
-      return match.slice(1).map((channel) => Number(channel) * 255);
-    }
-
-    /** `color` drawn at `alpha` over the opaque `base`: what a layer paints. */
-    function over(color: number[], alpha: number, base: number[]): number[] {
-      return color.map((channel, i) => alpha * channel + (1 - alpha) * base[i]);
-    }
-
-    function expectColor(actual: number[], expected: number[]) {
-      actual.forEach((channel, i) =>
-        expect(channel).toBeCloseTo(expected[i], 3),
-      );
-    }
-
     it('paints what the overlay layer painted, as one background color', () => {
       const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
       const el = render(
-        <Box styles={{ ...TOKENS, fill: '#dark 4%, #surface' }} />,
+        <Box styles={{ ...MIX_TOKENS, fill: '#dark 4%, #surface' }} />,
       ).getByTestId('Box');
 
       // `'#surface #dark.04'` drew `#dark` at 4% over `#surface`.
       expectColor(
         srgb(computed(el, 'background-color')),
-        over([20, 30, 40], 0.04, [250, 250, 250]),
+        over(DARK, 0.04, SURFACE),
       );
       expect(computed(el, 'background-image')).toBe('none');
     });
@@ -342,7 +356,7 @@ describe('generated CSS applies in the browser', () => {
       const el = render(
         <Box
           styles={{
-            ...TOKENS,
+            ...MIX_TOKENS,
             '$overlay-weight': '12%',
             fill: '#dark $overlay-weight, #surface',
           }}
@@ -351,8 +365,126 @@ describe('generated CSS applies in the browser', () => {
 
       expectColor(
         srgb(computed(el, 'background-color')),
-        over([20, 30, 40], 0.12, [250, 250, 250]),
+        over(DARK, 0.12, SURFACE),
       );
+    });
+  });
+
+  describe('a compound color', () => {
+    it('paints each layer over the base, as one background color', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ ...MIX_TOKENS, fill: '#surface+#accent.1+#dark.04' }} />,
+      ).getByTestId('Box');
+
+      expectColor(
+        srgb(computed(el, 'background-color')),
+        over(DARK, 0.04, over(ACCENT, 0.1, SURFACE)),
+      );
+      expect(computed(el, 'background-image')).toBe('none');
+    });
+
+    it('is a color in any color slot', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            ...MIX_TOKENS,
+            color: '#surface+#dark.5',
+            border: '1bw solid #surface+#accent.25',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      expectColor(srgb(computed(el, 'color')), over(DARK, 0.5, SURFACE));
+      expectColor(
+        srgb(computed(el, 'border-top-color')),
+        over(ACCENT, 0.25, SURFACE),
+      );
+    });
+
+    it('layers over the inherited color with `#current`', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            ...MIX_TOKENS,
+            color: '#surface',
+            fill: '#current+#dark.2',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      expectColor(
+        srgb(computed(el, 'background-color')),
+        over(DARK, 0.2, SURFACE),
+      );
+    });
+
+    it('composites over a translucent base exactly', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box styles={{ ...MIX_TOKENS, fill: '#surface.5+#dark.04' }} />,
+      ).getByTestId('Box');
+
+      // `#dark` at 4% source-over a half-transparent `#surface`.
+      const alpha = 0.04 + 0.5 * 0.96;
+      const premultiplied = DARK.map(
+        (channel, i) => 0.04 * channel + 0.96 * 0.5 * SURFACE[i],
+      );
+      const [r, g, b, a] = srgba(computed(el, 'background-color'));
+
+      expect(a).toBeCloseTo(alpha, 3);
+      expectColor(
+        [r, g, b],
+        premultiplied.map((channel) => channel / alpha),
+      );
+    });
+
+    it('defines a token, and colors a shadow and an outline', () => {
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            ...MIX_TOKENS,
+            '#hover': '#surface+#dark.5',
+            fill: '#hover',
+            shadow: '0 0 1x #surface+#accent.5',
+            outline: '1bw #surface+#accent.25',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      expectColor(
+        srgb(computed(el, 'background-color')),
+        over(DARK, 0.5, SURFACE),
+      );
+      expectColor(
+        srgb(computed(el, 'box-shadow').replace(/\).*$/, ')')),
+        over(ACCENT, 0.5, SURFACE),
+      );
+      expectColor(
+        srgb(computed(el, 'outline-color')),
+        over(ACCENT, 0.25, SURFACE),
+      );
+    });
+
+    it('is see-through when a layer token is transparent at runtime', () => {
+      // Tasty cannot see that `#overlay` holds `transparent`, and the
+      // premultiplied mix lowers the alpha of the whole color by the layer's
+      // opacity. Layer tokens have to be opaque.
+      const Box = tasty({ qa: 'Box', styles: { display: 'block' } });
+      const el = render(
+        <Box
+          styles={{
+            ...MIX_TOKENS,
+            '#overlay': '#clear',
+            fill: '#surface+#overlay.04',
+          }}
+        />,
+      ).getByTestId('Box');
+
+      expect(srgba(computed(el, 'background-color'))[3]).toBeCloseTo(0.96, 3);
     });
   });
 

@@ -168,6 +168,7 @@ color: '#purple.5',         // 50% opacity
 color: '#purple.05',        // 5% opacity
 color: '#purple.$fade',     // Opacity from a custom property
 fill: '#current',           // → currentcolor
+fill: '#surface+#dark.04',  // #dark at 4% opacity over #surface, as one color
 color: '(#primary, #secondary)',  // Fallback syntax
 ```
 
@@ -254,6 +255,57 @@ Fades always mix `in oklab`: it is unbounded, so a wide-gamut color is not
 clamped, and rectangular, so there is no hue to interpolate against
 `transparent`. Nothing configures it — see
 [Color space](configuration.md#color-space).
+
+### Compound colors
+
+Join color tokens with `+` to paint each one, at its own opacity, over the
+colors before it. The result is one color, so it works anywhere a token does:
+
+```jsx
+fill: '#surface+#dark.04',
+// → color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))
+
+border: '1bw #border+#dark.1',
+color: 'light-dark(#primary+#black.2, #primary+#white.2)',
+'#hover-surface': '#surface-2+#surface-text.03',
+```
+
+Read it left to right, bottom layer first: `#surface+#accent.1+#dark.04` paints
+`#accent` at 10% over `#surface`, then `#dark` at 4% over that. Every operand is
+an ordinary token — `#current`, `#clear`, a hex color, a replace token — and
+takes its opacity suffix as it does anywhere: `#surface+#dark.$hover` reads the
+opacity from `$hover`, and a faded base such as `#surface.5+#dark.04` is layered
+as it is.
+
+The layers mix in sRGB, the space browsers composite in, so the color is exactly
+what stacking them as layers would show — but it is one color, which contrast
+checkers can read and transitions interpolate. A faded base is exact too:
+`#surface.5+#dark.04` is as translucent as the two layers would be.
+
+Every layer's token has to be opaque. The mix counts a layer's own alpha as well
+as its opacity suffix, and lowers the alpha of the whole color, so a layer token
+that holds a translucent color, or turns transparent in some state, leaves the
+result see-through: with `'#overlay': { '': '#clear', hovered: '#dark' }`,
+`'#surface+#overlay.04'` is 96% opaque at rest. Vary the opacity instead
+(`'#surface+#dark.$hover'`), or give each state its own color
+(`fill: { '': '#surface', hovered: '#surface+#dark.04' }`).
+
+- Write it as one word: `#surface + #dark.04` is three separate values, and
+  Tasty warns in development.
+- A layer without an opacity covers everything before it: `#surface+#dark` is
+  `#dark`, with a development warning.
+- A layer Tasty can see is transparent — `#clear`, a fade to `.0`, a color with
+  a zero alpha — is left out: `#surface+#clear` is `#surface`.
+- Over a transparent base, a layer is just its fade: `#clear+#dark.04` compiles
+  to `#dark.04`.
+- A `+` joining anything but color tokens (`#surface+1x`) is not a compound: the
+  token is dropped, with a development warning, and the style renders as if
+  that color were not there.
+
+A `+` joins tokens only. To fade a whole compound, give it a token
+(`'#hover-surface': '#surface+#dark.04'`) and fade that (`#hover-surface.5`). For
+a mix that is not a layer over another color, such as an even blend in OKLCH,
+write `color-mix()` itself.
 
 ---
 

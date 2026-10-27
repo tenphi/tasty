@@ -1,7 +1,12 @@
 import { renderStyles } from '../pipeline';
+import {
+  resetGlobalPredefinedTokens,
+  setGlobalPredefinedTokens,
+} from '../utils/styles';
 import { resetStyleWarnings } from '../utils/warnings';
 
-import { fillStyle } from './fill';
+import { colorStyle } from './color';
+import { fillStyle, svgFillStyle } from './fill';
 
 const LAYER =
   'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))';
@@ -74,6 +79,30 @@ describe('a comma mixes two fill colors', () => {
   });
 });
 
+describe('a compound color', () => {
+  it('fills one background color', () => {
+    expect(fillStyle({ fill: '#surface+#dark.04' })).toEqual({
+      'background-color':
+        'color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))',
+    });
+  });
+
+  it('can be one side of a comma mix', () => {
+    expect(fillStyle({ fill: '#surface+#dark.04, #accent 10%' })).toEqual({
+      'background-color':
+        'color-mix(in srgb, color-mix(in srgb, var(--dark-color) 4%, var(--surface-color)), var(--accent-color) 10%)',
+    });
+  });
+});
+
+describe('a malformed compound', () => {
+  it('leaves no declaration rather than the raw input', () => {
+    expect(fillStyle({ fill: '#surface+1x' })).toBe(null);
+    expect(colorStyle({ color: '#surface+1x' })).toBe(null);
+    expect(svgFillStyle({ svgFill: '#surface+1x' })).toBe(null);
+  });
+});
+
 describe('fill diagnostics', () => {
   let warn: ReturnType<typeof vi.spyOn>;
 
@@ -110,6 +139,62 @@ describe('fill diagnostics', () => {
           'fill="#surface #dark.04": two colors separated by a space are deprecated',
         ),
       );
+      // The same two tokens joined with a plus paint the same thing.
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Join them with a plus instead: "#surface+#dark.04"',
+        ),
+      );
+    });
+
+    it('suggests the overlay alone when it has no opacity', () => {
+      // `#surface+#accent` would only warn again; the overlay alone is the fix.
+      fillStyle({ fill: '#surface #accent' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('so use it alone: "#accent"'),
+      );
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Join them with a plus'),
+      );
+    });
+
+    it('suggests the base alone when the overlay is transparent', () => {
+      fillStyle({ fill: '#surface #clear' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('so use the first color alone: "#surface"'),
+      );
+    });
+
+    it('suggests the base alone for an overlay faded to nothing', () => {
+      fillStyle({ fill: '#surface #dark.0' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('so use the first color alone: "#surface"'),
+      );
+    });
+
+    it('tells a translucent overlay token to become opaque', () => {
+      setGlobalPredefinedTokens({ '#overlay': '#dark.04' });
+
+      try {
+        fillStyle({ fill: '#surface #overlay' });
+      } finally {
+        resetGlobalPredefinedTokens();
+      }
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"#overlay" is translucent, which would leave a compound see-through',
+        ),
+      );
+    });
+
+    it('stays quiet for a compound color', () => {
+      fillStyle({ fill: '#surface+#dark.04' });
+
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('names `backgroundColor` when that is where the colors are', () => {

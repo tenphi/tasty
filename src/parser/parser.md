@@ -144,6 +144,7 @@ Each `StyleParser` instance maintains its own LRU cache.
 | Order | Rule                                                                                       | Bucket   |
 |-------|--------------------------------------------------------------------------------------------|----------|
 | 0     | Double prefix (literal name) – `$$ident` → `--ident`; `##ident` → `--ident-color`. Function call form: `$$ident(args)` → `--ident(<processed args>)`, `##ident(args)` → `--ident-color(<processed args>)` (custom `@function` invocation; args parsed recursively). **`@function` polyfill:** when a compiled closure is registered for `--ident` (via `configure({ polyfills: { functions: true } })`), the call is inlined into plain CSS instead of emitting `--ident(...)`; a recursion-cycle bail leaves the call untouched. | value    |
+| 0a    | Compound color – `#a+#b.N(+#c.N…)`: every `+`-separated operand is a hash token, with an optional opacity suffix. Operands are classified by the rules here, then folded left to right into `color-mix(in srgb, <layer> N%, <below>)`. A transparent layer or a `.0` is skipped, a layer over a transparent base is its fade, and a layer without a suffix replaces what is below it (dev warning). Any other `+` leaves the token to the rules below. | color    |
 | 1     | URL – `url(` opens `inUrl`; everything to its `)` is a single token.                       | value    |
 | 2     | Custom property – `$ident` → `var(--ident)`; `($ident,fallback)` → `var(--ident, <processed fallback>)`. Must start with letter or underscore, followed by letters, numbers, hyphens, or underscores. An ident ending in `-color` is filed under both buckets (see note below). | value / color+value |
 | 3     | Hash token – `#xxxxxx` if valid hex → `var(--xxxxxx-color, #xxxxxx)`; otherwise `var(--name-color)`. | color    |
@@ -298,6 +299,9 @@ it is filed as a color only when its arguments hold one — `light-dark(#dark,
 | `oklch(from #a l c h / 50%)`  | Color; relative color syntax with the origin token expanded.                    |
 | `#a.5`                        | `color-mix(in oklab, var(--a-color) 50%, transparent)`.                        |
 | `#a.$fade`                    | `color-mix(in oklab, var(--a-color) calc(var(--fade) * 100%), transparent)`.   |
+| `#a+#b.04`                    | `color-mix(in srgb, var(--b-color) 4%, var(--a-color))`.                       |
+| `#a+#b.1+#c.04`               | `color-mix(in srgb, var(--c-color) 4%, color-mix(in srgb, var(--b-color) 10%, var(--a-color)))`. |
+| `#a+#b`                       | `var(--b-color)`, with a dev warning: an opaque layer covers what is below it. |
 | `($123invalid, fallback)`     | `calc($123invalid, fallback)` (invalid name → auto-calc).                      |
 | Excess spaces/newlines         | Collapsed in output.                                                            |
 | `+2r, 1e3x`                    | Invalid → modifiers.                                                            |

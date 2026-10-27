@@ -120,13 +120,23 @@ export function fillStyle({
         firstColor || resolveCustomProperties(colorValue);
 
       if (secondColor) {
+        // A token and a faded token join into a compound color that paints the
+        // same thing.
+        const tokens = colorValue.trim().split(/\s+/);
+        const compound =
+          tokens.length === 2 &&
+          tokens[0][0] === '#' &&
+          /^#[^.]+\.\S+$/.test(tokens[1])
+            ? tokens.join('+')
+            : '#surface+#dark.04';
+
         warnOnceDev(
           `fill-two-colors:${colorProperty}:${colorValue}`,
           `${colorProperty}="${colorValue}": two colors separated by a space ` +
             `are deprecated. The second one is painted as a background-image ` +
-            `layer, which contrast checkers such as axe cannot read. Mix the ` +
-            `colors with a comma instead: "#dark 4%, #surface" paints #dark ` +
-            `at 4% over #surface as one background color.`,
+            `layer, which contrast checkers such as axe cannot read. Join them ` +
+            `with a plus instead: "${compound}" paints the second color over ` +
+            `the first as one background color.`,
         );
         result['--tasty-second-fill-color'] = secondColor;
       }

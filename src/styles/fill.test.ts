@@ -74,6 +74,22 @@ describe('a comma mixes two fill colors', () => {
   });
 });
 
+describe('a compound color', () => {
+  it('fills one background color', () => {
+    expect(fillStyle({ fill: '#surface+#dark.04' })).toEqual({
+      'background-color':
+        'color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))',
+    });
+  });
+
+  it('can be one side of a comma mix', () => {
+    expect(fillStyle({ fill: '#surface+#dark.04, #accent 10%' })).toEqual({
+      'background-color':
+        'color-mix(in srgb, color-mix(in srgb, var(--dark-color) 4%, var(--surface-color)), var(--accent-color) 10%)',
+    });
+  });
+});
+
 describe('fill diagnostics', () => {
   let warn: ReturnType<typeof vi.spyOn>;
 
@@ -110,6 +126,29 @@ describe('fill diagnostics', () => {
           'fill="#surface #dark.04": two colors separated by a space are deprecated',
         ),
       );
+      // The same two tokens joined with a plus paint the same thing.
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Join them with a plus instead: "#surface+#dark.04"',
+        ),
+      );
+    });
+
+    it('suggests no join for an overlay without opacity', () => {
+      // `#surface+#accent` would only warn again; the overlay alone is the fix.
+      fillStyle({ fill: '#surface #accent' });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Join them with a plus instead: "#surface+#dark.04"',
+        ),
+      );
+    });
+
+    it('stays quiet for a compound color', () => {
+      fillStyle({ fill: '#surface+#dark.04' });
+
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('names `backgroundColor` when that is where the colors are', () => {

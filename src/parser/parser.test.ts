@@ -1696,3 +1696,171 @@ describe('Color keywords', () => {
     );
   });
 });
+
+describe('Compound colors', () => {
+  let setGlobalPredefinedTokens: (tokens: Record<string, string>) => void;
+  let resetGlobalPredefinedTokens: () => void;
+
+  beforeAll(async () => {
+    const styles = await vi.importActual<any>('../utils/styles');
+    setGlobalPredefinedTokens = styles.setGlobalPredefinedTokens;
+    resetGlobalPredefinedTokens = styles.resetGlobalPredefinedTokens;
+  });
+
+  afterEach(() => {
+    resetGlobalPredefinedTokens();
+  });
+
+  test('a layer is mixed over the base at its opacity, in sRGB', () => {
+    const [group] = parser.process('#surface+#dark.04').groups;
+
+    expect(group.output).toBe(
+      'color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))',
+    );
+    expect(group.colors).toEqual([group.output]);
+  });
+
+  test('layers stack left to right', () => {
+    expect(parser.process('#surface+#accent.1+#dark.04').output).toBe(
+      'color-mix(in srgb, var(--dark-color) 4%, ' +
+        'color-mix(in srgb, var(--accent-color) 10%, var(--surface-color)))',
+    );
+  });
+
+  test('a `$prop` opacity scales to a percentage', () => {
+    expect(parser.process('#surface+#dark.$hover').output).toBe(
+      'color-mix(in srgb, var(--dark-color) calc(var(--hover) * 100%), var(--surface-color))',
+    );
+  });
+
+  test('a faded base is mixed as it is', () => {
+    expect(parser.process('#surface.5+#dark.04').output).toBe(
+      'color-mix(in srgb, var(--dark-color) 4%, ' +
+        'color-mix(in oklab, var(--surface-color) 50%, transparent))',
+    );
+  });
+
+  test('over a transparent base, a layer is its own fade', () => {
+    expect(parser.process('#clear+#dark.04').output).toBe(
+      parser.process('#dark.04').output,
+    );
+  });
+
+  test.each(['#surface+#clear', '#surface+#clear.5', '#surface+#dark.0'])(
+    '%s paints nothing over the base',
+    (value) => {
+      expect(parser.process(value).output).toBe('var(--surface-color)');
+    },
+  );
+
+  test('`#current` and hex colors are operands like any token', () => {
+    expect(parser.process('#current+#black.08').output).toBe(
+      'color-mix(in srgb, var(--black-color) 8%, currentcolor)',
+    );
+    expect(parser.process('#fff+#000.1').output).toBe(
+      'color-mix(in srgb, var(--000-color, #000) 10%, var(--fff-color, #fff))',
+    );
+  });
+
+  test('fills the color slot of a multi-part value', () => {
+    const [group] = parser.process('1bw solid #border+#dark.1').groups;
+
+    expect(group.colors).toEqual([
+      'color-mix(in srgb, var(--dark-color) 10%, var(--border-color))',
+    ]);
+    expect(group.mods).toEqual(['solid']);
+  });
+
+  test('works inside color functions and comma groups', () => {
+    expect(
+      parser.process('light-dark(#surface+#dark.1, #surface+#white.1)').output,
+    ).toBe(
+      // Color functions drop the spaces after their arguments' commas.
+      'light-dark(color-mix(in srgb,var(--dark-color) 10%,var(--surface-color)),' +
+        'color-mix(in srgb,var(--white-color) 10%,var(--surface-color)))',
+    );
+    expect(
+      parser.process('#surface+#dark.04, #b').groups.map((g) => g.colors),
+    ).toEqual([
+      ['color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))'],
+      ['var(--b-color)'],
+    ]);
+  });
+
+  test('replace tokens resolve before they are layered', () => {
+    setGlobalPredefinedTokens({
+      '#clear': 'transparent',
+      '#base': '#surface',
+      '#solid': 'hsl(220 90% 50%)',
+      '#invisible': 'transparent',
+    });
+    const fresh = new StyleParser();
+
+    // The layer is the token's color with no alpha written into it; the
+    // suffix is the mix weight.
+    expect(fresh.process('#base+#solid.1').output).toBe(
+      'color-mix(in srgb, hsl(220 90% 50%) 10%, var(--surface-color))',
+    );
+    expect(fresh.process('#base+#invisible.5').output).toBe(
+      'var(--surface-color)',
+    );
+  });
+
+  test('a replace token holding a compound is faded as a whole', () => {
+    setGlobalPredefinedTokens({
+      '#clear': 'transparent',
+      '#hover': '#surface+#dark.04',
+    });
+    const fresh = new StyleParser();
+    const compound =
+      'color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))';
+
+    expect(fresh.process('#hover').output).toBe(compound);
+    expect(fresh.process('#hover.5').output).toBe(
+      `color-mix(in oklab, ${compound} 50%, transparent)`,
+    );
+  });
+
+  test('a `+` between anything but color tokens is left alone', () => {
+    expect(parser.process('#a+1x').output).toBe('var(--a+1x-color)');
+  });
+
+  describe('diagnostics', () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(async () => {
+      const { resetStyleWarnings } =
+        await vi.importActual<any>('../utils/warnings');
+      resetStyleWarnings();
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+        /* noop */
+      });
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    test('a layer without opacity covers the base, with a warning', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+
+      expect(new StyleParser().process('#surface+#dark').output).toBe(
+        'var(--dark-color)',
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"#surface+#dark": "#dark" has no opacity, so it covers everything before it',
+        ),
+      );
+    });
+
+    test('a layer with opacity is silent', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+
+      new StyleParser().process('#surface+#dark.04+#clear');
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+});

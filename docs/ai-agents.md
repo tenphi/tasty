@@ -72,6 +72,7 @@ The last row goes the other way — longhands over the shorthand — because `fl
 | `#name.50`            | token at 50% opacity — digits are a decimal fraction: `.5` = `.50` = 50%, `.05` = 5%, `.100` = 10% |
 | `#name.$opacity`      | opacity from a custom property                                                                     |
 | `#clear` / `#current` | `transparent` / `currentcolor`                                                                     |
+| `#a+#b.04`            | `#b` at 4% opacity over `#a`, as one color; layers stack left to right (`#a+#b.1+#c.04`)           |
 | `$name`               | custom property → `var(--name)`                                                                    |
 | `(#a, #b)`            | fallback chain                                                                                     |
 | `$$name` / `##name`   | the custom property _name_ (not its value) — inside `transition`                                   |
@@ -134,7 +135,7 @@ Directional modifiers beat placeholder zeros:
 - ❌ `padding: '2x 4x top right'` — a directional group takes one value, so `4x` is dropped → ✅ `padding: '2x top, 4x right'`
 - ❌ `fade: '3x 1x top bottom'` → ✅ `fade: '3x top, 1x bottom'`
 
-Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill`, `color`, `caretColor`, and `accentColor` take a color only (use `#clear` for transparent). `fill` also mixes two colors with a comma, the weight as a percentage: ❌ `fill: '#surface #dark.04'` (deprecated overlay layer) · ❌ `fill: '#dark.04, #surface'` (half-transparent mix) → ✅ `fill: '#dark 4%, #surface'`.
+Value-only properties reject both colors and modifiers: `gap`, `columnGap`, `rowGap`, `opacity`, `zIndex`, `order`, `flexGrow`, `flexShrink`, `flexBasis`, `aspectRatio`, `lineClamp`, and `tabSize`. Logical axis category styles accept one or two values in start/end order and the `start`, `end`, and `longhand` modifiers. `fill`, `color`, `caretColor`, and `accentColor` take a color only (use `#clear` for transparent). An overlay is a compound color, in any color slot: ❌ `fill: '#surface #dark.04'` (deprecated overlay layer) · ❌ `fill: '#dark.04, #surface'` (half-transparent mix) → ✅ `fill: '#surface+#dark.04'`. Every layer after the first needs an opacity suffix. `fill` also mixes two colors with a comma, the weight as a percentage: `'#dark 4%, #surface'`.
 
 ### `transition`
 

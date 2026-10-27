@@ -1,5 +1,13 @@
 # @tenphi/tasty
 
+## 3.15.0
+
+### Minor Changes
+
+- [#437](https://github.com/tenphi/tasty/pull/437) [`9480486`](https://github.com/tenphi/tasty/commit/94804868556b774582b2e2e5daeba6e3fe9cfd71) Thanks [@tenphi](https://github.com/tenphi)! - `fill` and `backgroundColor` mix two comma-separated colors into one `background-color`: `fill: '#dark 4%, #surface'` compiles to `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`. With an opaque `#dark`, that is exactly the color the old overlay layer painted, but contrast checkers such as axe-core can read it, and it transitions like any other color.
+
+  Two colors separated by a space (`fill: '#surface #dark.04'`) are deprecated and warn in development. Their output is unchanged until the next major version; rewrite them as a mix, e.g. `'#dark 4%, #surface'`. A mixed color with an opacity but no percentage (`'#dark.04, #surface'`) warns too, because the mix comes out see-through.
+
 ## 3.14.0
 
 ### Minor Changes

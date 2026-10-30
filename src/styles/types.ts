@@ -126,7 +126,7 @@ export interface StylesInterface extends Omit<
    * - `fill="okhsl(200 100% 50%)"` // perceptually uniform OKHSL color
    * - `fill="oklch(0.7 0.15 200)"` // OKLCH color
    * - `fill="#surface+#dark.04"` // `#dark` at 4% opacity over `#surface`, as one color
-   * - `fill="#dark 4%, #surface"` // two colors mixed: the same color as `color-mix()` arguments
+   * - `fill="#dark 4%, #surface"` // deprecated: two colors mixed with a comma, the same color as `#surface+#dark.04`
    * - `fill="#surface #dark.04"` // deprecated: the second color as an overlay layer
    *
    * `fill={false}` sets no fill. `fill={true}` names no color and is ignored.

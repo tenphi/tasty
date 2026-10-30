@@ -206,60 +206,20 @@ describe('fill diagnostics', () => {
     });
 
     it.each([
-      ['#dark.04, #surface', '"#dark.04"', 'layer it: "#surface+#dark.04"'],
-      ['#surface, #dark.04', '"#dark.04"', 'layer it: "#surface+#dark.04"'],
-      [
-        '#dark.$hover, #surface',
-        '"#dark.$hover"',
-        'layer it: "#surface+#dark.$hover"',
-      ],
-      ['#surface, #clear', '"#clear"', 'use "#surface" alone'],
-    ])('warns that %s mixes a translucent color by half', (fill, part, fix) => {
-      fillStyle({ fill });
-
-      expect(warn).toHaveBeenCalledOnce();
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(`${part} is translucent and has no percentage`),
-      );
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining(fix));
-    });
-
-    it.each([
-      ['#dark 4%, #surface', '#surface+#dark.04'],
-      ['#surface, #dark 4%', '#surface+#dark.04'],
-      ['#dark 30%, #surface', '#surface+#dark.3'],
-      ['#dark 4.5%, #surface.5', '#surface.5+#dark.045'],
-      ['#accent 10%, #surface+#dark.04', '#surface+#dark.04+#accent.1'],
-    ])('deprecates %s as the compound %s', (fill, compound) => {
+      '#dark 4%, #surface',
+      '#surface, #dark 4%',
+      '#dark.04, #surface',
+      '#dark $hover-weight, #surface',
+      'rgb(0 0 0) 4%, #surface',
+    ])('deprecates %s, naming a compound and `color-mix()`', (fill) => {
       fillStyle({ fill });
 
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
           `fill="${fill}": mixing colors with a comma is deprecated. Layer ` +
-            `the colors instead: "${compound}" is the same color.`,
-        ),
-      );
-    });
-
-    it.each([
-      '#dark, #surface',
-      '#dark.5 20%, #surface',
-      '#dark $hover-weight, #surface',
-      '#dark ($hover * 100%), #surface',
-      'rgb(0 0 0) 4%, #surface',
-      '#dark 4%, ($base-color, #surface)',
-      '#dark 100%, #surface',
-      // A compound would leave the transparent layer out.
-      '#clear 10%, #surface',
-    ])('deprecates %s as `color-mix()` itself', (fill) => {
-      fillStyle({ fill });
-
-      expect(warn).toHaveBeenCalledOnce();
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `Write the mix as color-mix() instead: "color-mix(in srgb, ${fill})" ` +
-            `is the same color.`,
+            `the colors as a compound color instead: "#dark 4%, #surface" is ` +
+            `"#surface+#dark.04". For any other mix, write color-mix() itself`,
         ),
       );
     });
@@ -282,8 +242,7 @@ describe('fill diagnostics', () => {
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"#b+#a.1" is the same color. A mix takes two colors, so the extra ' +
-            'ones are ignored.',
+          'A mix takes two colors; the rest are ignored.',
         ),
       );
     });

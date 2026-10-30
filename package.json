@@ -267,7 +267,7 @@
       "name": "core (import *)",
       "path": "dist/core/index.js",
       "import": "*",
-      "limit": "58.48 kB"
+      "limit": "57.38 kB"
     },
     {
       "name": "static",
@@ -321,7 +321,7 @@
         "node:module",
         "node:path"
       ],
-      "limit": "42.56 kB"
+      "limit": "41.48 kB"
     }
   ]
 }

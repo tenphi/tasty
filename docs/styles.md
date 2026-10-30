@@ -349,7 +349,7 @@ If an overlay has to stay a translucent token, draw the layer yourself with `fil
 
 #### Two colors mixed with a comma (deprecated)
 
-`fill: '#dark 4%, #surface'` mixes the two colors in sRGB, as the arguments of `color-mix()`: `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`. It still works, with a development warning, and is going away in the next major version. A compound color is the same mix, in every color slot, and `color-mix()` itself covers what a compound can't write. The warning names the rewrite for the colors it was given.
+`fill: '#dark 4%, #surface'` mixes the two colors in sRGB, as the arguments of `color-mix()`: `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`. It still works, with a development warning, and is going away in the next major version. A compound color is the same mix, in every color slot, and `color-mix()` itself covers what a compound can't write. `tasty/prefer-fill-mix` in [`@tenphi/eslint-plugin-tasty`](https://github.com/tenphi/eslint-plugin-tasty) rewrites each mix to the same color.
 
 | Before | After |
 |--------|-------|

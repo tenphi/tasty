@@ -369,7 +369,7 @@ describe('generated CSS applies in the browser', () => {
       );
     });
 
-    // The rewrites the deprecation warning suggests.
+    // The rewrites the docs give for the deprecated comma mix.
     it.each([
       ['#dark 4%, #surface', '#surface+#dark.04'],
       ['#surface, #dark 4%', '#surface+#dark.04'],

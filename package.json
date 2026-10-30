@@ -207,7 +207,7 @@
     "@eslint/js": "^10.0.1",
     "@size-limit/esbuild": "^14.1.0",
     "@size-limit/file": "^14.1.0",
-    "@tenphi/eslint-plugin-tasty": "^1.8.0",
+    "@tenphi/eslint-plugin-tasty": "^1.15.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.1",

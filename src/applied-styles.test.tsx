@@ -368,6 +368,33 @@ describe('generated CSS applies in the browser', () => {
         over(DARK, 0.12, SURFACE),
       );
     });
+
+    // The rewrites the docs give for the deprecated comma mix.
+    it.each([
+      ['#dark 4%, #surface', '#surface+#dark.04'],
+      ['#surface, #dark 4%', '#surface+#dark.04'],
+      ['#dark 4.5%, #surface.5', '#surface.5+#dark.045'],
+      ['#accent 10%, #surface+#dark.04', '#surface+#dark.04+#accent.1'],
+      ['#dark, #surface', 'color-mix(in srgb, #dark, #surface)'],
+      [
+        '#dark $overlay-weight, #surface',
+        'color-mix(in srgb, #dark $overlay-weight, #surface)',
+      ],
+    ])('paints %s as %s does', (mix, rewrite) => {
+      const Box = tasty({ styles: { display: 'block' } });
+      const tokens = { ...MIX_TOKENS, '$overlay-weight': '12%' };
+      const { getByTestId } = render(
+        <>
+          <Box qa="Mix" styles={{ ...tokens, fill: mix }} />
+          <Box qa="Rewrite" styles={{ ...tokens, fill: rewrite }} />
+        </>,
+      );
+      const [mixed, rewritten] = ['Mix', 'Rewrite'].map((qa) =>
+        srgba(computed(getByTestId(qa), 'background-color')),
+      );
+
+      expectColor(rewritten, mixed);
+    });
   });
 
   describe('a compound color', () => {

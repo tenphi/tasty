@@ -11,7 +11,7 @@ import { fillStyle, svgFillStyle } from './fill';
 const LAYER =
   'linear-gradient(var(--tasty-second-fill-color), var(--tasty-second-fill-color))';
 
-describe('a comma mixes two fill colors', () => {
+describe('a comma mixes two fill colors (deprecated)', () => {
   it('compiles to one `color-mix()` in sRGB', () => {
     expect(fillStyle({ fill: '#dark 4%, #surface' })).toEqual({
       'background-color':
@@ -206,35 +206,44 @@ describe('fill diagnostics', () => {
     });
 
     it.each([
-      ['#dark.04, #surface', '"#dark.04"'],
-      ['#surface, #dark.04', '"#dark.04"'],
-      ['#dark.$hover, #surface', '"#dark.$hover"'],
-      ['#surface, #clear', '"#clear"'],
-    ])('warns that %s mixes a translucent color by half', (fill, part) => {
+      '#dark 4%, #surface',
+      '#surface, #dark 4%',
+      '#dark.04, #surface',
+      '#dark $hover-weight, #surface',
+      'rgb(0 0 0) 4%, #surface',
+    ])('deprecates %s, naming a compound and `color-mix()`', (fill) => {
       fillStyle({ fill });
 
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(`${part} is translucent and has no percentage`),
+        expect.stringContaining(
+          `fill="${fill}": mixing colors with a comma is deprecated. Layer ` +
+            `the colors as a compound color instead: "#dark 4%, #surface" is ` +
+            `"#surface+#dark.04". For any other mix, write color-mix() itself`,
+        ),
       );
     });
 
-    it.each(['#dark 4%, #surface', '#dark.5 20%, #surface', '#dark, #surface'])(
-      'stays quiet for %s',
-      (fill) => {
-        fillStyle({ fill });
+    it('names `backgroundColor` when it is the one mixing', () => {
+      fillStyle({ backgroundColor: '#dark 4%, #surface' });
 
-        expect(warn).not.toHaveBeenCalled();
-      },
-    );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'backgroundColor="#dark 4%, #surface": mixing colors with a comma',
+        ),
+      );
+    });
 
     it('mixes the first two colors of three and warns', () => {
       expect(fillStyle({ fill: '#a 10%, #b, #c' })).toEqual({
         'background-color':
           'color-mix(in srgb, var(--a-color) 10%, var(--b-color))',
       });
+      expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('a mix takes two colors'),
+        expect.stringContaining(
+          'A mix takes two colors; the rest are ignored.',
+        ),
       );
     });
   });

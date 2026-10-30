@@ -303,14 +303,13 @@ Avoid setting physical and logical declarations that resolve to the same edge in
 
 Background color with design token support. Preferred over `backgroundColor` and `background`.
 
-**Syntax:** `[color]`, or two colors mixed with a comma: `[color] [weight%], [color]`
+**Syntax:** `[color]`
 
 | Value | Effect |
 |-------|--------|
 | `"#purple"` | Token-based background color |
 | `"#purple.10"` | Token color at 10% opacity |
 | `"#surface+#dark.04"` | `#dark` at 4% opacity over `#surface`, as one color — see [Compound colors](dsl.md#compound-colors) |
-| `"#dark 4%, #surface"` | `#dark` mixed into `#surface` at 4% — the same color, written as `color-mix()` arguments |
 | `"rgb(255 128 0)"` | CSS color value |
 | `"color-mix(in oklab, #primary 50%, #surface)"` | CSS color function — see [CSS Color Functions](dsl.md#css-color-functions) |
 
@@ -325,28 +324,11 @@ fill: { '': '#surface', hovered: '#surface+#dark.04', pressed: '#surface+#dark.0
 
 The overlay token has to be opaque, with its opacity in the suffix: a translucent
 token, or one that turns `#clear` in some state, leaves the background
-see-through.
-
-#### Mixing two colors
-
-A comma between two colors mixes them into one:
-
-```jsx
-fill: '#dark 4%, #surface'
-// → background-color: color-mix(in srgb, var(--dark-color) 4%, var(--surface-color));
-```
-
-The comma-separated parts are the arguments of `color-mix()`, as written, mixed in sRGB: the space browsers composite layers in. When the weighted color is opaque, the mix is exactly what drawing it at that opacity over the other color shows. And because it is one `background-color`:
+see-through. Because the result is one `background-color`:
 
 - contrast checkers such as axe-core and Lighthouse can read it;
 - it transitions and animates between states like any other color;
 - an `image` on the same element stays the only `background-image` layer.
-
-The weight can come from a token or an expression: `'#dark $hover-weight, #surface'`, `'#dark ($hover * 100%), #surface'`.
-
-Give the weight as a percentage, not as an opacity. A color without a percentage takes half the weight, and its own alpha weighs it down again, so the mix comes out see-through: `'#dark.04, #surface'` is 52% opaque, not `#dark` at 4% over `#surface`. In development Tasty warns about a `#name.N` or `#clear` part without a percentage. It can't see into a token, though, so a token holding a translucent color mixes the same way with no warning: keep the token opaque and put its weight in the percentage.
-
-A mix takes two colors. Any more are ignored, with a development warning.
 
 #### Two colors separated by a space (deprecated)
 
@@ -364,6 +346,20 @@ Put a `+` where the space is:
 The rewrites are exact when the overlay token is opaque. A state map no longer needs the same two-color shape in every state to transition smoothly: every state is now a plain background color.
 
 If an overlay has to stay a translucent token, draw the layer yourself with `fill: '#base', image: 'linear-gradient(#overlay, #overlay)'`. Contrast checkers can't read that either.
+
+#### Two colors mixed with a comma (deprecated)
+
+`fill: '#dark 4%, #surface'` mixes the two colors in sRGB, as the arguments of `color-mix()`: `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`. It still works, with a development warning, and is going away in the next major version. A compound color is the same mix, in every color slot, and `color-mix()` itself covers what a compound can't write. `tasty/prefer-fill-mix` in [`@tenphi/eslint-plugin-tasty`](https://github.com/tenphi/eslint-plugin-tasty) rewrites each mix to the same color.
+
+| Before | After |
+|--------|-------|
+| `'#dark 4%, #surface'`, `'#surface, #dark 4%'` | `'#surface+#dark.04'` |
+| `'#accent 10%, #surface+#dark.04'` | `'#surface+#dark.04+#accent.1'` |
+| `'#dark $hover-weight, #surface'` (a percentage) | `'#surface+#dark.$hover-alpha'`, with `$hover-alpha` the opacity as a number — or `'color-mix(in srgb, #dark $hover-weight, #surface)'` |
+| `'#dark, #surface'`, `'rgb(0 0 0) 4%, #surface'`, and any other mix | `'color-mix(in srgb, #dark, #surface)'` — the same parts, in `color-mix()` |
+| `'#dark.04, #surface'` (a translucent part without a percentage) | `'#surface+#dark.04'` |
+
+Every rewrite but the last row's is the same color. `'#dark.04, #surface'` mixed a translucent color in by half and came out 52% opaque, so its rewrite paints what it was most likely meant to: `#dark` at 4% over `#surface`.
 
 There is no default fill color, so `fill: true` is ignored with a development warning. Use `false` for no fill.
 

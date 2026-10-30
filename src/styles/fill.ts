@@ -11,48 +11,28 @@ import { warnOnceDev } from '../utils/warnings';
  * Mix the comma-separated colors of a fill into one: `'#dark 4%, #surface'` is
  * `color-mix(in srgb, var(--dark-color) 4%, var(--surface-color))`.
  *
- * Mixed in sRGB, an opaque color at weight `a` shows exactly what drawing it at
- * alpha `a` over the other color would, as one `background-color` that contrast
- * checkers can read. The weight has to come from the percentage: a color that
- * is itself translucent is weighted by its alpha as well.
+ * Deprecated: a compound color, `'#surface+#dark.04'`, is the same mix and works
+ * in every color slot, and `color-mix()` itself covers the rest. The warning
+ * names both forms rather than working out each value's rewrite, which would
+ * ship in every bundle; the ESLint plugin's `tasty/prefer-fill-mix` does that.
  */
 function mixFillColors(
   property: string,
   value: string,
   groups: StyleDetails[],
 ): string {
-  if (groups.length > 2) {
-    warnOnceDev(
-      `fill-mix-extra:${property}:${value}`,
-      `${property}="${value}": a mix takes two colors. The extra ones are ` +
-        `ignored.`,
-    );
-  }
+  warnOnceDev(
+    `fill-mix:${property}:${value}`,
+    `${property}="${value}": mixing colors with a comma is deprecated. Layer ` +
+      `the colors as a compound color instead: "#dark 4%, #surface" is ` +
+      `"#surface+#dark.04". For any other mix, write color-mix() itself, ` +
+      `such as "color-mix(in srgb, #dark $weight, #surface)".` +
+      (groups.length > 2
+        ? ' A mix takes two colors; the rest are ignored.'
+        : ''),
+  );
 
   const [first, second] = groups;
-
-  for (const group of [first, second]) {
-    // A translucent color without a weight is weighed down twice, by its share
-    // of the mix and by its own alpha, which also leaves the mix see-through:
-    // `#dark.04, #surface` is 52% opaque, not `#dark` at 4% over `#surface`.
-    if (group.all.length !== 1) continue;
-
-    const color = group.colors[0];
-    const fade = color && parseAlphaMix(color);
-
-    if (color === 'transparent' || (fade && fade.percentage !== '100%')) {
-      warnOnceDev(
-        `fill-mix-alpha:${property}:${value}`,
-        `${property}="${value}": "${group.input}" is translucent and has no ` +
-          `percentage, so its alpha weighs it down on top of its share of the ` +
-          `mix and the background comes out see-through. To paint it over the ` +
-          `other color, layer it: "#surface+#dark.04", not "#dark.04, ` +
-          `#surface". Or give it a percentage: "#dark 4%, #surface". A ` +
-          `transparent color mixes in nothing; leave it out.`,
-      );
-    }
-  }
-
   return `color-mix(in srgb, ${first.output}, ${second.output})`;
 }
 

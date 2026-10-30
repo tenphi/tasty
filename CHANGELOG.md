@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.17.0
+
+### Minor Changes
+
+- [#444](https://github.com/tenphi/tasty/pull/444) [`e34adc9`](https://github.com/tenphi/tasty/commit/e34adc98430742d90acbb846aefa53645cefed68) Thanks [@tenphi](https://github.com/tenphi)! - Deprecate mixing two `fill` or `backgroundColor` colors with a comma (`'#dark 4%, #surface'`) in favor of compound colors (`'#surface+#dark.04'`), which compile to the same `color-mix()` and work in every color slot. The comma mix renders as before, warns in development, and goes away in the next major version. For a mix a compound can't write, such as one weighted by a custom property, write `color-mix(in srgb, …)` with the same parts. `tasty/prefer-fill-mix` in `@tenphi/eslint-plugin-tasty` rewrites each mix to the same color. The one deprecation warning replaces the separate warnings for a translucent mix part without a percentage and for a mix of more than two colors.
+
 ## 3.16.0
 
 ### Minor Changes

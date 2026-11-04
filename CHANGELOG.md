@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.17.1
+
+### Patch Changes
+
+- [#448](https://github.com/tenphi/tasty/pull/448) [`ceed487`](https://github.com/tenphi/tasty/commit/ceed487660e95a63df2231340809f24980db6632) Thanks [@tenphi](https://github.com/tenphi)! - `tasty.config.ts` lists `$icon-size`, which every `preset` sets next to `$bold-font-weight`, so the ESLint plugin's `valid-custom-property` no longer reports it as unknown.
+
 ## 3.17.0
 
 ### Minor Changes

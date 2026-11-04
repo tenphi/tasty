@@ -11,6 +11,7 @@ export default {
     '$transition',
     '$sharp-radius',
     '$bold-font-weight',
+    '$icon-size',
   ],
   styles: ['viewTransitionName'],
   // This repo imports its own API relatively, so the plugin's default

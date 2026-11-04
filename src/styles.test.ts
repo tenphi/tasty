@@ -1,3 +1,5 @@
+import tastyConfig from '../tasty.config';
+
 import { resetConfig } from './config';
 
 import { borderStyle } from './styles/border';
@@ -402,6 +404,20 @@ describe('Tasty style tests', () => {
       'text-transform':
         'var(--t3-text-transform, var(--default-text-transform))',
     });
+  });
+
+  // The ESLint plugin reads this package's `tasty.config.ts` as the base of
+  // every project's config, so a custom property the preset handler sets that
+  // the config doesn't list reads as unknown wherever a project uses it.
+  it('lists every custom property a preset sets in tasty.config.ts', () => {
+    const set = Object.keys(presetStyle({ preset: 't3' }))
+      .filter((key) => key.startsWith('--'))
+      .map((key) => `$${key.slice(2)}`);
+
+    expect(set).toEqual(['$bold-font-weight', '$icon-size']);
+    expect(set.filter((name) => !tastyConfig.tokens.includes(name))).toEqual(
+      [],
+    );
   });
 
   it.each(['mark', 'highlight / strong', 'navy', 'highlight tight'])(

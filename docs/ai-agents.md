@@ -10,7 +10,7 @@ Notation: ❌ wrong → ✅ correct.
 
 Color tokens (`#name`), custom properties (`$name`), `preset` names, `recipe` names, state aliases (`@mobile`) and extra units are **project-defined** in `tasty.config.ts` or a `configure({ … })` call. Look them up before writing styles. Never invent a name — reuse an existing one, or add it to the config.
 
-Only Tasty's built-ins exist without config: `#white`, `#black`, `#border`, `#outline`, `#current`, `#clear`, and `$gap`, `$radius`, `$border-width`, `$outline-width`, `$transition`, `$sharp-radius`, `$bold-font-weight`, `$icon-size`, `$font-sans-fallback`, `$font-mono-fallback`.
+Only Tasty's built-ins exist without config: `#white`, `#black`, `#border`, `#outline`, `#current`, `#clear`, and `$gap`, `$radius`, `$border-width`, `$outline-width`, `$transition`, `$sharp-radius`, `$bold-font-weight`, `$icon-size` (only where a `preset` applies), `$font-sans-fallback`, `$font-mono-fallback`.
 
 ## 1. Where styles go
 

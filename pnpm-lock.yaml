@@ -35,10 +35,10 @@ importers:
         version: 10.0.1(eslint@10.12.0(jiti@2.7.0))
       '@size-limit/esbuild':
         specifier: ^14.1.0
-        version: 14.1.0(size-limit@14.1.0)
+        version: 14.3.0(size-limit@14.3.0)
       '@size-limit/file':
         specifier: ^14.1.0
-        version: 14.1.0(size-limit@14.1.0)
+        version: 14.3.0(size-limit@14.3.0)
       '@tenphi/eslint-plugin-tasty':
         specifier: ^1.17.0
         version: 1.17.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
@@ -95,7 +95,7 @@ importers:
         version: 19.3.0(react@19.3.0)
       size-limit:
         specifier: ^14.1.0
-        version: 14.1.0
+        version: 14.3.0
       tsdown:
         specifier: ^0.23.0
         version: 0.23.0(oxc-resolver@11.24.2)(typescript@6.0.3)
@@ -1310,17 +1310,17 @@ packages:
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
 
-  '@size-limit/esbuild@14.1.0':
-    resolution: {integrity: sha512-VRkw9yssPhJ8aRO9RIN9rxbaNSFyUOz4IZiW5YnRfwN3+GkS2WhXCj/wTPA0afjbHlMZFnI5TEwmAz6Yg9PFhQ==}
+  '@size-limit/esbuild@14.3.0':
+    resolution: {integrity: sha512-0HvGvD5vw2j/lZ7u+koacP5UpveaFVirc8Gm0GJRfICDd+4xEpZX3ManDSnFzwlk7qe0JtJjE8d5jp5t8sUlEQ==}
     engines: {node: ^22.19.0 || ^24.5.0 || >=26.0.0}
     peerDependencies:
-      size-limit: 14.1.0
+      size-limit: 14.3.0
 
-  '@size-limit/file@14.1.0':
-    resolution: {integrity: sha512-mR0uVxzdzV31pk8Iz795dDXxhHsrv9RSsyjeCVboUr1Q2+2KL/GpjeMZ44ydFqI2JfXZ22dOsbY28yPeOse1Nw==}
+  '@size-limit/file@14.3.0':
+    resolution: {integrity: sha512-GWKOi0rorXPbYmwbT926Z91t28rg5gd5hv8ywY1FNcaYf8NbibgK5K5YabYbLkV6KpGwuuixBRtIzl3ZpPzUfw==}
     engines: {node: ^22.19.0 || ^24.5.0 || >=26.0.0}
     peerDependencies:
-      size-limit: 14.1.0
+      size-limit: 14.3.0
 
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
@@ -2327,8 +2327,8 @@ packages:
     resolution: {integrity: sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==}
     engines: {node: '>= 12.0.0'}
 
-  lilconfig@3.1.3:
-    resolution: {integrity: sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw==}
+  lilconfig@3.1.4:
+    resolution: {integrity: sha512-zJZyBmQhArDRefuWTypZxwDpFDIYmrj8ypSBvwGD5P13Y95s6DjzKgu4DVdGbeQa5PDEsAOCAPNk4X+QOR006w==}
     engines: {node: '>=14'}
 
   locate-path@6.0.0:
@@ -2696,8 +2696,8 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
-  size-limit@14.1.0:
-    resolution: {integrity: sha512-ANW8IDwAK3P84y+bElmWqq8ymV/mNS8Jan+otR5XItVVS4AEyAx7MpT+1BsMULbgDaJ1cle3qN/hkOYQS0vF7g==}
+  size-limit@14.3.0:
+    resolution: {integrity: sha512-SoT7DtEYQ9AkOIyrNmmHu8IyJyA3P/Q6EUVjUUinT0iBuaI6IOpWxwyI+teUxg8WdLwcTwbu9moKvw/LGlCE7g==}
     engines: {node: ^22.19.0 || ^24.5.0 || >=26.0.0}
     hasBin: true
 
@@ -4105,14 +4105,14 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@size-limit/esbuild@14.1.0(size-limit@14.1.0)':
+  '@size-limit/esbuild@14.3.0(size-limit@14.3.0)':
     dependencies:
       esbuild: 0.28.2
-      size-limit: 14.1.0
+      size-limit: 14.3.0
 
-  '@size-limit/file@14.1.0(size-limit@14.1.0)':
+  '@size-limit/file@14.3.0(size-limit@14.3.0)':
     dependencies:
-      size-limit: 14.1.0
+      size-limit: 14.3.0
 
   '@swc/helpers@0.5.23':
     dependencies:
@@ -5107,7 +5107,7 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.33.0
       lightningcss-win32-x64-msvc: 1.33.0
 
-  lilconfig@3.1.3: {}
+  lilconfig@3.1.4: {}
 
   locate-path@6.0.0:
     dependencies:
@@ -5535,9 +5535,9 @@ snapshots:
 
   sisteransi@1.0.5: {}
 
-  size-limit@14.1.0:
+  size-limit@14.3.0:
     dependencies:
-      lilconfig: 3.1.3
+      lilconfig: 3.1.4
       nanospinner: 1.2.2
 
   smol-toml@1.9.0: {}

@@ -149,7 +149,7 @@ Converts each state key in a style value map (like `'hovered & !disabled'`, `'@m
    - `@own(hovered)` → `OwnCondition` wrapping the parsed inner condition
    - `@supports(display: grid)` → `SupportsCondition`
    - `@(w < 600px)` → `ContainerCondition` (dimension, style, or raw subtypes)
-   - `@mobile` → Resolved via predefined states, then parsed recursively
+   - `@mobile` → Resolved via predefined states, then parsed recursively. A local alias resolves against local, then global aliases; a global alias resolves against global aliases only. A stack of the aliases being resolved stops a cycle: the repeated alias becomes `FALSE` and emits `CIRCULAR_STATE_ALIAS`
 
 Pipeline warnings for invalid inputs (e.g. bad `$` selector affix) are emitted from `warnings.ts`.
 

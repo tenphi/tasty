@@ -34,6 +34,7 @@ import {
   createRootCondition,
   createStartingCondition,
   createSupportsCondition,
+  falseCondition,
   not,
   or,
   trueCondition,
@@ -65,6 +66,21 @@ export interface ParseStateKeyOptions {
 
 // Cache for parsed state keys (key -> ConditionNode)
 const parseCache = new Lru<string, ConditionNode>(5000);
+
+// Aliases being resolved right now, scope-prefixed ('l@x' / 'g@x'), to stop
+// a circular alias before it overflows the stack.
+const resolvingAliases: string[] = [];
+
+const NO_LOCAL_STATES: Record<string, string> = {};
+
+function toGlobalScope(options: ParseStateKeyOptions): ParseStateKeyOptions {
+  const ctx = options.context!;
+  if (ctx.localPredefinedStates === NO_LOCAL_STATES) return options;
+  return {
+    ...options,
+    context: { ...ctx, localPredefinedStates: NO_LOCAL_STATES },
+  };
+}
 
 // ============================================================================
 // Internal-pseudo Detection
@@ -830,8 +846,33 @@ class Parser {
       );
     }
 
-    // Parse the resolved value recursively
-    return parseStateKey(resolved, this.options);
+    // An alias may reference other aliases. A local alias resolves against
+    // the local scope (falling back to global); a global alias resolves
+    // against global aliases only, so it means the same in every component
+    // and a local override never leaks into it.
+    const isLocal = !!ctx.localPredefinedStates[raw];
+    const scopedName = (isLocal ? 'l' : 'g') + raw;
+
+    if (resolvingAliases.includes(scopedName)) {
+      const chain = [...resolvingAliases, scopedName]
+        .slice(resolvingAliases.indexOf(scopedName))
+        .map((name) => name.slice(1));
+      emitWarning(
+        'CIRCULAR_STATE_ALIAS',
+        `State alias '${raw}' is circular: ${chain.join(' → ')}. It never matches.`,
+      );
+      return falseCondition();
+    }
+
+    resolvingAliases.push(scopedName);
+    try {
+      return parseStateKey(
+        resolved,
+        isLocal ? this.options : toGlobalScope(this.options),
+      );
+    } finally {
+      resolvingAliases.pop();
+    }
   }
 
   /**

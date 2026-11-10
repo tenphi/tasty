@@ -213,10 +213,25 @@ export function generateChunkCacheKey(
 
   if (Object.keys(localStates).length > 0) {
     const relevantLocalStates: string[] = [];
+    // Follow local aliases into the aliases they reference: `@a: '@b'` makes
+    // `@b`'s definition part of what `@a` renders to. Global aliases resolve
+    // against globals only and cannot change once styles exist, so the walk
+    // stops at them.
+    const refs = extractPredefinedStateRefs(chunkStylesStr);
+    const seen = new Set(refs);
 
-    for (const stateName of extractPredefinedStateRefs(chunkStylesStr)) {
-      if (localStates[stateName]) {
-        relevantLocalStates.push(`${stateName}=${localStates[stateName]}`);
+    // `for…of` re-reads the length, so names pushed below are visited too.
+    for (const stateName of refs) {
+      const definition = localStates[stateName];
+      if (!definition) continue;
+
+      relevantLocalStates.push(`${stateName}=${definition}`);
+
+      for (const ref of extractPredefinedStateRefs(definition)) {
+        if (!seen.has(ref)) {
+          seen.add(ref);
+          refs.push(ref);
+        }
       }
     }
 

@@ -1,6 +1,7 @@
 import { clearPipelineCache } from '../pipeline';
 import type { Styles } from '../styles/types';
 
+import { generateChunkCacheKey } from './cacheKey';
 import { categorizeStyleKeys } from './definitions';
 import { renderStylesForChunk } from './renderChunk';
 
@@ -156,5 +157,32 @@ describe('Chunking with local predefined states', () => {
       rule.selector.includes('data-mobile'),
     );
     expect(hasDataMobileSelector).toBe(false);
+  });
+
+  it('keys a chunk by the local aliases its aliases reference', () => {
+    // `fill` names only `@narrow`; `@tiny` reaches it through `@narrow`.
+    // Components that differ only in `@tiny` must not share cached CSS.
+    const renderWith = (breakpoint: string) => {
+      const styles: Styles = {
+        '@narrow': '@tiny',
+        '@tiny': `@media(w < ${breakpoint})`,
+        fill: { '': '#white', '@narrow': '#purple' },
+      };
+      const keys = categorizeStyleKeys(styles as Record<string, unknown>).get(
+        'appearance',
+      )!;
+      const cacheKey = generateChunkCacheKey(styles, 'appearance', keys);
+      return renderStylesForChunk(styles, 'appearance', keys, cacheKey);
+    };
+    const usesBreakpoint = (
+      result: ReturnType<typeof renderStylesForChunk>,
+      breakpoint: string,
+    ) =>
+      result.rules.some((rule) =>
+        rule.atRules?.some((atRule) => atRule.includes(breakpoint)),
+      );
+
+    expect(usesBreakpoint(renderWith('300px'), '300px')).toBe(true);
+    expect(usesBreakpoint(renderWith('900px'), '900px')).toBe(true);
   });
 });

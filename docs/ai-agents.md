@@ -201,7 +201,7 @@ Advanced states:
 | `@name`        | project state alias                                                              | `@mobile`                                           |
 
 - At root level write the selector directly: ❌ `'@own(:hover)'` → ✅ `':hover'`.
-- `@name` aliases must exist in `states` in the config or be declared locally as an `'@name': '<state expression>'` key; alias keys start with `@` and their value must be a valid state expression.
+- `@name` aliases must exist in `states` in the config or be declared locally as an `'@name': '<state expression>'` key; alias keys start with `@` and their value must be a valid state expression. A value may use other aliases (`'@collapsed': '@mobile & !expanded'`), but never in a loop.
 - `:is()` / `:has()` / `:not()` / `:where()` work in state keys but support at most 2 levels of nested parentheses, and `:has()` is expensive — prefer `@parent()`, `@own()` and modifiers.
 
 When extending a parent's state map: `'@inherit'` reuses the parent's value for that state, `null` removes a state (or resets a property, letting recipes fill in), `false` is a tombstone that blocks it entirely.

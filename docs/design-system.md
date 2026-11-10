@@ -191,6 +191,18 @@ const Card = tasty({
 });
 ```
 
+Aliases can build on each other, so a composite state is defined once too:
+
+```tsx
+configure({
+  states: {
+    '@mobile': '@media(w < 768px)',
+    '@tablet': '@media(768px <= w < 1024px)',
+    '@touch': '@mobile | @tablet',
+  },
+});
+```
+
 Theme switching belongs in tokens (`'#surface': { '': '#fff', '@dark': '#1c1c1e' }`) rather than in component state maps, so components stay theme-agnostic.
 
 Without aliases, the same component would need the full media query expression inlined in every state map — across every property, in every component. Aliases eliminate that duplication.

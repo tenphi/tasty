@@ -15,7 +15,8 @@ type TastyWarningCode =
   | 'REDUNDANT_DEFAULT_STATE'
   | 'HANDLER_CAMEL_CASE_KEY'
   | 'INVALID_STATE_KEY'
-  | 'PSEUDO_ELEMENT_STATE_IGNORED';
+  | 'PSEUDO_ELEMENT_STATE_IGNORED'
+  | 'CIRCULAR_STATE_ALIAS';
 
 interface TastyWarning {
   code: TastyWarningCode;

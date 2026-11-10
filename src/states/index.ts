@@ -140,17 +140,6 @@ export function setGlobalPredefinedStates(
       continue;
     }
 
-    // Check for cross-references
-    const crossRefs = extractPredefinedStateRefs(value);
-    if (crossRefs.length > 0) {
-      warnOnce(
-        `cross-ref:${name}`,
-        `[Tasty] Predefined state '${name}' references another predefined state '${crossRefs[0]}'.\n` +
-          `Predefined states cannot reference each other. Use the full definition instead.`,
-      );
-      continue;
-    }
-
     // Check for duplicates
     if (
       globalPredefinedStates[name] &&
@@ -254,17 +243,6 @@ export function extractLocalPredefinedStates(
       BUILTIN_STATES.has(key) ||
       isReservedStateName(key)
     ) {
-      continue;
-    }
-
-    // Check for cross-references (predefined states cannot reference each other)
-    const crossRefs = extractPredefinedStateRefs(value);
-    if (crossRefs.length > 0) {
-      warnOnce(
-        `local-cross-ref:${key}`,
-        `[Tasty] Predefined state '${key}' references another predefined state '${crossRefs[0]}'.\n` +
-          `Predefined states cannot reference each other. Use the full definition instead.`,
-      );
       continue;
     }
 

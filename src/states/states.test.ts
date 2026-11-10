@@ -586,6 +586,17 @@ describe('Advanced State Mapping', () => {
         '@rooted': '@root(theme=dark)',
       });
     });
+
+    it('should keep aliases that reference other aliases', () => {
+      setGlobalPredefinedStates({
+        '@mobile': '@media(w < 768px)',
+        '@collapsed': '@mobile & !expanded',
+      });
+
+      expect(getGlobalPredefinedStates()['@collapsed']).toBe(
+        '@mobile & !expanded',
+      );
+    });
   });
 
   describe('extractLocalPredefinedStates', () => {
@@ -626,6 +637,18 @@ describe('Advanced State Mapping', () => {
       expect(extractLocalPredefinedStates(styles)).toEqual({
         '@media-query': '@media(w < 920px)',
         '@rooted': '@root(theme=dark)',
+      });
+    });
+
+    it('should keep aliases that reference other aliases', () => {
+      expect(
+        extractLocalPredefinedStates({
+          '@narrow': '@mobile | @tiny',
+          '@tiny': '@media(w < 300px)',
+        }),
+      ).toEqual({
+        '@narrow': '@mobile | @tiny',
+        '@tiny': '@media(w < 300px)',
       });
     });
   });

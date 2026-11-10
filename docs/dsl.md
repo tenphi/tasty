@@ -29,6 +29,26 @@ styles: {
 }
 ```
 
+An alias can use other aliases, anywhere in its expression:
+
+```jsx
+configure({
+  states: {
+    '@mobile': '@media(w < 768px)',
+    '@collapsed': '@mobile & !expanded',
+  },
+});
+
+styles: {
+  '@compact': '@collapsed | @media:print', // local, built on a global alias
+  padding: { '': '4x', '@compact': '2x' },
+}
+```
+
+- A local alias sees the component's aliases first, then the global ones. Aliases declared inside a sub-element also see the root-level ones.
+- A global alias sees only global aliases. It means the same thing in every component: if a component redefines `@mobile` locally, the global `@collapsed` keeps using the global `@mobile`.
+- A circular alias (`'@a': '@b'` with `'@b': '@a'`, or `'@a': '@a & hovered'`) never matches, and a `CIRCULAR_STATE_ALIAS` warning names the loop.
+
 #### State Key Types
 
 | Syntax             | Example                  | Generated CSS                                                            |

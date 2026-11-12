@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "tasty",
+  "description": "Tasty styles: the style rules, the docs of the installed version, and a tool that prints the CSS a styles object produces",
+  "homepage": "https://tasty.style",
+  "repository": "https://github.com/tenphi/tasty",
+  "keywords": ["tasty", "css-in-js", "styles", "design-system", "react"],
+  "extensions": {
+    "dev.harnesspm": {
+      "docs": "../docs",
+      "scripts": {
+        "styles": {
+          "file": "./dev.harnesspm/scripts/styles.mjs",
+          "description": "Print the CSS a Tasty styles object produces, with the app's configure() loaded through --setup, and flag values that stayed unresolved",
+          "allow": true
+        }
+      }
+    }
+  }
+}

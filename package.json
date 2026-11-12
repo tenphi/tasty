@@ -97,6 +97,7 @@
   "files": [
     "dist",
     "docs",
+    "harness",
     "tasty.config.ts"
   ],
   "sideEffects": [
@@ -121,10 +122,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint src harness",
+    "lint:fix": "eslint src harness --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"harness/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"harness/**/*.mjs\"",
     "size": "size-limit",
     "bench": "vitest bench --project \"node (bench)\"",
     "bench:browser": "vitest bench --project \"browser (chromium) (bench)\"",
@@ -138,6 +139,7 @@
     "version": "changeset version",
     "release": "changeset publish",
     "knip": "knip",
+    "check:harness": "harnesspm check",
     "check:build": "node scripts/check-built-entries.mjs",
     "check:react-compat": "node scripts/check-react-compat.mjs",
     "check:babel-compat": "node scripts/check-babel-compat.mjs",
@@ -208,6 +210,7 @@
     "@size-limit/esbuild": "^14.1.0",
     "@size-limit/file": "^14.1.0",
     "@tenphi/eslint-plugin-tasty": "^1.17.0",
+    "@tenphi/harnesspm": "^0.1.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.1",

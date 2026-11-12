@@ -585,6 +585,20 @@ See [Debug Utilities](docs/debug.md).
 
 Style definitions are declarative and fully typed, so agents can read and write them reliably. [Style Rules for AI Agents](docs/ai-agents.md) is a one-page brief to add to an agent's context.
 
+The package also ships a harness for coding agents such as Claude Code and Codex, in [`harness/`](harness). With [harnesspm](https://www.npmjs.com/package/@tenphi/harnesspm), a project that depends on Tasty gets:
+
+- a short rule: read the brief and the project's config first, use tokens and units, write state maps right;
+- the docs index, so an agent reads the pages in `docs/` of the installed version;
+- the `tasty:styles` tool: the CSS a styles object produces, with the app's `configure()` loaded through `--setup`, and a warning for every value that stayed unresolved.
+
+```bash
+npm i -D @tenphi/harnesspm
+npx harnesspm init
+npx harnesspm run tasty:styles '{"fill":"#surface","padding":"2x"}' --setup ./src/tasty-setup.ts
+```
+
+The tool runs only in projects that trust the package: `"trust": { "@tenphi/tasty": true }` in `harnesspm.json`.
+
 ## Performance
 
 ### Bundle size

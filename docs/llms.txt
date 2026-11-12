@@ -1,0 +1,31 @@
+# Tasty
+
+> Docs for `@tenphi/tasty`, the version installed in this project. Read the style rules for AI agents before you write or review styles.
+
+## Start here
+
+- [Tasty Style Rules for AI Agents](ai-agents.md): the rules for correct styles, with a checklist. Read it before you write or review styles.
+- [Getting Started](getting-started.md): installation, a first component, configuration, the ESLint plugin, and choosing a rendering mode.
+
+## Guides
+
+- [Methodology](methodology.md): root and sub-elements, `styleProps` as the public API, `tokens`, `styles` vs `style`, wrapping and extending, anti-patterns.
+- [Building a Design System](design-system.md): token vocabularies, state aliases, recipes, layout primitives, compound components, override contracts.
+
+## Reference
+
+- [Style DSL Reference](dsl.md): state maps and state keys, color tokens, units, replace tokens, recipes, advanced states (`@media`, `@parent`, `@root`, `:has`), keyframes, `@property`, `@font-face`, `@function`.
+- [Style Properties Reference](styles.md): every Tasty style property (`fill`, `padding`, `border`, `radius`, `flow`, `preset`, …) and its syntax.
+- [React API](react-api.md): `tasty()`, extending, `styleProps`, `modProps`, `tokenProps`, variants, sub-elements, `useStyles` and the other style functions.
+- [Configuration](configuration.md): `configure()`: state aliases, units, tokens, replace tokens, recipes, presets, handlers, plugins.
+- [Plugins & Extension Points](plugins.md): choosing between functions, units, states, handlers, prop handlers, recipes and base style props.
+
+## Rendering modes
+
+- [Build-Time Extraction (`tastyStatic`)](tasty-static.md): zero-runtime CSS through the Babel plugin, Next.js setup, config files, limitations.
+- [Server-Side Rendering (SSR)](ssr.md): the style collector, hydration, Next.js App Router and Astro.
+
+## Help
+
+- [Tasty Debug Utilities](debug.md): `tastyDebug` in the browser console: the CSS on the page, cache metrics, chunks.
+- [Migration Guide: v2 → v3](migration-v3.md): every breaking change from v2, with a search-and-replace cheat sheet.

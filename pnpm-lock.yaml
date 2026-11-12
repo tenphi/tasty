@@ -42,6 +42,9 @@ importers:
       '@tenphi/eslint-plugin-tasty':
         specifier: ^1.17.0
         version: 1.17.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
+      '@tenphi/harnesspm':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.3)
@@ -1337,6 +1340,11 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  '@tenphi/harnesspm@0.1.0':
+    resolution: {integrity: sha512-AIhzEvOIyJcO4mscWGL5VhVTRUuNL3Kr+tHN3CHYKXRkP06A5gaDSzQHJbSbn0im53KgH2zc9dCM1qa8WnZSGg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -4129,6 +4137,10 @@ snapshots:
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@tenphi/harnesspm@0.1.0':
+    dependencies:
+      yaml: 2.9.1
 
   '@testing-library/dom@10.4.1':
     dependencies:

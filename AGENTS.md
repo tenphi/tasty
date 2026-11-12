@@ -31,6 +31,7 @@ Repository: <https://github.com/tenphi/tasty>
 | `pnpm check:test-only` | Verify test-only code stays out of the build (run after `pnpm build`) |
 | `pnpm hygiene` | Run lint + format check + typecheck together |
 | `pnpm hygiene:fix` | Auto-fix lint + format, then typecheck |
+| `pnpm check:harness` | Validate the agent harness in `harness/` (`harnesspm check`) |
 
 ## Before pushing changes
 
@@ -160,7 +161,8 @@ src/
 | [`docs/getting-started.md`](docs/getting-started.md) | Getting started guide — prerequisites, installation, first component, configuration setup, ESLint plugin setup, editor tooling, rendering mode decision tree. Start here for initial setup. |
 | [`docs/methodology.md`](docs/methodology.md) | Methodology — the recommended patterns for structuring Tasty components: root + sub-elements model (vs BEM), `styleProps` as the public API, `tokens` prop, `styles` vs `style` props, wrapping/extension, how configuration simplifies components, and anti-patterns. |
 | [`docs/design-system.md`](docs/design-system.md) | Building a design system — practical how-to for DS teams: designing token vocabularies, defining state aliases, creating recipes, building layout primitives with `styleProps`, compound components with sub-elements, override contracts, and project structure. |
-| [`docs/ai-agents.md`](docs/ai-agents.md) | Style rules for AI agents — condensed, rule-based brief on correct value syntax, tokens, units, modifiers, state maps, sub-elements, and special top-level keys. Keep in sync with the DSL and style-property docs. |
+| [`docs/ai-agents.md`](docs/ai-agents.md) | Style rules for AI agents — condensed, rule-based brief on correct value syntax, tokens, units, modifiers, state maps, sub-elements, and special top-level keys. Keep in sync with the DSL and style-property docs, and keep the harness rule (`harness/dev.harnesspm/rules/usage.md`), a digest of sections 0–5, in step with it. |
+| [`docs/llms.txt`](docs/llms.txt) | The docs index that apps get through the harness: the consumer pages, with one line each. A new page goes into it, or into the list of internal pages in `src/harness.test.ts`. |
 | [`docs/dsl.md`](docs/dsl.md) | Style DSL reference — the Tasty style language shared by runtime and static modes: state maps, state key types, color tokens, built-in units, replace tokens, recipes, extending/replacing semantics, advanced states (@media, @parent, @root, :is, :has), keyframes, @property, @font-face, @counter-style, and @function. |
 | [`docs/react-api.md`](docs/react-api.md) | React API — `tasty()` factory, component creation, extending, `styleProps`, `modProps`, `tokenProps`, variants, sub-element styling (`elements` prop, selector affix), and style functions (`useStyles`, `useGlobalStyles`, `useRawCSS`, `useKeyframes`, `useProperty`, `useFontFace`, `useCounterStyle`, `useFunction`). |
 | [`docs/configuration.md`](docs/configuration.md) | Global configuration via `configure()` — CSP nonce, custom state aliases, parser cache size, custom units, custom functions, polyfills, design tokens (`:root` CSS variables), replace tokens (parse-time substitution), recipes, style handlers, props middleware, base style props, and plugins. |
@@ -174,6 +176,17 @@ src/
 | [`docs/ssr.md`](docs/ssr.md) | Server-side rendering guide — zero-cost hydration, `ServerStyleCollector`, framework integrations (Next.js App Router, Astro), streaming compatibility. Requires React 18+. |
 | [`docs/comparison.md`](docs/comparison.md) | Comparison with other styling systems — Tailwind, Panda CSS, vanilla-extract, StyleX, Stitches, Emotion. Covers positioning, abstraction levels, trade-offs, and when Tasty fits vs. alternatives. |
 | [`docs/adoption.md`](docs/adoption.md) | Adoption guide — where Tasty sits in the stack, who should use it, what the DS team defines, incremental adoption phases, and what changes for product engineers. |
+
+## Agent harness (`harness/`)
+
+The harness that apps get through [harnesspm](https://www.npmjs.com/package/@tenphi/harnesspm). It is for people who **use** Tasty; contributor instructions stay in this file. `pnpm check:harness` validates it, and CI runs it.
+
+| File | Description |
+|---|---|
+| [`harness/plugin.json`](harness/plugin.json) | Agent Plugins manifest: plugin `tasty`, `docs` pointing at `../docs` (indexed by `docs/llms.txt`), and the `styles` script. |
+| [`harness/dev.harnesspm/rules/usage.md`](harness/dev.harnesspm/rules/usage.md) | The one always-on rule: a digest of `docs/ai-agents.md` sections 0–5 and a pointer to `tasty:styles`. It is copied into every consumer's `AGENTS.md`, so keep it under 640 bytes (a test checks). Its `##` sections let a consumer, such as a UI kit, patch one of them. |
+| [`harness/dev.harnesspm/scripts/styles.mjs`](harness/dev.harnesspm/scripts/styles.mjs) | `tasty:styles`: imports the `--setup` modules (one that calls `configure()`, or one that default-exports a config), renders the styles, prints the CSS and the warnings. Loads `../../../dist/core/index.js`, so in this repository run `pnpm build` first. |
+| [`harness/dev.harnesspm/scripts/render.mjs`](harness/dev.harnesspm/scripts/render.mjs) | What the tool computes. It renders through `computeStyles()`, the core `tasty()` uses, because a bare `renderStyles()` skips recipes. Also the config summary, the checks for values Tasty leaves unresolved, and the CSS printer. Every function takes the Tasty module, so `src/harness.test.ts` runs them against the source. It reads config tokens from `globalThis.__tasty_cfg_tokens__`; a test pins that key. |
 
 ## Code Conventions
 
@@ -208,7 +221,7 @@ Vitest runs two projects, configured in [`vitest.config.ts`](vitest.config.ts):
 
 ## CI/CD
 
-- **CI**: build, lint, format check, typecheck, dead-code check (`knip`), built-entry check (`check:build`), React and Babel compatibility checks (`check:react-compat`, `check:babel-compat`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
+- **CI**: build, lint, format check, typecheck, harness check (`check:harness`), dead-code check (`knip`), built-entry check (`check:build`), React and Babel compatibility checks (`check:react-compat`, `check:babel-compat`), test-only code check, tests, size limit on push to `main` and PRs. Chromium is installed via Playwright and cached on the lockfile hash.
 - **Release**: Changesets — on push to `main`, either creates a version PR or publishes to npm
 - **Snapshots**: every PR push publishes `0.0.0-snapshot.<sha>` under the `pr_<number>` dist-tag and comments the install command on the PR
 - **npm trusted publishing**: OIDC provenance via the `release` GitHub environment

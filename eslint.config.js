@@ -94,6 +94,16 @@ export default tseslint.config(
     },
   },
   {
+    // The agent tools in harness/ are Node scripts that print their answer.
+    files: ['harness/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**'],
   },
 );

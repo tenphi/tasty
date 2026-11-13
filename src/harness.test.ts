@@ -5,7 +5,19 @@
  * does in CI after `pnpm build`.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
@@ -272,7 +284,7 @@ describe.runIf(existsSync(BUILD))('tasty:styles CLI (needs pnpm build)', () => {
       run('{"recipe":"pill"}', '--setup', './tasty-zero.config.mjs', '--json'),
     );
 
-    expect(result.setup).toEqual([
+    expect(result.setup).toMatchObject([
       { module: './tasty-zero.config.mjs', configured: 'default export' },
     ]);
     expect(result.css).toContain('border-radius: 9999rem');
@@ -292,4 +304,117 @@ describe.runIf(existsSync(BUILD))('tasty:styles CLI (needs pnpm build)', () => {
       run('{"padding":"2x"}', '--setup', './tasty.config.ts'),
     ).toThrow(/only lists names/);
   });
+
+  describe('with a second copy of Tasty, as in a monorepo', () => {
+    // An app folder whose own @tenphi/tasty is a copy of this build under
+    // another version, and a UI library package that configures that copy.
+    let app: string;
+    const runIn = (cwd: string, ...args: string[]) =>
+      JSON.parse(
+        execFileSync(process.execPath, [script, ...args, '--json'], {
+          cwd,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, HARNESSPM_PROJECT_DIR: cwd },
+        }),
+      );
+
+    beforeAll(() => {
+      app = realpathSync(mkdtempSync(join(tmpdir(), 'tasty-styles-')));
+      const copy = join(app, 'node_modules/@tenphi/tasty');
+      cpSync(join(ROOT, 'dist'), join(copy, 'dist'), { recursive: true });
+      // Tasty's build imports React, which every app on Tasty has.
+      symlinkSync(
+        realpathSync(join(ROOT, 'node_modules/react')),
+        join(app, 'node_modules/react'),
+      );
+      const manifest = JSON.parse(
+        readFileSync(join(ROOT, 'package.json'), 'utf8'),
+      );
+      writeFileSync(
+        join(copy, 'package.json'),
+        JSON.stringify({ ...manifest, version: '0.0.0-copy' }),
+      );
+      writeFileSync(
+        join(app, 'app-setup.mjs'),
+        "import { configure } from '@tenphi/tasty/core';\nconfigure({ units: { cw: '12px' } });\n",
+      );
+      mkdirSync(join(app, 'node_modules/@acme/ui'), { recursive: true });
+      writeFileSync(
+        join(app, 'node_modules/@acme/ui/package.json'),
+        JSON.stringify({ name: '@acme/ui', type: 'module' }),
+      );
+      writeFileSync(
+        join(app, 'node_modules/@acme/ui/setup.mjs'),
+        "import { configure } from '@tenphi/tasty/core';\nconfigure({ states: { '@wide': '@media(w >= 1600px)' } });\n",
+      );
+      writeFileSync(join(app, 'nothing.mjs'), 'export const x = 1;\n');
+    });
+
+    afterAll(() => rmSync(app, { recursive: true, force: true }));
+
+    it("renders with the copy the app's setup configures", () => {
+      const result = runIn(
+        app,
+        '{"padding":"2cw"}',
+        '--setup',
+        './app-setup.mjs',
+      );
+
+      expect(result.tasty.version).toBe('0.0.0-copy');
+      expect(result.setup[0].tasty).toEqual([
+        { version: '0.0.0-copy', path: 'node_modules/@tenphi/tasty' },
+      ]);
+      expect(result.css).toContain('padding: 24px');
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('resolves a package path in --setup from the current folder', () => {
+      const result = runIn(
+        app,
+        '{"color":{"":"#a","@wide":"#b"}}',
+        '--setup',
+        '@acme/ui/setup.mjs',
+        '--setup',
+        './app-setup.mjs',
+      );
+
+      expect(result.config.states).toContain('@wide');
+      expect(result.config.units.cw).toBe('12px');
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('warns when the setups configure two copies, and names both', () => {
+      const result = runIn(
+        app,
+        '{"padding":"2cw"}',
+        '--setup',
+        join(__dirname, 'harness-fixtures/setup.mjs'),
+        '--setup',
+        './app-setup.mjs',
+      );
+      const warning = result.warnings.find((w: string) =>
+        w.includes('2 copies of @tenphi/tasty'),
+      );
+
+      expect(warning).toContain('0.0.0-copy (node_modules/@tenphi/tasty)');
+      expect(warning).toContain(manifestVersion());
+      expect(warning).toContain('make every package use one version');
+      // The app's own copy wins: it is the one the app's code imports.
+      expect(result.tasty.version).toBe('0.0.0-copy');
+    });
+
+    it('warns about a setup that changes no config', () => {
+      const result = runIn(app, '{"padding":"2x"}', '--setup', './nothing.mjs');
+
+      expect(result.setup[0].configured).toBe('nothing');
+      expect(result.warnings.join('\n')).toContain(
+        '--setup ./nothing.mjs changed no Tasty config this tool can see',
+      );
+    });
+  });
 });
+
+function manifestVersion(): string {
+  return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
+}

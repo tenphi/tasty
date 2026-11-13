@@ -2,12 +2,19 @@
  * tasty:styles — prints the CSS Tasty generates for a styles object, with the
  * app's configuration loaded first, and flags values that stayed unresolved.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   configChanged,
+  configFingerprint,
   configSummary,
   describeUnits,
   findIssues,
@@ -30,12 +37,19 @@ selector or an at-rule. To see what a state key becomes, put it in a state map.
                for several modules. TypeScript needs Node 22.18 or later.
 --json         print the result as JSON
 
+Run it from the package whose styles you check. Package paths in --setup resolve
+from there, and the CSS comes from the copy of @tenphi/tasty that the setup
+modules configure, which in a monorepo can differ from package to package.
+
 Without --setup, the CSS uses Tasty's defaults (x = 8px, r = 6px, ...) and none
 of the app's units, presets, recipes or state aliases.`;
 
-const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const PACKAGE_ROOT = realpathSync(
+  fileURLToPath(new URL('../../../', import.meta.url)),
+);
 const BUILD = join(PACKAGE_ROOT, 'dist/core/index.js');
-const projectDir = process.env.HARNESSPM_PROJECT_DIR || process.cwd();
+const cwd = process.cwd();
+const projectDir = process.env.HARNESSPM_PROJECT_DIR || cwd;
 
 function fail(message) {
   console.error(`tasty: ${message}`);
@@ -96,15 +110,22 @@ const tastyWarnings = [];
 const warn = console.warn;
 console.warn = (...args) => tastyWarnings.push(args.map(String).join(' '));
 
-const t = await import(pathToFileURL(BUILD).href);
-const version = JSON.parse(
-  readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'),
-).version;
+// Every copy of @tenphi/tasty this run can see, by its real folder. A setup
+// module configures the copy it imports, which in a monorepo or with a second
+// version installed need not be this tool's own.
+const copies = new Map();
+const own = await copyAt(PACKAGE_ROOT);
+const appRoot = tastyRootFrom(cwd);
+const app = appRoot === undefined ? undefined : await copyAt(appRoot);
 
-const before = configSummary(t);
 const loaded = [];
 for (const spec of options.setup) {
   const file = resolveSetup(spec);
+  const nearRoot = tastyRootFrom(dirname(realpathSync(file)));
+  const near = nearRoot === undefined ? undefined : await copyAt(nearRoot);
+  const before = new Map(
+    [...copies.values()].map((c) => [c.root, configFingerprint(c.t)]),
+  );
   let mod;
   try {
     mod = await import(pathToFileURL(file).href);
@@ -113,33 +134,74 @@ for (const spec of options.setup) {
     fail(`cannot import --setup ${spec}: ${importHint(file, error)}`);
   }
   const config = mod.default;
-  if (config && Object.getPrototypeOf(config) === Object.prototype) {
+  const isConfig =
+    config !== null &&
+    typeof config === 'object' &&
+    Object.getPrototypeOf(config) === Object.prototype;
+  let changed;
+  if (isConfig) {
+    const target = near ?? app ?? own;
     try {
-      t.configure(config);
+      target.t.configure(config);
     } catch (error) {
       console.warn = warn;
       fail(
         `configure() rejected the default export of ${spec}: ${error instanceof Error ? error.message : error}`,
       );
     }
-    loaded.push({ module: spec, configured: 'default export' });
+    changed = [target];
   } else {
-    loaded.push({ module: spec, configured: 'on import' });
+    changed = [...copies.values()].filter((c) =>
+      configChanged(before.get(c.root), configFingerprint(c.t)),
+    );
   }
+  loaded.push({
+    module: spec,
+    configured: isConfig
+      ? 'default export'
+      : changed.length > 0
+        ? 'on import'
+        : 'nothing',
+    tasty: changed.map((c) => ({ version: c.version, path: show(c.root) })),
+  });
+  for (const c of changed) c.setups.push(spec);
 }
+
+const configured = [...copies.values()].filter((c) => c.setups.length > 0);
+const chosen =
+  configured.length === 0
+    ? (app ?? own)
+    : configured.includes(app)
+      ? app
+      : configured.reduce((a, b) =>
+          b.setups.length > a.setups.length ? b : a,
+        );
+const t = chosen.t;
+const version = chosen.version;
 const config = configSummary(t);
 
 const warnings = [];
 if (loaded.length === 0) {
-  const candidates = findSetupCandidates(projectDir);
+  const candidates = findSetupCandidates(
+    cwd.startsWith(projectDir) ? cwd : projectDir,
+  );
   warnings.push(
     candidates.length > 0
       ? `No --setup: this is the CSS for Tasty's defaults, not the app's config. These files configure Tasty: ${candidates.join(', ')}. Run again with --setup <file>.`
       : "No --setup: this is the CSS for Tasty's defaults. No file in this project calls configure() from @tenphi/tasty. If the app configures Tasty elsewhere, such as in a UI library, pass that module with --setup.",
   );
-} else if (!configChanged(before, config)) {
+}
+for (const entry of loaded.filter((l) => l.configured === 'nothing')) {
   warnings.push(
-    `The --setup modules did not change the configuration of the Tasty copy this tool uses (${relative(projectDir, PACKAGE_ROOT) || '.'}). They may configure another copy of @tenphi/tasty, or call configure() only inside a function.`,
+    `--setup ${entry.module} changed no Tasty config this tool can see. It may call configure() only inside a function, or configure a copy of @tenphi/tasty that neither this package nor the other setup modules use.`,
+  );
+}
+if (configured.length > 1) {
+  const parts = configured.map(
+    (c) => `${c.version} (${show(c.root)}) got ${c.setups.join(', ')}`,
+  );
+  warnings.push(
+    `The --setup modules configure ${configured.length} copies of @tenphi/tasty, so this CSS has only part of the config: ${parts.join('; ')}. This CSS comes from ${chosen.version} (${show(chosen.root)}). The app runs these copies too, each with part of the config: make every package use one version of @tenphi/tasty.`,
   );
 }
 
@@ -162,7 +224,7 @@ if (options.json) {
   console.log(
     JSON.stringify(
       {
-        tasty: { version, path: relative(projectDir, PACKAGE_ROOT) || '.' },
+        tasty: { version, path: show(chosen.root) },
         setup: loaded,
         config,
         classNames: result.classNames,
@@ -183,7 +245,8 @@ function render() {
     loaded.length > 0
       ? `setup ${loaded.map((l) => l.module).join(', ')}`
       : 'no setup, Tasty defaults';
-  out.push(`Tasty ${version}, ${setup}`);
+  const from = chosen === own ? '' : ` (${show(chosen.root)})`;
+  out.push(`Tasty ${version}${from}, ${setup}`);
   const parts = [`units ${describeUnits(config.units)}`];
   if (config.states.length > 0) parts.push(`states ${list(config.states)}`);
   if (config.recipes.length > 0) parts.push(`recipes ${list(config.recipes)}`);
@@ -220,17 +283,64 @@ function resolveSetup(spec) {
     if (!existsSync(asPath)) fail(`cannot find --setup ${spec}`);
     return asPath;
   }
+  // From the current package first: in a monorepo, each package can install
+  // its own version.
+  for (const base of new Set([cwd, projectDir])) {
+    try {
+      return createRequire(join(base, 'noop.js')).resolve(spec);
+    } catch {
+      // A path the package's exports do not list, such as a file in its dist/.
+    }
+    for (let dir = base; ; dir = dirname(dir)) {
+      const candidate = join(dir, 'node_modules', spec);
+      if (existsSync(candidate)) return candidate;
+      if (dirname(dir) === dir) break;
+    }
+  }
+  return fail(`cannot resolve --setup ${spec} from ${cwd}`);
+}
+
+/** The real folder of the @tenphi/tasty that code in `dir` imports. */
+function tastyRootFrom(dir) {
+  let entry;
   try {
-    return createRequire(join(projectDir, 'package.json')).resolve(spec);
+    entry = createRequire(join(dir, 'noop.js')).resolve('@tenphi/tasty');
   } catch {
-    // A path the package's exports do not list, such as a file in its dist/.
+    return undefined;
   }
-  for (let dir = projectDir; ; dir = dirname(dir)) {
-    const candidate = join(dir, 'node_modules', spec);
-    if (existsSync(candidate)) return candidate;
-    if (dirname(dir) === dir) break;
+  for (let d = dirname(entry); dirname(d) !== d; d = dirname(d)) {
+    const manifest = join(d, 'package.json');
+    if (
+      existsSync(manifest) &&
+      JSON.parse(readFileSync(manifest, 'utf8')).name === '@tenphi/tasty'
+    ) {
+      return realpathSync(d);
+    }
   }
-  return fail(`cannot resolve --setup ${spec} from ${projectDir}`);
+  return undefined;
+}
+
+/** Loads a copy of Tasty once; undefined when it has no usable build. */
+async function copyAt(root) {
+  if (copies.has(root)) return copies.get(root);
+  const build = join(root, 'dist/core/index.js');
+  if (!existsSync(build)) return undefined;
+  const core = await import(pathToFileURL(build).href);
+  if (typeof core.computeStyles !== 'function') return undefined;
+  const copy = {
+    root,
+    version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+      .version,
+    t: core,
+    setups: [],
+  };
+  copies.set(root, copy);
+  return copy;
+}
+
+/** A path as the person sees it: relative to the current folder. */
+function show(path) {
+  return relative(cwd, path) || '.';
 }
 
 function importHint(file, error) {

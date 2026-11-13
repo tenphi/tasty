@@ -43,8 +43,8 @@ importers:
         specifier: ^1.17.0
         version: 1.17.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
       '@tenphi/harnesspm':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.3.0
+        version: 0.3.0
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.3)
@@ -1341,8 +1341,8 @@ packages:
       typescript:
         optional: true
 
-  '@tenphi/harnesspm@0.1.0':
-    resolution: {integrity: sha512-AIhzEvOIyJcO4mscWGL5VhVTRUuNL3Kr+tHN3CHYKXRkP06A5gaDSzQHJbSbn0im53KgH2zc9dCM1qa8WnZSGg==}
+  '@tenphi/harnesspm@0.3.0':
+    resolution: {integrity: sha512-La+PN82DLZoaXLIqbAfDKfuJU5H1J8GaB+3wUYJM75lB3lytIA90eh1OaNA4l4AuO/OvIDMGX50mItj7MhPpEQ==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -4138,7 +4138,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tenphi/harnesspm@0.1.0':
+  '@tenphi/harnesspm@0.3.0':
     dependencies:
       yaml: 2.9.1
 

@@ -99,7 +99,16 @@ export function configSummary(t) {
   };
 }
 
-/** Whether two `configSummary()` results differ. */
+/**
+ * The parts of the configuration that belong to one copy of Tasty. Tokens are
+ * left out: Tasty shares them between copies through `globalThis`.
+ */
+export function configFingerprint(t) {
+  const { units, states, recipes } = configSummary(t);
+  return { units, states, recipes };
+}
+
+/** Whether two `configSummary()` or `configFingerprint()` results differ. */
 export function configChanged(before, after) {
   return JSON.stringify(before) !== JSON.stringify(after);
 }

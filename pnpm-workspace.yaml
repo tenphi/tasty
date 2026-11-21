@@ -4,6 +4,7 @@ minimumReleaseAgeIgnoreMissingTime: false
 # First-party packages, published by the same maintainer, install immediately.
 minimumReleaseAgeExclude:
   - '@tenphi/*'
+  - '@uniaria/*'
 
 allowBuilds:
   esbuild: false

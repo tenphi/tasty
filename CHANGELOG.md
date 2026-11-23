@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.19.2
+
+### Patch Changes
+
+- [#476](https://github.com/tenphi/tasty/pull/476) [`289507b`](https://github.com/tenphi/tasty/commit/289507ba8450099c52cb9a5cc06a5312fabfa867) Thanks [@tenphi](https://github.com/tenphi)! - Warn about undefined color and token references when `tasty:styles` loads a config with tokens.
+
 ## 3.19.1
 
 ### Patch Changes

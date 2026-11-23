@@ -30,6 +30,7 @@ import {
 } from '../harness/dev.harnesspm/scripts/render.mjs';
 
 import type * as Core from './core';
+import { DEFAULT_PROPERTIES } from './properties/defaults';
 
 const ROOT = join(__dirname, '..');
 const HARNESS = join(ROOT, 'harness');
@@ -155,6 +156,87 @@ describe('tasty:styles issues', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain('Preset "h9"');
+  });
+
+  it('flags missing colors and tokens once the config defines tokens', async () => {
+    const t = await freshTasty();
+    const styles = {
+      fill: { '': '#surfce.5', hovered: '#surface+#surfce.1' },
+      color: '#text',
+      Label: { margin: '$gapp', padding: '2x' },
+    };
+    expect(findIssues(t, styles, renderCss(t, styles).css)).toEqual([]);
+
+    const configured = await freshTasty();
+    configured.configure({
+      units: { x: 'var(--gap)' },
+      tokens: { '#surface': '#fff', '#text': '#000', $gap: '8px' },
+    });
+    const issues = findIssues(
+      configured,
+      styles,
+      renderCss(configured, styles).css,
+    );
+
+    expect(issues).toEqual([
+      expect.stringContaining('Color "#surfce"'),
+      expect.stringContaining('Token "$gapp"'),
+    ]);
+  });
+
+  it('accepts built-ins, declarations, replacements and fallbacks', async () => {
+    const t = await freshTasty();
+    t.configure({
+      tokens: { '#surface': '#fff', $LineHeight: '20px' },
+      replaceTokens: { $spacing: '2x' },
+      properties: {
+        '#registered': { inherits: true, initialValue: 'red' },
+        '--registered-size': {
+          syntax: '<length>',
+          inherits: true,
+          initialValue: '4px',
+        },
+      },
+      globalStyles: { ':root': { '$global-size': '4px' } },
+    });
+    const styles = {
+      ...Object.fromEntries(
+        Object.keys(DEFAULT_PROPERTIES).map((token, index) => [
+          `$builtin-${index}`,
+          token,
+        ]),
+      ),
+      '@property': {
+        '#local-type': { inherits: true, initialValue: 'blue' },
+      },
+      '#local': '#surface',
+      $localAlpha: 0.5,
+      fill: '#local.$localAlpha',
+      border: '1px solid #border',
+      Title: { color: '#current', margin: '$gap', lineHeight: '$lineHeight' },
+      Label: { color: '#clear', padding: '$spacing' },
+      Hint: { color: '#white' },
+      Icon: { color: '#registered', width: '$registered-size' },
+      Note: { color: '(#optional, #abc)', margin: '($optional, 0)' },
+      Body: { color: '#local-type', margin: '$global-size' },
+    };
+
+    expect(findIssues(t, styles, renderCss(t, styles).css)).toEqual([]);
+  });
+
+  it('ignores references inside strings and native CSS variable syntax', async () => {
+    const t = await freshTasty();
+    t.configure({ tokens: { $gap: '8px' } });
+    const styles = {
+      $label: '"escaped \\"quote $external"',
+      // eslint-disable-next-line tasty/prefer-custom-property-syntax -- This case exercises native CSS.
+      margin: 'var(--external)',
+      padding: '$typo',
+    };
+
+    expect(findIssues(t, styles, renderCss(t, styles).css)).toEqual([
+      expect.stringContaining('Token "$typo"'),
+    ]);
   });
 });
 
@@ -289,6 +371,23 @@ describe.runIf(existsSync(BUILD))('tasty:styles CLI (needs pnpm build)', () => {
     ]);
     expect(result.css).toContain('border-radius: 9999rem');
     expect(result.warnings).toEqual([]);
+  });
+
+  it('reports missing token references alongside the rendered CSS in JSON', () => {
+    const result = JSON.parse(
+      run(
+        '{"fill":"#surfce","color":"#surface","margin":"$gapp"}',
+        '--setup',
+        './tasty-zero.config.mjs',
+        '--json',
+      ),
+    );
+
+    expect(result.css).toContain('background-color: var(--surfce-color)');
+    expect(result.warnings).toEqual([
+      expect.stringContaining('Color "#surfce"'),
+      expect.stringContaining('Token "$gapp"'),
+    ]);
   });
 
   it('warns without a setup and names the files that configure Tasty', () => {

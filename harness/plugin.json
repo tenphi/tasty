@@ -11,7 +11,7 @@
       "scripts": {
         "styles": {
           "file": "./dev.harnesspm/scripts/styles.mjs",
-          "description": "Print the CSS a Tasty styles object produces, with the app's configure() loaded through --setup, and flag values that stayed unresolved",
+          "description": "Print the CSS a Tasty styles object produces and report rendering warnings, including unknown token references when the --setup config defines tokens",
           "allow": true
         }
       }

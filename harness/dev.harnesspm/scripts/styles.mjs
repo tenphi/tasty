@@ -1,6 +1,6 @@
 /**
  * tasty:styles — prints the CSS Tasty generates for a styles object, with the
- * app's configuration loaded first, and flags values that stayed unresolved.
+ * app's configuration loaded first, and reports problems found during rendering.
  */
 import {
   existsSync,
@@ -40,6 +40,9 @@ selector or an at-rule. To see what a state key becomes, put it in a state map.
 Run it from the package whose styles you check. Package paths in --setup resolve
 from there, and the CSS comes from the copy of @tenphi/tasty that the setup
 modules configure, which in a monorepo can differ from package to package.
+
+When the loaded config defines tokens, the tool warns about unknown #color
+and $token references that still need a value in the generated CSS.
 
 Without --setup, the CSS uses Tasty's defaults (x = 8px, r = 6px, ...) and none
 of the app's units, presets, recipes or state aliases.`;

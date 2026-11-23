@@ -81,13 +81,29 @@ const PRESET_MODIFIERS = new Set([
   'normal',
 ]);
 
-/**
- * Where `configure()` keeps its `tokens` (and the typography tokens that
- * `presets` generate). Tasty shares them through `globalThis` so that every
- * copy of the engine sees them; the tool reads them only to check preset
- * names. `src/harness.test.ts` fails if the key changes.
- */
+// Tasty shares these configured resources across copies through globalThis.
 const CONFIG_TOKENS_KEY = '__tasty_cfg_tokens__';
+const CONFIG_PROPERTIES_KEY = '__tasty_cfg_properties__';
+const CONFIG_GLOBAL_STYLES_KEY = '__tasty_cfg_global_styles__';
+
+// The core entry point does not expose its default @property definitions.
+const DEFAULT_PROPERTIES = [
+  '--tasty-second-fill-color',
+  '--current-color',
+  '--white-color',
+  '--black-color',
+  '--border-color',
+  '--outline-color',
+  '--gap',
+  '--radius',
+  '--border-width',
+  '--outline-width',
+  '--transition',
+  '--sharp-radius',
+  '--bold-font-weight',
+  '--font-sans-fallback',
+  '--font-mono-fallback',
+];
 
 /** The parts of the configuration that a setup module changes. */
 export function configSummary(t) {
@@ -136,6 +152,7 @@ export function parseCss(css) {
   const stack = [root];
   let buffer = '';
   let quote = '';
+  let escaped = false;
   let depth = 0;
 
   const flush = () => {
@@ -156,7 +173,9 @@ export function parseCss(css) {
   for (const char of css) {
     if (quote) {
       buffer += char;
-      if (char === quote) quote = '';
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = '';
       continue;
     }
     if (char === '"' || char === "'") {
@@ -209,17 +228,24 @@ export function formatCss(css) {
   return lines.join('\n');
 }
 
-/** Every declaration in CSS text, at any depth. */
-function declarationsOf(css) {
-  const found = [];
+/** Declarations and @property names at any depth. */
+function inspectCss(css) {
+  const declarations = [];
+  const properties = new Set();
   const walk = (nodes) => {
     for (const node of nodes) {
-      if ('prelude' in node) walk(node.children);
-      else if (node.property) found.push(node);
+      if ('prelude' in node) {
+        const registration = /^@property\s+(--[\w-]+)$/.exec(node.prelude);
+        if (registration) properties.add(registration[1]);
+        walk(node.children);
+      } else if (node.property) {
+        declarations.push(node);
+        if (node.property.startsWith('--')) properties.add(node.property);
+      }
     }
   };
   walk(parseCss(css));
-  return found;
+  return { declarations, properties };
 }
 
 /**
@@ -249,6 +275,87 @@ function valuesOf(styles, property) {
   };
   walk(styles);
   return found;
+}
+
+function cssNameOf(token, normalize = false) {
+  const sigil = token[0];
+  if (sigil !== '#' && sigil !== '$') {
+    return token.startsWith('--') ? token : `--${token}`;
+  }
+  const name = token.slice(1);
+  // The DSL folds the first letter. Registered CSS properties keep their name.
+  const cssName = normalize
+    ? name.charAt(0).toLowerCase() + name.slice(1)
+    : name;
+  return `--${cssName}${sigil === '#' ? '-color' : ''}`;
+}
+
+function withoutLiterals(value) {
+  return value
+    .replace(
+      /\/\*[\s\S]*?\*\/|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'/g,
+      ' ',
+    )
+    .replace(/\burl\((?:\\[\s\S]|[^)\\])*\)/gi, ' ');
+}
+
+/** Authored DSL references that survive rendering as a var() without a fallback. */
+function findTokenIssues(t, styles, tokens, { declarations, properties }) {
+  const references = new Set();
+  for (const { value } of declarations) {
+    for (const [, name] of withoutLiterals(value).matchAll(
+      /(?<![\w-])var\(\s*(--[\w-]+)\s*\)/gi,
+    )) {
+      references.add(name);
+    }
+  }
+  if (references.size === 0) return [];
+
+  const defined = new Set([
+    ...DEFAULT_PROPERTIES,
+    ...properties,
+    ...tokens.map((token) => cssNameOf(token, true)),
+    ...Object.keys(globalThis[CONFIG_PROPERTIES_KEY] ?? {}).map((name) =>
+      cssNameOf(name),
+    ),
+  ]);
+  const missing = new Map();
+  const walk = (value) => {
+    if (typeof value === 'string') {
+      for (const [token] of withoutLiterals(value).matchAll(
+        /(?<![#$\\])[#$][\w-]+/g,
+      )) {
+        const name = cssNameOf(token, true);
+        if (references.has(name) && !defined.has(name))
+          missing.set(token, name);
+      }
+    } else if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) walk(child);
+    }
+  };
+  walk(styles);
+  if (missing.size === 0) return [];
+
+  for (const [selector, globalStyles] of Object.entries(
+    globalThis[CONFIG_GLOBAL_STYLES_KEY] ?? {},
+  )) {
+    for (const rule of t.renderStyles(globalStyles, selector)) {
+      for (const property of inspectCss(rule.declarations).properties) {
+        defined.add(property);
+      }
+    }
+  }
+
+  return [...missing]
+    .filter(([, name]) => !defined.has(name))
+    .map(([token, name]) => {
+      const color = token.startsWith('#');
+      const known = tokens.filter((key) => key[0] === token[0]).slice(0, 8);
+      const example = known.length
+        ? ` Known ${color ? 'colors' : 'tokens'} include ${known.join(', ')}.`
+        : '';
+      return `${color ? 'Color' : 'Token'} "${token}" is not in the loaded config. Its CSS variable var(${name}) needs a value from other CSS.${example}`;
+    });
 }
 
 /**
@@ -299,8 +406,13 @@ export function findIssues(t, styles, css) {
     }
   }
 
+  const rendered = inspectCss(css);
+  if (tokens.length > 0) {
+    issues.push(...findTokenIssues(t, styles, tokens, rendered));
+  }
+
   const rawUnits = new Map();
-  for (const { property, value } of declarationsOf(css)) {
+  for (const { property, value } of rendered.declarations) {
     if (property.startsWith('--')) continue;
     for (const match of value.matchAll(
       /(?<![\w#.$-])(-?(?:\d+\.?\d*|\.\d+))([a-zA-Z]+)(?![\w(-])/g,

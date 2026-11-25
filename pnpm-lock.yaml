@@ -43,8 +43,8 @@ importers:
         specifier: ^1.21.1
         version: 1.21.1(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
       '@tenphi/harnesspm':
-        specifier: ^0.10.1
-        version: 0.10.1
+        specifier: ^0.13.2
+        version: 0.13.2
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.3)
@@ -1341,8 +1341,8 @@ packages:
       typescript:
         optional: true
 
-  '@tenphi/harnesspm@0.10.1':
-    resolution: {integrity: sha512-vYYFQqLPgWmyuwED2wb2GJCSvDVFJvr4h1/H/x+GbIclOyc9q6MxodS25srITLiSlqwSGOC9f5MkV/07yjBOcA==}
+  '@tenphi/harnesspm@0.13.2':
+    resolution: {integrity: sha512-fMkfurzPUBXR1gpWcXKf4esXL0JNNX6SQe0olJj7NBv629001zTktgYgnLGfJv8hhDLvzJzs9d8Nfk+ndPJ14Q==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -3128,12 +3128,15 @@ packages:
 
   yuku-ast@0.10.2:
     resolution: {integrity: sha512-UnG9mA6giglCvSErft2/40TVFX750Sj1xgwddPLpG7J7rlr/P1wPADg9G2RK+d/1tNLtRVoLdMMOMVBB9561TQ==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-codegen@0.10.2:
     resolution: {integrity: sha512-hentl2dtrF6cPjiAirtkfxfFZBA6Hdm61UqRJ7cA0qrlDNMk9PZGOjw5w1mx3E0hu/6pHcJF4dJW+D0SXHPZOA==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.10.2:
     resolution: {integrity: sha512-CgaU0/PPjCAIEZ3WQroosOxTY3eeKldAN3h+vk8pMNz4+jl1CZzBR4pW+K/rRPF112VooCL5FdjJoiMNjDrL2A==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
@@ -4138,7 +4141,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tenphi/harnesspm@0.10.1':
+  '@tenphi/harnesspm@0.13.2':
     dependencies:
       yaml: 2.9.1
 

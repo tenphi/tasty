@@ -319,7 +319,7 @@ const LoadingButton = tasty(Button, {
 
 ## Learn more
 
-- [README](../README.md) -- overview, quick start, and feature highlights
+- [README](https://github.com/tenphi/tasty#readme) -- overview, quick start, and feature highlights
 - [Getting Started](getting-started.md) -- installation, first component, tooling setup
 - [Methodology](methodology.md) -- the recommended patterns for structuring Tasty components
 - [Building a Design System](design-system.md) -- practical guide to building a DS layer with Tasty

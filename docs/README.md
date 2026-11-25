@@ -6,7 +6,7 @@ Use this hub to move from the core idea to a working component, then into design
 
 ## Start Here
 
-- **Understand why**: [Introduction](../README.md) for the problem, the state-map model, and the product overview.
+- **Understand why**: [Introduction](https://github.com/tenphi/tasty#readme) for the problem, the state-map model, and the product overview.
 - **Try it**: [Getting Started](getting-started.md) to build a stateful component, add shared configuration, and choose a rendering mode.
 - **Build a component system**: [Methodology](methodology.md) for root + sub-elements, typed public APIs, tokens, and extension patterns; then [Building a Design System](design-system.md).
 - **Evaluate or adopt it**: [Comparison](comparison.md) for tool-selection context and [Adoption Guide](adoption.md) for an incremental rollout.
@@ -31,7 +31,7 @@ Use this hub to move from the core idea to a working component, then into design
 - **Learn the style language**: [Style DSL](dsl.md)
 - **Set up linting and autocomplete**: [Getting Started — ESLint plugin](getting-started.md#eslint-plugin) and [TypeScript autocomplete](getting-started.md#typescript-autocomplete)
 - **Design a component's public API** (`styleProps`, `modProps`, `tokenProps`, variants, sub-elements): [React API](react-api.md), then [Methodology](methodology.md)
-- **Generate a color palette with contrast solving**: [Glaze](../README.md#glaze)
+- **Generate a color palette with contrast solving**: [Glaze](https://github.com/tenphi/tasty#glaze)
 - **Brief an AI agent (or yourself) on writing correct styles**: [Style Rules for AI Agents](ai-agents.md)
 - **Look up a property handler**: [Style Properties](styles.md)
 - **Define tokens, units, recipes, keyframes, properties, functions, or polyfills globally**: [Configuration](configuration.md)

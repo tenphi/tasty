@@ -2,7 +2,7 @@
 
 Build one stateful component first. You will see how Tasty expresses priority as a state map, why overlapping states do not compete, and where shared design-system configuration fits afterward.
 
-This is the right starting point when you are ready to try Tasty in code. If you are still evaluating it, read the [Introduction](../README.md), [Comparison](comparison.md), and [Adoption Guide](adoption.md).
+This is the right starting point when you are ready to try Tasty in code. If you are still evaluating it, read the [Introduction](https://github.com/tenphi/tasty#readme), [Comparison](comparison.md), and [Adoption Guide](adoption.md).
 
 ---
 
@@ -250,7 +250,7 @@ See [Configuration → TypeScript](configuration.md#typescript) for every augmen
 
 **[VS Code Extension](https://github.com/tenphi/tasty-vscode-extension)** — Syntax highlighting for Tasty styles in TypeScript/TSX/JavaScript/JSX: color tokens, custom units, state keys, presets, and style properties inside `tasty()`, `tastyStatic()`, `styles` objects, and style functions. It also adds snippets for components, state maps, and `configure()`. Install the `.vsix` from the [latest GitHub release](https://github.com/tenphi/tasty-vscode-extension/releases/latest); the extension is not published to the marketplace.
 
-**[Glaze](https://github.com/tenphi/glaze)** — Not an editor tool, but the fastest way to fill `configure({ tokens })`: it generates light, dark, and high-contrast palettes from one hue in the OKHST color space, solves WCAG and APCA contrast, and exports them as Tasty tokens with `configure({ tokens: theme.tasty() })`. See [Glaze in the README](../README.md#glaze).
+**[Glaze](https://github.com/tenphi/glaze)** — Not an editor tool, but the fastest way to fill `configure({ tokens })`: it generates light, dark, and high-contrast palettes from one hue in the OKHST color space, solves WCAG and APCA contrast, and exports them as Tasty tokens with `configure({ tokens: theme.tasty() })`. See [Glaze in the README](https://github.com/tenphi/tasty#glaze).
 
 ---
 

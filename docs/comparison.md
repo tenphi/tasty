@@ -329,7 +329,7 @@ That makes it narrower in audience, but deeper in architectural ambition.
 
 There is also a fundamental architectural difference: Emotion and styled-components rely on React context and hooks internally, which means they require `'use client'` in modern React and cannot run as React Server Components. Tasty's style functions and `tasty()` components are hook-free, so they work as server components by default and ship no Tasty styling runtime in server-only contexts. This is not a minor compatibility detail — it means Tasty-based components stay as server components until _your_ code needs interactivity, while Emotion and styled-components force the client boundary at the styling layer.
 
-For teams evaluating runtime styling at scale, Tasty publishes reproducible [Runtime Benchmarks](runtime-benchmarks.md) and summarizes its caching model in the [README](../README.md#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
+For teams evaluating runtime styling at scale, Tasty publishes reproducible [Runtime Benchmarks](runtime-benchmarks.md) and summarizes its caching model in the [README](https://github.com/tenphi/tasty#performance). That matters, but it is still secondary to the core question of whether you want Tasty's deterministic selector model.
 
 ---
 
@@ -439,7 +439,7 @@ Tasty is most compelling when the problem is not just "how do we write styles," 
 
 ## Learn more
 
-- [README](../README.md) — overview, quick start, and feature highlights
+- [README](https://github.com/tenphi/tasty#readme) — overview, quick start, and feature highlights
 - [Style DSL](dsl.md) — state maps, tokens, units, extending semantics, keyframes, @property
 - [React API](react-api.md) — `tasty()` factory, component props, variants, sub-elements, style functions
 - [Style Properties](styles.md) — complete reference for all enhanced style properties

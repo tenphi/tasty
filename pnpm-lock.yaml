@@ -33,6 +33,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.12.0(jiti@2.7.0))
+      '@harnesspm/cli':
+        specifier: ^0.18.2
+        version: 0.18.2
       '@size-limit/esbuild':
         specifier: ^14.1.0
         version: 14.1.0(size-limit@14.1.0)
@@ -42,9 +45,6 @@ importers:
       '@tenphi/eslint-plugin-tasty':
         specifier: ^1.21.1
         version: 1.21.1(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
-      '@tenphi/harnesspm':
-        specifier: ^0.13.2
-        version: 0.13.2
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.3)
@@ -660,6 +660,11 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@harnesspm/cli@0.18.2':
+    resolution: {integrity: sha512-w+7a5hPDvhSguVgfdUBjk/GO3m6yJg3Hn8QmfrleNMa6yWdAg3HAf9jZcIQL22QTUuviluYRdMIj8xQMs07I3w==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1340,11 +1345,6 @@ packages:
         optional: true
       typescript:
         optional: true
-
-  '@tenphi/harnesspm@0.13.2':
-    resolution: {integrity: sha512-fMkfurzPUBXR1gpWcXKf4esXL0JNNX6SQe0olJj7NBv629001zTktgYgnLGfJv8hhDLvzJzs9d8Nfk+ndPJ14Q==}
-    engines: {node: '>=20'}
-    hasBin: true
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -3690,6 +3690,10 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
+  '@harnesspm/cli@0.18.2':
+    dependencies:
+      yaml: 2.9.1
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -4140,10 +4144,6 @@ snapshots:
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
-
-  '@tenphi/harnesspm@0.13.2':
-    dependencies:
-      yaml: 2.9.1
 
   '@testing-library/dom@10.4.1':
     dependencies:

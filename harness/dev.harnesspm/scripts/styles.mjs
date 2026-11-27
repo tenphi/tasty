@@ -22,7 +22,7 @@ import {
   renderCss,
 } from './render.mjs';
 
-const USAGE = `Usage: npx harnesspm run tasty:styles '<styles JSON>' [--setup <module>]... [--json]
+const USAGE = `Usage: npx -y @harnesspm/cli run tasty:styles '<styles JSON>' [--setup <module>]... [--json]
 
 Prints the CSS Tasty generates for a styles object, as tasty() and useStyles()
 render it: recipes resolved, one class per style chunk, and every state as a

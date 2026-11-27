@@ -9,6 +9,7 @@ updates:
       # First-party packages skip the cooldown, matching pnpm-workspace.yaml.
       exclude:
         - '@tenphi/*'
+        - '@harnesspm/*'
     groups:
       babel:
         patterns: ['@babel/*']

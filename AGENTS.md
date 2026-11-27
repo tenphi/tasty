@@ -53,8 +53,8 @@ Select the newest compatible stable, non-deprecated release published at least
 dates; record the cutoff, selected versions, and compatibility holds in the PR.
 Keep coupled packages in sync and review migrations before major upgrades. Keep
 the pnpm release-age checks and Dependabot cooldown enabled. First-party
-`@tenphi/*` packages are the one standing exception: they are excluded from both,
-so their latest release can be adopted right away.
+`@tenphi/*` and `@harnesspm/*` packages are the one standing exception: they are
+excluded from both, so their latest release can be adopted right away.
 Preserve consumer support: a tooling upgrade does not justify raising public
 peer minima, narrowing peer ranges, or raising the published Node requirement.
 Any necessary consumer support change must be called out and reviewed explicitly.
@@ -179,7 +179,7 @@ src/
 
 ## Agent harness (`harness/`)
 
-The harness that apps get through [harnesspm](https://www.npmjs.com/package/@tenphi/harnesspm). It is for people who **use** Tasty; contributor instructions stay in this file. `pnpm check:harness` validates it, and CI runs it.
+The harness that apps get through [harnesspm](https://www.npmjs.com/package/@harnesspm/cli). It is for people who **use** Tasty; contributor instructions stay in this file. `pnpm check:harness` validates it, and CI runs it.
 
 | File | Description |
 |---|---|

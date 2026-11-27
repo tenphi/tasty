@@ -1,5 +1,11 @@
 # @tenphi/tasty
 
+## 3.19.3
+
+### Patch Changes
+
+- [#482](https://github.com/tenphi/tasty/pull/482) [`e1c53a8`](https://github.com/tenphi/tasty/commit/e1c53a891106a55d83c9c1f0cbbc6feb584f1a21) Thanks [@tenphi](https://github.com/tenphi)! - The agent harness now names harnesspm by its new package, `@harnesspm/cli`: the `tasty:styles` usage line types `npx -y @harnesspm/cli run tasty:styles`, which also works outside the project folder.
+
 ## 3.19.2
 
 ### Patch Changes
